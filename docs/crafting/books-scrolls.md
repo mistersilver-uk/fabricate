@@ -153,12 +153,9 @@ These chips only appear while the book's **Limited learning** is on; an unmet re
 A learn-only book never shows a use limit, and an item-only book never shows a learn limit.
 A book that both grants access by being held and can be learned from can show both.
 
-Below the limits, a single call-to-action button reveals the recipes.
-Its label depends on the book.
-A book you learn from reads **Read & learn** (for example "Read & learn up to 2 of 5" when a learn cap restricts you, or "Read & learn 5 recipes" when it does not).
-A book that grants crafting access by being held reads **Craft** (for example "Craft 3 recipes").
-A book that only lists its recipes reads **View recipes**.
-Selecting the button expands the recipe list, and selecting it again hides it.
+The book's recipes are listed below its limits.
+On a book you learn from, the header holds a **Read & learn** button (for example "Read & learn all 5 recipes") that learns every recipe you have not yet learned in one press.
+It appears only when you can learn the whole book: no learn cap stops you short, the cap's budget is not spent, and at least one recipe is still unlearned.
 
 A book with a single recipe shows that recipe's name, description, and its action button.
 A book with several recipes lists them in an accordion: each row has the recipe's icon, name, and its action button, and expands to reveal the description.

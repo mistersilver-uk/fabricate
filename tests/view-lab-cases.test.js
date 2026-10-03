@@ -668,10 +668,11 @@ function caseSelectors(viewCase) {
   return selectors;
 }
 
-// The five player cases whose layout expectation asserts "this STACKED at 1024px": one
+// The six player cases whose layout expectation asserts "this STACKED at 1024px": one
 // resolved track, inside a 960px content box.
 const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-inventory-bulk-mixed-narrow',
+  'player-inventory-book-read-learn-stacked',
   'player-gathering-stacked',
   'player-crafting-stacked',
   'player-alchemy-stacked',
@@ -998,7 +999,7 @@ test('all Journal lifecycle captures assert defining product state rather than a
     'essence-overshoot',
     'past-routed-stage',
     'future-routed-stage',
-    'kind-menu-open',
+    'kind-toggles',
     'history-settling',
   ]) {
     assert.ok(byState.has(state), `issue #1648 v4 explicitly requires ${state}`);
@@ -2317,8 +2318,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    123,
-    `expected the 123 crafting-path cases to be examined, saw ${examined.length}`
+    126,
+    `expected the 126 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>

@@ -20,7 +20,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/theme.js',
   ],
-  compiledModules: [CRAFT_BUTTON],
+  compiledModules: ['src/ui/svelte/components/Button.svelte', CRAFT_BUTTON],
   componentPath: CRAFT_BUTTON,
   rootClass: 'fabricate-app',
 });

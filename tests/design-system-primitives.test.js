@@ -84,12 +84,16 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/ActionMenu.svelte',
   // Issue 1506: an actor's portrait, and the FIRST key this list gains by a primitive ARRIVING.
   'src/ui/svelte/components/Avatar.svelte',
+  // Issue 1518: the button, on the two journal frames whose run action bar draws its roles.
+  'src/ui/svelte/components/Button.svelte',
   // Issue 1505: the widened standing statement, the FIRST entry whose primitive earned its frames by
   // re-authoring rather than by a new state, and — with `EmptyState` — moved here by issue 1710.
   'src/ui/svelte/components/Callout.svelte',
   // Issue 1508: the percentage slider, and the second key gained by a family being RE-ROOTED rather
   // than by a component arriving or acquiring a state.
   'src/ui/svelte/components/ChanceSlider.svelte',
+  // Issue 1518: the chip, on the player frame whose recipe header and rows draw it.
+  'src/ui/svelte/components/Chip.svelte',
   // Issue 1509: the editor tab strip, and the third key gained by neither of the two routes above —
   // the component did not acquire a state and it did not arrive.
   'src/ui/svelte/components/ChoiceOptionList.svelte',
@@ -122,7 +126,11 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1505: the surface that reports something that just happened.
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/OutcomeLadder.svelte',
+  // Issue 1518: the pager, on the player frames that draw its persistent and threshold forms.
+  'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  // Issue 1518: the requirement chooser, on the frame that opens it on a choice slot.
+  'src/ui/svelte/components/RequirementChooser.svelte',
   // Issue 1512: the product's ONE row disclosure, promoted on its second importer. Its frame is the
   // open step row, where `aria-expanded="true"` over a visible body is the only state in which the
   // control is more than a chevron. It sorts here rather than beside the entry it arrived with.
@@ -205,11 +213,8 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
-  'src/ui/svelte/components/Button.svelte',
-  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/FillBar.svelte',
-  'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/TintPicker.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',
 ];
@@ -230,9 +235,12 @@ test('the inputs every property below quantifies over are alive', () => {
   // had crossed the membership bar with nobody adjudicating it.
   // 68 as of issue 2005, which promoted the shared Preview-as picker, the Player sees block and the
   // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles;
-  // 73 as of issue 1516: `PickerRow` on its second importer, the result card.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 73, 'the shipped primitive set changed size');
-  // 16 as of issue 1516: `PickerRow` left for the member table.
+  // 72 as of issue 2008: the Formula card's option well, and the `<Well>` on its second caller.
+  // 73 as of issue 1518: the slot tile, on the requirement chooser as its second importer.
+  // 74 as of issue 1516: `PickerRow` on its second importer, the result card.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 74, 'the shipped primitive set changed size');
+  // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
+  // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer.
   assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
@@ -348,6 +356,42 @@ test('(a) the two older overrides still name the frame that renders their state'
     assert.ok(
       selected.includes(caseId),
       `a ${file} change selected ${JSON.stringify(selected)}, which does not include '${caseId}'`
+    );
+  }
+});
+
+test('(a) the three player-window overrides name a frame that draws the primitive', () => {
+  // Each expected id is a player frame outside the representative pair, so repointing an entry
+  // at the pair, or at a manager frame, reds here rather than passing as an unchanged selection.
+  const expectations = [
+    ['src/ui/svelte/components/Chip.svelte', ['player-crafting-simple']],
+    [
+      'src/ui/svelte/components/Button.svelte',
+      [
+        'fabricate-journal-lifecycle-ready-single',
+        'fabricate-journal-lifecycle-cancel-confirmation',
+      ],
+    ],
+    ['src/ui/svelte/components/Pagination.svelte', ['player-inventory', 'player-crafting-simple']],
+  ];
+  for (const [file, caseIds] of expectations) {
+    assert.deepEqual([...BROAD_SIGNAL_CASE_OVERRIDES[file]], caseIds, `${file} names its frames`);
+    const selected = mapChangedFilesToCases([file]);
+    for (const caseId of caseIds) {
+      const viewCase = selected.find((candidate) => candidate.id === caseId);
+      assert.ok(Boolean(viewCase), `a ${file} change does not select '${caseId}'`);
+      assert.ok(viewCase.kinds.includes('player'), `'${caseId}' is not a player-window frame`);
+    }
+  }
+
+  // The button's frames anchor on the controls the run action bar renders through it.
+  const anchors = BROAD_SIGNAL_CASE_OVERRIDES['src/ui/svelte/components/Button.svelte']
+    .map((id) => VIEW_LAB_CASES.find((viewCase) => viewCase.id === id)?.expectSelector ?? '')
+    .join(' ');
+  for (const action of ['primary', 'cancel-confirm', 'cancel-keep']) {
+    assert.ok(
+      anchors.includes(`[data-run-action="${action}"]`),
+      `no Button frame anchors on the run action bar's ${action} control`
     );
   }
 });

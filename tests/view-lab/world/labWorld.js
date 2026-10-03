@@ -4,7 +4,7 @@ import { createLocalizer, toI18nStub } from '../labI18n.js';
 import { JOURNAL_RUN_SOCKET_KIND } from '../../../src/systems/journalRunCommands.js';
 import { JOURNAL_RUN_CLAIM_PAGE_ID } from '../../../src/systems/journalRunAuthority.js';
 
-import { buildLabActors, buildDocumentIndex } from './labActors.js';
+import { buildLabActors, buildDocumentIndex, seedLearnableBook } from './labActors.js';
 import {
   buildLabContent,
   ICON_BASE,
@@ -471,6 +471,8 @@ function stripAuthoredWorldComponents(content) {
  *   Links no-regions empty state. It also skips the interactable seed, which needs a region.
  * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
  * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component.
+ * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
+ *   {@link seedLearnableBook}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
@@ -490,6 +492,7 @@ export async function buildLabWorld({
   journalCaseState = null,
   checkPreviewState = null,
   resultRowState = null,
+  learnableBook = false,
 } = {}) {
   const content = buildLabContent({ journalCaseState });
   if (
@@ -508,6 +511,7 @@ export async function buildLabWorld({
   if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
   seedCheckPreviewState(content, actors, checkPreviewState);
+  if (learnableBook) seedLearnableBook(content, actors);
   const documents = buildDocumentIndex(content, actors);
   registerLabMacros(documents);
   const shippedLocalize = await createLocalizer();

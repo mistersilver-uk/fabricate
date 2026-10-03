@@ -547,6 +547,7 @@ macro that was skipped or threw — none of which may ever reach a player surfac
 ### Top-Level Tabs
 
 The player app is a single shared window with a full-height left navigation rail.
+The rail's geometry — a 72px column of labelled 44px icon wells, with the Journal's active-run count as a pip on its well's outer corner — is `design-system/spec.md`'s, under _Naming, announcement and hit targets are component obligations_.
 
 - The player app carries five **Core** tabs, in this order: Crafting (always present), Alchemy (conditional — shown when at least one crafting system uses the alchemy resolution mode, `resolutionMode === "alchemy"`), Gathering, Journal, Inventory.
 - Alchemy is the only conditional Core entry.
@@ -920,6 +921,8 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 
 #### Recipe Detail
 
+- The detail leads with its identity header: the recipe's 38px tile, its name in the serif face, and Craft as the pane's one primary.
+  Craft is absent, not disabled, while the live craftability says the craft cannot run, and the header then states what is missing; a craft in flight keeps it, disabled.
 - The detail body is keyed on the recipe's `modeToken` (simple,
   routedByIngredients, routedByCheck, progressive), so each resolution mode renders
   its own body (ingredient sets, routed-by-check outcome-tier table, progressive
@@ -977,7 +980,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - "Pick for me" fills the set's unmade choices and suggests an essence allocation.
   It ranks a group's alternatives by whether they are satisfied, then by coverage (what is held over what is needed), then by authored order, so an essence amount is never compared against an item count.
   When it switches a group onto an essence alternative, it suggests the allocation for the new selection rather than keeping the previous one.
-  It lives in the rail header, scoped to the rail, rather than in the app footer: the rail renders inside step and routed bodies while Craft sits in a fixed footer outside the scrolling body.
+  It lives in the rail header, scoped to the rail: the rail renders inside step and routed bodies while Craft is the recipe's identity-header primary outside the scrolling body.
   On an infeasible inventory it returns the best partial suggestion and an honest shortfall rather than throwing or looping.
 - Every rail control is keyboard-operable and named for assistive technology, and bar transitions honour `prefers-reduced-motion`.
 
@@ -988,6 +991,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - A carrier's allocatable maximum is its `ownedUnits` — the units left AFTER the set's non-essence plan has claimed — never the raw stack quantity, so the stepper cannot allocate the player into an infeasible state.
 - A requirement's ratio reports `delivered / need` as essence amounts, so a satisfied requirement reads exactly `need / need` rather than the whole matching inventory.
   Unit-granular overshoot is visible in the per-carrier allocation, never in a requirement's ratio.
+  It is stated in words beneath the source list, one sentence per essence naming the surplus ("{essence}: {amount} more than required", the journal stage's own wording), and the consumption-plan panel states the same line; the sentence outlives the essence pool's replacement under issue 1644.
 - The **consumption-plan panel** states what the craft will spend before it is spent: one row per planned item with the quantity that item contributes, plus a pending line naming the requirements still to choose.
   That "still to choose" list is joined with the platform list formatter rather than an authored separator key, so the join is correct in every locale.
 - Legacy set-level essence requirements (`IngredientSet.essences`) are threshold-only and never consumed, so they cannot enter the pool.
@@ -1022,6 +1026,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   of a progressive run, time-gated), plus a keyboard- and pointer-accessible Back
   affordance that returns the rail to the Shopping List without losing the recorded
   outcome.
+- The Run Summary's craft action — "Craft another", or "Craft next step" on a progressive run — is a ghost button, so the recipe's identity header keeps the pane's one primary.
 - Advancing re-invokes the craft seam for the same recipe and ingredient set (it
   carries no separate run id; the engine advances the active step).
 - The Run Summary's result box keeps its `Craft complete` or failure head and rolled total, and states the executed check's evidence rows — the same `Needed`, `Target`, `Pre-rolled` and `Margin` rows the chat card states (§Result Chat Cards) — through `CheckEvidenceRows.svelte`, rendered as keyed fact rows.
@@ -1037,13 +1042,14 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 ### Alchemy Tab
 
 The player Alchemy tab is an IMPLEMENTED route (it replaced the earlier `{:else}` "Coming soon" placeholder in `FabricateAppRoot.svelte`).
-Its content mounts inside `.fabricate-app-content` — the shell's 84px nav rail is NOT part of this grid — so the content is a **three-column** layout `known . workbench . inventory` mirroring the Crafting/Gathering views.
+Its content mounts inside `.fabricate-app-content` — the shell's nav rail is NOT part of this grid — so the content is a **three-column** layout `known . workbench . inventory` mirroring the Crafting/Gathering views.
 The sides are compressible (`minmax(230px,280px)` each) with a floored, growable centre (`minmax(340px,1fr)`) so the 340px workbench floor coexists with the 1024px minimum window; its named container stacks at the shared `@container fabricate-alchemy (max-width: 960px)` breakpoint with the **workbench leading** the stacked order.
 It uses `--fab-*` design tokens only (no hex — see the theme-colour contract).
 
 The additional component-sources bar (`ComponentSourcesBar`) renders in the shared top bar on the alchemy tab (`ActorSelectTopBar` `showSourcesBar` includes `activeTab === "alchemy"`), so a player can pull components from other actors; the discipline block (system name + Switch) sits ABOVE the "Known recipes" heading, stacked (name on its own line, Switch below).
 
-The a11y contract: the status pill is `aria-live="polite"`; the bench chip body is a focusable `role="button"` (Enter/Space add one; Shift+Enter removes one), the chip `−` (remove-one) and `×` (remove-all) are real focusable `<button>`s that `stopPropagation` so they never also add, and the palette `+` add is a real focusable `<button>` (drag is mouse-only, so the keyboard add is the required parity affordance); unavailable inventory rows carry the `disabled` attribute; the drop zone has an accessible name/role plus a non-color dragover cue (a thicker dashed border); chooser cards and "Switch discipline" are real buttons; on Switch, focus moves to the chooser heading; the ready-state `brewpulse` animation honors `prefers-reduced-motion`.
+The a11y contract: the status pill is `aria-live="polite"`; the bench chip body is a focusable `role="button"` (Enter/Space add one; Shift+Enter removes one), the chip `−` (remove-one) and `×` (remove-all) are real focusable `<button>`s that `stopPropagation` so they never also add, and the palette `+` add is a real focusable `<button>` (drag is mouse-only, so the keyboard add is the required parity affordance); unavailable inventory rows carry the `disabled` attribute; the drop zone has an accessible name/role plus a non-color dragover cue (a thicker dashed border); chooser cards and "Switch discipline" are real buttons; on Switch, focus moves to the chooser heading.
+Brew is the Workbench's one primary, a full-width green button, and it carries no ready pulse: its enabled state is what says the bench is ready.
 
 #### Alchemy System Selector
 
@@ -1216,6 +1222,7 @@ The player's route to salvage.
   A relative outcome carries a DC **delta**, so its effective threshold is `baseDc + delta` and an override moves it.
   A **fixed** outcome carries an absolute, non-overlapping `[start, end]` segment of the roll range, matches on `start <= total <= end`, and never reads a DC at all — so a **routed + fixed** salvage renders its authored ranges **verbatim** and shows **no DC**.
   "Verbatim" names the numbers, not the glyphs: the panel renders the range through the same `netRange` formatter the Journal's counting band uses (issue 2152), so a fixed tier whose end is negative separates its bounds with a spaced en dash and the true minus sign (`−2 – −1`), never a raw template interpolation (`-2–-1`), and a single-value segment states its one number (`5`, never `5–5`).
+- The action is the item header's one primary while the Salvage tab is open and no result ribbon stands; a note at the foot of the tab states what pressing it costs.
 - The action is **one-shot for every mode**: it rolls AND commits in a single gesture.
   The roll prompt IS the roll step; there is no separate confirm, no reroll, and no pre-roll dice box.
   The label names the gesture — with no usable check it is a plain salvage, with one it is a roll.
@@ -1236,7 +1243,7 @@ The player's route to salvage.
   Disclosure is independent of resolution mode **and** of the misconfigured state: a prerequisite is worth disclosing in every state.
   A present-but-broken tool reads unavailable; the panel renders availability only, with no distinct repair cue.
 - **Tool-blocked action.** The pre-roll action is **disabled when any required tool is unavailable**, so the one-shot roll is never spent on an attempt the engine will reject for a missing tool.
-  In that state the footer note **supersedes** the one-shot cost note and instead explains why the button is off; the disabled action may reference the note via `aria-describedby`.
+  In that state the note explaining why the action is off sits directly beneath the tab strip, nearest the header action, which references it by `aria-describedby`, and it replaces the one-shot cost note the footer otherwise carries.
   The engine's `_validateTools` remains the server-side authority — this disable is a UX affordance mirroring crafting's `canCraft`.
 - **Depleted-stack honesty.** After the last copy is consumed the store reconciles the held row to `totalQuantity` 0, the header reads "None remaining", the ribbon's "Salvage again" is replaced by a nothing-left note, and the pre-roll action disables on depletion or an unavailable required tool (`disabled = busy || misconfigured || waiting || depleted || !toolsAvailable`).
   The "Salvage again" inline reset is the dismissal gesture the "until dismissed" rule alludes to.

@@ -266,6 +266,17 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Notice.svelte',
+  // The identity row every player detail pane leads with (issue 1518), and the primary it draws.
+  'src/ui/svelte/apps/PlayerDetailHeader.svelte',
+  'src/ui/svelte/components/Button.svelte',
+  // The search field, card box and switch the player controls converted onto (issue 1518).
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/InspectorCard.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte',
+  // The requirement chooser the crafting rail renders (issue 1518), the tile it draws and its well.
+  'src/ui/svelte/components/RequirementChooser.svelte',
+  'src/ui/svelte/components/SlotTile.svelte',
+  'src/ui/svelte/components/Well.svelte',
 ]);
 
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
@@ -330,6 +341,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/ingredientOptionStatus.js',
   // The requirement rail's pure slot/consumption-plan projection (issue 917).
   'src/ui/svelte/util/requirementSlots.js',
+  // The pool's surplus per essence, which the pool and the consumption plan both state.
+  'src/ui/svelte/apps/crafting/detail/essenceOvershoot.js',
   // RecipeDetailHeader surfaces the recipe's authored craft duration pre-craft (issue 846) via this
   // formatter.
   'src/ui/svelte/util/recipeDuration.js',
@@ -430,6 +443,9 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   ...SELECT_COMPILED_MODULES,
   // The manager's icon-only push-button (issue 1422).
   'src/ui/svelte/components/IconButton.svelte',
+  // The search field and the card box the crafting controls converted onto (issue 1518).
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/InspectorCard.svelte',
   // The shared numeric stepper the essence pool's per-carrier rows are built on (issue 917).
   'src/ui/svelte/components/Stepper.svelte',
   // The two marks this tree reaches (issue 1505): the eyebrow nine `detail/` components render, and
@@ -446,10 +462,12 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
   'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
   'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
-  // IoTable is the requirement surface's composition root (issue 917) and renders all four of
-  // these.
+  // IoTable is the requirement surface's composition root (issue 917) and renders these; the
+  // rail renders the shared chooser, which draws the shared slot tile.
   'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
-  'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
+  'src/ui/svelte/components/RequirementChooser.svelte',
+  'src/ui/svelte/components/SlotTile.svelte',
+  'src/ui/svelte/components/Well.svelte',
   'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
   'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
   // The one "N Radiant" contribution chip both of the two panels above render. They
@@ -488,6 +506,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/Notice.svelte',
+  // The identity row `RecipeDetailHeader` composes (issue 1518), flat for the same reason.
+  'src/ui/svelte/apps/PlayerDetailHeader.svelte',
   'src/ui/svelte/apps/crafting/CraftingView.svelte'
 ]);
 

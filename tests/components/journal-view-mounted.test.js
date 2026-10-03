@@ -12,6 +12,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -39,12 +40,26 @@ const harness = createMountedComponentHarness({
     'src/utils/scalars.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
+    // The real store the kind toggles drive (issue 1518), and its raw closure.
+    'src/ui/presenters/additionalDicePrompt.js',
+    'src/systems/additionalDiceReach.js',
+    'src/utils/fillPlaceholders.js',
+    'src/utils/localizeWithFallback.js',
+    'src/systems/countEvaluation.js',
+    'src/systems/countTriggerReach.js',
+    'src/systems/normalize/checkEvaluation.js',
+    'src/systems/checkEvaluation.js',
+    'src/systems/checkTarget.js',
+  ],
+  runeModules: [
+    'src/ui/svelte/stores/browseListing.svelte.js',
+    'src/ui/svelte/stores/journalStore.svelte.js',
   ],
   compiledModules: [
     ...SELECT_COMPILED_MODULES,
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/SearchField.svelte',
-    component('Pagination'),
+    'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     component('Button'),
     component('RunActionBar'),
@@ -107,7 +122,7 @@ function makeJournal(overrides = {}) {
     selectedRunId: '',
     viewedStageIndex: 0,
     search: '',
-    kindFilter: 'all',
+    kindFilter: ['crafting', 'gathering', 'salvage', 'alchemy'],
     activeStatusFilter: 'all',
     activeSort: 'soonestReady',
     historySort: 'newest',
@@ -117,7 +132,7 @@ function makeJournal(overrides = {}) {
     tickWorldTime() {},
     select: (value) => calls.select.push(value),
     setSearch: (value) => calls.search.push(value),
-    setKindFilter: (value) => calls.kind.push(value),
+    toggleKind: (value) => calls.kind.push(value),
     setActiveStatusFilter: (value) => calls.status.push(value),
     setActiveSort: (value) => calls.activeSort.push(value),
     setHistorySort: (value) => calls.historySort.push(value),
@@ -182,6 +197,46 @@ function oddsChipOf(row) {
   assert.equal(chips.length, 1, 'a yield row carries exactly one odds chip');
   return chips[0];
 }
+
+const RUN_KINDS = ['crafting', 'gathering', 'salvage', 'alchemy'];
+
+/** One run per kind on each list, two of them matching the search `silver`. */
+function kindListing() {
+  const active = (id, kind, title, derivedStatus) =>
+    makeCraftingRun({
+      id, key: `active-${id}`, runType: kind === 'alchemy' ? 'crafting' : kind, activityKind: kind,
+      derivedStatus, names: { title, subtitle: '' },
+    });
+  const finished = (id, kind, title, finishedAt) =>
+    makeSucceededRun({
+      id, key: `history-${id}`, runType: kind === 'alchemy' ? 'crafting' : kind, activityKind: kind,
+      finishedAt, names: { title, subtitle: '' },
+    });
+  const activeRuns = [
+    active('a-craft', 'crafting', 'Silver Sword', 'ready'),
+    active('a-gather', 'gathering', 'Silver Herbs', 'waiting'),
+    active('a-salvage', 'salvage', 'Copper Scrap', 'ready'),
+    active('a-brew', 'alchemy', 'Copper Draught', 'paused'),
+  ];
+  const history = [
+    finished('h-craft', 'crafting', 'Copper Nail', 40),
+    finished('h-gather', 'gathering', 'Copper Ore', 30),
+    finished('h-salvage', 'salvage', 'Silver Shard', 20),
+    finished('h-brew', 'alchemy', 'Silver Tonic', 10),
+  ];
+  return {
+    selectedActorId: 'Actor.actor-1',
+    selectedActorUuid: 'Actor.actor-1',
+    counts: { active: activeRuns.length, history: history.length },
+    activeRuns,
+    history,
+  };
+}
+
+/** Every subset of the four kinds, the empty one included. */
+const KIND_SUBSETS = Array.from({ length: 16 }, (_unused, mask) =>
+  RUN_KINDS.filter((_kind, index) => mask & (1 << index))
+);
 
 async function mountHistory(run) {
   const { store } = makeJournal({
@@ -318,7 +373,7 @@ describe('JournalView mounted behavior', () => {
     const search = target.querySelector('[data-journal-search] input');
     search.value = 'herb';
     search.dispatchEvent(new Event('input', { bubbles: true }));
-    chooseSelectOption(target, '[data-journal-kind-filter]', 'gathering');
+    target.querySelector('[data-journal-kind-toggle="gathering"]').click();
     target.querySelector('[data-journal-status-filter] input[value="ready"]').click();
     chooseSelectOption(target, '[data-journal-sort="active"]', 'newest');
     chooseSelectOption(target, '[data-journal-sort="history"]', 'oldest');
@@ -670,7 +725,7 @@ describe('JournalView mounted behavior', () => {
     const target = await harness.mount({ services: makeServices(store) });
     assert.equal(target.querySelectorAll('[data-yield-scale]').length, 1, 'active scale has no duplicate received aggregate');
     assert.ok(target.querySelector('[data-yield-cut]'));
-    assert.match(target.querySelector('.journal-detail-meta').textContent, /d100/u);
+    assert.match(target.querySelector('.player-detail-header-meta').textContent, /d100/u);
 
     harness.remount();
     const routed = makeGatheringRun({
@@ -688,8 +743,8 @@ describe('JournalView mounted behavior', () => {
     });
     const routedTarget = await harness.mount({ services: makeServices(routedStore) });
     assert.equal(routedTarget.querySelectorAll('[data-outcome-tier]').length, 2);
-    assert.match(routedTarget.querySelector('.journal-detail-meta').textContent, /Mode\.routed/u);
-    assert.doesNotMatch(routedTarget.querySelector('.journal-detail-meta').textContent, /null/u);
+    assert.match(routedTarget.querySelector('.player-detail-header-meta').textContent, /Mode\.routed/u);
+    assert.doesNotMatch(routedTarget.querySelector('.player-detail-header-meta').textContent, /null/u);
     const ruleHint = (root) => root.querySelector('[data-outcome-ladder] .fab-outcome-hint').textContent;
     assert.match(ruleHint(routedTarget), /Yields\.RoutedRule$/u);
 
@@ -720,7 +775,7 @@ describe('JournalView mounted behavior', () => {
     const straightTarget = await harness.mount({ services: makeServices(straightStore) });
     assert.ok(straightTarget.querySelector('[data-yield-entry="ore"]'));
     assert.equal(straightTarget.querySelector('[data-yield-cut]'), null);
-    assert.match(straightTarget.querySelector('.journal-detail-meta').textContent, /Mode\.straight/u);
+    assert.match(straightTarget.querySelector('.player-detail-header-meta').textContent, /Mode\.straight/u);
   });
 
   it('personalizes active d100 chances without replacing terminal evidence', async () => {
@@ -974,5 +1029,140 @@ describe('JournalView mounted behavior', () => {
     assert.ok(target.querySelector('[data-journal-recovery]'));
     assert.match(target.textContent, /Hidden recipe/);
     assert.doesNotMatch(target.textContent, /selectedIngredientSetId/);
+  });
+
+  describe('kind toggles through the real store', () => {
+    let createJournalStore;
+    before(async () => {
+      ({ createJournalStore } = await harness.loadRuneModule(
+        'src/ui/svelte/stores/journalStore.svelte.js'
+      ));
+    });
+
+    async function mountStore(listing = kindListing()) {
+      const store = createJournalStore({
+        services: {
+          listJournalForActor: async () => listing,
+          getSelectedActorId: () => 'Actor.actor-1',
+          getWorldTime: () => 0,
+        },
+      });
+      await store.load();
+      const target = await harness.mount({ services: makeServices(store) });
+      await settle();
+      return { store, target, listing };
+    }
+
+    const shown = (target, attribute) =>
+      [...target.querySelectorAll(`[${attribute}]`)].map((row) => row.getAttribute(attribute)).sort(byCodePoint);
+    const toggleOf = (target, kind) => target.querySelector(`[data-journal-kind-toggle="${kind}"]`);
+
+    /** Click the toggles whose state differs from `kinds`, then settle. */
+    async function showOnly(target, kinds) {
+      for (const kind of RUN_KINDS) {
+        const pressed = toggleOf(target, kind).getAttribute('aria-pressed') === 'true';
+        if (pressed !== kinds.includes(kind)) toggleOf(target, kind).click();
+      }
+      await settle();
+    }
+
+    it('shows the union of the pressed kinds, under every combination and with search', async () => {
+      const { store, target, listing } = await mountStore();
+      assert.deepEqual(
+        RUN_KINDS.map((kind) => toggleOf(target, kind).getAttribute('aria-pressed')),
+        ['true', 'true', 'true', 'true'],
+        'every kind starts shown'
+      );
+      for (const query of ['', 'silver']) {
+        const search = target.querySelector(':scope [data-journal-search] input');
+        search.value = query;
+        search.dispatchEvent(new Event('input', { bubbles: true }));
+        await settle();
+        for (const kinds of KIND_SUBSETS) {
+          await showOnly(target, kinds);
+          const expect = (runs) =>
+            runs
+              .filter((run) => kinds.includes(run.activityKind))
+              .filter((run) => run.names.title.toLowerCase().includes(query))
+              .map((run) => run.id)
+              .sort(byCodePoint);
+          const label = `kinds [${kinds}] with search "${query}"`;
+          assert.deepEqual([...store.kindFilter].sort(byCodePoint), [...kinds].sort(byCodePoint), `${label}: the store set`);
+          assert.deepEqual(shown(target, 'data-run-id'), expect(listing.activeRuns), `${label}: active`);
+          assert.deepEqual(
+            shown(target, 'data-history-run-id'),
+            expect(listing.history),
+            `${label}: finished`
+          );
+          for (const kind of RUN_KINDS) {
+            assert.equal(
+              toggleOf(target, kind).getAttribute('aria-pressed'),
+              String(kinds.includes(kind)),
+              `${label}: ${kind} reads its own state`
+            );
+          }
+        }
+      }
+    });
+
+    it('keeps the status control exclusive inside the shown kinds', async () => {
+      const { target } = await mountStore();
+      await showOnly(target, ['crafting', 'salvage', 'alchemy']);
+      const checked = () =>
+        [...target.querySelectorAll(':scope [data-journal-status-filter] input:checked')].map(
+          (input) => input.value
+        );
+      target.querySelector(':scope [data-journal-status-filter] input[value="ready"]').click();
+      await settle();
+      assert.deepEqual(checked(), ['ready']);
+      assert.deepEqual(shown(target, 'data-run-id'), ['a-craft', 'a-salvage']);
+      target.querySelector(':scope [data-journal-status-filter] input[value="paused"]').click();
+      await settle();
+      assert.deepEqual(checked(), ['paused'], 'choosing a second status releases the first');
+      assert.deepEqual(shown(target, 'data-run-id'), ['a-brew']);
+    });
+
+    it('words an empty list as filtered while any kind is hidden, and as plain when none is', async () => {
+      const partial = kindListing();
+      partial.history = partial.history.filter((entry) => entry.activityKind !== 'alchemy');
+      const { target } = await mountStore(partial);
+      await showOnly(target, ['alchemy']);
+      assert.match(
+        target.querySelector('[data-journal-empty="history"]').textContent,
+        /Empty\.MatchingHistory/u,
+        'one kind shown over no run of it is a filtered empty'
+      );
+      harness.remount();
+
+      const { target: allOn } = await mountStore({ ...kindListing(), activeRuns: [], history: [] });
+      const plain = allOn.querySelector('[data-journal-empty="history"]').textContent;
+      assert.match(plain, /Empty\.History/u, 'every kind shown over an empty journal is plain');
+      assert.doesNotMatch(plain, /Matching/u);
+    });
+
+    it('names each kind toggle by a visible label that presses it', async () => {
+      const { store, target } = await mountStore();
+      const toggle = toggleOf(target, 'gathering');
+      const label = target.querySelector(`label[for="${toggle.id}"]`);
+      assert.match(label.textContent, /Kind\.Gathering/u, 'the label is the kind name');
+      assert.ok(!toggle.hasAttribute('aria-labelledby'), 'named by the label, not by an id ref');
+      label.click();
+      await settle();
+      assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'clicking the label toggles it');
+      assert.ok(!store.kindFilter.includes('gathering'));
+    });
+
+    it('draws the empty state for both lists when no kind is shown', async () => {
+      const { target } = await mountStore();
+      await showOnly(target, []);
+      for (const list of ['active', 'history']) {
+        const empty = target.querySelector(`[data-journal-empty="${list}"]`);
+        assert.ok(Boolean(empty), `the ${list} list draws its empty state`);
+        assert.ok(empty.classList.contains('manager-empty'), 'through the shared EmptyState');
+        assert.match(empty.textContent, /Empty\.Matching/u, 'and words it as a filtered empty');
+      }
+      assert.equal(target.querySelectorAll('[data-run-id], [data-history-run-id]').length, 0);
+      assert.equal(target.querySelectorAll('.journal-run-list, .journal-history-list').length, 0);
+    });
   });
 });

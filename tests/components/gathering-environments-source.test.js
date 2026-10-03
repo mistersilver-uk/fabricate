@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { compile } from 'svelte/compiler';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function read(relPath) {
@@ -205,7 +207,6 @@ describe('GatheringEnvironmentList labeled region', () => {
 
   it('renders a base-token search box wired to the localized placeholder/label', () => {
     assert.ok(listSource.includes('gathering-env-search'), 'search box element present');
-    assert.ok(listSource.includes('type="search"'), 'search input uses type=search');
     assert.ok(listSource.includes('bind:value={searchTerm}'), 'search input binds to searchTerm');
     assert.ok(listSource.includes("let searchTerm = $state('')"), 'searchTerm is rune state');
     assert.ok(
@@ -242,13 +243,17 @@ describe('GatheringEnvironmentList labeled region', () => {
     );
   });
 
-  it('themes the unstyled manager-pagination markup with base tokens and renders a no-match message', () => {
-    assert.ok(
-      listSource.includes(':global(.manager-pagination)'),
-      'list themes the manager-pagination markup in the player scope'
-    );
-    assert.ok(listSource.includes(':global(.manager-icon-button)'), 'list themes the pagination nav buttons');
+  it('renders a no-match message', () => {
     assert.ok(listSource.includes('FABRICATE.App.Gathering.Environments.NoMatches'), 'no-match copy localized');
+  });
+
+  // Issue 1518: the shared pager paints itself, so no gathering column re-themes its markup.
+  it('declares nothing for the shared pager’s own markup in any gathering column', () => {
+    for (const file of ['GatheringEnvironmentList', 'GatheringTasksPanel', 'GatheringEventsPanel']) {
+      const path = `src/ui/svelte/apps/gathering/${file}.svelte`;
+      const { css } = compile(read(`../../${path}`), { filename: path, css: 'external' });
+      assert.doesNotMatch(css?.code ?? '', /manager-(?:pagination|icon-button)/u, file);
+    }
   });
 });
 

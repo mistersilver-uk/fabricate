@@ -142,8 +142,11 @@ Spec reference: openspec/specs/recipes-and-steps/spec.md
 A slot IS an `IngredientGroup` — the same record, named for how the player meets it — so "slot" and "ingredient group" are never two different things.
 A slot is **fixed** when its group authors exactly one option, a **choice** when it authors more than one, and an **essence** slot when the option resolved for it is an essence alternative.
 Slot state is `met` / `partial` / `short`, and the rail keeps at most one slot's chooser open at a time.
+An unchosen choice slot is `partial`, a to-do rather than an error, and its tile is drawn open; a chosen choice that falls short is `short`; a partly delivered essence is `partial` but paints as `short` until the slot tile gains a partial face (issue 1644), and the difference is stated in words.
+A short alternative is dimmed but still offered, and its shortfall is stated in words beside it.
+The shared requirement chooser draws every slot as a slot tile, and the crafting rail is its adopter.
 
-Canonical mapping: `IngredientGroup`, `requirementSlots.js`, `RequirementRail.svelte`
+Canonical mapping: `IngredientGroup`, `requirementSlots.js`, `RequirementChooser.svelte`, `SlotTile.svelte`, `RequirementRail.svelte`
 
 Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
 

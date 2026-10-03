@@ -104,6 +104,12 @@ const EXCEPTIONS = Object.freeze([
     reason: 'a requirement chooser, the one family the convention gives `onChoose`',
   },
   {
+    component: 'RequirementChooser',
+    name: 'onChoose',
+    fault: REGISTER_ONLY,
+    reason: 'a requirement chooser, the one family the convention gives `onChoose`',
+  },
+  {
     component: 'EmptyState',
     name: 'compact',
     fault: REGISTER_ONLY,

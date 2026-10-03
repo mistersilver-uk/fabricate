@@ -195,7 +195,10 @@ describe('a caption click cannot close a list it is wrapped in a <label> with (i
   });
 });
 
-/** The three floored sites, and what each one is floored against. */
+/**
+ * The two floored sites, and what each one is floored against. The book's page size left this
+ * list when it became `Pagination`'s own control, floored by that primitive's hook rule.
+ */
 const FLOORED_SITES = Object.freeze([
   {
     subject: 'filters',
@@ -210,13 +213,6 @@ const FLOORED_SITES = Object.freeze([
     floor: 113,
     shortest: { value: 'oldest' },
     longest: { value: 'soonestReady' },
-  },
-  {
-    subject: 'book',
-    name: 'the book page size',
-    floor: 47,
-    shortest: {},
-    longest: { choose: '12' },
   },
 ]);
 

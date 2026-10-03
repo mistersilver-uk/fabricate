@@ -8,6 +8,7 @@
   when there is no recorded result.
 -->
 <script>
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import { statesEvidence } from '../../../../presenters/checkEvidenceRows.js';
   import { countBotched, statesCountEvidence } from '../../../../presenters/countEvidenceRows.js';
@@ -45,10 +46,8 @@
 </script>
 
 {#if result}
-  <section
-    class="crafting-roll-box"
-    class:is-success={success}
-    class:is-failure={!success}
+  <InspectorCard
+    class={`crafting-roll-box ${success ? 'is-success' : 'is-failure'}`}
     data-recipe-section="roll-result"
     data-roll-success={success ? 'true' : 'false'}
   >
@@ -84,26 +83,17 @@
         {/each}
       </ul>
     {/if}
-  </section>
+  </InspectorCard>
 {/if}
 
 <style>
-  .crafting-roll-box {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-  }
-
-  .crafting-roll-box.is-success {
+  /* The box is the shared card's; the outcome is its tone fill. */
+  :global(.crafting-roll-box.is-success) {
     border-color: var(--fab-success-border);
     background: var(--fab-success-soft);
   }
 
-  .crafting-roll-box.is-failure {
+  :global(.crafting-roll-box.is-failure) {
     border-color: var(--fab-danger-border);
     background: var(--fab-danger-soft);
   }
@@ -114,11 +104,11 @@
     gap: 8px;
   }
 
-  .crafting-roll-box.is-success .crafting-roll-head i {
+  :global(.crafting-roll-box.is-success) .crafting-roll-head i {
     color: var(--fab-success-text);
   }
 
-  .crafting-roll-box.is-failure .crafting-roll-head i {
+  :global(.crafting-roll-box.is-failure) .crafting-roll-head i {
     color: var(--fab-danger-text);
   }
 

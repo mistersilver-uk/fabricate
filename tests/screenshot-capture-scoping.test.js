@@ -1024,13 +1024,12 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-scoped-list-filter',
   'data-recipe-bulk-category',
   'data-recipe-bulk-check-tier',
-  // ISSUE 1511 — the player app's six.
+  // ISSUE 1511 — the player app's six, less the book page size `Pagination` now draws.
   'data-inventory-system-select',
   'data-journal-sort',
   'data-crafting-category-filter',
   'data-crafting-system-filter',
   'data-inventory-sort',
-  'data-inventory-page-size',
   // ISSUE 1510 PHASE 1 — the manager's settings and tabs.
   'data-world-currency-strategy-select',
   'data-world-currency-provider-select',

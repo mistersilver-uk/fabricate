@@ -138,6 +138,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     copyModule('src/ui/svelte/apps/gathering/selectionDefault.js');
     copyModule('src/ui/svelte/apps/gathering/scopedSelection.js');
     copyModule('src/ui/svelte/util/sceneImages.js');
+    copyModule('src/ui/svelte/apps/gathering/linkedSceneImage.js');
     // GatheringTaskDetail imports the calendar-aware respawn-ETA duration
     // formatter, which imports the foundryCalendar helpers.
     copyModule('src/ui/svelte/util/formatDuration.js');
@@ -181,7 +182,13 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
+    // The tab strip and the shared EditorTabs it renders (issue 1518).
+    for (const tabStrip of [
+      'src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte',
+      'src/ui/svelte/components/EditorTabs.svelte',
+    ]) {
+      writeCompiledSvelte(tabStrip);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');

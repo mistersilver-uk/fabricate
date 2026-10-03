@@ -309,18 +309,13 @@ test('both documented exemptions are live, and nothing else is exempt', () => {
 });
 
 /**
- * WHAT THIS RATCHET DOES NOT SEE, stated rather than inferred from the name.
- * The live shape of that gap has TWO forms, and the worked example is re-pointed at a surviving
- * one: `apps/inventory/detail/InventoryDetailHeader.svelte` sets `--inventory-detail-thumb-size`
- * in markup from a JS prop and reads it back in a scanned declaration, and `components/Medallion`
- * writes `width`/`height` straight into a `style` attribute from its own `size` prop. Both are
- * SIZES rather than spacing, so neither is this ratchet's debt; they are named because the shape
- * is what this note is about, and the file it used to name — a crafting thumbnail doing the same
- * thing — was deleted at issue 1506 when both crafting tiles retired into that one tile. The
- * control-height ladder records the same blind spot for the same reason. Closing it would mean
- * resolving a token through Svelte markup and a JS prop default, which is a different scanner
- * from this one. So "no new raw spacing literal has been introduced" is a claim about what the
- * two stylesheet corpora DECLARE, not about what the product renders.
+ * What this ratchet does not see: a value a component computes in script and writes into a `style`
+ * attribute, as `components/Medallion` writes `width`/`height` from its own `size` prop. That is a
+ * size rather than spacing, so it is not this ratchet's debt; it is named because closing the gap
+ * would mean resolving a token through Svelte markup and a JS prop default, a different scanner
+ * from this one, and the control-height ladder records the same blind spot. So "no new raw spacing
+ * literal has been introduced" is a claim about what the two stylesheet corpora declare, not about
+ * what the product renders.
  */
 test('no new raw spacing literal has been introduced', (t) => {
   checkGate(

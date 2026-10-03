@@ -121,7 +121,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
       'essence-overshoot',
       'past-routed-stage',
       'future-routed-stage',
-      'kind-menu-open',
+      'kind-toggles',
       'history-settling',
       'history-compact-grid',
       'history-compact-tools',

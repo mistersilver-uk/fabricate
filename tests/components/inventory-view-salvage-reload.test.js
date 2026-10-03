@@ -23,6 +23,8 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-inventory-salvage-reload-',
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
+    // The salvage action's state the inspector header and panel share (issue 1518).
+    'src/ui/svelte/apps/inventory/detail/salvage/salvageAction.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
@@ -91,6 +93,8 @@ const harness = createMountedComponentHarness({
     // The multi-system participation selector InventoryComponentDetail now imports (issue
     // 766) — a `.svelte` leaf; an omission HANGS this suite (# cancelled), never fails.
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
+    // The Info | Salvage strip (issue 1518).
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     // The bulk tree (issue 859). `InventoryView` renders the panel as a SIBLING of

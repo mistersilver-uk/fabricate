@@ -589,7 +589,7 @@ export const CASES = Object.freeze([
     ],
     expectCenterHit: PLAYER_EXTENSION_RAIL_BUTTON,
     expectClick: PLAYER_EXTENSION_RAIL_BUTTON,
-    // `.fabricate-app-nav` computes `overflow-x: auto`, so an untruncated label scrollbars the 84px column.
+    // `.fabricate-app-nav` computes `overflow-x: auto`, so an untruncated label scrollbars the 72px column.
     expectNoHorizontalOverflow: [
       '.fabricate-app-content',
       '.fabricate-app-nav',

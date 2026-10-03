@@ -3,10 +3,11 @@
   RecipeBrowser is the left column: a search box and a paginated,
   status-badged list of recipes. It is prop-driven (the store state is
   threaded in by CraftingView) so it stays presentational and independently
-  testable. Pagination reuses the shared Pagination component.
+  testable. The search and the pager are the shared primitives, each painting itself.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import SearchField from '../../components/SearchField.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import Select from '../../components/Select.svelte';
   import RecipeListRow from './RecipeListRow.svelte';
@@ -92,9 +93,6 @@
     ...systems.map((system) => ({ value: system.id, label: system.name })),
   ]);
 
-  function onInput(event) {
-    onSearch?.(event.currentTarget.value);
-  }
   // The sentinel row hands back `''` exactly as the `<option value="">` it replaces did, so the
   // null-for-unfiltered contract the store reads is unchanged by the conversion.
   function chooseSystem(next) {
@@ -108,16 +106,13 @@
 <section class="crafting-browser" data-crafting-browser>
   <header class="crafting-browser-header">
     <p class="crafting-browser-title">{localize('FABRICATE.App.Crafting.Browser.Title')}</p>
-    <div class="crafting-browser-search">
-      <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-      <input
-        type="text"
-        value={search}
-        placeholder={localize('FABRICATE.App.Crafting.Browser.SearchPlaceholder')}
-        aria-label={localize('FABRICATE.App.Crafting.Browser.SearchLabel')}
-        oninput={onInput}
-      />
-    </div>
+    <SearchField
+      class="crafting-browser-search"
+      value={search}
+      onChange={(value) => onSearch?.(value)}
+      placeholder={localize('FABRICATE.App.Crafting.Browser.SearchPlaceholder')}
+      ariaLabel={localize('FABRICATE.App.Crafting.Browser.SearchLabel')}
+    />
 
     <div class="crafting-browser-filters" data-crafting-filters>
       <div class="crafting-browser-filter-toggles">
@@ -253,29 +248,10 @@
     font-weight: 600;
   }
 
-  .crafting-browser-search {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-browser-search input {
-    flex: 1 1 auto;
+  /* The field's family basis is a toolbar width, which in this column would be its height. */
+  .crafting-browser-header > :global(.crafting-browser-search) {
+    flex: none;
     min-width: 0;
-    border: none;
-    outline: none;
-    background: transparent;
-    color: var(--fab-text);
-    font-size: 13px;
-  }
-
-  .crafting-browser-search:focus-within {
-    border-color: var(--fab-accent);
   }
 
   /* Filters: the two toggles share a row; the system dropdown sits on its own line. */
@@ -336,24 +312,9 @@
     color: var(--fab-text-muted);
   }
 
-  /* THE TRIGGER'S BOX, STATED HERE AND ONLY HERE (issue 1511). Height, corner, border, type and
-     the focus treatment now come from the sheet's `.fabricate-select*` family - the `inline`
-     rung's 30px and 7px against the 30px and 8px this block declared. Two properties are not the
-     family's and stay this file's, under the licence `Select.svelte`'s own note grants a call
-     site for its per-site skin:
-
-     WIDTH, because core stretched a `<select>` to the column with its own `width: 100%` while a
-     `<button>` hugs its current value - so without this the two filters would resize every time a
-     player chose a longer category, and the column would read as two ragged controls under a
-     full-width search field.
-
-     FILL, because `--fab-surface` is this column's control fill: the pager one row below restates
-     it for the same reason, and taking the rung's `--fab-bg-2` here would put three different
-     control fills - soft on the search field and the toggles, bg-2 here, surface on the pager -
-     into one 280px column.
-
-     ANCESTOR-QUALIFIED, not a leading bare `:global()`. A bare one is document-wide and would
-     reach the pager's own trigger one row below, which deliberately refuses a width floor. */
+  /* The filter triggers' width and fill are this column's (issue 1511): a `<button>` trigger hugs
+     its value, so it spans the column, and keeps `--fab-surface` rather than the rung's fill.
+     Ancestor-qualified, so the pager's own trigger is not reached. */
   .crafting-browser-filter-category :global(.fabricate-select-trigger),
   .crafting-browser-filter-system :global(.fabricate-select-trigger) {
     width: 100%;
@@ -380,123 +341,5 @@
 
   .crafting-browser-pagination {
     flex: 0 0 auto;
-  }
-
-  /*
-    Pagination.svelte renders .manager-pagination* + .manager-icon-button markup.
-    Theme it here with base --fab-* tokens as a single compact inline row (mirrors
-    the gathering environment list), rather than the block that stacks the summary,
-    nav, and per-page controls onto separate lines. (Written before issue 1502, when
-    that markup really was .fabricate-manager-scoped and so unstyled here; see the
-    note below.)
-
-    ISSUE 1502 — THE PAGER'S SHEET RULES NOW REACH THIS BLOCK, and the `1502 base` declarations
-    below are what stops that moving the frame. `Pagination` and `IconButton` are rooted at the
-    classes they emit, so `styles/fabricate.css` paints this player-app pager where it previously
-    only painted the manager's — the markup is no longer "unstyled" here, which is why that word
-    is gone from the sentence above. Every property this block already declares still WINS (a
-    Svelte `:global` block is injected unlayered; the sheet is imported at `layer(modules)`), so
-    only the remainder is newly painted — and each `1502 base` declaration restates what the
-    remainder rendered BEFORE the widening, which for this control is Foundry core's own `button`
-    / `select` chrome. The per-property audit for all six player callers is in
-    `components/Pagination.svelte`'s docblock.
-  */
-  .crafting-browser-pagination :global(.manager-pagination) {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2) 0 0;
-    border-top: 1px solid var(--fab-border);
-    font-size: 12px;
-    color: var(--fab-text-muted);
-    /* 1502 base: the sheet's `background: var(--fab-overlay-light-03)` is newly painted here
-       and this bar has always been transparent. */
-    background: transparent;
-  }
-
-  .crafting-browser-pagination :global(.manager-pagination-summary) {
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .crafting-browser-pagination :global(.manager-pagination-nav) {
-    flex: 0 0 auto;
-    display: inline-flex;
-    gap: 4px;
-    align-items: center;
-  }
-
-  .crafting-browser-pagination :global(.manager-pagination-page) {
-    color: var(--fab-text);
-    white-space: nowrap;
-    /* 1502 base: the sheet newly paints `min-width: 96px` and `font-weight: 700` on this
-       label. It has always been a content-width flex item at the inherited weight; the
-       sheet's `text-align: center` is adopted and is inert on a content-width box. */
-    min-width: auto;
-    font-weight: 400;
-  }
-
-  .crafting-browser-pagination :global(.manager-pagination-size) {
-    flex: 0 0 auto;
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-    margin-left: auto;
-    white-space: nowrap;
-  }
-
-  /* 1504: the per-page control is a `<Select size="inline">`, so its height, corner, border
-     and colour come from the sheet's `.fabricate-select*` family rather than from this block.
-     Its height (30) and corner (7) are the `inline` rung's, where this block declared 26 and 6;
-     only the border and the ink are unchanged. Only the FILL is this pager's own, and the
-     sheet's family note records how this block still beats the family for it. */
-  .crafting-browser-pagination :global(.manager-pagination-size .fabricate-select-trigger) {
-    background: var(--fab-surface);
-    /* And this row REFUSES the pager's 64px width floor, as it refused the same floor on the
-       native select it replaces: the footer is one nowrap line in a narrow column, and a floor
-       is the thing that would wrap it. */
-    min-width: 0;
-    /* AND IT NARROWS THE TRIGGER'S OWN INLINE PADDING, at this site only. The family's
-       `padding: 0 var(--fab-space-3)` plus its gap and chevron measure 12px wider than the
-       native control they replace (49 -> 61px), and the summary beside them is the row's only
-       shrinkable item — so the whole 12px came out of it and `Showing 1-12 o…` truncated to
-       `Showing 1-1…`, inside the range number, which reads as a different and wrong fact. The
-       narrowest player column is the reason this site alone takes it: the inventory pager's
-       summary survives the same growth intact. `--fab-space-2` is a published step, so the
-       spacing ladder does not move. */
-    padding-inline: var(--fab-space-2);
-  }
-
-  .crafting-browser-pagination :global(.manager-icon-button) {
-    /* 1502 base: Foundry core's `button` rule gives every button `min-height: 2em` and
-       `font-size: var(--font-size-14)`, and the sheet newly overrides both with
-       `min-height: 0` and `font: inherit`. Restated, so the arrow keeps its 28px box (the
-       core minimum, not the 26px below) and the chevron keeps its 14px glyph. */
-    min-height: var(--button-size, 2em);
-    font-size: var(--font-size-14, 0.875rem);
-    flex: 0 0 auto;
-    width: 26px;
-    height: 26px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--fab-border);
-    border-radius: 7px; /* 1504: the specimen's icon rung, so the pager reads as one pair */
-    background: var(--fab-surface);
-    color: var(--fab-text);
-    cursor: pointer;
-  }
-
-  .crafting-browser-pagination :global(.manager-icon-button:disabled) {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .crafting-browser-pagination :global(.manager-icon-button:hover:not(:disabled)) {
-    background: var(--fab-surface-raised);
   }
 </style>

@@ -84,6 +84,9 @@ const INK_LADDER = [
   '--fab-text-disabled',
 ];
 
+/** The solid face of every tone family a caller draws over artwork (issue 1518). */
+const SOLID_TONES = ['', 'positive', 'danger', 'warning', 'info', 'accent', 'neutral', 'muted'];
+
 /** The two roots where `--fab-surface-raised` and `--fab-overlay-light-06` are byte-identical. */
 const EQUAL_GROUND_THEMES = new Set(['mythwright', 'foundry-native']);
 
@@ -107,6 +110,13 @@ function themeBlock(theme) {
       chip.hashClass
     )
   ).join('');
+  const solids = SOLID_TONES.map((tone) =>
+    withScopeHash(
+      `<span class="manager-chip is-solid${tone ? ` is-${tone}` : ''}" data-solid="${theme}-${tone}">x</span>`,
+      'manager-chip',
+      chip.hashClass
+    )
+  ).join('');
   // One probe per token the table names, painted with that token and nothing else.
   const tokens = TOKEN_PROBES.map(
     (token) =>
@@ -115,7 +125,7 @@ function themeBlock(theme) {
   ).join('');
   return (
     `<div class="fabricate fabricate-manager" data-fabricate-theme="${theme}" data-theme-root="${theme}">` +
-    `${chips}${tokens}</div>`
+    `${chips}${solids}${tokens}</div>`
   );
 }
 
@@ -248,6 +258,24 @@ describe('1506 Chip — the converted status faces, per theme', () => {
           retired[0],
           'the accent ink the chip uses must not be the one the retired pill used'
         );
+      });
+
+      it('stands every solid chip on an opaque ground, inked at 4.5:1 or better', async () => {
+        const failures = [];
+        for (const tone of SOLID_TONES) {
+          const [ink, ground, opacity] = await page.evaluate((key) => {
+            const styles = getComputedStyle(document.querySelector(`[data-solid="${key}"]`));
+            return [styles.color, styles.backgroundColor, styles.opacity];
+          }, `${theme}-${tone}`);
+          const alpha = Number(ground.match(/[\d.]+/g)[3] ?? 1);
+          const contrast = contrastOver(ink, ground);
+          if (alpha !== 1 || opacity !== '1' || contrast < 4.5) {
+            failures.push(
+              `"${tone}": ${ink} on ${ground} at opacity ${opacity}, ${contrast.toFixed(2)}:1`
+            );
+          }
+        }
+        assert.deepEqual(failures, [], 'every solid face is opaque and legible at the chip size');
       });
 
       it("pins `neutral`'s ground move as a five/two per-theme split", async () => {

@@ -227,7 +227,7 @@ Issue 2005 adds a second outside `components/`, under `apps/crafting/detail/`: `
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
-Issue 1518 and issue 1520 are the changes that turn all six from claims into facts, and issue 1520 has now turned five of them.
+Issue 1520 turned five of the six from claims into facts; the sixth, `ChanceSlider`, is recorded below.
 `src/ui/svelte/apps/InteractableConfigRoot.svelte` imports `Field` and `StatusToggle` from `src/ui/svelte/components/` and renders four fields and three switches, and that importer path lies outside both `apps/manager/` and `components/` — which is the whole of what the claim asked for.
 The same file discharges the CHAIN half as well, and the chain is what the two sentences above record as the reason the field family was unreachable rather than merely un-imported.
 It renders eight `<Select>`s that each pass a `label`, so `labelled` computes TRUE and `Select`'s own `<Field as="label">` renders — putting the `.fabricate-field` box, its element-typed chrome and its focus pair on a screen through a component that never writes `Field` at its call site.
@@ -239,11 +239,12 @@ The fifth phase discharged three more, and their importer paths are recorded bec
 Both paths lie outside `apps/manager/` and `components/`, which is the whole of what the claim asked for.
 `InspectorCard` moved to the second file rather than to the browser because the browser has no card-shaped surface: its rows are horizontal `<li>` children of a `<ul>`, and the primitive renders a `<section>` with no host prop, so converting them would have produced invalid list markup and lost the list semantics a screen reader announces.
 One remains a claim.
-`ChanceSlider` has no site in any of the three interactables windows, so it is not this change's to discharge and stays issue 1518's.
+`ChanceSlider` has no site in any of the three interactables windows, so it is not this change's to discharge and remains a capability that no player or interactables window renders.
 Five more satisfy it as of issue 1509: `EditorTabs` emits `fabricate-tabs`, `EditorValidationSurface` emits `fabricate-validation`, `RadioCardGroup` emits `fabricate-option-cards`, `ToggleCard` emits `fabricate-toggle-card` and `ItemDropZone` emits `fabricate-link-field`.
 None of the five portals anything either, so each needs exactly one root, and each declares one `mirrored` fixture pair.
-All five are pure CAPABILITIES today, and that is measured rather than assumed: every importer of every one of them lies under `src/ui/svelte/apps/manager/`, so no surface outside the manager renders one yet.
-Issue 1518 is the change that turns them into facts.
+Issue 1518 turned `EditorTabs` into a fact in the player application: `gathering/GatheringDetailTabs.svelte` and `inventory/InventoryComponentDetail.svelte` render it, and both lie outside `apps/manager/` and `components/`.
+`RadioCardGroup` was already a fact there through `journal/StepDetails.svelte`.
+`EditorValidationSurface`, `ToggleCard` and `ItemDropZone` remain capabilities, every importer of each still lying under `src/ui/svelte/apps/manager/`, and `ChanceSlider` remains a capability whose every importer lies there too; none has a player-application site to convert.
 `SortableList` satisfies it as of issue 1512, emitting `fabricate-sortable-list`; it portals nothing and needs one root, and it is the first entry here whose family was never application-rooted at all, so the gate is told by name that a class matching the family pattern is a namespace class.
 It declares NO `mirrored` fixture pair, and that is measured rather than omitted: the only class a hand-written fixture of a converted list carries is `manager-checks-tier-row`, which `checks/CraftingCheckEditor.svelte` writes too, so a mirror keyed on it would demand that row class on rows this list does not render.
 `tests/components/searchable-popover-area-scope.test.js` derives each class set from the components' own markup and fails when a rule a primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
@@ -619,11 +620,14 @@ And the radius rule puts 26 to 32px at radius 7 while the specimen's 32px square
 The shipped population is off the art size ladder at more distinct values than it is on — measured on the tree rather than asserted, and RE-MEASURED after any change that moves a tile — and `tests/components/design-system-debt-ratchets.test.js` measures every art-tile render site at the base commit and in the change, with a non-literal `size` counted as an explicit `dynamic` size, so a new off-ladder site fails and the geometry sweep's progress is reported rather than re-derived by hand.
 
 A CONVERSION PRESERVES THE RENDERED SIZE AND CARRIES ITS REASON AT THE SITE; THE SWEEP SNAPS IT.
-Moving a hand-rolled tile onto the art or portrait primitive MUST preserve the rendered pixel size even when that size is off the published ladder for its kind — the art ladder for a record's tile, the portrait ladder for an actor's — and each tile the art-size gate newly counts MUST carry a `ratchet-exempt` reason at the site, stating the rung it rejected and why, or recording that the tile already sits at its kind's published rung and is counted only because the census filters portraits against the art ladder.
+Moving a hand-rolled tile onto the art or portrait primitive MUST preserve the rendered pixel size even when that size is off the published ladder for its kind — the art ladder for a record's tile, the portrait ladder for an actor's — and each tile the art-size gate newly counts MUST carry a `ratchet-exempt` reason at the site, stating the rung it rejected and why.
 The site is pre-existing debt becoming VISIBLE: the tile was already that size and only the conversion puts it where the census can see it.
 Resizing to the nearest rung in the same change would smuggle a layout move into a conversion, and the two must be separable so that a reviewer can approve one without the other.
 The scenario below therefore binds a NEW or RESIZED geometry and not a conversion that preserves one.
-Discharging the accumulated sites is the geometry sweep's, which is issue 1519; that sweep also owns reconciling `design-system-debt-ratchets.test.js`'s single `ART_SIZE_LADDER` constant with the TWO ladders this requirement publishes, because filtering both primitives against the art ladder alone makes a portrait at the canon's own 32px rung count as an offender while a 38px portrait does not.
+Issue 1519's sweep discharged the six player identity tiles: `apps/PlayerDetailHeader.svelte` draws its record tile at the art ladder's 38.
+It also reconciled the census with the two ladders this requirement publishes: `design-system-debt-ratchets.test.js` holds each art-tile component to its own kind's ladder, `Medallion` to the art ladder and `Avatar` to the portrait ladder.
+The remaining population is 57 off-ladder art tiles across 39 files, at 14 distinct sizes and one non-literal size, and 4 off-ladder portraits at 34, 40 and 50; 36 of those 61 sites lie outside `apps/manager/`, and each keeps its shipped size until a change resizes it.
+A conversion onto a shared primitive takes that primitive's shipped geometry, and a conflict the library's planned-migrations table records as open stays open: the conversion never settles it by drawing the specimen's value.
 The icon chip's own flat 9px radius and flat 0.9rem glyph are off the radius and glyph ladders above, are not corrected here, and are not visible to a ratchet counting tile sizes.
 Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for a 44px control and for cards and panels, and 999 for pills and tracks.
 A fully rounded radius is for a shape whose contents are text alone.
@@ -655,7 +659,7 @@ It joins a rule to a same-selector twin elsewhere in the same file, because the 
 
 - **WHEN** an existing tile at an off-ladder size is converted to a shared art or portrait primitive
 - **THEN** the rendered size is preserved and the tile carries a `ratchet-exempt` reason at the site
-- **AND** that reason states the rung that was rejected and why, or records that the tile already sits at its kind's published rung
+- **AND** that reason states the rung that was rejected and why
 - **AND** the resize is left to the geometry sweep that owns the ladder
 
 ### Requirement: Field-sized empty states match their associated controls
@@ -767,8 +771,9 @@ The default is to wrap to a stated number of lines and then truncate with an ell
 Every pointer target MUST offer at least a 24 by 24 pixel hit area, per WCAG 2.2 section 2.5.8.
 The hit area MAY exceed the painted area, so a 2px divider still carries a 24px handle and a chromeless remove action is 24px around a 9px glyph.
 A control that cannot meet the minimum in a dense row MUST offer a comfortable density its caller can select.
-A primary navigation destination is not a dense row and MUST be sized generously: the player app rail gives each item a 44 by 44 pixel icon well.
-A count pip on such an item sits on the OUTER CORNER of that well with a ground-coloured ring, never over the glyph — a pip that overlaps the icon destroys the one thing the item is recognised by.
+A primary navigation destination is not a dense row and MUST be sized generously: the player app rail is a 72px column whose every item is a 44 by 44 pixel icon well with its label beneath it.
+A count pip on such an item is at least 16px and sits on the OUTER CORNER of that well with a 2px ground-coloured ring, never over the glyph — a pip that overlaps the icon destroys the one thing the item is recognised by.
+The player rail's pip is `.fabricate-app .fabricate-app-nav-count` in `styles/fabricate.css`.
 
 #### Scenario: A primitive renders an icon-only control
 
@@ -932,8 +937,10 @@ The two are separate entries rather than one tile taking a `kind` prop, because 
 A choice between two to four named things is a segmented control, or option cards when each choice needs a sentence.
 Independent criteria that narrow a list are filter toggles, because any combination is valid.
 A one-of-N SCOPE the list is always in — rather than a filter that can be cleared — is a segmented control in the same bar; a segmented whose value could be "none" is a toggle in disguise.
+The journal's kind filter is therefore four independent toggles, because any combination of kinds is a valid view, while its active-status filter stays a segmented control, because its four values are mutually exclusive.
 
 The Rail Marker Family in `DOMAIN.md` is four marks and MUST NOT be substituted for one another: a record COUNT is a bare mono numeral with no fill and no border; an ISSUE SUMMARY is a filled warning badge carrying its count; a DIRTY MARKER is a 6px dot; and the PREMIUM chip marks a tier gate, in the manager only.
+A count has two faces and neither licenses a third: at the end of a labelled row it is that bare mono numeral, and on an item whose only visible content is a glyph it is a filled pip on the icon well's outer corner with a 2px ground-coloured ring.
 The unsaved CHIP beside an editor title is a separate mark and is not a member of that family: it names the state of the record being edited rather than the state of something behind a navigation item.
 That mark, and that mark alone, is drawn by the shared chip primitive: measured, none of the family's four vehicles is one — the count, the issue summary, the dirty marker and the premium chip are all bare `span` elements painted from `styles/fabricate.css` by `.manager-nav-count`, `.manager-nav-issue-badge`, `.manager-nav-dirty-marker` and `.manager-nav-premium` respectively.
 The vehicles are cited by SELECTOR and never by line number, because a line into that sheet is not verifiable by a reader of this document and the four this sentence carried before had all gone stale.
@@ -959,6 +966,12 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **WHEN** the same record's enabled state appears in a browse list and in that record's own editor
 - **THEN** the list row renders a status button
 - **AND** the editor renders a toggle
+
+#### Scenario: A rail item is an icon well
+
+- **WHEN** a navigation item's only visible content is a glyph
+- **THEN** its count is the filled pip on the well's outer corner
+- **AND** a labelled row's count renders as a bare numeral
 
 ### Requirement: An ordered row opens in place to its editing body
 
@@ -1704,20 +1717,33 @@ The environment editor's validation tab was ADJUDICATED a different surface at i
 
 ### Requirement: A player chooses the item, not just the requirement
 
+A requirement renders as a slot, and a slot is `fixed`, a `choice` or an essence slot.
+Its state is `met`, `partial` or `short`.
+At most one slot's chooser is open at a time.
+
 Where a requirement names a CLASS rather than a record — a tag requirement — the player still chooses which held item satisfies it, so every held item carrying the tag renders as a candidate.
 A candidate whose count falls short renders dimmed rather than hidden, because knowing what almost works is what tells a player what to go and find.
+A short alternative is dimmed, still offered, and stated in words as well as in danger ink.
 
 An essence requirement has no single source: several components each contribute, so the surface states the TOTAL against the requirement and shows which items make it up and by how much.
 An overshoot is stated rather than hidden, because spending more of an essence than the requirement asks is a real cost the player is choosing.
+It is stated in words beneath the source list, never in a requirement's ratio and never clamped away.
+A bar's fill may clamp at full, because a fill has no state above full; the stated count may not.
 
 A held-versus-needed count renders on a SOLID ground rather than a soft wash: it is read at a glance against artwork of unknown colour, and a translucent fill cannot be relied on to stay legible over it.
-The chip that draws those counts states no such ground today, and the `solid` face this sentence implies is NOT shipped: the requirement stands unmet rather than being read as satisfied by the conversion that moved those readings onto the shared chip.
+The shared chip states that ground as its `solid` emphasis, which a held-versus-needed chip takes: an opaque theme token under every tone, with a coloured tone filled in its own colour and inked to read on that fill.
 
 #### Scenario: Several held items carry the required tag
 
 - **WHEN** a player resolves a tag requirement and holds four items carrying it
 - **THEN** all four render as candidates
 - **AND** the ones that cannot meet the count are dimmed rather than omitted
+
+#### Scenario: A threshold is exceeded
+
+- **WHEN** an essence's delivered total exceeds what its requirement asks
+- **THEN** a sentence beneath the source list names the essence and the surplus
+- **AND** the ratio beside the requirement states neither
 
 ### Requirement: A multi-step flow inside the manager uses the shared modal
 
@@ -1807,7 +1833,10 @@ The environments screen's inspector rail is a declared repurposing of that third
 The maintainer ruled on 2026-09-19 that this departure is a declared exception to the read-only convention rather than an open row in the library's planned-migrations table.
 The departure predates the extraction and is neither widened nor narrowed by it, and the read-only convention stands as the default for every other rail.
 
-A PLAYER screen orders the app rail, a browse column carrying search and filters, and a detail pane that leads with identity and a single primary action, then progress, then requirements.
+A PLAYER screen orders the app rail, a browse column carrying search and filters, and a detail pane that leads with its identity header, then progress, then requirements.
+The identity header carries at most one primary action: zero is correct, and two never is.
+Its shipped composition is `apps/PlayerDetailHeader.svelte`, which renders the primary itself so that a caller cannot pass a second.
+A pane with no identity row of its own — the alchemy Workbench, the inventory bulk panel — still carries at most one primary, beside the flow it commits.
 The player window carries NO premium signal in any state, and a player-side chooser is a read-only mirror of the GM's authored group.
 
 #### Scenario: A new GM browse surface is built
@@ -1815,6 +1844,18 @@ The player window carries NO premium signal in any state, and a player-side choo
 - **WHEN** a new surface lists records a GM can filter and open
 - **THEN** it follows the browse recipe's element order
 - **AND** its row state renders as a status button rather than a toggle
+
+#### Scenario: Two commit verbs
+
+- **WHEN** a player pane can both start and continue a run
+- **THEN** its identity header carries one primary
+- **AND** the other verb renders as a ghost
+
+#### Scenario: Primary unreachable
+
+- **WHEN** a player pane's commit verb is unavailable
+- **THEN** its identity header carries no primary, unless the screen's spec requires a disabled start action that names its blocker
+- **AND** no second-choice verb takes its place
 
 ### Requirement: A window is registered in the View Lab before a change re-skins it
 

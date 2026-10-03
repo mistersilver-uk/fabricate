@@ -453,8 +453,9 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     });
 
     await selectGatheringEnvironment('Moonlit Blind Grove');
+    // The blind gather is the centre header's one primary (issue 1518).
     await appShell
-      .locator('[data-gathering-blind-card]')
+      .locator('[data-gathering-blind-attempt]')
       .first()
       .waitFor({ state: 'visible', timeout: 10_000 });
     await captureCurrentPlayerGathering('player-gathering-blind');
@@ -633,7 +634,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           .first();
         await altRecipeRow.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
         await altRecipeRow.locator('.crafting-recipe-row-main').click({ timeout: 5000 });
-        // Issue 917 re-point: `[data-recipe-section="alternatives"]` is no longer always present.
+        // The open choice slot's panel holds its alternative tiles (issue 1518).
         await appShell
           .locator('[data-recipe-section="requirement-rail"]')
           .first()
@@ -642,7 +643,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           .locator('[data-requirement-slot][data-slot-kind="choice"]')
           .first();
         await ensureSlotOpen(altSlotTile).catch(() => {});
-        const altSection = appShell.locator('[data-recipe-section="alternatives"]').first();
+        const altSection = appShell.locator('[data-requirement-panel]').first();
         await altSection.waitFor({ state: 'visible', timeout: 10_000 });
         // Pointer hit-test (issue 917): the whole 80px slot-tile column is the control, under the
         // rail's wrapping flex row. happy-dom computes no cascade, so only a real frame can prove
@@ -661,18 +662,24 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         await screenshot(page, 'player-crafting-essence-alternative');
         await screenshot(page, 'player-crafting-alternatives');
 
-        // Nice-to-have "switched" variant: click the second alternative so the
-        // selection tick moves, evidencing the player choosing the other option.
-        const altOptions = appShell.locator('.crafting-alt-option');
-        if ((await altOptions.count()) > 1) {
-          await altOptions
-            .nth(1)
-            .click({ timeout: 5000 })
-            .catch(() => {});
-          await page.waitForTimeout(250);
-          await assertNoScreenshotOverlays(page);
-          await screenshot(page, 'player-crafting-alternatives-switched');
-        }
+        // The player presses the second alternative tile: a real hit-tested click, then its press.
+        const altTile = appShell
+          .locator('[data-requirement-panel] [data-requirement-alternative].crafting-alt-option')
+          .nth(1);
+        const altButton = altTile.locator('button');
+        await assertPointerTarget(
+          page,
+          altButton,
+          '[data-requirement-alternative] button',
+          'Requirement chooser alternative tile'
+        );
+        await altButton.click({ timeout: 5000 });
+        await altTile
+          .locator('[aria-pressed="true"]')
+          .first()
+          .waitFor({ state: 'visible', timeout: 5000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-crafting-alternatives-switched');
         // Restore the unfiltered recipe list for the subsequent stacked frame.
         await recipeSearch.fill('').catch(() => {});
         await page.waitForTimeout(200);
@@ -785,9 +792,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             `Requirement rail states were ${JSON.stringify(railStates)}, expected ${JSON.stringify(expectedRailStates)}`
           );
         }
-        const openChoosers = await appShell
-          .locator('[data-recipe-section="alternatives"], [data-recipe-section="essence-pool"]')
-          .count();
+        const openChoosers = await appShell.locator('[data-requirement-panel]').count();
         if (openChoosers !== 1) {
           throw new Error(
             `Requirement rail had ${openChoosers} choosers open, expected exactly one`
@@ -814,9 +819,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             ).length,
             // Issue 1506: the fallback glyph is the shared art tile's glyph face.
             glyphTiles: rail.querySelectorAll('[data-medallion="glyph"]').length,
-            openChoosers: document.querySelectorAll(
-              '#fabricate-app [data-recipe-section="alternatives"], #fabricate-app [data-recipe-section="essence-pool"]'
-            ).length,
+            openChoosers: document.querySelectorAll('#fabricate-app [data-requirement-panel]')
+              .length,
           };
         });
         if (!tagReport) throw new Error('Tag-requirement rail did not render');

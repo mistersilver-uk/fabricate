@@ -807,7 +807,6 @@
           "RequirementsLabel": "Learning requirements",
           "RecipeSearchPlaceholder": "Search recipes…",
           "RecipeSearchLabel": "Search recipes",
-          "RecipesPerPage": "Per page",
           "SourcesTitle": "Sources",
           "ContributingTitle": "Contributing components",
           "ContributingEmpty": "No owned components contribute this essence.",
@@ -818,8 +817,6 @@
           "RequiredForEmpty": "Not required as a tool by any known recipe.",
           "ProducedByTitle": "Produced by",
           "ProducedByEmpty": "Not produced by any known recipe, salvage, or gathering.",
-          "PagePrevious": "Previous page",
-          "PageNext": "Next page",
           "RoleIngredient": "Ingredient",
           "RoleTool": "Tool",
           "RoleEssence": "Essence",
@@ -974,9 +971,9 @@
           "Available": "Available",
           "Unavailable": "Unavailable",
           "AlternativesTitle": "Alternatives",
-          "AlternativesHint": "Choose which alternative this craft will use.",
           "ChooseStackTitle": "Which {name} to use",
           "ChooseOption": "Choose {name}",
+          "ChooseShortOption": "Choose {name}: you have {have}, and this needs {need}.",
           "OptionSelected": "Selected",
           "CurrencyCost": "{amount} {unit}",
           "CurrencyUnaffordable": "Not enough {unit}"
@@ -998,6 +995,7 @@
           "CurrencySetupDirective": "Ask your GM to finish the world's currency setup (Crafting Systems → World → Currency).",
           "OptionsOne": "{count} alternative",
           "OptionsMany": "{count} alternatives",
+          "ChooseOne": "Choose 1 of {count}",
           "Change": "Change",
           "EditPool": "Edit selection",
           "AddItems": "Add items"
@@ -1011,6 +1009,7 @@
           "Owned": "You own {count}.",
           "Contribution": "{amount} {name}",
           "Meter": "{name} has {delivered} of {need} delivered.",
+          "Overshoot": "{essence}: {amount} more than required",
           "Allocate": "Units of {name} to spend",
           "AllocateLess": "Spend one less {name}",
           "AllocateMore": "Spend one more {name}"
@@ -1020,6 +1019,7 @@
           "Empty": "This craft doesn't use any components.",
           "Owned": "You own {count}.",
           "StillToChoose": "Still to choose: {items}.",
+          "Overshoot": "{essence}: {amount} more than required",
           "EssenceRequirement": "{name} essence"
         },
         "Shopping": {
@@ -1271,7 +1271,6 @@
           "SearchLabel": "Search runs",
           "Kind": {
             "Label": "Kind",
-            "All": "All kinds",
             "Crafting": "Crafting",
             "Gathering": "Gathering",
             "Salvage": "Salvage",
@@ -1596,7 +1595,6 @@
           "TargetedHint": "Choose a task below to attempt.",
           "SceneGateHint": "You can't gather here until you visit the linked scene below.",
           "BlindAttempt": "Attempt gathering",
-          "BlindAttemptPrompt": "Wonder what you'll find?",
           "Attempt": "Attempt",
           "DiscoveredHeading": "Discovered Tasks ({x}/{y})",
           "NothingDiscovered": "Nothing discovered here yet.",

@@ -4,6 +4,8 @@ player-actor-picker
 player-inventory
 player-inventory-page-size
 player-inventory-sort-list
+player-inventory-book-read-learn
+player-inventory-book-read-learn-stacked
 player-salvage
 player-salvage-no-check
 player-salvage-tools

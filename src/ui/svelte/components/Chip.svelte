@@ -1,15 +1,13 @@
 <!--
-  THE app's one chip: a short, fully-rounded badge carrying a count, a state, a category or a tag.
-  `SearchablePopover` and `Select` render it too, which is why it ships under `components/`, and its
-  CSS lives in this scoped `<style>` so `VIEW_RECIPES` maps a change here to the views that render it.
+  The app's one chip: a short, fully-rounded badge carrying a count, a state, a category or a tag. `SearchablePopover` and `Select` render it too, so it ships under `components/`, and its CSS lives in this scoped `<style>` so `VIEW_RECIPES` maps a change here to the views that render it.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `tag` | `'span'` \| `'li'` \| `'button'` \| `'div'` | `'span'` | The rendered element. A chip inside a `role="list"` must be an `li`; a clickable chip must be a real `button`. |
   | `tone` | `active`, `positive`, `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `accent`, `muted`, `secondary`, `subtle`, `tag` | `''` | Colour ONLY, never size. A CLOSED set: an unrecognised value is DROPPED rather than emitted as an unstyled `is-*`, so a typo shows as the default chip. See the invariants for how a caller picks one. |
-  | `emphasis` | `'outlined'` \| `'lit'` \| `'bare'` | `''` | A SECOND AXIS: `tone` says which family the chip belongs to, `emphasis` how that family arrives. The three are ALTERNATIVES, not a composition, and the set is closed the same way. |
-  | `density` | `'default'` \| `'row'` \| `'list'` \| `'action'` \| `'tag-run'` \| `'inspector'` | `'default'` | The scale, closed. It is THE variant-on-the-primitive escape hatch and the only one: a layout context may size a chip's POSITION from outside, never its own geometry, and a value within a pixel of a shipped one is that same drift. `manager-layout.test.js`'s hand-rolled-chip ratchet catches the alternative. |
+  | `emphasis` | `'outlined'` \| `'lit'` \| `'bare'` \| `'solid'` | `''` | A second axis: `tone` says which family the chip belongs to, `emphasis` how that family arrives. The four are alternatives, not a composition, and the set is closed the same way. `solid` is the opaque ground for a chip read over artwork. |
+  | `density` | `'default'` \| `'row'` \| `'list'` \| `'action'` \| `'tag-run'` \| `'inspector'` | `'default'` | The scale, closed. It is THE variant-on-the-primitive escape hatch and the only one: a layout context may size a chip's POSITION from outside, never its own geometry, and a value within a pixel of a shipped one is that same drift. `manager-layout.test.js`'s hand-rolled-chip ratchet catches the alternative. `presentation="clock"` is `WorldClockChip`'s own opt-in geometry and no density. |
   | `mono` / `struck` / `icon` | booleans / Font Awesome classes | `false` / `false` / `''` | Numerals in the mono face with `tabular-nums`, so columns of counts, DCs and quantities line up; the MUTED VARIANT, a value switched off in the scope being read, composing with every tone, which owns the ink; and a leading glyph. |
   | `swatch` / `tint` | bare `--fab-tag-*` keys | `''` | A leading colour DOT (the chip is ABOUT a colour) and an ink for the WHOLE chip (the chip IS that colour). Both are validated to a bare key before interpolation into a `style` attribute, both ride `--fab-chip-color`, and the tint wins when both are set. |
   | `truncate` / `iconOnly` | booleans | `false` | `truncate` is single-line and clipped; wrapping is the DEFAULT because the label arrives as a snippet and no `title` can be derived from one, so a caller that truncates should pass one. `iconOnly` makes the chip its glyph — a square with equal insets and no label — and REQUIRES AN ACCESSIBLE NAME, which a source contract holds because a primitive cannot make a caller pass one. |
@@ -18,39 +16,15 @@
   | `element` | bindable | `null` | The rendered DOM node. `bind:this` on a component yields the INSTANCE, so a caller that must measure or focus the chip has no other way to reach it. |
 
   Rest spread:
-  - `{...rest}` lands on the rendered element, so `title`, `aria-label`, `data-*` hooks, `onclick`
-    and `type` all forward. `role` and `disabled` are written BEFORE it, so a caller's own value
-    still wins.
+  - `{...rest}` lands on the rendered element after `role` and `disabled`, so a caller's own value wins; `title`, `aria-label`, `data-*` hooks, `onclick` and `type` all forward.
 
   Invariants:
-  - THE ROOT KEEPS THE LITERAL `manager-chip` CLASS, which `manager-layout.test.js`, the mounted
-    suites and `scripts/foundry-test-run.mjs` all pin, so renaming it breaks them while changing
-    nothing a user sees.
-  - FOUR OF THE THIRTEEN TONES ARE ONE RECESSIVE LADDER a caller routes by MEANING, which
-    `openspec/specs/design-system/spec.md` states under "Every interactive primitive declares its
-    full state set". The names deliberately do not track the tokens — `muted` inks
-    `--fab-text-disabled` while `neutral` inks `--fab-text-muted`.
-  - `emphasis="bare"` IS THE ONE EMPHASIS THAT DOES NOT COMPOSE WITH `struck`, because its `border`
-    shorthand resets the dashed `border-style` that prop states. No caller pairs the two.
-  - `iconOnly` EMITS `role="img"` BESIDE THE LABEL, since `aria-label` on a bare `span` is dropped
-    under ARIA's prohibition on naming a generic role — but only on a NON-INTERACTIVE host, and
-    before the rest spread so a caller's own `role` wins. SIX SIDES ARE PUBLISHED, one per density,
-    because the prop must be total over the axis it reads; `is-list` states `min-height: 0` and has
-    none to read, leaving an icon-only list chip about two pixels taller than its neighbours.
-  - `removable` REFUSES THREE SHAPES WITH A THROW rather than a dropped prop: `tag="button"`/`"a"`
-    nests a control inside a control, a missing `removeLabel` leaves a control whose only content is
-    an `aria-hidden` glyph, and a missing `onRemove` is an affordance for an edit the screen cannot
-    make. An unrecognised `tone` is dropped instead, because a dropped `removable` would be a chip
-    that LOOKS removable and is not.
-  - `removeLabel` MUST NAME THE MEMBER IT TAKES OUT ("Remove Perception"), because the chip's own
-    label arrives as a snippet. It defaults to `undefined`, never `''` and never a word of its own,
-    for the three reasons `tests/design-system-required-names.test.js` ratchets.
-  - THE REMOVE CONTROL IS A BUTTON OUTSIDE A FORM, so it carries `data-keyboard-focus="true"`, per
-    `openspec/specs/design-system/spec.md` under "The Foundry contract binds every primitive".
-  - FOCUS DIES WITH THE REMOVED BUTTON and THE LIVE REGION IS THE CALLER'S — both rules, including
-    the two fallback hooks a caller owes, are `openspec/specs/design-system/spec.md`'s. The caller's
-    own hook here is `[data-chip-remove-fallback]`, searched outwards for the first match, and no
-    test asserts that a removable-chip caller has a summary region.
+  - The root keeps the literal `manager-chip` class — pinned by `manager-layout.test.js`, the mounted suites and `scripts/foundry-test-run.mjs`.
+  - Four of the thirteen tones are one recessive ladder a caller routes by meaning, per "Every interactive primitive declares its full state set" in `openspec/specs/design-system/spec.md`; the names do not track the tokens (`muted` inks `--fab-text-disabled`, `neutral` inks `--fab-text-muted`).
+  - `emphasis="bare"` is the one emphasis that does not compose with `struck`, because its `border` shorthand resets the dashed `border-style` that prop states.
+  - `iconOnly` emits `role="img"` on a non-interactive host only, before the rest spread so a caller's own `role` wins, because `aria-label` on a bare `span` is dropped; six square sides are published, one per density, and `is-list` has no `min-height` to read.
+  - `removable` throws rather than drops on `tag="button"`/`"a"`, a missing `removeLabel` and a missing `onRemove`; `removeLabel` names the member it takes out and defaults to `undefined`, never `''` — pinned by `tests/design-system-required-names.test.js`.
+  - The remove control is a button outside a form, so it carries `data-keyboard-focus="true"`; focus moves to a sibling's remove control or the nearest enclosing `[data-chip-remove-fallback]` before `onRemove` runs, and the live region is the caller's, per "The Foundry contract binds every primitive" in `openspec/specs/design-system/spec.md`.
 -->
 <script>
   let {
@@ -72,7 +46,6 @@
     disabled = false,
     element = $bindable(null),
     children,
-    // WorldClockChip opts into its owning geometry; ordinary density callers keep their face.
     presentation = '',
     ...rest
   } = $props();
@@ -105,7 +78,7 @@
     'subtle',
   ]);
 
-  const EMPHASES = new Set(['outlined', 'lit', 'bare']);
+  const EMPHASES = new Set(['outlined', 'lit', 'bare', 'solid']);
 
   const INTERACTIVE_TAGS = new Set(['button', 'a']);
 
@@ -354,12 +327,8 @@
     border-radius: 999px;
     font-size: 9px;
     font-weight: 600;
-    /* The canonical library states an explicit 1.6 line-height: 18.4px with the border,
-       16.4px bare. Issue 1648 repairs the inherited line-height of 1 to match that
-       specimen rather than the contradictory height prose it replaced. */
+    /* The library's explicit 1.6, on one line; how much room the row gives the chip is the caller's. */
     line-height: 1.6;
-    /* SINGLE-LINE, and the one density that had to say so. Shrink protection stays with the
-       caller: this states how the text lays out, never how much room the row gives the chip. */
     white-space: nowrap;
   }
 
@@ -516,5 +485,36 @@
 
   .manager-chip.is-bare i:not(.fa-circle) {
     font-size: 7px;
+  }
+
+  /* Every solid ground is an opaque token, written after each tone so its paint wins the tie. */
+  .manager-chip.is-solid {
+    color: var(--fab-text);
+    background: var(--fab-bg-3);
+  }
+
+  .manager-chip.is-solid:is(.is-active, .is-positive) {
+    color: var(--fab-on-success);
+    background: var(--fab-success);
+  }
+
+  .manager-chip.is-solid:is(.is-disabled, .is-warning) {
+    color: var(--fab-bg-0);
+    background: var(--fab-warning);
+  }
+
+  .manager-chip.is-solid.is-info {
+    color: var(--fab-on-info);
+    background: var(--fab-info);
+  }
+
+  .manager-chip.is-solid:is(.is-danger, .is-negative) {
+    color: var(--fab-on-danger);
+    background: var(--fab-danger);
+  }
+
+  .manager-chip.is-solid.is-accent {
+    color: var(--fab-on-accent);
+    background: var(--fab-accent);
   }
 </style>

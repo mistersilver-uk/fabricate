@@ -527,11 +527,13 @@
         onclick={() => onSelectTab?.(tab.routeKey)}
         onkeydown={(event) => onNavKeydown(event, index)}
       >
-        <i class={tab.iconClass} aria-hidden="true"></i>
+        <span class="fabricate-app-nav-well">
+          <i class={tab.iconClass} aria-hidden="true"></i>
+          {#if tab.count > 0}
+            <span class="fabricate-app-nav-count" data-nav-count={tab.routeKey}>{tab.count}</span>
+          {/if}
+        </span>
         <span class="fabricate-app-nav-label">{tab.text}</span>
-        {#if tab.count > 0}
-          <span class="fabricate-app-nav-count" data-nav-count={tab.routeKey}>{tab.count}</span>
-        {/if}
       </button>
     {/each}
   </div>
@@ -657,88 +659,76 @@
     background: var(--fab-surface);
   }
 
-  /* `scrollbar-gutter: stable` reserves the gutter whether or not the rail is currently
-     scrolling, so crossing the entry count that starts the scroll does not reflow the column
-     and shift every button sideways. See `.fabricate-app-nav-item`'s width for the other half
-     of this. */
+  /* The rail is the library's AppRail: a 72px column of 44px icon wells, each labelled beneath.
+     `scrollbar-gutter: stable` reserves the gutter up front, so crossing the entry count that
+     starts the scroll does not reflow the column. */
   .fabricate-app-nav {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    flex: 0 0 84px;
-    padding: 8px;
+    gap: var(--fab-space-2xs);
+    flex: 0 0 72px;
+    padding: var(--fab-space-chip);
     border-right: 1px solid var(--fab-border);
     background: var(--fab-surface-soft);
     overflow-y: auto;
     scrollbar-gutter: stable;
   }
 
-  /* `width: min(64px, 100%)`, NOT a bare `64px`. The rail is a fixed 84px column with 8px of
-     padding, so its content box is 68px — and Foundry's reset applies `* { scrollbar-width:
-     thin }`, which on a classic (non-overlay) scrollbar platform takes ~11-12px of layout
-     width the moment the rail scrolls. A non-shrinkable 64px button against a ~56px content
-     box overflows, and because `overflow-y: auto` forces `overflow-x` to compute to `auto`
-     that is a VISIBLE horizontal scrollbar inside an 84px column rather than a silent clip.
-     It is reachable: at the 1024x640 window floor the rail fits exactly 8 entries, and 9 —
-     Core's 5 tabs plus a 4-tab companion — scrolls. Yielding the gutter keeps the promise the
-     seam's spec makes about no horizontal overflow at the minimum window size.
-     `.fabricate-app-nav-label`'s `max-width: 100%` follows the button down, so the ellipsis
-     rule below still holds at the narrower width.
-
-     THE VIEW LAB CANNOT CATCH THIS. Its `expectNoHorizontalOverflow` compares `scrollWidth`
-     against `clientWidth`, and headless Chromium renders OVERLAY scrollbars, which consume no
-     layout width at all — a green capture proves no CONTENT overflow and says nothing about a
-     scrollbar gutter. The guard is the declaration assertion in
-     `tests/components/fabricate-app-root-mounted.test.js`. */
+  /* Foundry's `.application button` fixes a height and line-height, so the item resets both. */
   .fabricate-app-nav-item {
-    position: relative;
     box-sizing: border-box;
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 6px;
-    width: min(64px, 100%);
-    height: 64px;
+    gap: var(--fab-space-chip);
+    margin: 0;
+    padding: var(--fab-space-2) 0 var(--fab-space-chip);
+    width: 100%;
+    height: auto;
+    font: inherit;
+    line-height: normal;
     text-align: center;
-    border: 1px solid transparent;
-    border-radius: 10px;
+    border: 0;
+    border-radius: 9px;
     background: transparent;
     color: var(--fab-text-muted);
     cursor: pointer;
   }
 
-  .fabricate-app-nav-item i {
+  /* `width: min(44px, 100%)`, not a bare 44px: Foundry's `scrollbar-width: thin` takes ~12px of
+     a classic scrollbar's layout width once the rail scrolls, and a well that cannot shrink would
+     then overflow into a visible horizontal scrollbar. Headless Chromium's overlay scrollbars
+     cannot show this, so `fabricate-app-root-mounted.test.js` asserts the declaration. */
+  .fabricate-app-nav-well {
+    position: relative;
+    box-sizing: border-box;
+    display: grid;
+    place-items: center;
+    width: min(44px, 100%);
+    height: 44px;
+    border-radius: 9px;
+  }
+
+  .fabricate-app-nav-well i {
     font-size: 20px;
     line-height: 1;
   }
 
-  /* `overflow` and `text-overflow` are what ADMIT a third-party label. Core authors its own
-     five strings and its longest consumes almost exactly the ~52px text box a fixed 64px
-     button leaves; a companion's label and its localizations are unbounded, and
-     `.fabricate-app-nav` is `overflow-y: auto`, so `overflow-x` computes to `auto` and an
-     unbounded label would spill and put a horizontal scrollbar in the 84px column. The
-     untruncated text is what `accessibleName` and `tooltip` are for. */
+  /* A companion's label and its localizations are unbounded, so the label truncates; the full
+     text is what `accessibleName` and `tooltip` carry. */
   .fabricate-app-nav-label {
     max-width: 100%;
     overflow: hidden;
-    font-size: 11px;
+    font-size: 10px;
+    font-weight: 600;
     line-height: 1.1;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  /* The `aria-describedby` target for a provider tab that supplies a tooltip. It is taken
-     OUT OF FLOW and clipped rather than rendered: the rail is an 84px column with a fixed
-     64px button grid, so a visible tooltip is the same overhang that failed the Manager
-     strip's horizontal-overflow assertion, and the seam's contract is that a supplied
-     tooltip is EXPOSED through `aria-describedby`, not that Core paints it. No pixels move
-     for the five shipped Core buttons, which supply no tooltip and render no such node.
-     Being out of flow and clipped to 1x1 is also why these nodes could be lifted out of the
-     tablist (where a `tooltip` child is unallowed owned content) without moving a pixel. */
+  /* The `aria-describedby` target for a provider tab that supplies a tooltip: exposed to
+     assistive technology, taken out of flow and clipped so it paints nothing in the rail. */
   .fabricate-app-nav-tooltip {
     position: absolute;
     width: 1px;
@@ -754,9 +744,12 @@
   }
 
   .fabricate-app-nav-item.active {
-    background: var(--fab-accent-soft);
+    background: var(--fab-surface-active);
     color: var(--fab-accent);
-    border-color: var(--fab-accent);
+  }
+
+  .fabricate-app-nav-item.active .fabricate-app-nav-well {
+    background: var(--fab-accent-soft);
   }
 
   /* Focus rings (Foundry orange suppressed on :focus, accent ring on
