@@ -1,15 +1,27 @@
 /** Assertions over the identity row a player detail pane leads with (`PlayerDetailHeader`). */
 import assert from 'node:assert/strict';
 
+const PRIMARY_SELECTOR = [
+  '.manager-button.is-primary',
+  'button.is-primary',
+  '[data-crafting-craft]:not(.is-ghost)',
+  '[data-gathering-attempt]',
+].join(', ');
+// An inline `background` or `background-color` on the accent or success fill (not `-soft` etc.).
+const PRIMARY_FILL_STYLE = /background(?:-color)?\s*:[^;]*var\(\s*--fab-(?:accent|success)\s*[,)]/u;
+
 /**
- * Every primary-styled or craft action rendered under `root`: a `ManagerButton role="primary"`, a
- * hand-rolled `.is-primary` button, or any Craft verb that is not a ghost.
+ * Every primary action rendered under `root`: a `ManagerButton role="primary"`, a hand-rolled
+ * `.is-primary` button, a Craft verb that is not a ghost, a gathering Attempt, or a button whose
+ * inline style fills it with the accent or success colour. happy-dom computes no cascade, so a
+ * fill reached only through a stylesheet rule is not seen.
  */
-export const primaryButtons = (root) => [
-  ...root.querySelectorAll(
-    '.manager-button.is-primary, button.is-primary, [data-crafting-craft]:not(.is-ghost)'
-  ),
-];
+export const primaryButtons = (root) => {
+  const filled = [...root.querySelectorAll('button[style], [role="button"][style]')].filter(
+    (element) => PRIMARY_FILL_STYLE.test(element.getAttribute('style'))
+  );
+  return [...new Set([...root.querySelectorAll(PRIMARY_SELECTOR), ...filled])];
+};
 
 /**
  * Assert `pane` leads with one identity row carrying one `h2` and a 38px tile, that the row holds

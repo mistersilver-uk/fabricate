@@ -69,7 +69,7 @@ describe('Workbench (mounted)', () => {
     assert.equal(target.querySelector('[data-alchemy-status]').getAttribute('aria-live'), 'polite');
   });
 
-  // Issue 1518: the shared button family at its shipped geometry; the ready pulse is gone.
+  // Issue 1518: the shared button family at its shipped geometry; no ready pulse.
   it('draws Brew as the bench’s one full-width primary and Clear as a ghost, with no pulse', async () => {
     const target = await harness.mount({
       mode: 'ready',

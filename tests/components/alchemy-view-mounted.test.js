@@ -8,6 +8,7 @@ import {
   PLAYER_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
+import { primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -143,6 +144,11 @@ describe('AlchemyView mounted behavior', () => {
       },
     });
     const target = await harness.mount({ services: services(store) });
+    assert.equal(
+      primaryButtons(target.querySelector('[data-alchemy-state="workbench"]')).length,
+      1,
+      'Brew is the view’s one primary'
+    );
 
     target.querySelector('[data-alchemy-brew]').click();
     await Promise.resolve();
