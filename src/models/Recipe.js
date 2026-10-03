@@ -209,16 +209,17 @@ export class Recipe {
   }
 
   /**
-   * Structure plus completeness (the sets and groups a craft needs). Without `Roll`,
+   * Structure plus completeness (the sets and groups a craft needs). Without `Roll`, or under a
+   * `progressive` system, whose award drops every formula (`ResolutionModeService`),
    * `Result.validate` reports nothing about a rolled amount.
    */
-  validate({ Roll } = {}) {
-    return this._validate({ requireComplete: true, Roll });
+  validate({ Roll, progressive = false } = {}) {
+    return this._validate({ requireComplete: true, Roll: progressive ? null : Roll });
   }
 
   /** Structure only, waiving completeness. */
-  validateStructure({ Roll } = {}) {
-    return this._validate({ requireComplete: false, Roll });
+  validateStructure({ Roll, progressive = false } = {}) {
+    return this._validate({ requireComplete: false, Roll: progressive ? null : Roll });
   }
 
   _validate({ requireComplete = true, Roll } = {}) {

@@ -16,6 +16,12 @@ import {
  */
 const DIE_TERM = /(\d*)d(\d+)(?:(kh|kl)(\d*)|(xo?)(?:(<=|>=|<|>|=)(\d+))?)?/gi;
 
+/** `NdS` with any modifier suffix, which core's synchronous evaluation ignores. */
+const SYNC_DIE_TERM = /(\d*)d(\d+)(?:[a-z]+(?:<=|>=|<|>|=)?\d*)*/gi;
+
+/** The most dice one term may hold before core's synchronous evaluation throws. */
+const MAX_SYNC_DICE = 999;
+
 /** Core's `Die#explode` recursion limit, and the message a count Roll recognizes. */
 const MAX_EXPLOSIONS = 1000;
 
@@ -225,33 +231,34 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
             'DIE_TERM in tests/view-lab/foundry/labRoll.js rather than letting it score partially.'
         );
       }
-      const value = evaluateNumericExpression(rolledOut);
-      this.total = Number.isFinite(value) ? value : 0;
+      // Left as computed: core's async evaluation never checks that its total is finite.
+      this.total = evaluateNumericExpression(rolledOut);
       this.result = rolledOut;
       this._evaluated = true;
       return this;
     }
 
     /**
-     * Core's `evaluateSync`: `maximize` or `minimize` reads every kept die at a face extreme, which
-     * is how the rollability floor proves a formula; dice under neither option throw, as core's
-     * do. The total is left as computed, so a non-finite one reaches the caller.
+     * Core's `evaluateSync`: `maximize` or `minimize` reads every die at a face extreme and runs no
+     * modifier, so `4d6kh3` maximises to 24; dice under neither option, or more than 999 in one
+     * term, throw, as core's do. The total is left as computed, so a non-finite one reaches the
+     * caller.
      *
      * @param {{ maximize?: boolean, minimize?: boolean }} [options] Options.
      * @returns {LabRoll} This roll.
      */
     evaluateSync({ maximize = false, minimize = false } = {}) {
       const masked = this.formula.replaceAll(FLAVOUR_SPAN, '');
-      const extreme = masked.replaceAll(DIE_TERM, (match, count, faces, keep, keepCount) => {
+      const extreme = masked.replaceAll(SYNC_DIE_TERM, (match, count, faces) => {
         const shape = dieShape(count, faces);
         if (!shape) return match;
         if (!maximize && !minimize) {
           throw new Error(`View Lab Roll cannot evaluate "${this.formula}" synchronously`);
         }
-        const kept = keep
-          ? Math.min(keepCount === '' ? 1 : Number(keepCount), shape.number)
-          : shape.number;
-        return String(kept * (maximize ? shape.sides : 1));
+        if (shape.number > MAX_SYNC_DICE) {
+          throw new Error(`View Lab Roll cannot roll more than ${MAX_SYNC_DICE} dice in one term`);
+        }
+        return String(shape.number * (maximize ? shape.sides : 1));
       });
       this.total = evaluateNumericExpression(extreme);
       this.result = extreme;
