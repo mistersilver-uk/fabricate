@@ -73,21 +73,12 @@ function offeredRoutes(extensionSurfaces) {
   return routes;
 }
 
-/**
- * The cross-tab jumps a player view asks the shell for. Each selects through the destination's own
- * store singleton, so the selection is applied before that tab renders; a crafting outcome that
- * left a reward to pick opens that run in the Journal (issue 1773).
- */
-function crossTabNavigation(services, selectTab) {
-  return {
-    navigateToCraftingRecipe: (recipeId) => {
-      if (recipeId) services.crafting?.select?.(recipeId);
-      selectTab('crafting');
-    },
-    navigateToJournalRun: (runId) => {
-      if (runId) services.journal?.select?.(runId, 'crafting');
-      selectTab('journal');
-    },
+/** Open run `runId` in the Journal, as a crafting outcome that left a reward to pick does
+ *  (issue 1773). */
+function journalRunNavigator(services, selectTab) {
+  return (runId) => {
+    if (runId) services.journal?.select?.(runId, 'crafting');
+    selectTab('journal');
   };
 }
 
@@ -346,8 +337,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // All three tab stores read the SAME actor and source selection, so they agree on what the
     // player owns; only the workbench and discipline state is local to this one.
     services.alchemy = createAlchemyStore({ services });
-    Object.assign(services, crossTabNavigation(services, (tab) => this._selectTab(tab)));
+    // Both stores are the Crafting tab's singletons, so the selection lands before it renders.
+    services.navigateToCraftingRecipe = (recipeId) => {
+      if (recipeId) services.crafting?.select?.(recipeId);
+      this._selectTab('crafting');
+    };
     services.journal = createJournalStore({ services });
+    services.navigateToJournalRun = journalRunNavigator(services, (tab) => this._selectTab(tab));
     return services;
   }
 
