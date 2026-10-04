@@ -530,10 +530,11 @@ test('main --apply writes one real segment per secret and announces the new pref
 
   // `newSegment` is deliberately not injected: reading the real generator's output back out of
   // the write is the only way a constant segment shows up as a failure. No `--label` either, so
-  // the default month label is what reaches `gh`.
+  // the default month label is what reaches `gh`; the injected date is one no real clock can
+  // match, so dropping `deps.now` fails here rather than only once the month rolls over.
   await main({
     argv: ['--config', config, '--premium-config', premiumConfig, '--apply'],
-    deps: { runGh: gh.runGh, log, now: () => new Date('2026-10-04T12:00:00Z') },
+    deps: { runGh: gh.runGh, log, now: () => new Date('1999-03-15T00:00:00Z') },
   });
 
   const sets = gh.calls.slice(1);
@@ -550,7 +551,7 @@ test('main --apply writes one real segment per secret and announces the new pref
   );
 
   const written = sets.map(({ input }) => input);
-  for (const value of written) assert.match(value, /^oct2026-[0-9a-f]{32}$/);
+  for (const value of written) assert.match(value, /^mar1999-[0-9a-f]{32}$/);
   assert.equal(written[0], written[1], 'a shared secret reaches both repositories with one value');
   assert.equal(written[2], written[3], 'and so does the early-access one');
   assert.equal(new Set(written).size, 3, 'one segment per secret, and no two secrets share one');
