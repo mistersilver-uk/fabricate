@@ -16437,6 +16437,33 @@
   line-height: 1.4;
 }
 
+/* A credit or grant (issue 1773) spans the grid and wraps as a complication does, and stacks its sentence, its roll and its reason in the one label, the reason as de-emphasised context as a complication's source is. */
+.fabricate-craft-chat__item--reward {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+}
+
+.fabricate-craft-chat__item--reward .fabricate-craft-chat__label {
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.fabricate-craft-chat__reward-reason {
+  opacity: 0.72;
+}
+
+/* A reward's glyph sits centred in the 22px box an item image fills. */
+.fabricate-craft-chat__item--reward .fabricate-craft-chat__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
 /* The runs inside that one label are separated by WEIGHT rather than by more punctuation — the renderer already joins them with an em dash, and a second visual separator on top of it reads as a list. */
 .fabricate-gather-chat__complication-name,
 .fabricate-craft-chat__complication-name {

@@ -9,11 +9,10 @@
 -->
 <script>
   import InspectorCard from '../../../components/InspectorCard.svelte';
-  import Medallion from '../../../components/Medallion.svelte';
   import { statesEvidence } from '../../../../presenters/checkEvidenceRows.js';
   import { countBotched, statesCountEvidence } from '../../../../presenters/countEvidenceRows.js';
   import CheckEvidenceRows from './CheckEvidenceRows.svelte';
-  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
+  import AwardPill from './AwardPill.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let { result = null } = $props();
@@ -75,11 +74,7 @@
     {#if items.length > 0}
       <ul class="crafting-roll-awards">
         {#each items as item, index (item.name + index)}
-          <li class="crafting-roll-award">
-            <Medallion {...resolveCraftingArt(item.img)} alt="" size={24} />
-            <span class="crafting-roll-award-name">{item.name}</span>
-            <span class="crafting-roll-award-qty">×{item.qty ?? 1}</span>
-          </li>
+          <AwardPill {item} variant="roll" />
         {/each}
       </ul>
     {/if}
@@ -145,36 +140,5 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-  }
-
-  .crafting-roll-award {
-    /* Cap to the column so a long name ellipsizes instead of widening/wrapping the pill. */
-    max-width: 100%;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 2px 8px 2px 2px;
-    border: 1px solid var(--fab-border);
-    border-radius: 999px;
-    background: var(--fab-surface);
-    font-size: 12px;
-  }
-
-  /* Every pill is one line tall regardless of name length: the 24px thumb never varies,
-     so the ONLY thing that changed a pill's height was a long name WRAPPING to a second
-     line. Pin the name to a single ellipsized line so all pills share the thumb-driven
-     height (mirrors the salvage summary fix, issue 687). `min-width:0` lets the flex item
-     shrink far enough for the ellipsis to engage. */
-  .crafting-roll-award-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .crafting-roll-award-qty {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    color: var(--fab-text-muted);
   }
 </style>

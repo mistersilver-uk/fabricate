@@ -395,6 +395,10 @@ A refused choice cancels the whole batch with zero mutation, and a resource that
   The card reads the roll the award recorded and never re-rolls it.
   The evaluated rolls are carried in the message's `rolls`, which is what sounds the dice and animates Dice So Nice; the custom card content survives that, and neither card is ever whispered, so carrying them hides it from nobody.
   The gathering card states no roll — it has its own builder and its own row shape — and the run journal is where a gathered amount's roll is read.
+- **A card lists the currency credits and knowledge grants its craft awarded** (issue 1773), as rows of the results section after the created Items, each drawing its kind's glyph in place of an image.
+  A credit reads its label, when authored, beside its amount and unit, states a rolled amount's roll in the same `{formula} = {total}` treatment, and carries its reason; an empty credit is stated rather than omitted.
+  A grant names the recipe it taught and says whether it was learned or already known.
+  A rolled credit's evaluated roll rides the message's `rolls` after the rolled Item amounts.
 - **A counting check states its executed dice.**
   For a public, non-secret counting check (`publicroll` on V13, `public` on V14) the crafting, salvage and bulk salvage cards show the die tiles and the count rows, and the summary line `{pool}d{die}, each {sym} {threshold}` replaces the numeric roll row.
   Each active die is one tile in roll order with its marks combined (qualified, cancelled and exploded, each by its Font Awesome glyph), and each explosion roll is its own tile straight after the die that produced it.
@@ -667,6 +671,10 @@ The rail's geometry — a 72px column of labelled 44px icon wells, with the Jour
   A single-step recipe outside `simple` keeps resolving `defaultSet`, which is the one case where the player's chosen route rather than the step decides the row.
   That first authored set is a REPRESENTATIVE headline only: a product step routing several sets to different groups shows the first set's group in the one PRODUCES row, while the per-set product grid beneath it stays exact (issue 1907).
   The `routedByIngredients` detail body follows the same rule: on a recipe with more than one execution step it renders the projected product-step `result` instead of the selected set's products, and swaps its routing hint for one saying the chosen option decides what THIS STEP consumes while PRODUCES is the recipe's final product (issue 1907).
+- Every PRODUCT row of a `knowledge` result (issue 1773) — the expected output, the per-set products, the step products and the outcome tiers — names its taught recipe only when the viewer is a GM, or `evaluateRecipeAccess` finds that recipe visible to the viewer and not a teaser, and it is not disabled.
+  Otherwise the row reads `FABRICATE.App.Crafting.Io.UnknownRecipe`, because `recipe-visibility` § Information Disclosure lets no non-revealed name reach a client field.
+  The rule is single-sourced (`taughtNameReader`), and a product read handed no reader redacts.
+  The post-craft chat card still names the recipe it taught, because by then the crafter has learned it.
 - The crafting-check descriptor is not surfaced (the projection yields `null`) when the mode's check is optional, has no authored roll formula, and checks are not enabled (`craftingCheck.enabled !== true` and `features.craftingChecks !== true`).
   A mandatory-by-mode check, an authored formula, or an enabled-but-unformulated check still surface (the last keeps the "no roll formula configured" GM misconfiguration note).
 

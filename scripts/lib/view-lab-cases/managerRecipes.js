@@ -91,6 +91,35 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
     ],
   }),
+  // Issue 1773: the inspector's Produces rows name a currency reward by its label and amount with
+  // its unit, and a knowledge reward by the recipe it teaches, each with its kind's glyph.
+  managerCase({
+    id: 'manager-recipes-inspector-reward-rows',
+    label: 'Manager — Recipes inspector Produces rows of every result kind',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing', resultRowState: 'reward-kinds' },
+    steps: [
+      'Crafting',
+      { selector: '.manager-recipe-row[data-recipe-id="sm-r-horseshoe"] .manager-recipe-identity' },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '[data-recipe-inspector]' +
+      ':has([data-recipe-produces-kind="currency"] i.fa-coins)' +
+      ':has([data-recipe-produces-kind="knowledge"] i.fa-book-open)',
+    expectContained: [
+      {
+        container: '[data-recipe-inspector]',
+        target: '[data-recipe-produces-kind="knowledge"]',
+      },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipes\/Recipe(?:BrowserInspector|ProduceRow)\.svelte$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
+    ],
+  }),
   // The inspector's ingredient-set list (issue 1510), at a 1024 window: the inspector restacks
   // under the list there, so the trigger fills a column far past the `inline` rung's 240px panel
   // ceiling and the frame shows the panel spanning the manager's overlay inset under the call

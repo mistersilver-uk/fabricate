@@ -17,7 +17,7 @@ import {
 } from '../../systems/historyItemEvidence.js';
 import { readStackQuantity } from '../../systems/itemStackQuantity.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
-import { historyEvidenceFields } from '../../systems/runHistoryEvidence.js';
+import { historyEvidenceFields, splitHistoryReceipts } from '../../systems/runHistoryEvidence.js';
 import {
   craftingOutcomeBand,
   ladderRule,
@@ -55,6 +55,7 @@ import {
   recordedNumber,
   taskCountNeed,
 } from './journalCheckText.js';
+import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
@@ -119,25 +120,6 @@ function historicalStepAttempted(step, run, index) {
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 const EXECUTION_JOURNAL_STATUSES = new Set(['planned', 'committed', 'recoveryRequired']);
 const EXECUTION_EFFECT_PHASES = new Set(['planned', 'applying', 'applied']);
-const SAFE_EXECUTION_EFFECT_KINDS = new Set([
-  'executeCraftingStage',
-  'consumeItems',
-  'awardItems',
-  'consumeIngredients',
-  'consumeAlchemyExtras',
-  'spendCurrency',
-  'applyToolUsage',
-  'awardResults',
-  'finalizeCraftingStage',
-  'recordRecipeUse',
-  'learnAlchemyRecipe',
-  'fireComplications',
-  'postCraftChat',
-  'recordAlchemyDeadEnd',
-  'consumeAlchemyItems',
-  'createGatheredResults',
-  'refundStageConsumption',
-]);
 
 /**
  * Defensively drop models that repeat a native run identity, keeping the first
@@ -2724,14 +2706,15 @@ export class RunJournalBuilder {
         }[settlement[key]],
         hasReceipt: true,
         receipt: entitled
-          ? {
-              items: normalizeList(
-                key === 'consumption'
-                  ? (owner.consumedIngredients ?? owner.consumedComponents)
-                  : owner.createdResults
-              ).map((entry) => this._mapResult(entry, run.craftingSystemId, false)),
-              currencies: [],
-            }
+          ? this._receiptProjection(
+              key === 'consumption'
+                ? normalizeList(owner.consumedIngredients ?? owner.consumedComponents)
+                : [owner.createdResults, owner.currencyCredits, owner.knowledgeGrants].flatMap(
+                    normalizeList
+                  ),
+              run.craftingSystemId,
+              { resolveMetadata: false }
+            )
           : null,
       }));
     return {
@@ -2774,16 +2757,29 @@ export class RunJournalBuilder {
       entries = normalizeList(receipt.results);
     } else if (effect.kind === 'createGatheredResults') {
       entries = normalizeList(receipt);
+    } else if (effect.kind === 'awardRewards') {
+      entries = [receipt.currencyCredits, receipt.knowledgeGrants].flatMap(normalizeList);
     }
+    const spends = effect.kind === 'spendCurrency' ? normalizeList(receipt.settledSpends) : [];
+    return this._receiptProjection(entries, systemId, { spends });
+  }
+
+  /** A receipt's rows by shape (issue 1773): Item receipts as items, a spend or a credit as a
+   *  currency row and a grant as a grant row, so a reconciling GM sees what a reward step paid. */
+  _receiptProjection(entries, systemId, { spends = [], resolveMetadata = true } = {}) {
+    const { items, currencyCredits, knowledgeGrants } = splitHistoryReceipts(entries);
+    const grants = knowledgeGrants.map(({ recipeId, recipeName, outcome }) => ({
+      recipeId,
+      recipeName: recipeName ?? null,
+      outcome,
+    }));
     return {
-      items: entries.map((entry) => this._mapResult(entry, systemId)),
-      currencies:
-        effect.kind === 'spendCurrency'
-          ? normalizeList(receipt.settledSpends).map((spend) => ({
-              unit: stringOrEmpty(spend?.unit),
-              amount: numberOrNull(spend?.amount),
-            }))
-          : [],
+      items: items.map((entry) => this._mapResult(entry, systemId, resolveMetadata)),
+      currencies: [...spends, ...currencyCredits].map((entry) => ({
+        unit: stringOrEmpty(entry?.unit),
+        amount: numberOrNull(entry?.amount),
+      })),
+      ...(grants.length > 0 && { grants }),
     };
   }
 }

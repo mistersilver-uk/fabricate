@@ -228,13 +228,29 @@ A tool's durable identity is stamped on its source Item as `Item.flags.fabricate
 ```javascript
 {
   (id, // string
+    kind, // "component" | "currency" | "knowledge" (default "component")
     componentId, // string (managed component reference)
     itemUuid, // string (direct Foundry item reference)
     quantity, // number (default 1) -- the AUTHORED, fixed amount
     quantityFormula, // string | null -- a non-empty value means the amount is ROLLED instead
+    unit, // string | null -- a currency result's unit id
+    recipeId, // string | null -- a knowledge result's taught recipe id
+    label, // string | null -- a currency result's optional note
+    reason, // string | null -- a currency result's optional reason
     propertyMacroUuid); // string | null
 }
 ```
+
+{: .note }
+
+> `kind` says what the result awards (issue 1773).
+> A `component` result awards an item, as every result did before this field existed, and an absent `kind` means `component`.
+> A `currency` result names a `unit` and credits an amount of it, fixed by `quantity` or rolled by `quantityFormula`, to the crafting character.
+> A `knowledge` result names a `recipeId` and teaches that recipe's knowledge to the crafting character, so it takes no amount.
+> Only a `currency` result carries `label` or `reason`, and only a `component` result runs a `propertyMacroUuid`.
+> `Result.validate()` reports a result whose fields do not fit its kind.
+> This release adds the data shape and the crafting engine's handling of it; the Manager does not yet author these kinds.
+> Gathering and salvage results stay components: gathering refuses another kind, and salvage drops it.
 
 {: .note }
 

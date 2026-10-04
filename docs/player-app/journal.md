@@ -151,6 +151,11 @@ After execution, history reports actual awards as **Crafted**, **Brought back**,
 A result whose amount is rolled shows its dice expression rather than a plain number while it is still only a preview, because no preview can know what the roll will be.
 Once the run has actually awarded it, the same result states the roll that produced it beside the quantity delivered, such as "Rolled 1d6 = 4", and a roll of zero or lower states that nothing was produced rather than showing an empty quantity.
 
+A recipe's result can also pay out currency or teach a recipe's knowledge instead of producing an item.
+A currency result shows its amount with the unit's name, such as "2d6 gp" in a preview and the rolled amount once awarded.
+A knowledge result shows as **Recipe knowledge**, and once awarded the history states that the recipe was learned, or that it was already known.
+A recipe you are not entitled to see is named **Unknown recipe** rather than by its real name.
+
 ### Reading a closed run
 
 Finished history is a read-only account of what happened.

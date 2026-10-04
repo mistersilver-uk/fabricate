@@ -980,7 +980,10 @@
           "ChooseShortOption": "Choose {name}: you have {have}, and this needs {need}.",
           "OptionSelected": "Selected",
           "CurrencyCost": "{amount} {unit}",
-          "CurrencyUnaffordable": "Not enough {unit}"
+          "CurrencyUnaffordable": "Not enough {unit}",
+          "RecipeKnowledge": "Recipe knowledge",
+          "CurrencyReward": "Currency",
+          "UnknownRecipe": "Unknown recipe"
         },
         "Slots": {
           "Title": "Requirements",
@@ -1181,6 +1184,9 @@
         "History": {
           "Title": "Finished",
           "UnknownMaterial": "Unknown material",
+          "CurrencyAwarded": "Currency awarded",
+          "RecipeLearned": "Recipe learned",
+          "RecipeAlreadyKnown": "Recipe already known",
           "NotRecorded": "Not recorded",
           "NoCheck": "No check — it simply completes",
           "NoRoll": "No roll — collecting takes it all",
@@ -1248,6 +1254,7 @@
           "OutcomeLog": "How the check landed",
           "Outcome": "Recorded outcome",
           "ClosedSuccess": "A closed run. Its results are already in your inventory; the entry stays here as a record.",
+          "ClosedSuccessRewards": "A closed run. Its results are already yours; the entry stays here as a record.",
           "ClosedFailedCheck": "This run failed its final check. Failed runs are kept so you can see what was attempted and when.",
           "ClosedFailedEmpty": "This run could not meet what it needed, so nothing was produced. Failed runs are kept so you can see what was attempted and when.",
           "ClosedFailureAwards": "This run failed, but the results recorded above were awarded. Failed runs are kept so you can see what was attempted and when.",
@@ -1916,7 +1923,9 @@
       "TierStepDown": "Stepped down {steps} tier(s)",
       "TierStepTarget": "Stepped to a target tier",
       "RolledAmount": "Rolled {formula} = {total}",
-      "RolledAmountEmpty": "Rolled {formula} = {total}, nothing produced"
+      "RolledAmountEmpty": "Rolled {formula} = {total}, nothing produced",
+      "RecipeLearned": "Learned the recipe {recipe}",
+      "RecipeAlreadyKnown": "Already knew the recipe {recipe}"
     },
     "Check": {
       "Roll": {
@@ -2245,6 +2254,8 @@
           "macro": "Macros",
           "dropRowItem": "Drop-row items",
           "componentLink": "Component links",
+          "recipeLink": "Taught recipe links",
+          "currencyUnit": "Currency reward units",
           "taskLink": "Task links",
           "eventLink": "Event links",
           "recipeItem": "Recipe item links",
