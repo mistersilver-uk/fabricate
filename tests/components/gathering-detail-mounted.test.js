@@ -345,9 +345,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     // Issue 2053: the attempt buttons record the window a roll prompt opens in.
+    // Issue 1782: the drop-rate ramp the chance bar's `BandedBar` reads its fills from.
     for (const rawModule of [
       ...SEARCHABLE_POPOVER_RAW_MODULES,
       'src/ui/svelte/util/rollPromptOrigin.js',
+      'src/ui/svelte/util/dropRateTier.js',
     ]) {
       const rawDestination = join(tempRoot, rawModule);
       mkdirSync(dirname(rawDestination), { recursive: true });
@@ -360,10 +362,14 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
-    // `FillBar` joined this tree when issue 1096 rebuilt `ChanceBar` on the shared
-    // primitive `ui-visual-style/spec.md` names. A hand-rolled harness that omits it HANGS
-    // (# cancelled) rather than failing, which is why the primitive allowlist lists it.
-    writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
+    // `ChanceBar` is a single-row `BandedBar` over the shared `FillBar` (issues 1096, 1782). A
+    // hand-rolled harness that omits either HANGS (# cancelled) rather than failing.
+    for (const instrument of [
+      'src/ui/svelte/components/FillBar.svelte',
+      'src/ui/svelte/components/BandedBar.svelte',
+    ]) {
+      writeCompiledSvelte(instrument);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/ChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');

@@ -36,6 +36,8 @@ const harness = createMountedComponentHarness({
     'src/systems/foundryCalendar.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
     'src/ui/svelte/apps/journal/historyPresentation.js',
+    // Issue 1773: a reward row's glyph.
+    'src/ui/presenters/resultKindGlyphs.js',
     'src/ui/svelte/apps/journal/runStateNotice.js',
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
     // The roll line signs an executed margin with the shared formatter (issue 2005).
@@ -72,6 +74,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     component('EssencePool'),
     component('RunProgress'),
+    'src/ui/svelte/components/StageBars.svelte',
     component('StageNav'),
     component('StageCard'),
     component('ListRow'),

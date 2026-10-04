@@ -512,9 +512,10 @@ That vehicle is cited by SELECTOR here and never by a line into the sheet: the c
 The comment above `.manager-nav-count` in `styles/fabricate.css`, "A rail count badge is a BARE NUMERAL, not a badge (issue 643)", is a STYLING correction — the record-count vehicle must draw as bare text, never a filled chip — and NOT a vocabulary ban: its own opening clause reads "count badge", using badge as the umbrella the styling note narrows rather than rejects.
 A companion's tab badge (issue 1302) renders through the ISSUE-SUMMARY vehicle, CORRECTED at issue 1515: this family's discriminator between vehicle one and vehicle two is that the second carries a count AND names its unit in its `aria-label`, which a companion's badge does, and the Downtime parent's rollup is the SUM of exactly those badges, so a sum and its addends cannot be different marks.
 The `Soon` word on a disabled planned-view row is NOT a member of this family at all and no longer borrows one: it is neither a record count, nor an issue summary, nor an unsaved marker, nor a tier gate, so it draws through `.manager-nav-planned` and claims no membership.
+The premium padlock drawn by `.manager-editor-tab-lock` after a label on the shared editor tab strip is NOT a member either: it is a tier gate on a tab, not a rail mark, and it draws through the tab strip's own vehicle.
 The Downtime rail parent's rollup renders through that same vehicle, and for the reason every issue-summary mark is amber: **the mark is amber because it asks for attention, not because it reports a fault** — the rollup states how many tabs have something to say, not that anything is wrong.
 
-Canonical mapping: `.manager-nav-count`; `.manager-nav-issue-badge`; `.manager-nav-dirty-marker`; `.manager-nav-premium` (the `PREMIUM` chip, its own vehicle since issue 1515); NOT a member: `.manager-nav-planned`; `src/ui/svelte/apps/manager/checks/checksNav.js`; `styles/fabricate.css`
+Canonical mapping: `.manager-nav-count`; `.manager-nav-issue-badge`; `.manager-nav-dirty-marker`; `.manager-nav-premium` (the `PREMIUM` chip, its own vehicle since issue 1515); NOT a member: `.manager-nav-planned`; `.manager-editor-tab-lock` (the tab-strip premium padlock); `src/ui/svelte/apps/manager/checks/checksNav.js`; `styles/fabricate.css`
 
 Spec reference: openspec/specs/ui-manager-shell/spec.md
 

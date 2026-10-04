@@ -282,6 +282,7 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/PlayerViewState.svelte',
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Meter.svelte',
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Notice.svelte',
@@ -369,6 +370,11 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/characterLibraries.js',
   'src/ui/presenters/CraftingListingBuilder.js',
+  'src/ui/presenters/resultOutputRows.js',
+  // Issue 1773: a reward row's glyph and its unit's display name.
+  'src/ui/presenters/resultKindGlyphs.js',
+  'src/systems/currencyProfile.js',
+  'src/config/currencyPresets.js',
   // Issue 2005: the check card's roll-under or character-value target line.
   'src/ui/presenters/checkDescriptor.js',
   // Issue 2006: a count card's successes needed, read as the engine reads it.
@@ -496,6 +502,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
+  // Issue 1773: the one award pill the three above render.
+  'src/ui/svelte/apps/crafting/detail/AwardPill.svelte',
   'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
   'src/ui/svelte/components/DiceTiles.svelte',
   'src/ui/svelte/apps/journal/JournalFactRow.svelte',
@@ -526,6 +534,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Meter.svelte',
   'src/ui/svelte/components/Notice.svelte',
   // The identity row `RecipeDetailHeader` composes (issue 1518), flat for the same reason.
   'src/ui/svelte/apps/PlayerDetailHeader.svelte',

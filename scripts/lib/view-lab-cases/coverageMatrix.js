@@ -272,7 +272,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     // The bars themselves, not the panel: a panel that abstained would still render.
-    expectSelector: '.fabricate-manager [data-checks-odds-bar]',
+    expectSelector: '.fabricate-manager [data-banded-bar-track]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
@@ -319,7 +319,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     // A bucket that must exist, not merely a bar.
-    expectSelector: '.fabricate-manager [data-checks-odds-row="award-0"]',
+    expectSelector: '.fabricate-manager [data-banded-bar-row="award-0"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,

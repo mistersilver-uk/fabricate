@@ -69,6 +69,7 @@ The library is where the vocabulary lives and this document is where its rules l
 A member that has SHIPPED MUST also carry a row in `scripts/lib/designSystemPrimitives.json` naming its implementation path, which is what lets a diff be attributed to a primitive.
 A member that has not shipped carries no row, because the manifest enumerates what ships and a row naming no file is a correspondence to nothing.
 `tests/design-system-coverage.test.js` reads both artifacts and fails when a name is in one and not the other, in either direction.
+`EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry; issue 1782 merged `<ValidationList>` into it, so the 40 naming headings declare 71 distinct names.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
@@ -118,7 +119,7 @@ Every specimen in `openspec/specs/design-system/library.html` and every row of t
 An entry whose specimen states no Svelte API therefore cannot read `shipped`, because a specimen that names no props gives nothing to match: it stays `target` until that API is written, and the library's "Entries without an API" migrations row is the record of every entry in that position.
 `divergent` means a recorded decision keeps the shipped component different; such an entry MUST name the issue that decided it, and only a maintainer decision may put one there.
 A heading that names several primitives MUST declare a status PER NAME, so every member of the set carries exactly one, and the block's own value is the weakest of them — `divergent` if any name is, otherwise `target` if any name is, otherwise `shipped`.
-The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 30 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
+The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 40 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
 
 Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the `deferred: root convergence pending` exemptions in the source-contract tests record.
 An entry may be `shipped` while most of the tree still hand-rolls the thing it replaces, and an entry whose every caller is perfect may be `target` because the specimen names props nothing has built.
@@ -215,6 +216,7 @@ The three most-imported controls satisfy it too: `Button` emits `fabricate-butto
 None of the three portals anything, so each needs one root, and each writes it on its own root element — for the two buttons as the leading literal of the `classes` array the component composes, for the pager inline on its root `<section>`.
 Six more satisfy it as of issue 1508: `Field` emits `fabricate-field`, `SearchField` emits `fabricate-search`, `FilterBar` emits `fabricate-filter-bar`, `InspectorCard` emits `fabricate-card`, `StatusToggle` emits `fabricate-toggle` and `ChanceSlider` emits `fabricate-slider`.
 None of the six portals anything either, so each needs exactly one root.
+Issue 1782 adds three instruments over the shared fill leaf: `Meter` emits `fab-meter`, `BandedBar` emits `fab-banded-bar` and `StageBars` emits `fab-stage-bars`, each on its own root element; none portals anything, so each needs one root, and each family is scoped to its component as the leaf's own is.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
 The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issues 1523 and 1779.
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
@@ -755,6 +757,8 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 
 A control whose visible text is a glyph or a bare number MUST take its accessible name as a REQUIRED prop, named `ariaLabel`, rather than an optional one.
 A name composed from a value MUST be derived by a shared helper, because the alternative drifted across 23 call sites before `src/ui/svelte/components/stepperLabels.js` existed.
+A stage group (`StageBars`) takes exactly one naming route, `ariaLabel` or `ariaLabelledBy`, the latter where the caller renders the kicker.
+The one bar of a one-stage group takes the group's own name, because "Stage 1 of 1" states a position there is nothing to choose between.
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
@@ -957,7 +961,9 @@ The vehicles are cited by SELECTOR and never by line number, because a line into
 Naming the primitive here therefore binds the unsaved mark and leaves the four-mark rule intact.
 The family reaches a TAB STRIP as well as the rail, because a tab's mark states a fact about what is behind that tab exactly as a rail entry's does, and the tab-strip primitive MUST own the drawing of every vehicle it offers so that a call site names which one its mark uses and never how it looks.
 A caller that cannot name the vehicle it needs is a MISSING CAPABILITY on that primitive, never a licence to hand-roll a second strip or to draw one vehicle with another: a difference recorded between two strips MUST be a functional or informational one the shared primitive absorbs, because a deliberate STYLE divergence is precisely what a shared primitive exists to remove.
-The PREMIUM vehicle stays a rail mark and is not offered on a tab strip, since a vehicle no caller on a surface can reach is configuration that cannot be exercised.
+The PREMIUM vehicle stays a rail mark and is not offered on a tab strip, because the rail's PREMIUM chip and the title-bar badge already state the tier once and loudly, and a chip on every tab of a strip whose tabs are all gated would repeat it.
+A tab whose destination is tier-gated carries the strip's premium PADLOCK instead — the premium signal the rail's Downtime sub-items already carry — drawn by the tab-strip primitive, hidden from assistive technology, its meaning stated in words by the tab's description.
+The padlock is a state of the tab and not a mark of the family, so it does not enter the four-mark set and no call site names its glyph; it is not `<Locked>`, because a padlocked tab stays selectable; and like every premium signal it is drawn in the manager only, so no player-window caller marks a tab with it.
 A mark carries a LABEL and a TONE and never a glyph: a PASS mark is the issue vehicle carrying a tick character, not a fourth vehicle and not a caller-supplied icon, because a call site naming a Font Awesome class is a call site choosing a shape and that is the one thing the ownership rule above forbids.
 
 A rule that is always true is a callout, which stays put.
@@ -969,6 +975,8 @@ An empty state INSIDE AN OVERLAY the product has already drawn a boundary around
 
 A number a GM can change is a stepper and never a stat box.
 A continuous scale cut into named regions is a range bar whose spans tile; an ordered set of named tiers with a position marker is a tier track.
+`StageBars` is the progress instrument, and `StageNav` chooses the stage on screen.
+`RunProgress` is the same implementation as `StageBars` rather than a neighbour of it: it is `StageBars` under a run heading, and the `<RunProgress>` entry stays `target` in its own library block, whose owner flips it.
 A GRIP is the pointer's drag handle and the keyboard's move control, one per ordered row; a ROCKER is the stacked up and down chevron PAIR that steps a row one position, and neither word names the other's affordance.
 
 #### Scenario: A list row and an editor both show the same record state
@@ -982,6 +990,44 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **WHEN** a navigation item's only visible content is a glyph
 - **THEN** its count is the filled pip on the well's outer corner
 - **AND** a labelled row's count renders as a bare numeral
+
+#### Scenario: A tier-gated tab carries the premium padlock
+
+- **WHEN** a manager caller marks a tab `tierGated`
+- **THEN** the strip draws one padlock in that tab, hidden from assistive technology
+- **AND** the tab stays selectable
+- **AND** no call site supplies the glyph or its class
+
+### Requirement: A tab strip always keeps a tab stop, and names and describes a tab from its own entry
+
+The tab-strip primitive's roving tab stop is the selected tab, or the first rendered tab when the selected id names no rendered tab, while `aria-selected` stays bound to the selected id.
+A tab entry MAY override its accessible name, and an overriding name MUST contain the tab's visible label.
+A tab entry MAY carry a description that the strip renders as a `role="tooltip"` element beside the tablist rather than inside it — a tablist owns only tabs — referenced by the tab's `aria-describedby`.
+A description is placed above its tab, start-aligned to it, clamped inside the positioned ancestor, and falls back to that ancestor's top end when its tab cannot be measured.
+The strip shows the hovered tab's description, else the focused tab's, and Escape hides it until that tab is next hovered or focused, without moving focus or selection.
+A description stays shown while the pointer is over it, and Escape hides a description shown by hover even when focus is outside the strip, without closing the window that holds it.
+A pointer activation focuses the tab it selects.
+A tier-gated tab stays focusable and selectable, carrying neither `disabled` nor `aria-disabled`.
+The strip does not move focus when the focused tab is removed; the caller that removed it owns the recovery.
+Apart from that fallback, an entry naming none of these renders exactly what it rendered before they existed.
+
+#### Scenario: The selected id names no rendered tab
+
+- **WHEN** a strip's selected id matches none of its tabs
+- **THEN** the first tab carries `tabindex="0"` and every other tab `-1`
+- **AND** no tab reports `aria-selected="true"`
+
+#### Scenario: The focused tab becomes tier-gated
+
+- **WHEN** the focused, selected tab re-renders `tierGated`
+- **THEN** it keeps `tabindex="0"` and `aria-selected="true"`
+- **AND** it carries neither `disabled` nor `aria-disabled`
+
+#### Scenario: Escape hides a hover-shown description with focus outside the strip
+
+- **WHEN** a description is shown by hover and focus is outside the strip
+- **THEN** Escape hides it
+- **AND** the window stays open
 
 ### Requirement: An ordered row opens in place to its editing body
 
@@ -1232,25 +1278,26 @@ There is no "result" kind and no "ingredient" kind: the row does not name which 
 The CONTEXT the row is rendered in decides which kinds its select offers, and that is the only difference between the two sides.
 
 The kind vocabulary is closed.
-Two of the six are NOT yet shipped in this repository and are marked as such, because a vocabulary that presents a planned kind as a live one sends an implementer looking for code that does not exist:
+One of the six is NOT yet shipped in this repository and is marked as such, because a vocabulary that presents a planned kind as a live one sends an implementer looking for code that does not exist:
 
 - `component` — both sides.
 - `currency` — both sides.
 - `activity` — a completed activity, both sides.
   NOT SHIPPED here; it exists in the premium companion and enters this repository only with the work that needs it.
 - `knowledge` — recipe knowledge, RESULT only.
-  NOT SHIPPED here.
 - `tag` — INGREDIENT only.
 - `essence` — INGREDIENT only.
 
 `tag` and `essence` are ingredient-only because each describes a CLASS of thing to consume rather than a record, and a craft cannot produce a class.
 `knowledge` is result-only because knowing a recipe is something a craft grants and never something it consumes.
 At the commit that promoted the row, the shipped ingredient side offered `component`, `currency`, `essence` and `tag`; the shipped result side offered `component` alone, as did gathering task results and salvage.
+As of issue 1773 a recipe's non-progressive result set offers `component`, `currency` where the system takes part in currency and world units exist, and `knowledge` where learned knowledge is observable; a progressive result set, gathering task results and salvage offer `component` alone.
 
 The row's kind maps to the persisted model in one module and nowhere else.
 On the ingredient side the kind IS `Ingredient.match.type`, the row's `tag` being the model's `tags`; the subject is `match.componentId`, `match.essenceId` or `match.unit`, and the amount is `match.amount` for `currency` and `essence` and `Ingredient.quantity` otherwise.
 On the result side the kind is `Result.kind`, an absent `kind` being `component` as `data-models` specifies, and the amount is `quantity` beside `quantityFormula`.
-The row reads a result's kind and never writes it, and an unrecognised kind is rendered as a misconfiguration rather than as a component.
+The result subject is `componentId`, `unit` or `recipeId` by kind.
+The row writes a result's kind through that one module when the GM picks a kind, clearing the previous kind's value, and an unrecognised kind is rendered as a misconfiguration rather than as a component.
 
 Every row leads with a kind-tinted chip, and the tint is what makes a list of eight rows scannable before any label is read.
 `tag` MUST take the purple family, because it is the one kind in the set that matches any item carrying a value rather than naming one record, and that abstraction is the distinction the reader most needs at a glance.
@@ -1294,7 +1341,8 @@ That menu lists the offered kinds for the row’s context, each with its kind ti
 
 The offered subset belongs to the SURFACE and not to the row, and the kind select, the convert menu and the set's adders MUST all state the same subset.
 A downtime activity awards what a patron can hand over, so it offers `component`, `currency` and `knowledge` — teaching a recipe is a reward a patron can give.
-A gathering task offers `component` and `currency` alone: it hands over material the character carried back, and neither recipe knowledge nor a completed activity is something a wilderness task produces.
+A gathering task offers `component`, and `currency` once gathering currency ships; until then it offers `component` alone.
+It hands over material the character carried back, and neither recipe knowledge nor a completed activity is something a wilderness task produces.
 A row that offers a kind its surface cannot award is authoring that validation has to reject later.
 
 A `currency` row on the RESULT side opens a body for what the reward is CALLED and why the player gets it, because an amount of a currency states a quantity and no meaning.
@@ -1308,7 +1356,7 @@ Naming the adders after the kinds would state the menu's own list twice.
 #### Scenario: The same authoring surface is used for results
 
 - **WHEN** the row is rendered in a result context
-- **THEN** its kind select offers component, currency, activity and knowledge
+- **THEN** its kind select offers only the result kinds its surface awards — in a recipe, component, currency and knowledge
 - **AND** it offers neither tag nor essence
 
 #### Scenario: A tag requirement matches on more than one tag
@@ -1350,7 +1398,7 @@ Naming the adders after the kinds would state the menu's own list twice.
 #### Scenario: A gathering task offers fewer kinds than a downtime activity
 
 - **WHEN** a result row is rendered inside a gathering task
-- **THEN** its kind select offers component and currency alone
+- **THEN** its kind select offers component alone, gathering currency being NOT SHIPPED here
 - **AND** its convert menu and the set's adder offer that same subset
 
 ### Requirement: Simple and alchemy carry a reserved failure set
@@ -1677,6 +1725,7 @@ Each issue offers an action that moves focus to the offending control.
   Focus moves first and the announcement follows.
 
 The arrangement is fixed because validation is where a GM goes when something is wrong, which is the worst moment to make them learn a second layout.
+Its one implementation is `src/ui/svelte/components/EditorValidationSurface.svelte`, the library's `<ValidationSummary>`: the verdict and the grouped rows are one entry, not two.
 
 A row MAY carry one action of its own, `{ labelKey, descriptionKey?, onAction }`, for an issue whose fix is a single staged edit.
 It is drawn by the same button IN PLACE OF View, so each row still offers one verb; its accessible name composes as View's does, from the verb and the row's title, `descriptionKey` becomes its accessible description, and activating it runs the action instead of the focus move.
@@ -2033,6 +2082,8 @@ The following are recorded as compositions and MUST NOT be reintroduced as compo
 
 A premium panel is recorded as out of scope rather than as a composition: its only original content is marketing copy, which is a product decision, and binding copy to a component makes the offer untranslatable against a codebase where every primitive takes pre-localized strings.
 A toast and a bespoke destructive-confirmation panel are recorded as surfaces Foundry already owns.
+
+A validation list is recorded as MERGED into `<ValidationSummary>` by maintainer ruling 4 (2026-09-18), "One component, merge the entries": the grouped rows and the verdict are one tab drawn by one shipped surface, so a second name pointed at no implementation of its own.
 
 A control caption — a one-line sentence documenting the control directly above it — is recorded as a shape the set does not name, and is neither the standing-statement callout nor a mark.
 The deciding question is whether the sentence states something about the WORLD or captions a CONTROL: a callout owns the standing statement, which is true whether or not anything is drawn beside it, while a caption documents a control and says nothing about the world.

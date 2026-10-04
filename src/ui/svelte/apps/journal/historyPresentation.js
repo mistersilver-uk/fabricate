@@ -1,4 +1,6 @@
 /** Read-only presentation of the builder's entitled evidence, with no catalogue or runtime reads. */
+import { RESULT_KIND_GLYPHS } from '../../../presenters/resultKindGlyphs.js';
+
 import { formatCountRoll, formatGradedRoll } from './runDetailPresentation.js';
 
 const prefix = 'FABRICATE.App.Journal.History.';
@@ -42,6 +44,69 @@ export function presentCurrencySpends(spends, localize) {
       label: localize(`${prefix}CurrencySpent`),
       value: `${spend.amount} ${spend.unit}`,
     }));
+}
+
+/** The amount a credit's roll states, or '' for a fixed amount (issue 1645). */
+function rolledText(rolled, localize) {
+  return named(rolled?.formula) && finite(rolled?.total)
+    ? localize('FABRICATE.App.Journal.RolledAmount', {
+        formula: rolled.formula,
+        total: rolled.total,
+      })
+    : '';
+}
+
+/** What a grant says: its recipe was learned, or was already known. */
+const grantLabel = (grant, localize) =>
+  localize(
+    `${prefix}${grant?.outcome === 'alreadyKnown' ? 'RecipeAlreadyKnown' : 'RecipeLearned'}`
+  );
+
+const grantRecipe = (grant) => (named(grant?.recipeName) ? grant.recipeName : grant?.recipeId);
+
+/**
+ * One stage's currency credits and knowledge grants as label/value rows (issue 1773), as its
+ * currency spends are: a credit under its label with its amount, roll and reason as segments that
+ * wrap between rather than within, and a grant saying whether its recipe was learned or already
+ * known. `quantity` is what it banked.
+ */
+export function presentRewards(stage, localize) {
+  const credits = list(stage?.currencyCredits).map((credit, index) => {
+    const unit = named(credit.unitName) ? credit.unitName : credit.unit;
+    const notes = [rolledText(credit.rolled, localize), credit.reason].filter(named);
+    return {
+      id: `credit-${stage?.stepId ?? ''}-${index}`,
+      kind: 'currency',
+      icon: RESULT_KIND_GLYPHS.currency,
+      label: named(credit.label) ? credit.label : localize(`${prefix}CurrencyAwarded`),
+      value: [`${credit.amount} ${unit}`, ...notes.map((note) => ` · ${note}`)],
+      quantity: credit.amount,
+    };
+  });
+  const grants = list(stage?.knowledgeGrants).map((grant, index) => ({
+    id: `grant-${stage?.stepId ?? ''}-${index}`,
+    kind: 'knowledge',
+    icon: RESULT_KIND_GLYPHS.knowledge,
+    label: grantLabel(grant, localize),
+    value: grantRecipe(grant),
+    quantity: grant.outcome === 'alreadyKnown' ? 0 : 1,
+  }));
+  return [...credits, ...grants];
+}
+
+/** A recovery receipt's currency and grant rows: a spend or a credit by its unit and amount, and a
+ *  grant by what it says of its recipe, so a reconciling GM reads what a reward step paid. */
+export function presentReceiptFacts(receipt, localize) {
+  return [
+    ...list(receipt?.currencies).map((entry) => ({
+      label: entry.unit,
+      value: String(entry.amount ?? ''),
+    })),
+    ...list(receipt?.grants).map((grant) => ({
+      label: grantLabel(grant, localize),
+      value: grantRecipe(grant),
+    })),
+  ];
 }
 
 function checkText(check, localize) {
@@ -118,6 +183,7 @@ export function presentStage(stage, localize) {
     route: stage?.selectedRequirementSnapshot?.name || '',
     consumed: presentMaterials(stage?.consumedIngredients, localize),
     produced: presentMaterials(stage?.createdResults, localize),
+    rewards: presentRewards(stage, localize),
     tools: presentMaterials(stage?.usedTools, localize),
     essence: presentEssenceSpend(stage ?? {}, localize),
   };
@@ -146,8 +212,10 @@ function closedKey(run, stages, results) {
     if (recordedEmptyAwards(run, stages, results)) return 'ClosedFailedEmpty';
     return 'ClosedMissing';
   }
-  if (results.some((entry) => finite(entry.quantity) && Number(entry.quantity) > 0))
-    return 'ClosedSuccess';
+  const banked = (entry) => finite(entry.quantity) && Number(entry.quantity) > 0;
+  // A credit or a learned recipe is not in an inventory, so a run that rewarded one says "yours".
+  if (results.some((entry) => entry.kind && banked(entry))) return 'ClosedSuccessRewards';
+  if (results.some(banked)) return 'ClosedSuccess';
   return recordedEmptyAwards(run, stages, results) ? 'ClosedSuccessEmpty' : 'ClosedMissing';
 }
 
@@ -285,6 +353,7 @@ export function presentHistory(run, localize) {
         .filter(attempted)
         .map((stage) => presentStage(stage, localize));
   const results = presentMaterials(run?.createdResults, localize);
+  const rewards = stages.flatMap((stage) => stage.rewards);
   const multi = stages.length > 1;
   const mode = run?.gatheringYield?.mode;
   const gathering = run?.runType === 'gathering';
@@ -316,6 +385,9 @@ export function presentHistory(run, localize) {
         : run?.failureReason ||
           stages.find((entry) => entry.status === 'failed')?.detail?.failureText ||
           localize(`${prefix}FailureReason`),
-    closed: localize(`${prefix}${closedKey(run, stages, results)}`, { count: stages.length }),
+    rewards,
+    closed: localize(`${prefix}${closedKey(run, stages, [...results, ...rewards])}`, {
+      count: stages.length,
+    }),
   };
 }

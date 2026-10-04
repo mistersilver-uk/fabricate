@@ -75,7 +75,7 @@ export const NOT_A_PRIMITIVE = frozenTable(MANIFEST.notAPrimitive);
 
 /**
  * The ruled-out register, mirroring spec.md requirement "The ruled-out register is part of the
- * specification" and `library.html:1985-2002`.
+ * specification" and `library.html` section 15, Ruled out.
  */
 export const RULED_OUT = frozenTable(MANIFEST.ruledOut);
 

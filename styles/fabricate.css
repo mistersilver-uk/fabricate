@@ -134,8 +134,8 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #D0AC95;
   --fab-overlay-dark-05: rgb(17 26 35 / 5%);
-  --fab-overlay-dark-08: rgb(17 26 35 / 8%);
   --fab-overlay-dark-10: rgb(17 26 35 / 10%);
   --fab-overlay-dark-12: rgb(17 26 35 / 12%);
   --fab-overlay-dark-14: rgb(17 26 35 / 14%);
@@ -233,8 +233,8 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #FA8951;
   --fab-overlay-dark-05: rgb(0 0 0 / 5%);
-  --fab-overlay-dark-08: rgb(0 0 0 / 8%);
   --fab-overlay-dark-10: rgb(0 0 0 / 10%);
   --fab-overlay-dark-12: rgb(0 0 0 / 12%);
   --fab-overlay-dark-14: rgb(0 0 0 / 14%);
@@ -332,8 +332,8 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #BF977A;
   --fab-overlay-dark-05: rgb(20 18 20 / 5%);
-  --fab-overlay-dark-08: rgb(20 18 20 / 8%);
   --fab-overlay-dark-10: rgb(20 18 20 / 10%);
   --fab-overlay-dark-12: rgb(20 18 20 / 12%);
   --fab-overlay-dark-14: rgb(20 18 20 / 14%);
@@ -431,8 +431,8 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #D0AE8D;
   --fab-overlay-dark-05: rgb(22 28 25 / 5%);
-  --fab-overlay-dark-08: rgb(22 28 25 / 8%);
   --fab-overlay-dark-10: rgb(22 28 25 / 10%);
   --fab-overlay-dark-12: rgb(22 28 25 / 12%);
   --fab-overlay-dark-14: rgb(22 28 25 / 14%);
@@ -530,8 +530,8 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #D7B5AF;
   --fab-overlay-dark-05: rgb(18 24 36 / 5%);
-  --fab-overlay-dark-08: rgb(18 24 36 / 8%);
   --fab-overlay-dark-10: rgb(18 24 36 / 10%);
   --fab-overlay-dark-12: rgb(18 24 36 / 12%);
   --fab-overlay-dark-14: rgb(18 24 36 / 14%);
@@ -631,8 +631,8 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #AF7B62;
   --fab-overlay-dark-05: rgb(12 10 20 / 5%);
-  --fab-overlay-dark-08: rgb(12 10 20 / 8%);
   --fab-overlay-dark-10: rgb(12 10 20 / 10%);
   --fab-overlay-dark-12: rgb(12 10 20 / 12%);
   --fab-overlay-dark-14: rgb(12 10 20 / 14%);
@@ -730,8 +730,8 @@
   --fab-drop-rate-very-rare: #D86CCB;
   --fab-drop-rate-legendary: #E5C558;
   --fab-drop-rate-none: #E26F6B;
+  --fab-hazard-mid: #D89F78;
   --fab-overlay-dark-05: rgb(10 14 26 / 5%);
-  --fab-overlay-dark-08: rgb(10 14 26 / 8%);
   --fab-overlay-dark-10: rgb(10 14 26 / 10%);
   --fab-overlay-dark-12: rgb(10 14 26 / 12%);
   --fab-overlay-dark-14: rgb(10 14 26 / 14%);
@@ -15223,6 +15223,44 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* A tab's description is a sibling of the tablist (a tablist owns only tabs), placed against the caller's nearest positioned ancestor; the strip writes its tab's start-aligned, clamped position inline, and this above-and-end-aligned box is the fallback when nothing can be measured (issue 1779). */
+.fabricate-tabs ~ .fabricate-tabs-tooltip {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: calc(100% + 7px);
+  width: max-content;
+  max-width: min(260px, 100%);
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 6px;
+  background: var(--fab-bg-0);
+  color: var(--fab-text);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  translate: 0 3px;
+}
+
+.fabricate-tabs ~ .fabricate-tabs-tooltip.is-described {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  translate: 0 0;
+}
+
+/* The premium padlock tracks currency, not lockedness, and colours itself, so it does not follow the label's hover. */
+.fabricate-tabs .manager-editor-tab-lock {
+  color: var(--fab-text-subtle);
+  font-size: 7px;
+}
+
+.fabricate-tabs .manager-editor-tab-button.is-active .manager-editor-tab-lock {
+  color: var(--fab-accent);
+}
+
 .fabricate-manager .manager-editor-tab-panel {
   min-width: 0;
   min-height: 0;
@@ -16397,6 +16435,33 @@
   text-overflow: clip;
   white-space: normal;
   line-height: 1.4;
+}
+
+/* A credit or grant (issue 1773) spans the grid and wraps as a complication does, and stacks its sentence, its roll and its reason in the one label, the reason as de-emphasised context as a complication's source is. */
+.fabricate-craft-chat__item--reward {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+}
+
+.fabricate-craft-chat__item--reward .fabricate-craft-chat__label {
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.fabricate-craft-chat__reward-reason {
+  opacity: 0.72;
+}
+
+/* A reward's glyph sits centred in the 22px box an item image fills. */
+.fabricate-craft-chat__item--reward .fabricate-craft-chat__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
 }
 
 /* The runs inside that one label are separated by WEIGHT rather than by more punctuation — the renderer already joins them with an em dash, and a second visual separator on top of it reads as a list. */

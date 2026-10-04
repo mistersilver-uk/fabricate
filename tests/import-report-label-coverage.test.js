@@ -86,7 +86,15 @@ function everyReferencePayload() {
         ingredientSets: [
           { ingredientGroups: [{ options: [{ componentId: 'ghost-ingredient' }] }] },
         ],
-        resultGroups: [{ results: [{ componentId: 'ghost-result' }] }],
+        resultGroups: [
+          {
+            results: [
+              { componentId: 'ghost-result' },
+              { kind: 'currency', unit: 'ghost-unit', quantity: 1 },
+              { kind: 'knowledge', recipeId: 'ghost-recipe', quantity: 1 },
+            ],
+          },
+        ],
       },
     ],
     gatheringEnvironments: [

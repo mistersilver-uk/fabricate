@@ -75,10 +75,8 @@
   // M18 asked for the multi-step rail only (issue 1648, UX2-6).
   const stages = $derived(Array.isArray(run?.steps) ? run.steps : []);
   const showsStageRail = $derived(!hasGate && stages.length > 1);
-  // WHAT THE TRACKS DRAW, in one number. With no gate `progress` is null, so the progressbar
-  // published 0 beside three filled tracks and told a screen-reader user "Progress, 0" (issue
-  // 1648, UX2-5). The stage rail reports COMPLETED STAGES OVER TOTAL — the reading `RunProgress`
-  // renders — and a gated run keeps its clock fraction.
+  // What the tracks draw, in one number for the `data-run-progress` hook: the stage rail reports
+  // completed stages over total and a gated run keeps its clock fraction (issue 1648, UX2-5).
   const currentStageIndex = $derived(Math.max(0, Number(run?.stepIndex) || 0));
   const filledStages = $derived(
     stages.filter(
@@ -164,19 +162,12 @@
   {#if showsTiming}
     <div class="journal-run-card-timing">
       {#if progress !== null || showsStageRail}
-        <div
-          class="journal-run-card-progress"
-          role="progressbar"
-          aria-label={localize('FABRICATE.App.Journal.Progress.Label')}
-          aria-valuemin="0"
-          aria-valuemax="100"
-          aria-valuenow={accessiblePercent}
-          data-run-progress={accessiblePercent}
-        >
+        <div class="journal-run-card-progress" data-run-progress={accessiblePercent}>
           <RunProgress
             stages={stages.length > 0 ? stages : [{}]}
             current={currentStageIndex}
             progress={progressPercent}
+            ariaLabel={localize('FABRICATE.App.Journal.Progress.Label')}
           />
         </div>
       {/if}
@@ -318,12 +309,7 @@
     color: var(--fab-text-muted);
   }
 
-  /* THE ARIA STAYS ON THE CALLER, THE TRACK BECOMES THE PRIMITIVE (issue 1514). `FillBar` is
-     a leaf with no `role` and no `aria-*` of its own, so the element that used to BE the
-     track survives as the wrapper carrying `role="progressbar"` and the three `aria-value*`
-     attributes. What it no longer declares is any geometry: the height, the corner, the
-     ground and the fill are all the primitive's now. Only the full width stays, because a
-     `FillBar` is `flex: 1 1 auto` and this wrapper is a plain block. */
+  /* Width only: the roles are `StageBars`' own, a named group of stage progress bars. */
   .journal-run-card-progress {
     min-width: 56px;
     flex: 1 1 auto;

@@ -47,6 +47,11 @@ const harness = createMountedComponentHarness({
     'src/config/stackQuantityPathPresets.js',
     'src/gatheringImageDefaults.js',
     'src/ui/presenters/CraftingListingBuilder.js',
+    'src/ui/presenters/resultOutputRows.js',
+    // Issue 1773: a reward row's glyph and its unit's display name.
+    'src/ui/presenters/resultKindGlyphs.js',
+    'src/systems/currencyProfile.js',
+    'src/config/currencyPresets.js',
     // Issue 2005: the check card's roll-under or character-value target line.
     'src/ui/presenters/checkDescriptor.js',
     // Issue 2006: a count card's successes needed, read as the engine reads it.
@@ -122,6 +127,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/gatheringConditionIcons.js',
     'src/ui/svelte/util/gatheringFormat.js',
+    'src/ui/svelte/util/dropRateTier.js',
     'src/ui/svelte/util/ingredientOptionStatus.js',
     'src/ui/svelte/util/recipeDuration.js',
     'src/ui/svelte/util/bookRecipeBrowse.js',
@@ -178,6 +184,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
     'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
     'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
+    'src/ui/svelte/apps/crafting/detail/AwardPill.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
     // The shared complication summary row and the two leaves it renders (issue 1286).
@@ -191,6 +198,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
     'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',
     'src/ui/svelte/apps/crafting/detail/StepRequirementsList.svelte',
+    'src/ui/svelte/components/BandedBar.svelte',
     'src/ui/svelte/apps/gathering/ChanceBar.svelte',
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringDetail.svelte',
@@ -259,6 +267,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SlotRow.svelte',
     'src/ui/svelte/components/EssencePool.svelte',
     'src/ui/svelte/components/RunProgress.svelte',
+    'src/ui/svelte/components/StageBars.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/StageNav.svelte',
     'src/ui/svelte/components/StageCard.svelte',

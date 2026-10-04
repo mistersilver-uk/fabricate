@@ -71,6 +71,7 @@ import {
   deriveBrowseStatus,
 } from './craftingBrowseStatus.js';
 import { heldToolBonus } from './heldToolBonus.js';
+import { resultOutputRows, resultSignature, taughtNameReader } from './resultOutputRows.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 
 /**
@@ -343,6 +344,12 @@ export class CraftingListingBuilder {
       craftingActor,
       craftSources,
       knowledgeSources,
+      taughtName: taughtNameReader(this, {
+        isGM,
+        viewer: resolvedViewer,
+        craftingActor,
+        knowledgeSources,
+      }),
     });
   }
 
@@ -455,7 +462,15 @@ export class CraftingListingBuilder {
    * Project a single visible recipe into its `RecipeListingModel`.
    * @private
    */
-  _buildRecipeModel({ recipe, access, isGM, craftingActor, craftSources, knowledgeSources }) {
+  _buildRecipeModel({
+    recipe,
+    access,
+    isGM,
+    craftingActor,
+    craftSources,
+    knowledgeSources,
+    taughtName,
+  }) {
     const system = this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null;
     const mode = stringOrEmpty(system?.resolutionMode) || 'simple';
     const modeLabel = this.localize(
@@ -474,22 +489,9 @@ export class CraftingListingBuilder {
     const base = {
       id: stringOrNull(recipe.id),
       name: stringOrEmpty(recipe.name),
-      // A recipe's icon is its OWN `img` and nothing else — `data-models/spec.md`
-      // `## Recipe` requirement 16. This previously borrowed the containing book's
-      // artwork ahead of an authored image, keyed on the legacy `recipe.recipeItemId`
-      // scalar; book membership is many-to-many, so "the containing book" tracked
-      // definition order rather than anything the GM authored (issue 884, the rule; issue
-      // 887 shipped the removal of the last borrows).
-      //
-      // `resolveRecipeImage` rather than `recipe.img` directly: Foundry's generic
-      // item-bag is the "no image" sentinel, and collapsing without it would render the
-      // BAG for a bag-valued recipe — which `tests/recipe-prompt-img.test.js` records as
-      // an explicit product requirement never to do. The helper is an import-free leaf
-      // already in `CRAFTING_APP_RAW_MODULES`, so this import adds no harness edge; do
-      // NOT reach for `models/Recipe.js` here, which would.
-      //
-      // Redaction no longer needs a branch: with no borrowed item image there is nothing
-      // for an undiscovered recipe's teaser to leak.
+      // A recipe's icon is its OWN `img` and nothing else (`data-models` Recipe requirement 16,
+      // issues 884 and 887), through `resolveRecipeImage` so Foundry's item-bag sentinel never
+      // renders (`tests/recipe-prompt-img.test.js`); an import-free leaf, unlike `models/Recipe.js`.
       img: stringOrNull(resolveRecipeImage(recipe)),
       systemId: stringOrNull(recipe.craftingSystemId),
       systemName: stringOrEmpty(system?.name),
@@ -507,7 +509,7 @@ export class CraftingListingBuilder {
     };
 
     if (redacted) {
-      return this._buildTeaserModel({ base, recipe, system, mode, hidden });
+      return this._buildTeaserModel({ base, recipe, system, mode, hidden, taughtName });
     }
 
     // An explicit multi-step recipe stores its sets on `steps[]` and leaves the raw
@@ -534,6 +536,7 @@ export class CraftingListingBuilder {
       step: firstStep,
       craftSources,
       craftingActor,
+      taughtName,
     });
 
     // Craft-button craftability evaluates the first step's sets over the UNION of
@@ -596,13 +599,13 @@ export class CraftingListingBuilder {
         ...ingredientSets.map((row) => row.craftability?.toolStates),
         ...(ingredientSets.length === 0 ? [fullCraftability?.toolStates] : []),
       ]),
-      outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
+      outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode, taughtName }),
       duration: this._buildDuration({ recipe, system, mode }),
-      result: this._buildResult({ recipe, system, mode, defaultSet }),
+      result: this._buildResult({ recipe, system, mode, defaultSet, taughtName }),
       // Per-step requirement projection (`simple` multi-step only; [] otherwise). Each
       // entry carries the step's label, its per-set craftability (tool union applied)
       // and the components it produces. See Multi-Step Recipe Presentation.
-      steps: this._buildSteps({ recipe, system, mode, craftSources, craftingActor }),
+      steps: this._buildSteps({ recipe, system, mode, craftSources, craftingActor, taughtName }),
       // The ordered stage list (progressive only; [] otherwise) — the F1 fix.
       progressiveStages: this._buildProgressiveStages({ recipe, system, mode }),
       // GM policy: may this player reorder the stages? Default true (issue 651).
@@ -621,14 +624,26 @@ export class CraftingListingBuilder {
    * `routedByCheck` awards per outcome tier, not per set, so its rows carry no products.
    * @private
    */
-  _buildIngredientSetRows({ recipe, system, mode, sets, step, craftSources, craftingActor }) {
+  _buildIngredientSetRows({
+    recipe,
+    system,
+    mode,
+    sets,
+    step,
+    craftSources,
+    craftingActor,
+    taughtName,
+  }) {
     return sets.map((set, idx) => ({
       id: stringOrNull(set.id),
       label:
         stringOrEmpty(set.name) ||
         this.localize('FABRICATE.App.Crafting.IngredientSetFallback', { index: idx + 1 }),
       craftability: this._evaluateSet({ recipe, set, step, craftSources, craftingActor }),
-      products: mode === 'routedByCheck' ? [] : this._productsForSet({ recipe, system, set, step }),
+      products:
+        mode === 'routedByCheck'
+          ? []
+          : this._productsForSet({ recipe, system, set, step, taughtName }),
     }));
   }
 
@@ -638,7 +653,7 @@ export class CraftingListingBuilder {
    * computed or surfaced for an undiscovered recipe.
    * @private
    */
-  _buildTeaserModel({ base, recipe, system, mode, hidden }) {
+  _buildTeaserModel({ base, recipe, system, mode, hidden, taughtName }) {
     const showIngredients = !hidden.has('ingredients');
     const showResults = !hidden.has('results');
     const showDescription = !hidden.has('description');
@@ -676,13 +691,16 @@ export class CraftingListingBuilder {
       // A teaser surfaces no step data, redacted exactly as `result`/`outcomeTiers`.
       steps: [],
       check: showResults ? this._buildCheck(system, mode, recipe) : null,
-      outcomeTiers: showResults ? this._buildOutcomeTiers({ recipe, system, mode }) : null,
+      outcomeTiers: showResults
+        ? this._buildOutcomeTiers({ recipe, system, mode, taughtName })
+        : null,
       result: showResults
         ? this._buildResult({
             recipe,
             system,
             mode,
             defaultSet: firstStepSets?.[0] ?? null,
+            taughtName,
           })
         : { items: [], timeLabel: null, xp: null },
       // Redacted exactly as `result`/`outcomeTiers` above. A teaser is shown to a player
@@ -799,11 +817,11 @@ export class CraftingListingBuilder {
    * exactly one ingredient set per step, so each entry carries exactly one set.
    * @private
    */
-  _buildSteps({ recipe, system, mode, craftSources, craftingActor }) {
+  _buildSteps({ recipe, system, mode, craftSources, craftingActor, taughtName }) {
     if (mode !== 'simple') return [];
     const steps = this._executionSteps(recipe);
     if (steps.length <= 1) return [];
-    const rowContext = { recipe, system, mode, craftSources, craftingActor };
+    const rowContext = { recipe, system, mode, craftSources, craftingActor, taughtName };
     return steps.map((step, index) => {
       const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
       return {
@@ -817,7 +835,7 @@ export class CraftingListingBuilder {
         // Retained deliberately as groundwork for a future non-`simple` step renderer
         // (intermediate yields are meaningful there) and to keep the entry shape
         // symmetric with `ingredientSets[]`; not rendered under the inputs-only body.
-        products: this._productsForSet({ recipe, system, set: sets[0] ?? null, step }),
+        products: this._productsForSet({ recipe, system, set: sets[0] ?? null, step, taughtName }),
       };
     });
   }
@@ -1084,7 +1102,7 @@ export class CraftingListingBuilder {
    *   awardedResults: Array<{name: string, img: string|null, qty: number}>}>|null}
    * @private
    */
-  _buildOutcomeTiers({ recipe, system, mode }) {
+  _buildOutcomeTiers({ recipe, system, mode, taughtName }) {
     if (mode !== 'routedByCheck') return null;
     const routed = system?.craftingCheck?.routed ?? null;
     const tiers = routed?.type === 'fixed' ? routed.fixedOutcomes : routed?.relativeOutcomes;
@@ -1112,7 +1130,9 @@ export class CraftingListingBuilder {
         id: stringOrNull(tier?.id),
         names: [stringOrEmpty(tier?.name)],
         success,
-        awardedResults: success ? this._resultItemsFromGroups(resolvedGroups, system) : [],
+        awardedResults: success
+          ? this._resultItemsFromGroups(resolvedGroups, { system, recipe, taughtName })
+          : [],
       };
       byKey.set(key, entry);
       groups.push(entry);
@@ -1120,21 +1140,9 @@ export class CraftingListingBuilder {
     return groups;
   }
 
-  /**
-   * Canonical, order-independent signature of a set of resolved result groups,
-   * built from `componentId` + `quantity` pairs (not resolved names) so unknown or
-   * renamed components still group correctly. Empty/failure resolves to `''`.
-   * @private
-   */
+  /** See `resultSignature`: what each result awards and its count, order-independent. @private */
   _resultSignature(groups) {
-    if (!Array.isArray(groups) || groups.length === 0) return '';
-    const pairs = [];
-    for (const group of groups) {
-      for (const result of group?.results ?? []) {
-        pairs.push(`${stringOrEmpty(result?.componentId)}:${Number(result?.quantity || 1)}`);
-      }
-    }
-    return pairs.sort((a, b) => a.localeCompare(b)).join(',');
+    return resultSignature(groups);
   }
 
   /**
@@ -1142,9 +1150,9 @@ export class CraftingListingBuilder {
    * is per-tier (see `outcomeTiers`), so the top-level item list is empty.
    * @private
    */
-  _buildResult({ recipe, system, mode, defaultSet }) {
+  _buildResult({ recipe, system, mode, defaultSet, taughtName }) {
     return {
-      items: this._resultItems({ recipe, system, mode, defaultSet }),
+      items: this._resultItems({ recipe, system, mode, defaultSet, taughtName }),
       timeLabel: null,
       xp: null,
     };
@@ -1157,13 +1165,14 @@ export class CraftingListingBuilder {
    * case where the player's chosen route, not the step, decides the row.
    * @private
    */
-  _resultItems({ recipe, system, mode, defaultSet }) {
+  _resultItems({ recipe, system, mode, defaultSet, taughtName }) {
     if (mode === 'routedByCheck') return [];
     if (mode !== 'simple' && this._executionSteps(recipe).length <= 1) {
-      return this._productsForSet({ recipe, system, set: defaultSet });
+      return this._productsForSet({ recipe, system, set: defaultSet, taughtName });
     }
     const step = this._productStep(recipe);
-    return this._productsForSet({ recipe, system, set: step?.ingredientSets?.[0] ?? null, step });
+    const set = step?.ingredientSets?.[0] ?? null;
+    return this._productsForSet({ recipe, system, set, step, taughtName });
   }
 
   /**
@@ -1173,7 +1182,7 @@ export class CraftingListingBuilder {
    * per-option product grid and the default set's expected output.
    * @private
    */
-  _productsForSet({ recipe, system, set, step = null }) {
+  _productsForSet({ recipe, system, set, step = null, taughtName = null }) {
     const resolvedStep = step ?? this._firstStep(recipe);
     const resolved = this.resolutionModeService?.resolveResultGroups?.({
       recipe,
@@ -1181,7 +1190,7 @@ export class CraftingListingBuilder {
       ingredientSet: set,
       checkResult: null,
     });
-    return this._resultItemsFromGroups(resolved?.groups, system);
+    return this._resultItemsFromGroups(resolved?.groups, { system, recipe, taughtName });
   }
 
   /**
@@ -1316,26 +1325,12 @@ export class CraftingListingBuilder {
     });
   }
 
-  /**
-   * Flatten resolved result groups into display item rows, resolving each
-   * component id against the system's component library for name/img.
-   * @private
-   */
-  _resultItemsFromGroups(groups, system) {
-    if (!Array.isArray(groups) || groups.length === 0) return [];
-    const components = resolvedComponentsFor(system);
-    const byId = new Map(components.map((component) => [component.id, component]));
-    const items = [];
-    for (const group of groups) {
-      for (const result of group?.results ?? []) {
-        const component = result?.componentId ? byId.get(result.componentId) : null;
-        items.push({
-          name: stringOrEmpty(component?.name) || this.localize(UNKNOWN_COMPONENT_KEY),
-          img: stringOrNull(component?.img),
-          qty: Number(result?.quantity || 1),
-        });
-      }
-    }
-    return items;
+  /** Resolved result groups as display rows of every kind (`resultOutputRows`), a currency row
+   *  naming its unit from the recipe's world units and a taught recipe named only through
+   *  `taughtName`, so a caller that passes none redacts it. @private */
+  _resultItemsFromGroups(groups, { system, recipe, taughtName = null }) {
+    const { recipeManager, localize } = this;
+    const currencyUnits = () => recipeManager?._resolveNormalizedCurrencyUnits?.(recipe) ?? [];
+    return resultOutputRows(groups, { system, currencyUnits, taughtName, localize });
   }
 }

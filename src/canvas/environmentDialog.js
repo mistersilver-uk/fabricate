@@ -31,10 +31,13 @@ export async function promptDropEnvironment({
     })
     .join('');
   const label = t('FABRICATE.Canvas.Interactable.EnvironmentDialogLabel', 'Environment');
+  // ratchet-exempt(design-system): a one-shot GM pick that gates the drop; DialogV2
+  // re-serialises its body, so the select stays native
+  const select = `<select name="environmentId">${options}</select>`;
   const content = `<div class="fabricate-canvas-env-dialog">
     <p>${escapeHtml(t('FABRICATE.Canvas.Interactable.EnvironmentDialogHint', 'Choose the gathering environment for this resource node.'))}</p>
     <label>${escapeHtml(label)}
-      <select name="environmentId">${options}</select>
+      ${select}
     </label>
     <p class="fabricate-canvas-env-dialog-modifier-hint">${escapeHtml(t('FABRICATE.Canvas.Interactable.DropModifierHint', 'Hold Alt while dropping to always choose the environment manually.'))}</p>
   </div>`;

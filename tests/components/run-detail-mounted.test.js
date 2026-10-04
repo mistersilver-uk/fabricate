@@ -51,6 +51,8 @@ const harness = createMountedComponentHarness({
     'src/systems/foundryCalendar.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
     'src/ui/svelte/apps/journal/historyPresentation.js',
+    // Issue 1773: a reward row's glyph.
+    'src/ui/presenters/resultKindGlyphs.js',
     'src/ui/svelte/apps/journal/runStateNotice.js',
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
     // The roll line signs an executed margin with the shared formatter (issue 2005).
@@ -78,6 +80,7 @@ const harness = createMountedComponentHarness({
       'ChoiceOptionList',
       'EssencePool',
       'RunProgress',
+      'StageBars',
       'StageNav',
       'StageCard',
       'YieldScale',
@@ -718,6 +721,43 @@ describe('RunDetail mounted behavior', () => {
       Boolean(body.querySelector('.fab-notice-title')),
       'the title still sits beside the glyph'
     );
+  });
+
+  // Issue 1773: a reward-only craft's credit and grant are stated in the banner the moment it ends.
+  it('states a just-finished credit and grant in the run-completed banner', async () => {
+    const { model } = await createPersistedCraftingHistory({ stageCount: 1 });
+    const run = structuredClone(model);
+    run.createdResults = [];
+    Object.assign(run.steps[0], {
+      consumedIngredients: [],
+      createdResults: [],
+      currencyCredits: [
+        { resultId: 'coin', unit: 'gp', unitName: 'gp', amount: 9, label: 'Guild bounty' },
+      ],
+      knowledgeGrants: [
+        {
+          resultId: 'lore',
+          recipeId: 'r-sword',
+          recipeName: 'Forge Longsword',
+          outcome: 'granted',
+        },
+      ],
+    });
+    const target = await harness.mount({ run, journal: { commandResult: { runKey: run.key } } });
+    const band = target.querySelector(':scope [data-journal-verdict] .fab-notice-evidence');
+    assert.ok(Boolean(band), 'the banner keeps its evidence band');
+    const facts = [...band.querySelectorAll('[data-journal-fact]')].map((row) =>
+      row.textContent.replaceAll(/\s+/g, ' ').trim()
+    );
+    assert.ok(
+      facts.some((fact) => /Guild bounty\s*9 gp/.test(fact)),
+      facts.join(' | ')
+    );
+    assert.ok(
+      facts.some((fact) => /Forge Longsword/.test(fact)),
+      facts.join(' | ')
+    );
+    assert.ok(Boolean(band.querySelector(':scope [data-journal-fact] i.fa-coins')));
   });
 
   // Issue 1648, M22. `Notice` renders its evidence band whenever the prop is supplied.

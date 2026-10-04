@@ -469,6 +469,7 @@
     !['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple')
   );
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
+  const essenceOptions = $derived(canShowEssences ? selectedSystem?.essenceDefinitions || [] : []);
   // Experimental toggle (issue 745): the Crafting group is now unconditional; this
   // gate only decides whether the unimplemented Graph placeholder is advertised.
   const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
@@ -5523,9 +5524,7 @@
         focusValidationNonce={toolValidationFocusNonce}
         managedItems={selectedSystem?.managedItemOptions || []}
         itemTags={selectedSystem?.itemTags || []}
-        essenceOptions={selectedSystem?.features?.essences === true
-          ? selectedSystem?.essenceDefinitions || []
-          : []}
+        {essenceOptions}
         currencyUnits={selectedCurrencyUnits}
         currencyEnabled={selectedCurrencyEnabled}
         prerequisiteOptions={selectedCharacterPrerequisites}
@@ -5690,9 +5689,7 @@
         toolsLibrary={recipeToolsLibrary}
         componentOptions={selectedSystem?.managedItemOptions || []}
         componentTagOptions={selectedSystem?.componentTagOptions || []}
-        essenceOptions={selectedSystem?.features?.essences
-          ? selectedSystem?.essenceDefinitions || []
-          : []}
+        {essenceOptions}
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
         checkEvaluation={recipeCheckTierEvaluation}
@@ -6326,9 +6323,9 @@
               recipeCount={($viewState.recipes || []).length}
               componentCount={selectedCounts.components}
               componentOptions={selectedSystem?.managedItemOptions || []}
-              essenceOptions={selectedSystem?.features?.essences
-                ? selectedSystem?.essenceDefinitions || []
-                : []}
+              {essenceOptions}
+              recipeOptions={$viewState.recipes || []}
+              currencyUnits={selectedCurrencyUnits}
               {showRecipeCategories}
               showVisibilitySummary={$viewState.showVisibilitySummary}
               onEdit={() => editRecipe(selectedRecipe?.id)}

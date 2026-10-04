@@ -39,10 +39,15 @@ const slotRowHarness = createHarness('SlotRow', [
 ]);
 const essenceHarness = createHarness('EssencePool', [
   component('FillBar'),
+  component('Meter'),
   component('Medallion'),
   component('Stepper'),
 ]);
-const progressHarness = createHarness('RunProgress', [component('FillBar')]);
+const progressHarness = createHarness(
+  'RunProgress',
+  [component('FillBar'), component('StageBars')],
+  [...FOUNDRY_BRIDGE_RAW_MODULES]
+);
 const stageNavHarness = createHarness('StageNav', [component('IconButton'), component('Button')]);
 const resultModules = ['ListRow', 'Medallion', 'Chip'].map(component);
 const stageCardHarness = createHarness('StageCard', [...resultModules, component('Kicker')]);
@@ -533,6 +538,7 @@ describe('run primitives mounted behavior', () => {
       held: () => 3,
       spare: () => 1,
       essenceLabel: (essence) => `${essence} channelled`,
+      meterValueLabel: (got, need) => `${got} of ${need}`,
       sourceReading: (_source, contributions, held, spare) =>
         `${contributions.map((entry) => `+${entry.amount} ${entry.label}`).join(' · ')} each · ${held} held · ${spare} spare`,
       overshootLabel: (essence, amount) => `${essence} is ${amount} over the requirement`,
@@ -546,11 +552,18 @@ describe('run primitives mounted behavior', () => {
     assert.equal(target.querySelector('[data-essence-total="shadow"]').textContent.trim(), '4 / 3');
     assert.equal(
       target
-        .querySelector(':scope [data-essence-threshold="shadow"] [role="progressbar"]')
+        .querySelector(':scope [data-essence-threshold="shadow"] [role="meter"]')
         .getAttribute('aria-valuenow'),
       '3',
-      'overshoot does not put the progressbar value beyond its maximum'
+      'overshoot does not put the meter value beyond its maximum'
     );
+    const radiant = target.querySelector('[data-essence-threshold="radiant"]');
+    const head = radiant.querySelector('.fab-essence-name');
+    const radiantMeter = radiant.querySelector('[role="meter"]');
+    assert.ok(head.id, 'the drawn essence name carries an id');
+    assert.equal(radiantMeter.getAttribute('aria-labelledby'), head.id, 'and names the meter');
+    assert.ok(!radiantMeter.querySelector('.visually-hidden'), 'no second copy of the name');
+    assert.equal(radiantMeter.getAttribute('aria-valuetext'), '4 of 4', 'the caller words the reading');
     const overshoot = target.querySelector('[data-essence-overshoot]');
     assert.match(overshoot.textContent, /shadow channelled is 1 over/u);
     assert.ok(
@@ -581,9 +594,17 @@ describe('run primitives mounted behavior', () => {
       blocker: 'Materials needed',
       label: 'Progress',
     });
-    assert.equal(progress.querySelectorAll('[data-run-progress-track]').length, 8);
+    assert.equal(progress.querySelectorAll('[data-stage-bars-stage]').length, 8);
     assert.equal(progress.querySelector('[data-run-progress-blocker]').textContent, 'Materials needed');
-    expectGeometry('RunProgress', '.fab-run-progress-track', [/height:\s*6px/u, /border-radius:\s*999px/u]);
+    const group = progress.querySelector('[role="group"]');
+    assert.equal(
+      group.getAttribute('aria-labelledby'),
+      progress.querySelector('.fab-run-progress-kicker').id,
+      'the drawn kicker names the stage group'
+    );
+    assert.ok(!group.hasAttribute('aria-label'), 'exactly one naming route');
+    assert.ok(!group.querySelector('.fab-stage-bars-caption'), 'the run heading draws no captions');
+    expectGeometry('StageBars', '.fab-stage-bars-track', [/height:\s*6px/u, /border-radius:\s*999px/u]);
 
     const nav = await stageNavHarness.mount({
       stages,

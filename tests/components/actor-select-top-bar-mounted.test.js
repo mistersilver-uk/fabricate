@@ -42,6 +42,8 @@ const harness = createMountedComponentHarness({
     // renders`, citing this file, that module and the tree that renders it.
     'src/ui/svelte/components/Avatar.svelte',
     'src/ui/svelte/components/FillBar.svelte',
+    // The stamina strip's `Meter` (issue 1782), which draws the fill leaf above.
+    'src/ui/svelte/components/Meter.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
     'src/ui/svelte/apps/ActorSelectTopBar.svelte'
   ],
@@ -137,6 +139,15 @@ describe('ActorSelectTopBar mounted behavior', () => {
       '',
       'the 72px pin is a scoped rule on the wrapper, not an inline width'
     );
+    // Issue 1782: no frame can show this strip, so its role is held here. It is a `meter`
+    // named by a visually hidden label, reading the pool as its value text.
+    const meter = bar.querySelector(':scope .actor-bar-stamina-track [role="meter"]');
+    assert.ok(Boolean(meter), 'the stamina strip is a meter inside its width pin');
+    const name = meter.querySelector('.visually-hidden');
+    assert.equal(meter.getAttribute('aria-labelledby'), name.id, 'named by its hidden label');
+    assert.equal(name.textContent, 'FABRICATE.App.ActorBar.Stamina');
+    assert.equal(meter.getAttribute('aria-valuenow'), '40');
+    assert.match(meter.getAttribute('aria-valuetext'), /^FABRICATE\.App\.ActorBar\.StaminaValue/);
   });
 
   it('hides the stamina bar when there is no pool or off the gathering tab', async () => {

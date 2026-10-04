@@ -4,6 +4,8 @@
  */
 
 import { isFixedSumOver } from '../../systems/checkTarget.js';
+import { currencyUnitDisplayName, findCurrencyUnit } from '../../systems/currencyProfile.js';
+import { RESULT_KIND_GLYPHS } from '../presenters/resultKindGlyphs.js';
 
 import {
   buildEntityBrowserModel,
@@ -443,7 +445,34 @@ function amountLabelOf(result) {
 }
 
 /**
- * One Produces row per result item, in authoring order, tagged with the result GROUP it belongs to.
+ * A non-component result's own fields (issue 1773): its kind, what names it and its glyph. A
+ * currency row states its amount with its unit's display name, never a generated unit id, and a
+ * knowledge row names the recipe it teaches from `recipeOptions` (the GM reads every name).
+ */
+function rewardProduceFields(result, rosters) {
+  if (result?.kind === 'currency') {
+    const unit = findCurrencyUnit(rosters.currencyUnits, result.unit);
+    const unitName = currencyUnitDisplayName(unit) || result.unit || '';
+    return {
+      kind: 'currency',
+      unit: result.unit || '',
+      name: result.label || '',
+      icon: RESULT_KIND_GLYPHS.currency,
+      amountLabel: `${amountLabelOf(result)} ${unitName}`.trim(),
+    };
+  }
+  const taught = findById(rosters.recipeOptions, result?.recipeId);
+  return {
+    kind: 'knowledge',
+    recipeId: result?.recipeId || '',
+    name: taught?.name || '',
+    icon: RESULT_KIND_GLYPHS.knowledge,
+  };
+}
+
+/**
+ * One Produces row per result item, in authoring order, tagged with the result GROUP it belongs to;
+ * a currency or knowledge row adds its kind and names itself rather than a component.
  */
 export function buildRecipeProduceRows(recipe, rosters = {}) {
   const components = rosters.componentOptions;
@@ -474,6 +503,8 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
           // The reserved alchemy-Simple failure group: what a FAILED craft makes.
           failure: group?.role === 'failure',
           scopeName: scope.multi ? scope.name : '',
+          ...((result?.kind ?? 'component') !== 'component' &&
+            rewardProduceFields(result, rosters)),
         });
       }
     }

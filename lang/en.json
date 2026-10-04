@@ -18,6 +18,9 @@
         "Expand": "Show details for {name}",
         "Collapse": "Hide details for {name}"
       },
+      "StageBars": {
+        "Unnamed": "Stage {index} of {count}"
+      },
       "DiceTiles": {
         "Generated": "rolled by an explosion",
         "More": "+{count} more",
@@ -841,6 +844,7 @@
       "ActorBar": {
         "Trigger": "Select a character",
         "Stamina": "Stamina",
+        "StaminaValue": "{current} of {max}",
         "SearchPlaceholder": "Search characters…",
         "SearchLabel": "Search characters",
         "NoActorsTitle": "No selectable characters",
@@ -976,7 +980,10 @@
           "ChooseShortOption": "Choose {name}: you have {have}, and this needs {need}.",
           "OptionSelected": "Selected",
           "CurrencyCost": "{amount} {unit}",
-          "CurrencyUnaffordable": "Not enough {unit}"
+          "CurrencyUnaffordable": "Not enough {unit}",
+          "RecipeKnowledge": "Recipe knowledge",
+          "CurrencyReward": "Currency",
+          "UnknownRecipe": "Unknown recipe"
         },
         "Slots": {
           "Title": "Requirements",
@@ -1008,7 +1015,8 @@
           "YourSelection": "Your selection",
           "Owned": "You own {count}.",
           "Contribution": "{amount} {name}",
-          "Meter": "{name} has {delivered} of {need} delivered.",
+          "MeterLabel": "{name} delivered",
+          "MeterValue": "{delivered} of {need}",
           "Overshoot": "{essence}: {amount} more than required",
           "Allocate": "Units of {name} to spend",
           "AllocateLess": "Spend one less {name}",
@@ -1176,6 +1184,9 @@
         "History": {
           "Title": "Finished",
           "UnknownMaterial": "Unknown material",
+          "CurrencyAwarded": "Currency awarded",
+          "RecipeLearned": "Recipe learned",
+          "RecipeAlreadyKnown": "Recipe already known",
           "NotRecorded": "Not recorded",
           "NoCheck": "No check — it simply completes",
           "NoRoll": "No roll — collecting takes it all",
@@ -1243,6 +1254,7 @@
           "OutcomeLog": "How the check landed",
           "Outcome": "Recorded outcome",
           "ClosedSuccess": "A closed run. Its results are already in your inventory; the entry stays here as a record.",
+          "ClosedSuccessRewards": "A closed run. Its results are already yours; the entry stays here as a record.",
           "ClosedFailedCheck": "This run failed its final check. Failed runs are kept so you can see what was attempted and when.",
           "ClosedFailedEmpty": "This run could not meet what it needed, so nothing was produced. Failed runs are kept so you can see what was attempted and when.",
           "ClosedFailureAwards": "This run failed, but the results recorded above were awarded. Failed runs are kept so you can see what was attempted and when.",
@@ -1911,7 +1923,9 @@
       "TierStepDown": "Stepped down {steps} tier(s)",
       "TierStepTarget": "Stepped to a target tier",
       "RolledAmount": "Rolled {formula} = {total}",
-      "RolledAmountEmpty": "Rolled {formula} = {total}, nothing produced"
+      "RolledAmountEmpty": "Rolled {formula} = {total}, nothing produced",
+      "RecipeLearned": "Learned the recipe {recipe}",
+      "RecipeAlreadyKnown": "Already knew the recipe {recipe}"
     },
     "Check": {
       "Roll": {
@@ -2240,6 +2254,8 @@
           "macro": "Macros",
           "dropRowItem": "Drop-row items",
           "componentLink": "Component links",
+          "recipeLink": "Taught recipe links",
+          "currencyUnit": "Currency reward units",
           "taskLink": "Task links",
           "eventLink": "Event links",
           "recipeItem": "Recipe item links",
@@ -8304,8 +8320,6 @@
         "NoManagedItems": "No Components",
         "NoManagedItemsHint": "Drag in world or compendium items to build this system's item library.",
         "NoSystemHint": "Create or select a crafting system to manage components.",
-        "Tags": "Tags",
-        "Essences": "Essences",
         "Salvage": "Salvage",
         "SalvageQuantity": "Uses {count}",
         "SalvageTools": "Tools {count}",
@@ -8354,18 +8368,13 @@
           "Summary": "Imported {added} new, updated {updated}, skipped {skipped} of {total} items with folder categories and tags."
         },
         "Editor": {
-          "WindowTitle": "Edit {name}",
           "HintTagsAndEssences": "Edit this component's tags and essences.",
           "HintTagsOnly": "Edit this component's tags.",
           "HintEssencesOnly": "Edit this component's essences.",
           "NoEditableFields": "No editable component fields are enabled for this system.",
-          "NoTagsDefined": "No tags defined in this system.",
-          "NoEssencesDefined": "No essences defined in this system.",
           "IncrementEssence": "Increase {name}",
           "DecrementEssence": "Decrease {name}",
-          "QuantityLabel": "{name} quantity",
-          "Save": "Save Component",
-          "Cancel": "Cancel"
+          "QuantityLabel": "{name} quantity"
         }
       },
       "Environments": {

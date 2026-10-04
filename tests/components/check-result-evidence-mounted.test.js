@@ -44,6 +44,7 @@ const TILES = 'src/ui/svelte/components/DiceTiles.svelte';
 const MEDALLION = 'src/ui/svelte/components/Medallion.svelte';
 const INSPECTOR_CARD = 'src/ui/svelte/components/InspectorCard.svelte';
 const RESULT_BOX = 'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte';
+const AWARD_PILL = 'src/ui/svelte/apps/crafting/detail/AwardPill.svelte';
 const SALVAGE_SUMMARY = 'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte';
 const CHECK_CARD = 'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte';
 
@@ -115,7 +116,7 @@ describe('RollResultBox evidence rows', () => {
   const harness = createMountedComponentHarness({
     ...SHARED,
     tmpPrefix: 'fabricate-roll-result-evidence-',
-    compiledModules: [MEDALLION, INSPECTOR_CARD, FACT_ROW, TILES, EVIDENCE, RESULT_BOX],
+    compiledModules: [MEDALLION, INSPECTOR_CARD, FACT_ROW, TILES, EVIDENCE, AWARD_PILL, RESULT_BOX],
     componentPath: RESULT_BOX,
   });
   before(async () => {

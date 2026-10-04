@@ -48,6 +48,25 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/RunProgress.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
   ]),
+  // The instruments over the fill leaf (issue 1782): the run detail's stage track and a run card's.
+  'src/ui/svelte/components/StageBars.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-past-stage',
+    'fabricate-journal-lifecycle-waiting-auto-eligible',
+  ]),
+  // The crafting essence pool's requirement meters and the journal's shared essence stage.
+  'src/ui/svelte/components/Meter.svelte': Object.freeze([
+    'player-crafting-essence-pool',
+    'fabricate-journal-lifecycle-essence-shared',
+  ]),
+  // One chance bar of each scale, and the Checks Studio's odds histogram and one-outcome chart.
+  'src/ui/svelte/components/BandedBar.svelte': Object.freeze([
+    'player-gathering-task-ready',
+    'player-gathering-events',
+    'manager-checks-crafting-odds-enumerable',
+    'manager-checks-count-botch-odds',
+  ]),
+  // The bare leaf's one remaining caller: an opened gathering drop row's chance track.
+  'src/ui/svelte/components/FillBar.svelte': Object.freeze(['player-gathering-drop-open']),
   'src/ui/svelte/components/StageNav.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-future-stage',
@@ -141,6 +160,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-section-badged-and-dotted',
     'manager-environment-edit-events',
     'manager-knowledge-learned-lost-copy',
+    'interactables-browser-tasks',
+    // The padlocked strip with its first tab's description, wide (`-tracking-described`) and wrapped with its last tab's (`-narrow-settings`) (issue 1779).
+    'manager-world-downtime-tracking-described',
+    'manager-world-downtime-narrow-settings',
   ]),
   // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
