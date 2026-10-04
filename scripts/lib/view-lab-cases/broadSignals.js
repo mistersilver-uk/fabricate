@@ -142,6 +142,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-environment-edit-events',
     'manager-knowledge-learned-lost-copy',
     'interactables-browser-tasks',
+    // The padlocked strip with a description showing, wide and wrapped (issue 1779).
+    'manager-world-downtime-tracking',
+    'manager-world-downtime-narrow-settings',
   ]),
   // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([

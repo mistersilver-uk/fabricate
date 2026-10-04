@@ -1929,6 +1929,9 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       'manager-world-downtime-test-companion-rollup',
       // Issue 1332 — the companion NAVIGATING, appended for the same reason.
       'manager-world-downtime-test-companion-tab-navigation',
+      // Issue 1779 — the wrapped strip's last tab, appended last so it neither moves the index
+      // above nor ties the companion frame for this route's surface-coverage slot.
+      'manager-world-downtime-narrow-settings',
     ]
   );
   // The Core-preview frames and the premium-installed frame prove DIFFERENT things and cannot share
@@ -1950,12 +1953,18 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
   const companionChrome = named('manager-world-downtime-test-companion-chrome');
   const rollup = named('manager-world-downtime-test-companion-rollup');
   const cases = allCases.filter((entry) => !withCompanion.includes(entry));
+  // The one Core frame that proves the STRIP's pointer target, reached by clicking that tab.
+  const STRIP_HIT_CASE_ID = 'manager-world-downtime-narrow-settings';
+  const stripHit = getCaseById(STRIP_HIT_CASE_ID);
+  assert.equal(stripHit.expectCenterHit, '[data-downtime-tab="settings"]');
+  assert.deepEqual(stripHit.steps.at(-1), { selector: '[data-downtime-tab="settings"]' });
   for (const viewCase of cases) {
     assert.equal(viewCase.expectView, 'world-downtime');
     assert.ok(viewCase.expectNoHorizontalOverflow);
     assert.ok(viewCase.expectOverflowY);
     assert.ok(viewCase.expectVisible, `${viewCase.id} proves its keyboard tooltip is visible`);
     assert.equal(viewCase.expectContained.length, 2, `${viewCase.id} checks both World rail icons`);
+    if (viewCase.id === STRIP_HIT_CASE_ID) continue;
     assert.equal(
       viewCase.expectCenterHit,
       '.downtime-preview:not([hidden]) .downtime-cta',
