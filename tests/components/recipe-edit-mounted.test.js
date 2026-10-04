@@ -4081,9 +4081,8 @@ describe('RecipeEditView (mounted)', () => {
         const { ingredientSets } = patches.at(-1);
         await editHarness.setProps({ recipe: { ...RECIPE, ingredientSets } });
         await flushRender();
-        const rows = [
-          ...target.querySelectorAll('[data-recipe-group-id="grp-1"] [data-recipe-option]'),
-        ];
+        const group = target.querySelector('[data-recipe-group-id="grp-1"]');
+        const rows = [...group.querySelectorAll('[data-recipe-option]')];
         assert.equal(rows.length, 2, `${token} turns the row into the box`);
         const expected = rows[1].querySelector(field);
         assert.ok(Boolean(expected), `the new row draws ${field}`);
