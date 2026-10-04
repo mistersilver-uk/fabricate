@@ -37,3 +37,15 @@ export function managerColorTokenLabel(token, localize) {
   const translated = typeof localize === 'function' ? localize(fullKey) : '';
   return translated && translated !== fullKey ? translated : preset.label;
 }
+
+// A free hex is admitted only as `#RRGGBB`, uppercased, so a partial entry paints the preset.
+export function validCustomHex(value) {
+  const hex = String(value || '').trim();
+  return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toUpperCase() : '';
+}
+
+/** The `--manager-color-swatch` declaration both tint components paint a swatch from. */
+export function tintSwatchStyle(token, hex) {
+  const custom = validCustomHex(hex);
+  return `--manager-color-swatch: ${custom || `var(--fab-tag-${normalizeManagerColorToken(token)})`}`;
+}

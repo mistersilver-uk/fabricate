@@ -11,6 +11,9 @@
   | `on` | boolean | `false` | the revealed `children` render ONLY when true, which keeps a disabled effect's inputs out of the tab order. Ignored under `control="none"` |
   | `form` | `'condition'` \| `'effect'` \| `'pill'` | `'condition'` | the row's GEOMETRY: a condition is one item in a checklist and is transparent until checked; an effect is a standing affordance inside the "Then" card and keeps its fill; `pill` is a fixed-height inline control sized to its own content. A PROP rather than derived from `control`, because `pill` is a `switch` and deriving would draw it as an effect row. |
   | `onTone` / `tone` / `label` | | `'neutral'` / `'subtle'` / `''` | what the ON state MEANS, the glyph's colour family (colour only), and the control's accessible name, falling back to `title` |
+
+  Rest spread:
+  - `{...rest}` lands on the root after `class`, and carries the caller's `data-*` hook.
 -->
 <script>
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
@@ -27,18 +30,17 @@
     detail = '',
     label = '',
     disabled = false,
-    dataAttr = '',
-    dataValue = '',
     onToggle = () => {},
     children = undefined,
     // A trailing action for the HEAD, where a `switch` would sit; not enforced as exclusive.
     headAction = undefined,
+    class: extraClass = '',
+    ...rest
   } = $props();
 
   // Declared tones only, so a typo renders the default glyph rather than an unstyled class.
   const TONES = new Set(['danger', 'warning', 'success', 'accent', 'info', 'subtle']);
   const toneClass = $derived(TONES.has(tone) ? `is-tone-${tone}` : 'is-tone-subtle');
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
   const accessibleName = $derived(label || title);
   // Two derivations: PAINTED as enabled and children reachable differ for a `none` row.
   const enabled = $derived(control !== 'none' && on === true);
@@ -77,10 +79,10 @@
 {/snippet}
 
 <div
-  class="fab-complication-effect {formClass} {onToneClass}"
+  class={['fab-complication-effect', formClass, onToneClass, extraClass]}
   class:is-on={enabled}
   class:is-disabled={disabled}
-  {...hookAttributes}
+  {...rest}
 >
   {#if control === 'checkbox'}
     <label class="fab-complication-effect-head">{@render headContent()}</label>

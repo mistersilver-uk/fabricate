@@ -10,13 +10,15 @@
   combobox whose list floats in the application root (`util/typeaheadCombobox.svelte.js`).
 
   Invariants:
-  - one `<CharacterModifierBoundsRow>` for both subjects — `stepper-call-site-contract.test.js`.
+  - one `boundsRow` snippet for both subjects — `stepper-call-site-contract.test.js`.
   - every hook name follows `subject` — `manager-environments-mounted.js`.
 -->
 <script>
-  import CharacterModifierBoundsRow from './CharacterModifierBoundsRow.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import Field from '../../../components/Field.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import { typeaheadPanel } from '../../../actions/typeaheadPanel.js';
   import { createTypeaheadCombobox } from '../../../util/typeaheadCombobox.svelte.js';
 
@@ -62,11 +64,6 @@
     onSetCharacterModifierOverride = () => {},
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   // No `anchor`: the wrapping label is an inline box, so the input is the field's visual box.
   const search = createTypeaheadCombobox({
     component: 'GatheringModifierEditor',
@@ -78,7 +75,7 @@
     rows: { pitch: 34, gap: 2, chrome: 10 },
   });
   const searchLabel = $derived(
-    text(
+    localizeOr(
       'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
       'Search character modifiers to add'
     )
@@ -110,6 +107,15 @@
     }),
   });
 
+  // Clearing a bound persists literal `null`, "no bound", which `0` is not; no `min`, because a
+  // modifier's bounds are signed.
+  const bounds = $derived(
+    [
+      ['min', localizeOr('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min', 'Min')],
+      ['max', localizeOr('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max', 'Max')],
+    ].map(([key, label]) => ({ key, label, ...stepperLabels(label) }))
+  );
+
   /** One hook attribute, spread so its name follows the subject rather than the call site. */
   function hook(name, value = '') {
     const names = HOOK_NAMES[subject] ?? HOOK_NAMES.drop;
@@ -136,7 +142,7 @@
     <div class="manager-condition-modifier-add-row" {...hook('conditionModifierPicker', kind)}>
       <label class="fabricate-field manager-condition-modifier-picker">
         <span class="visually-hidden"
-          >{text(
+          >{localizeOr(
             'FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel',
             'Condition'
           )}</span
@@ -145,7 +151,7 @@
           value={pickerSelection}
           disabled={availableConditions.length === 0}
           data-tooltip={availableConditions.length === 0
-            ? text(
+            ? localizeOr(
                 'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
                 'All conditions already added.'
               )
@@ -160,17 +166,17 @@
       <button
         type="button"
         class="fabricate-icon-button"
-        aria-label={text(
+        aria-label={localizeOr(
           'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
           'Add modifier'
         )}
-        title={text(
+        title={localizeOr(
           'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
           'Add modifier'
         )}
         disabled={availableConditions.length === 0 || !pickerSelection}
         data-tooltip={availableConditions.length === 0
-          ? text(
+          ? localizeOr(
               'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
               'All conditions already added.'
             )
@@ -196,7 +202,7 @@
             >
             <label class="manager-condition-modifier-value">
               <span class="visually-hidden"
-                >{text(
+                >{localizeOr(
                   'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
                   'Modifier value'
                 )}</span
@@ -205,7 +211,7 @@
                 type="text"
                 inputmode="numeric"
                 value={gatheringModifierDisplayValue(modifier)}
-                aria-label={text(
+                aria-label={localizeOr(
                   'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
                   'Modifier value'
                 )}
@@ -222,7 +228,7 @@
             <button
               type="button"
               class="fabricate-icon-button is-danger manager-character-modifier-row-reference-delete"
-              aria-label={text(
+              aria-label={localizeOr(
                 'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
                 'Delete modifier'
               )}
@@ -238,7 +244,7 @@
           <EmptyState
             compact
             icon="fas fa-sliders"
-            title={text(
+            title={localizeOr(
               'FABRICATE.Admin.Manager.Environment.Tasks.NoConditionModifiers',
               'No modifiers attached.'
             )}
@@ -249,17 +255,38 @@
   </section>
 {/each}
 
+{#snippet boundsRow(ref)}
+  <div class="manager-character-modifier-row-bounds fab-cluster" data-gap="3">
+    <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
+    {#each bounds as bound (bound.key)}
+      <Field as="div">
+        <span>{bound.label}</span>
+        <Stepper
+          value={ref[bound.key]}
+          allowUnset
+          step={1}
+          fill
+          ariaLabel={bound.ariaLabel}
+          decrementLabel={bound.decrementLabel}
+          incrementLabel={bound.incrementLabel}
+          onChange={(next) => onUpdateCharacterModifier(ref.id, { [bound.key]: next })}
+        />
+      </Field>
+    {/each}
+  </div>
+{/snippet}
+
 <section class="fabricate-card manager-character-modifier-row-card" {...hook('characterModifiers')}>
   <header class="manager-character-modifier-row-card-header">
     <div class="manager-character-modifier-row-card-heading">
       <h3 class="manager-card-title">
-        {text(
+        {localizeOr(
           'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionTitle',
           'Character modifiers'
         )}
       </h3>
       <p class="manager-muted">
-        {text(
+        {localizeOr(
           'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionHint',
           'Modifiers adjust the final chance based on the attempting character.'
         )}
@@ -275,14 +302,14 @@
       <input
         type="search"
         value={characterModifierSearchTerm}
-        placeholder={text(
+        placeholder={localizeOr(
           'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchPlaceholder',
           'Search character modifiers...'
         )}
         aria-label={searchLabel}
         disabled={characterModifierLibrary.length === 0}
         data-tooltip={characterModifierLibrary.length === 0
-          ? text(
+          ? localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
               'Add a modifier to the system library first to reference it here.'
             )
@@ -331,17 +358,18 @@
           {#if !libraryEntry}
             <span
               class="manager-character-modifier-stale-warning"
-              data-tooltip={text(
+              data-tooltip={localizeOr(
                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier',
-                'Unknown modifier ({id})'
-              ).replace('{id}', ref.modifierId)}
+                'Unknown modifier ({id})',
+                { id: ref.modifierId }
+              )}
             >
               <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
             </span>
           {/if}
           <label class={`manager-character-modifier-operator-select ${operatorClass}`}>
             <span class="visually-hidden"
-              >{text(
+              >{localizeOr(
                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator',
                 'Operator'
               )}</span
@@ -352,13 +380,13 @@
                 onUpdateCharacterModifier(ref.id, { operator: event.currentTarget.value })}
             >
               <option value="+"
-                >{text(
+                >{localizeOr(
                   'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive',
                   'Positive'
                 )}</option
               >
               <option value="-"
-                >{text(
+                >{localizeOr(
                   'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative',
                   'Negative'
                 )}</option
@@ -368,7 +396,7 @@
           <button
             type="button"
             class="fabricate-icon-button is-danger manager-character-modifier-row-reference-delete"
-            aria-label={text(
+            aria-label={localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
               'Delete character modifier reference'
             )}
@@ -377,17 +405,13 @@
             <i class="fas fa-trash" aria-hidden="true"></i>
           </button>
         </header>
-        <CharacterModifierBoundsRow
-          min={ref.min}
-          max={ref.max}
-          onChange={(patch) => onUpdateCharacterModifier(ref.id, patch)}
-        />
+        {@render boundsRow(ref)}
         <div class="manager-character-modifier-override-row">
           <button
             type="button"
             class={`fabricate-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
             aria-pressed={hasOverride}
-            aria-label={text(
+            aria-label={localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
               'Override?'
             )}
@@ -398,11 +422,11 @@
             </span>
             <span class="manager-status-toggle-label">
               {hasOverride
-                ? text(
+                ? localizeOr(
                     'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn',
                     'Overridden'
                   )
-                : text(
+                : localizeOr(
                     'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
                     'Override?'
                   )}
@@ -411,7 +435,7 @@
         </div>
         {#if hasOverride}
           <p class="manager-muted manager-character-modifier-override-hint">
-            {text(
+            {localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideHint',
               'Overrides the library expression for this row.'
             )}
@@ -421,7 +445,7 @@
             for={`${idPrefix}-character-modifier-${ref.id}-expression`}
           >
             <span
-              >{text(
+              >{localizeOr(
                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression',
                 'Expression'
               )}</span
@@ -442,7 +466,7 @@
       <EmptyState
         compact
         icon="fas fa-sliders"
-        title={text(
+        title={localizeOr(
           'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty',
           'No character modifiers attached.'
         )}

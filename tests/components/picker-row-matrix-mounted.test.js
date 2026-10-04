@@ -14,6 +14,7 @@ import {
   fromValue,
   toValue,
 } from '../../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   chooseSelectOption,
   selectOptionValues,
@@ -34,6 +35,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...KIND_MENU_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
     // The roll-expression field's display helpers, and what they import.
     'src/systems/characterModifierPrerequisiteCopy.js',
@@ -627,6 +629,24 @@ describe('PickerRow: the remaining branches', () => {
     );
     await settle();
     assert.deepEqual(await applied('enter'), { ...start, id: 'c-iron' });
+  });
+
+  it('words the name field for its kind, and for an empty catalogue', async () => {
+    const copy = {
+      component: ['Search components...', 'No components defined'],
+      essence: ['Search essences...', 'No essences defined'],
+      currency: ['Pick currency', 'No currencies defined'],
+    };
+    for (const [kind, [search, empty]] of Object.entries(copy)) {
+      const field = (await mountRow(ingredient, unnamed(kind))).target.querySelector(
+        '[data-recipe-option-search]'
+      );
+      assert.deepEqual([field.placeholder, field.getAttribute('aria-label')], [search, search]);
+      harness.remount();
+      const bare = await mountRow(ingredient, unnamed(kind), { catalogue: {} });
+      assert.equal(bare.target.querySelector('[data-recipe-option-search]').placeholder, empty);
+      harness.remount();
+    }
   });
 
   it('readonlyKinds draws the currency read-only face: a static unit, a tag and a static amount', async () => {

@@ -20,7 +20,7 @@
 -->
 <script>
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
-  import { localize } from '../../util/foundryBridge.js';
+  import { localizeOr } from '../../util/localizeOr.js';
 
   let {
     pageSelectionState = 'none',
@@ -49,19 +49,6 @@
     clearAttr = 'data-component-clear-selection',
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
-  function format(key, fallback, replacements) {
-    let result = text(key, fallback);
-    for (const [token, value] of Object.entries(replacements)) {
-      result = result.replace(`{${token}}`, value);
-    }
-    return result;
-  }
-
   // Spread because the NAME is a parameter, with `''` and NOT `true`: Svelte serializes `true` as
   // `="true"`, which would re-serialize every screenshot and smoke hook in the toolbar.
   const toolbarHook = $derived({ [toolbarAttr]: '' });
@@ -71,25 +58,27 @@
   const clearHook = $derived({ [clearAttr]: '' });
 
   // The accessible name, always the full phrase.
-  const selectAllLabel = $derived(text('FABRICATE.Admin.Manager.BulkEdit.SelectAll', 'Select all'));
+  const selectAllLabel = $derived(
+    localizeOr('FABRICATE.Admin.Manager.BulkEdit.SelectAll', 'Select all')
+  );
   const selectAllCaption = $derived(String(selectAllLabelOverride || '').trim() || selectAllLabel);
   const countLabel = $derived(
-    format('FABRICATE.Admin.Manager.BulkEdit.SelectedCount', '{count} selected', {
+    localizeOr('FABRICATE.Admin.Manager.BulkEdit.SelectedCount', '{count} selected', {
       count,
     })
   );
   const resultsLabel = $derived(
-    format('FABRICATE.Admin.Manager.BulkEdit.SelectAllResults', 'Select all {count} results', {
+    localizeOr('FABRICATE.Admin.Manager.BulkEdit.SelectAllResults', 'Select all {count} results', {
       count: selectAllResultsCount,
     })
   );
-  const clearLabel = $derived(text('FABRICATE.Admin.Manager.BulkEdit.Clear', 'Clear'));
+  const clearLabel = $derived(localizeOr('FABRICATE.Admin.Manager.BulkEdit.Clear', 'Clear'));
 
   const showsShown = $derived(selectAllScope === 'shown');
 
   // Its own key: `{count} results` and `{count} shown` name different populations.
   const shownLabel = $derived(
-    format('FABRICATE.Admin.Manager.BulkEdit.SelectAllShown', 'Select all {count} shown', {
+    localizeOr('FABRICATE.Admin.Manager.BulkEdit.SelectAllShown', 'Select all {count} shown', {
       count: selectAllResultsCount,
     })
   );

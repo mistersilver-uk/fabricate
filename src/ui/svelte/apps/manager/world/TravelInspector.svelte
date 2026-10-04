@@ -10,7 +10,7 @@
 <script>
   import Chip from '../../../components/Chip.svelte';
   import Button from '../../../components/Button.svelte';
-  import RealmNameField from '../RealmNameField.svelte';
+  import InlineRenameField from '../InlineRenameField.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
@@ -61,8 +61,9 @@
       </div>
 
       <section class="fabricate-card">
-        <RealmNameField
+        <InlineRenameField
           name={realm.name}
+          labelled
           disabled={travelSaving}
           onRename={(name) => onRenameRealm(realm.id, name)}
         />

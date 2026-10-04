@@ -26,7 +26,7 @@ import {
   COMPONENT_EDIT_VIEW_RAW_MODULES,
   COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 // The trigger clause and the dice-condition comparator are the shared `<Select>` since issue 1510,
 // so their option lists are read off a panel portaled onto the mount target.
 import {
@@ -74,6 +74,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-complications-section-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/util/iconPickerPopover.js',

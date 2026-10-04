@@ -24,7 +24,7 @@ import {
   INVALIDATION_STORES,
 } from '../../src/systems/invalidationDomains.js';
 import { CRAFTING_DATA_CHANGED_HOOK } from '../../src/systems/craftingDataChange.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -113,6 +113,7 @@ const harness = createMountedComponentHarness({
   'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/formatDuration.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...CHECK_EVIDENCE_RAW_MODULES,
     // Issue 2008: the player stores and GatheringView word additional-dice notices through it.
     ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,

@@ -16,7 +16,10 @@ import {
   TOOL_DISPLAY_PRECEDENCE_CASES,
   flattenToolForRecipeLibrary,
 } from '../helpers/toolDisplayPrecedenceCases.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 import { missingCensusHooks } from '../helpers/resultRowCensus.js';
 // The Overview cells and the ingredient row's kind control are the shared `<Select>` since issue
 // 1510, so choosing a value is an open-then-click on a panel portaled onto the mount target.
@@ -34,6 +37,7 @@ const repoRoot = resolve(__dirname, '../..');
 
 const RAW_MODULES = [
   ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
   // The add-new essence offer projection (issue 1036). The three ingredient components
   // below import it to withhold a DISABLED essence from their add controls.
@@ -636,7 +640,10 @@ describe('RecipeEditView (mounted)', () => {
     const cases = [
       [evaluation('under', 'fixed'), ['Default target', 'Easy (Target 12)', 'Hard (Target 8)']],
       [evaluation('over', 'attribute'), ['Default · base adjustment', 'Easy (−2)', 'Hard (+0.5)']],
-      [evaluation('under', 'attribute', 'multiply'), ['Default · base adjustment', 'Easy (×−2)', 'Hard (×½)']],
+      [
+        evaluation('under', 'attribute', 'multiply'),
+        ['Default · base adjustment', 'Easy (×−2)', 'Hard (×½)'],
+      ],
     ];
     for (const [checkEvaluation, labels] of cases) {
       const target = await editHarness.mount(
@@ -1157,7 +1164,9 @@ describe('RecipeEditView (mounted)', () => {
       return result;
     };
 
-    const quiet = await noteOf({ recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } } });
+    const quiet = await noteOf({
+      recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
+    });
     assert.equal(quiet.count, null, 'an ordinary recipe carries no standing warning');
 
     const one = await noteOf({
@@ -3051,7 +3060,10 @@ describe('RecipeEditView (mounted)', () => {
     const { target } = await mountProgressiveResults([{ id: 'res-1', componentId: 'cmp-herb' }], {
       props: { componentOptions: [{ ...COMPONENT_OPTIONS[0], difficulty: 12 }] },
     });
-    assert.deepEqual(missingCensusHooks(target.querySelector('[data-recipe-result-item]'), 'stage'), []);
+    assert.deepEqual(
+      missingCensusHooks(target.querySelector('[data-recipe-result-item]'), 'stage'),
+      []
+    );
     editHarness.remount();
   });
 
@@ -3163,9 +3175,9 @@ describe('RecipeEditView (mounted)', () => {
       'the band is a sibling of the line, not part of it'
     );
     assert.equal(
-      banded.querySelector('[data-recipe-result-complications]').closest(
-        '.fabricate-sortable-list-body'
-      ).parentElement,
+      banded
+        .querySelector('[data-recipe-result-complications]')
+        .closest('.fabricate-sortable-list-body').parentElement,
       line.parentElement,
       'the band sits in the list`s BODY, the line`s own sibling, which is what makes it full-width'
     );
@@ -3235,7 +3247,11 @@ describe('RecipeEditView (mounted)', () => {
     const row = target.querySelector('[data-recipe-result-row]');
     const body = row.querySelector('.fabricate-sortable-list-body');
     assert.ok(Boolean(body), 'the body is always present, so there is ONE row anatomy');
-    assert.equal(body.textContent.trim(), '', 'and it draws nothing until there is something to draw');
+    assert.equal(
+      body.textContent.trim(),
+      '',
+      'and it draws nothing until there is something to draw'
+    );
     assert.ok(
       !target.querySelector('.manager-recipe-stage-complications-wrap'),
       'and the `display: contents` wrapper that bought the old shape by hand is gone'
@@ -4872,7 +4888,10 @@ describe('RecipeEditView (mounted)', () => {
     const suggestions = [...list.querySelectorAll('[data-recipe-option-suggestion]')];
     assert.equal(suggestions.length, 1, 'the list narrows to the query');
 
-    const press = new globalThis.window.MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    const press = new globalThis.window.MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+    });
     suggestions[0].dispatchEvent(press);
     assert.equal(press.defaultPrevented, true, 'a press on the list never blurs the field');
     suggestions[0].click();
@@ -4916,10 +4935,14 @@ describe('RecipeEditView (mounted)', () => {
     }
 
     const held = await pressKey(field, 'ArrowDown', { shiftKey: true });
-    assert.equal(held.defaultPrevented, false, 'a key with a modifier held is not the list\'s');
+    assert.equal(held.defaultPrevented, false, "a key with a modifier held is not the list's");
     assert.equal(field.hasAttribute('aria-activedescendant'), false);
     await pressKey(field, 'ArrowDown', { isComposing: true });
-    assert.equal(field.hasAttribute('aria-activedescendant'), false, 'nothing moves mid-composition');
+    assert.equal(
+      field.hasAttribute('aria-activedescendant'),
+      false,
+      'nothing moves mid-composition'
+    );
 
     const down = await pressKey(field, 'ArrowDown');
     assert.equal(down.defaultPrevented, true);
@@ -4974,7 +4997,7 @@ describe('RecipeEditView (mounted)', () => {
         'an empty query is the closed state'
       );
       const idle = await pressKey(field, 'Escape');
-      assert.equal(idle.defaultPrevented, false, 'with nothing typed the key is not the field\'s');
+      assert.equal(idle.defaultPrevented, false, "with nothing typed the key is not the field's");
       assert.equal(reachedDocument, 1);
       assert.equal(patches.length, 0, 'and neither press commits anything');
     } finally {
@@ -5088,10 +5111,7 @@ describe('RecipeEditView (mounted)', () => {
     );
     const row = target.querySelector('[data-recipe-option]');
     // `assert.ok(!node)` rather than `assert.equal(node, null)`.
-    assert.ok(
-      !row.querySelector('[data-recipe-tags-empty]'),
-      'the dashed No tags set box is gone'
-    );
+    assert.ok(!row.querySelector('[data-recipe-tags-empty]'), 'the dashed No tags set box is gone');
     assert.ok(
       !row.querySelector('.manager-recipe-option-tags-detail'),
       'and so is the full-width second line it sat on'
@@ -5156,7 +5176,11 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('edits a member of a choice group in place, keeping the rest of the requirement', async () => {
-    const first = { id: 'opt-a', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } };
+    const first = {
+      id: 'opt-a',
+      quantity: 2,
+      match: { type: 'component', componentId: 'cmp-herb' },
+    };
     const second = { id: 'opt-b', quantity: 1, match: { type: 'component', componentId: null } };
     const { target, patches } = await mountSingleGroup([first, second], {
       props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS },
@@ -5838,7 +5862,11 @@ describe('RecipeEditView (mounted)', () => {
 
   it('a flat result row answers the retired row’s hooks (issue 1516)', async () => {
     const flat = await mountResultGroups([
-      { id: 'grp-1', name: 'Primary', results: [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }] },
+      {
+        id: 'grp-1',
+        name: 'Primary',
+        results: [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
+      },
     ]);
     assert.deepEqual(
       missingCensusHooks(flat.target.querySelector('[data-recipe-result-item]'), 'flat'),
@@ -5849,7 +5877,11 @@ describe('RecipeEditView (mounted)', () => {
 
   it('a typed rolled amount survives save and remount, Rolled and with quantity unchanged (issue 1516)', async () => {
     const start = [
-      { id: 'grp-1', name: 'Primary', results: [{ id: 'res-1', componentId: 'cmp-herb', quantity: 3 }] },
+      {
+        id: 'grp-1',
+        name: 'Primary',
+        results: [{ id: 'res-1', componentId: 'cmp-herb', quantity: 3 }],
+      },
     ];
     const { target, patches } = await mountResultGroups(start);
     const row = target.querySelector('[data-recipe-result-item]');
@@ -5863,12 +5895,17 @@ describe('RecipeEditView (mounted)', () => {
     field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     await flushRender();
     // Save: the draft through the persisted model, as the recipe manager stores it.
-    const saved = Recipe.fromJSON({ ...RECIPE, resultGroups: patches.at(-1).resultGroups }).toJSON();
+    const saved = Recipe.fromJSON({
+      ...RECIPE,
+      resultGroups: patches.at(-1).resultGroups,
+    }).toJSON();
     editHarness.remount();
 
     const reopened = await mountResultGroups(saved.resultGroups);
     const reread = reopened.target.querySelector('[data-recipe-result-item]');
-    assert.ok(reread.querySelector(':scope [data-recipe-option-amount-mode="rolled"] input').checked);
+    assert.ok(
+      reread.querySelector(':scope [data-recipe-option-amount-mode="rolled"] input').checked
+    );
     assert.equal(reread.querySelector('[data-recipe-option-formula]').value, '1d4+1');
     assert.equal(saved.resultGroups[0].results[0].quantity, 3, 'quantity is unchanged');
     editHarness.remount();
@@ -6057,8 +6094,18 @@ describe('RecipeEditView (mounted)', () => {
     const recipe = {
       ...RECIPE,
       steps: [
-        { id: 'step-1', name: 'Fold', ingredientSets: [], resultGroups: [{ id: 'rg-1', results: [] }] },
-        { id: 'step-2', name: 'Finish', ingredientSets: [], resultGroups: [{ id: 'rg-2', results: [] }] },
+        {
+          id: 'step-1',
+          name: 'Fold',
+          ingredientSets: [],
+          resultGroups: [{ id: 'rg-1', results: [] }],
+        },
+        {
+          id: 'step-2',
+          name: 'Finish',
+          ingredientSets: [],
+          resultGroups: [{ id: 'rg-2', results: [] }],
+        },
       ],
     };
     const target = await editHarness.mount(
@@ -6795,9 +6842,11 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     );
     assert.equal(counts(target).warnings, 1, 'the rail counts the unnamed step');
     assert.deepEqual(
-      [...target.querySelectorAll('[data-recipe-tab-button="validation"] .manager-editor-tab-badge')].map(
-        (node) => node.textContent.trim()
-      ),
+      [
+        ...target.querySelectorAll(
+          '[data-recipe-tab-button="validation"] .manager-editor-tab-badge'
+        ),
+      ].map((node) => node.textContent.trim()),
       ['1'],
       'and so does the strip badge, which showed nothing here'
     );
@@ -7073,8 +7122,16 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     assert.ok(Boolean(panel), 'the editor renders its tab panel');
     assertIs(document.activeElement, panel, 'and the panel holds focus, not `<body>`');
     // Read off the DOM, never through `isFocusable`: happy-dom focuses anything.
-    assert.equal(panel.getAttribute('tabindex'), '-1', 'a programmatic destination, not a tab stop');
-    assert.equal(panel.getAttribute('data-keyboard-focus'), 'true', 'and it declares itself focused');
+    assert.equal(
+      panel.getAttribute('tabindex'),
+      '-1',
+      'a programmatic destination, not a tab stop'
+    );
+    assert.equal(
+      panel.getAttribute('data-keyboard-focus'),
+      'true',
+      'and it declares itself focused'
+    );
     assertIs(
       target.querySelector('[data-validation-focused]')?.tagName ?? null,
       null,

@@ -24,7 +24,7 @@
 -->
 <script>
   import Button from '../../components/Button.svelte';
-  import { localize } from '../../util/foundryBridge.js';
+  import { localizeOr } from '../../util/localizeOr.js';
 
   let {
     heading = '',
@@ -46,11 +46,6 @@
     children,
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   // Spread because the NAME is a parameter, with `''`: Svelte serializes `true` as `="true"`.
   const panelHook = $derived({ [panelAttr]: '' });
   const clearHook = $derived({ [clearAttr]: '' });
@@ -61,7 +56,7 @@
 <section class="fab-bulk-edit-panel" {...panelHook}>
   <header class="fab-bulk-edit-header">
     <p class="fab-bulk-edit-eyebrow">
-      {text('FABRICATE.Admin.Manager.BulkEdit.PanelTitle', 'Bulk edit')}
+      {localizeOr('FABRICATE.Admin.Manager.BulkEdit.PanelTitle', 'Bulk edit')}
     </p>
     <button
       type="button"
@@ -72,7 +67,7 @@
       <i class="fas fa-xmark" aria-hidden="true"></i>
       <span
         >{clearLabel ||
-          text('FABRICATE.Admin.Manager.BulkEdit.ClearSelection', 'Clear selection')}</span
+          localizeOr('FABRICATE.Admin.Manager.BulkEdit.ClearSelection', 'Clear selection')}</span
       >
     </button>
   </header>
@@ -85,7 +80,7 @@
       <strong class="fab-bulk-edit-hero-title" {...countHook}>{heading}</strong>
       <span class="fab-bulk-edit-hero-hint"
         >{hint ||
-          text(
+          localizeOr(
             'FABRICATE.Admin.Manager.BulkEdit.SelectedHint',
             'Stage changes below, then apply to all at once.'
           )}</span

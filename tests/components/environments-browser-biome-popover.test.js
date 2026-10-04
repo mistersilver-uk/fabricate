@@ -8,7 +8,7 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -26,6 +26,8 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/gatheringImageDefaults.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
+    'src/ui/svelte/apps/manager/recordPickerOptions.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/iconPickerPopover.js',
@@ -81,7 +83,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEconomyView.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/PartyNameField.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/apps/manager/InlineRenameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     // The three card components the parties rebuild added (issue 1182).
     'src/ui/svelte/apps/manager/PartyMemberRow.svelte',

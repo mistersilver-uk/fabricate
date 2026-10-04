@@ -601,7 +601,7 @@
                   'Tell the player'
                 )}
                 disabled={saving}
-                dataAttr="data-complication-visibility"
+                data-complication-visibility
                 onToggle={(next) =>
                   setField(complication.id, 'visibility', next ? 'visible' : 'gmOnly')}
               />
@@ -711,8 +711,7 @@
                     title={text(...condition.title)}
                     detail={text(...condition.detail)}
                     disabled={saving}
-                    dataAttr="data-complication-condition"
-                    dataValue={condition.key}
+                    data-complication-condition={condition.key || true}
                     onToggle={(next) => setWhen(complication.id, condition.key, next)}
                   />
                 {/each}
@@ -754,8 +753,7 @@
                       'Fires when the trigger you name matches the roll, whatever its own break-tools or outcome effects do.'
                     )}
                     disabled={saving || triggerClauseUnavailable(complication)}
-                    dataAttr="data-complication-condition"
-                    dataValue="checkTrigger"
+                    data-complication-condition="checkTrigger"
                     onToggle={(next) =>
                       setWhen(
                         complication.id,
@@ -801,7 +799,7 @@
                     'Rolled against the character at the moment the result is decided.'
                   )}
                   disabled={saving}
-                  dataAttr="data-complication-roll-condition"
+                  data-complication-roll-condition
                   onToggle={(next) => setNested(complication.id, 'rollCondition', 'enabled', next)}
                 >
                   <!-- ONE LINE, and it needs a row of its own. The reveal strip is a WRAPPING flex
@@ -924,7 +922,7 @@
                     'Rolled and posted to chat when the complication fires.'
                   )}
                   disabled={saving}
-                  dataAttr="data-complication-effect-roll"
+                  data-complication-effect-roll
                   onToggle={(next) => setNested(complication.id, 'effectRoll', 'enabled', next)}
                 >
                   <input
