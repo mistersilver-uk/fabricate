@@ -433,6 +433,27 @@ export const CASES = Object.freeze([
       /^src\/ui\/presenters\/CraftingChatCard\.js$/,
     ],
   }),
+  // Issue 1773: a card's credit, with its label, roll and reason, and its learned and already-known
+  // grants, each a full-width row whose recipe name is never ellipsized away.
+  playerCase({
+    id: 'player-crafting-chat-card-rewards',
+    label: 'Player app — crafting result card with a credit and two knowledge grants',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'crafting',
+      rollPromptState: 'over-evidence',
+      resultRowState: 'reward-craft',
+      chatLog: '1',
+    },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      `${CHAT_CARD}:has([data-reward-kind="currency"] .fabricate-craft-chat__reward-reason)` +
+      ':has([data-reward-kind="knowledge"])',
+    expectVisible: `${LAB_CHAT('public')} [data-reward-kind="currency"]`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: [...CHAT_SOURCES, /^src\/systems\/(?:resultKindAward|craftChatEntries)\.js$/],
+  }),
   // The control: a sum/over fixed card gains the pill, dice line, and Needed and Margin rows (M1, M3).
   playerCase({
     id: 'player-crafting-chat-card-over-control',
@@ -792,6 +813,28 @@ export const CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_SIMPLE,
       /^src\/ui\/presenters\/(?:resultOutputRows|CraftingListingBuilder)\.js$/,
+    ],
+  }),
+  // Issue 1773: a routed tier that pays a credit previews it as a reward, not as an Item.
+  playerCase({
+    id: 'player-crafting-routed-tier-reward',
+    label: 'Player app — Crafting routed tier awarding a currency credit',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', resultRowState: 'reward-tiers' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Runeblade' },
+      { selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' },
+    ],
+    expectTab: 'crafting',
+    expectSelector:
+      '[data-recipe-section="outcome-tiers"]' +
+      ' .crafting-tier-awards:has([data-award-kind="component"]):has([data-award-kind="currency"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_ROUTED_CHECK,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/AwardPill\.svelte$/,
     ],
   }),
   // The Crafting header withholds `Ready to craft` and leads the blocking callout with the authority's own reason.

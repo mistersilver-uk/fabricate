@@ -13,9 +13,9 @@ import {
 } from './labContent.js';
 import { seedCheckPreviewState } from './labCheckPreviews.js';
 import { seedLabInteractables } from './labInteractables.js';
-import { stockJournalPrototype } from './labJournalPrototype.js';
+import { journalPrototypeRecipeId, stockJournalPrototype } from './labJournalPrototype.js';
 import { registerLabMacros } from './labMacros.js';
-import { installUpdateSemantics, makeGetFlag } from './labFlags.js';
+import { installUpdateSemantics, makeGetFlag, seedFabricateFlag } from './labFlags.js';
 import {
   buildLabBlindRunSecret,
   buildLabRunStates,
@@ -29,13 +29,18 @@ const FABRICATE_NAMESPACE = 'fabricate';
 // These variants change persisted authoring before the real services initialize. The default
 // world remains unchanged, including every existing d100 editor and gathering screenshot.
 
-/** `unnamed`: the horseshoe recipe's result names no component, as an item-only one does (1516). */
+/** The lab recipe `id` and its crafting system, or a thrown error naming the `state` needing it. */
+function recipeAndSystem(content, id, state) {
+  const recipe = content.recipes.find((entry) => entry.id === id);
+  const system = content.systems.find((entry) => entry.id === recipe?.craftingSystemId);
+  if (!recipe || !system) throw new Error(`view lab: ${state} requires recipe ${id}`);
+  return { recipe, system };
+}
+
 /** `reward-kinds` (issue 1773): Bend Horseshoe also pays a labelled, rolled bounty and teaches
  *  Forge Longsword, under a Smithing that takes part in currency. */
 function seedRewardKinds(content) {
-  const recipe = content.recipes.find((entry) => entry.id === 'sm-r-horseshoe');
-  const system = content.systems.find((entry) => entry.id === recipe?.craftingSystemId);
-  if (!recipe || !system) throw new Error('view lab: reward-kinds requires Bend Horseshoe');
+  const { recipe, system } = recipeAndSystem(content, 'sm-r-horseshoe', 'reward-kinds');
   system.requirements = { ...system.requirements, currency: { enabled: true } };
   recipe.resultGroups[0].results.push(
     {
@@ -51,14 +56,75 @@ function seedRewardKinds(content) {
   );
 }
 
-function seedResultRowState(content, state) {
-  if (state === 'reward-kinds') return seedRewardKinds(content);
-  if (state !== 'unnamed') return;
+/** `reward-craft`: the `reward-kinds` horseshoe under a knowledge-visibility Smithing, so the craft
+ *  clears the pre-flight, also re-teaching itself, which Brenna knows (`seedRewardCraftLearned`). */
+function seedRewardCraft(content) {
+  seedRewardKinds(content);
+  const { recipe, system } = recipeAndSystem(content, 'sm-r-horseshoe', 'reward-craft');
+  system.visibilityMode = 'knowledge';
+  recipe.resultGroups[0].results.push({
+    id: 'sm-r-horseshoe-known',
+    kind: 'knowledge',
+    recipeId: 'sm-r-horseshoe',
+    quantity: 1,
+  });
+}
+
+function seedRewardCraftLearned(actors) {
+  const brenna = actors.find((actor) => actor.id === 'lab-actor-brenna');
+  const learned = brenna?.flags?.fabricate?.fabricate?.learnedRecipes ?? {};
+  seedFabricateFlag(brenna, ['fabricate', 'learnedRecipes'], {
+    ...learned,
+    'sm-r-horseshoe': { sourceItemUuid: null, learnedAt: 1_200_000 },
+  });
+}
+
+/** `reward-tiers`: the Runeblade's masterwork tier also pays a labelled commission. */
+function seedRewardTiers(content) {
+  const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', 'reward-tiers');
+  system.requirements = { ...system.requirements, currency: { enabled: true } };
+  recipe.resultGroups[0].results.push({
+    id: 'rw-r-blade-commission',
+    kind: 'currency',
+    unit: 'gp',
+    quantity: 25,
+    label: 'Guild commission',
+  });
+}
+
+/** `unnamed`: the horseshoe recipe's result names no component, as an item-only one does (1516). */
+function seedUnnamedResult(content) {
   const recipe = content.recipes.find((entry) => entry.id === 'sm-r-horseshoe');
   const [result] = recipe?.resultGroups?.[0]?.results ?? [];
   if (!result) return;
   delete result.componentId;
   result.itemUuid = 'Item.sm-horseshoe';
+}
+
+/** `history-just-resolved-rewards`: the waxed cord's stage also pays a labelled credit, under a
+ *  workshop that takes part in currency, so the banner the execute raises states it. */
+function seedJustResolvedRewards(content) {
+  const id = journalPrototypeRecipeId('cord');
+  const { recipe, system } = recipeAndSystem(content, id, 'history-just-resolved-rewards');
+  system.requirements = { ...system.requirements, currency: { enabled: true } };
+  recipe.resultGroups[0].results.push({
+    id: 'jp-cord-fee',
+    kind: 'currency',
+    unit: 'gp',
+    quantity: 3,
+    label: 'Chandler’s fee',
+  });
+}
+
+const RESULT_ROW_STATES = Object.freeze({
+  unnamed: seedUnnamedResult,
+  'reward-kinds': seedRewardKinds,
+  'reward-craft': seedRewardCraft,
+  'reward-tiers': seedRewardTiers,
+});
+
+function seedResultRowState(content, state) {
+  RESULT_ROW_STATES[state]?.(content);
 }
 
 function seedGatheringTaskMode(content, mode) {
@@ -493,7 +559,8 @@ function stripAuthoredWorldComponents(content) {
  *   Links no-regions empty state. It also skips the interactable seed, which needs a region.
  * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
  * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component,
- *   or `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result.
+ *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result, `reward-craft`
+ *   for that award crafted, or `reward-tiers` for a Runeblade tier paying a commission.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
@@ -526,6 +593,7 @@ export async function buildLabWorld({
   if (journalCaseState === 'future-stage-under') seedJournalUnderCheck(content);
   seedGatheringTaskMode(content, gatheringTaskMode);
   seedResultRowState(content, resultRowState);
+  if (journalCaseState === 'history-just-resolved-rewards') seedJustResolvedRewards(content);
   seedRuneworkCheckMode(content, runeworkCheckMode);
   seedCheckOverride(content, checkOverride);
   if (noTools) stripTools(content);
@@ -533,6 +601,7 @@ export async function buildLabWorld({
   // A real Manager refresh resolves an empty selection to the first available crafting system.
   if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
+  if (resultRowState === 'reward-craft') seedRewardCraftLearned(actors);
   seedCheckPreviewState(content, actors, checkPreviewState);
   if (learnableBook) seedLearnableBook(content, actors);
   const documents = buildDocumentIndex(content, actors);

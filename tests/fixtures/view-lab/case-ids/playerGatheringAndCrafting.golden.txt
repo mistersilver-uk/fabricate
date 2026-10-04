@@ -18,6 +18,7 @@ player-crafting-chat-card-under-whispered
 player-crafting-chat-card-under-blind
 player-crafting-chat-card-under-fail
 player-crafting-chat-card-gm-complication-fault
+player-crafting-chat-card-rewards
 player-crafting-chat-card-over-control
 player-crafting-roll-prompt-count
 player-crafting-roll-prompt-count-threshold
@@ -39,6 +40,7 @@ player-gathering-realm-locked
 player-gathering-stacked
 player-crafting-simple
 player-crafting-results-kinds
+player-crafting-routed-tier-reward
 player-crafting-authority-blocked
 player-crafting-category-filter-list
 player-crafting-sources-picker
