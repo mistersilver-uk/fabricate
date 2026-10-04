@@ -1041,11 +1041,16 @@ test('the ratchet jobs check out and name their base, and a release test run opt
   for (const file of ['beta.yml', 'release.yml']) {
     const source = readFileSync(path.join(WORKFLOWS, file), 'utf8');
     const testing = Object.entries(parseJobs(source)).filter(([, job]) =>
-      job.steps.some((step) => /\bnpm test\b/.test(step.run))
+      job.steps.some((step) => /\bnpm (?:test|run test:shard)\b/.test(step.run))
     );
     assert.ok(testing.length > 0, `${file} runs npm test in some job`);
-    for (const [name] of testing) {
+    for (const [name, job] of testing) {
       assert.equal(jobEnv(source, name).RATCHET_BASE, 'none', `${file} job "${name}" runs npm test`);
+      // Sharded as in ci.yml: run whole, the suite meets a 15-minute bound.
+      assert.equal(jobEnv(source, name).UNIT_TEST_SHARD, '${{ matrix.shard }}/4', `${file} job "${name}"`);
+      assert.ok(Number(job['timeout-minutes']) <= 10, `${file} job "${name}" runs a quarter of the suite`);
+      assert.ok(!job.steps.some((step) => /\bnpm test\b/.test(step.run)), `${file} runs the whole suite`);
     }
+    assert.match(source, /\n {8}shard: \[1, 2, 3, 4\]\n/, `${file} must run all four shards`);
   }
 });
