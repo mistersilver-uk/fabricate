@@ -49,13 +49,7 @@
   );
 
   const classes = $derived(
-    [
-      'fabricate-search',
-      'manager-search',
-      density === 'compact' ? 'is-compact' : '',
-      sizeClass,
-      extraClass,
-    ]
+    ['fabricate-search', density === 'compact' ? 'is-compact' : '', sizeClass, extraClass]
       .filter(Boolean)
       .join(' ')
   );

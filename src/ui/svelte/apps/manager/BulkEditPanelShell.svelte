@@ -276,7 +276,7 @@
      selector matches nothing with no unused-selector warning; chained because `:global()` alone is
      (0,2,0) and loses to the primitive's own (0,3,0) compound. The `:hover`, `:disabled` and
      `:focus-visible` companions below are written the same way. */
-  :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply) {
+  :global(.fabricate-manager .fabricate-button.fab-manager-button.fab-bulk-edit-apply) {
     display: flex;
     gap: var(--fab-space-chip);
     align-items: center;
@@ -297,13 +297,13 @@
   }
 
   :global(
-    .fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:not(:disabled):hover
+    .fabricate-manager .fabricate-button.fab-manager-button.fab-bulk-edit-apply:not(:disabled):hover
   ) {
     border-color: var(--fab-accent);
     background: var(--fab-accent-strong);
   }
 
-  :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:disabled) {
+  :global(.fabricate-manager .fabricate-button.fab-manager-button.fab-bulk-edit-apply:disabled) {
     border-color: var(--fab-border);
     color: var(--fab-text-disabled);
     background: var(--fab-surface-soft);
@@ -313,7 +313,9 @@
   /* Apply's half of what was one focus group with `.fab-bulk-edit-clear`: Clear carries this
      component's scoping class and Apply never will, so one selector cannot reach both. Anchored
      and chained like its companions, because the sheet states the same declarations at (0,2,1). */
-  :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:focus-visible) {
+  :global(
+    .fabricate-manager .fabricate-button.fab-manager-button.fab-bulk-edit-apply:focus-visible
+  ) {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }

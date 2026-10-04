@@ -2,7 +2,7 @@
   The manager's ONE "how this surface works" explainer card: a glyph-led uppercase title, a list of
   glyph-led guidance rows (each an optional bold lead-in plus prose), and an optional trailing row of
   docs links, built because the same explanation had been built three ways (issue 881). The SHELL is
-  not re-derived — the root wears `.manager-inspector-card` and the title `.manager-card-title` — so
+  not re-derived — the root wears `.fabricate-card` and the title `.manager-card-title` — so
   this file owns only the title's glyph alignment, the rows and the link. `items` is
   `[{ icon, lead, text }]`; `links` is `[{ href, label, icon }]`, each needing BOTH, and is a LIST
   because a one-link cap is the incompatibility that keeps a hand-rolled card alive (issue 883).

@@ -926,24 +926,24 @@
     width: 100%;
   }
 
-  /* A FIELD'S VALUE IS NOT ITS CAPTION. `.fabricate-field.manager-field` sets `font-weight:
+  /* A FIELD'S VALUE IS NOT ITS CAPTION. `.fabricate-field.fabricate-field` sets `font-weight:
      700` on the BOX because the caption it wraps is a label, and Foundry's control reset gives
      an `<input>` `font: inherit` - so a GM's typed name would render at heading weight. The
      shipped repair for the same defect is scoped to one manager route
      (`[data-manager-view='world-tool-entry']` in `styles/fabricate.css`); this is that rule
      for this window, with its `:not(.fab-stepper-input)` exclusion intact because the stepper
      supplies its own chrome. */
-  .fabricate-interactable-config :global(.manager-field input:not(.fab-stepper-input)) {
+  .fabricate-interactable-config :global(.fabricate-field input:not(.fab-stepper-input)) {
     font-weight: 400;
   }
 
-  /* THE SWITCH'S READING IS A SENTENCE HERE. `.manager-status-toggle` caps itself at 78px, so
+  /* THE SWITCH'S READING IS A SENTENCE HERE. `.fabricate-toggle` caps itself at 78px, so
      with a 34px track the label has ~36px and every reading in this panel would ellipsise -
      "Linked to gathering task" to "Li...". The shipped precedent for a switch whose reading is
      the control's whole content is the Checks activation card, which releases the same cap in
      `styles/fabricate.css` for the same stated reason. Scoped to this root rather than added
      to the sheet, because the sheet is not this phase's to edit. */
-  .fabricate-interactable-config :global(.manager-status-toggle) {
+  .fabricate-interactable-config :global(.fabricate-toggle) {
     max-width: none;
   }
 
@@ -990,12 +990,12 @@
      matches the controls above it and leaving its 48px input marooned mid-border. 160px is
      the width the `fill` variant was measured against and leaves a 106px typeable field.
 
-     `:global(...)`, and the `.manager-field` half of the compound is load-bearing rather than
+     `:global(...)`, and the `.fabricate-field` half of the compound is load-bearing rather than
      decorative: this class now travels to a `<Field>`, so the scoped form
      `.fab-ic-node-count-field.svelte-<hash>` would match nothing, and a bare
      `:global(.fab-ic-node-count-field)` would reach the element at (0,1,0) where the scoped
      form was (0,2,0) - smuggling a cascade change in as a repair. */
-  :global(.manager-field.fab-ic-node-count-field) {
+  :global(.fabricate-field.fab-ic-node-count-field) {
     max-width: 160px;
   }
 
@@ -1094,7 +1094,7 @@
   /* THE PRESSED STATE'S ACCENT, STATED AGAINST THE ATTRIBUTE THAT CARRIES IT (issue 1520).
      The Disable and Lock buttons report a live state as well as offering an action, and without
      a treatment that state has no visual expression at all - which is the defect this sheet
-     records for the component browser's grouping switch, a `.manager-button` under a class with
+     records for the component browser's grouping switch, a `.fabricate-button` under a class with
      no CSS anywhere. Keyed on `aria-pressed` rather than on a companion class, so the drawn
      state and the announced state cannot drift; the same correction the Manage panel's promote
      disclosure took for its `aria-expanded` edge.

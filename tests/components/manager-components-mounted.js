@@ -125,7 +125,7 @@ export function registerComponentsCases() {
     assert.equal(target.textContent.includes('Evidence'), false);
     assert.equal(target.textContent.includes('Progressive difficulty'), false);
 
-    const search = target.querySelector('.manager-toolbar input[type="search"]');
+    const search = target.querySelector('.fabricate-filter-bar input[type="search"]');
     search.value = 'iron';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -454,10 +454,16 @@ export function registerComponentsCases() {
       'the source block renders inside the identity strip, not a rail inspector'
     );
     assert.equal(
-      target.querySelector('.manager-inspector .manager-inspector-card'),
+      target.querySelector('.manager-inspector .fabricate-card'),
       null,
       'the component editor renders no right-rail inspector card'
     );
+    // This proves only that the selector can match. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
+    const rail = target.ownerDocument.createElement('div');
+    rail.innerHTML = '<aside class="manager-inspector"><section class="fabricate-card"></section></aside>';
+    assert.ok(Boolean(rail.querySelector(':scope .manager-inspector .fabricate-card')), 'it can match');
 
     // ── THE SOURCE REGISTER IS GONE FROM THIS SCREEN (issue 1371, parity round 4) ──────────
     // Open-sheet on the name, the overflow's Copy source UUID and Unlink Source Item, and the

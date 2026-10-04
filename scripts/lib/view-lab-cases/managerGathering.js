@@ -19,7 +19,7 @@ const OPEN_PROSPECT_TASK = Object.freeze([
   { selector: '#manager-gathering-nav-tasks' },
   {
     selector:
-      '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
+      '[data-gathering-task-id="sm-task-prospect"] .fabricate-icon-button[aria-label^="Edit"]',
   },
 ]);
 const TASK_PREVIEW = '[data-gathering-task-dc] [data-override-preview-actor]';
@@ -155,7 +155,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
     ],
     // Hearth & Herb, the palette where the control outline is weakest (issue 2151).
@@ -185,7 +185,7 @@ export const CASES = Object.freeze([
         { selector: '#manager-gathering-nav-tasks' },
         {
           selector:
-            '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
+            '[data-gathering-task-id="sm-task-prospect"] .fabricate-icon-button[aria-label^="Edit"]',
         },
         ...chooseSelectOption('[data-gathering-task-node-respawn]', 'overTime'),
         { selector: '[data-gathering-task-node-interval]', fill: '1440' },
@@ -227,7 +227,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="sm-task-prospect"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-task-node-respawn]' },
     ],
@@ -263,7 +263,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-add-stamina-modifier]' },
       // The row renders no caption, so its own accessible name is the address (issue 1510).
@@ -310,7 +310,7 @@ export const CASES = Object.freeze([
           {
             selector:
               `[data-gathering-${kind}-id="${kind === 'task' ? 'hb-task-slowbloom' : 'hb-event-wolves'}"]` +
-              ' .manager-icon-button[aria-label^="Edit"]',
+              ' .fabricate-icon-button[aria-label^="Edit"]',
           },
           ...(kind === 'task'
             ? [
@@ -363,7 +363,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-task-results]', scroll: true },
     ],
@@ -389,7 +389,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-task-results]', scroll: true },
       { selector: `${STRAIGHT_RESULT} [data-recipe-option-amount-mode="rolled"]` },
@@ -430,7 +430,7 @@ export const CASES = Object.freeze([
         { selector: '#manager-gathering-nav-tasks' },
         {
           selector:
-            '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+            '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
         },
         {
           selector:
@@ -466,7 +466,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-task-results]', scroll: true },
     ],
@@ -490,7 +490,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-task-results]', scroll: true },
     ],
@@ -516,7 +516,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-task-availability]', scroll: true },
       { selector: '[data-gathering-task-field="biomes"] .manager-condition-menu-button' },
@@ -544,7 +544,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       // At 1000px the library stacks, so the scroll to reach Edit carries into the editor's own container.
       { selector: '[data-gathering-task-core-editor]', scroll: true },
@@ -570,7 +570,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
       },
     ],
     expectView: 'environment-edit',
@@ -608,7 +608,7 @@ export const CASES = Object.freeze([
         'Gathering',
         {
           selector:
-            '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+            '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
         },
         ...[
           ['realm', 'hb-realm-verdant'],
@@ -651,7 +651,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-environment-field="dangerLevel"]' },
     ],
@@ -683,7 +683,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-events' },
     ],
@@ -735,7 +735,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-encounters' },
       {
         selector:
-          '[data-gathering-event-id="hb-event-wolves"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-event-id="hb-event-wolves"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       // The danger pills into frame (issue 1515).
       { selector: '[data-gathering-event-danger-pills]', scroll: true },
@@ -768,7 +768,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-task-drop-id="hb-slowbloom-drop"]' },
       { selector: '[data-gathering-drop-condition-modifiers="biome"]', scroll: true },

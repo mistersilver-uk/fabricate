@@ -18,10 +18,7 @@
   }
 </script>
 
-<section
-  class="fabricate-card manager-inspector-card manager-gathering-rules-card"
-  data-gathering-inspector-rules
->
+<section class="fabricate-card manager-gathering-rules-card" data-gathering-inspector-rules>
   <div class="manager-inspector-title-row">
     <span class="manager-inspector-icon" aria-hidden="true">
       <i class="fas fa-scale-balanced"></i>

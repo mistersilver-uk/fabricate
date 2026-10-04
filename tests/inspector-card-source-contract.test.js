@@ -1,12 +1,12 @@
 /**
  * Source contract: the manager's card shell is written in ONE place (issue 1427).
- * `class="manager-inspector-card"` was a CSS convention, like the `manager-button` one
+ * A hand-written card class was a CSS convention, like the hand-written button class
  * `manager-button-source-contract.test.js` closes.
  */
 import { definePrimitiveSourceContract } from './helpers/primitiveSourceContract.js';
 
 /** The class only the primitive may write. */
-const CONTRACT_CLASS = 'manager-inspector-card';
+const CONTRACT_CLASS = 'fabricate-card';
 
 const PRIMITIVE = 'src/ui/svelte/components/InspectorCard.svelte';
 
@@ -124,12 +124,12 @@ definePrimitiveSourceContract({
 
   classOnlyRemedy:
     'a manager card is an `<InspectorCard>`, never a hand-written ' +
-    '`class="manager-inspector-card"` on a `<section>`. A per-site modifier travels as a ' +
+    '`class="fabricate-card"` on a `<section>`. A per-site modifier travels as a ' +
     'pass-through on the `class` prop and a per-site `data-*` hook rides the rest spread — ' +
     'see `InspectorCard.svelte`',
 
   restatementRemedy:
-    'the primitive emits `manager-inspector-card` itself and APPENDS the `class` prop to it, so ' +
+    'the primitive emits `fabricate-card` itself and APPENDS the `class` prop to it, so ' +
     'restating it from a call site emits the token twice and re-opens the convention this ' +
     'component exists to close',
 

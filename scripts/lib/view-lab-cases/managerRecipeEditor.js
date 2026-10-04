@@ -46,7 +46,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-overview' },
     ],
     expectView: 'recipe-edit',
@@ -80,7 +80,7 @@ export const CASES = Object.freeze([
       query: { system: 'lab-smithing', checkPreviewState: state },
       steps: [
         'Crafting',
-        { selector: '.manager-icon-button[aria-label^="Edit"]' },
+        { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
         { selector: '#recipe-tab-overview' },
         { selector: '[data-recipe-field="checkTierId"]' },
       ],
@@ -378,7 +378,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-tools' },
     ],
     expectView: 'recipe-edit',
@@ -396,7 +396,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-ingredients' },
     ],
     expectView: 'recipe-edit',
@@ -431,7 +431,7 @@ export const CASES = Object.freeze([
     // The walk stops on the trigger and clicks no row, so the list is still open when the frame is taken.
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-ingredients' },
       { selector: '[data-recipe-option-kind]' },
     ],
@@ -459,7 +459,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-ingredients' },
       { selector: `${COMPONENT_NAME_FIELD} [data-recipe-option-clear]` },
       { selector: `${COMPONENT_NAME_FIELD} [data-recipe-option-search]`, fill: 'ingot' },
@@ -744,7 +744,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',

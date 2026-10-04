@@ -669,7 +669,7 @@ export function registerSystemsCases() {
       'pre-condition: the manager opens on the systems library'
     );
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await Promise.resolve();
     await tick();
     flushSync();
@@ -699,7 +699,7 @@ export function registerSystemsCases() {
     });
     flushSync();
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await Promise.resolve();
     await tick();
     flushSync();
@@ -754,7 +754,7 @@ export function registerSystemsCases() {
     assert.ok(target.textContent.includes('Gathering docs'));
     assert.equal(target.textContent.includes('Select an environment'), false);
 
-    Array.from(target.querySelectorAll('.manager-table-scroll .manager-button'))
+    Array.from(target.querySelectorAll('.manager-table-scroll .fabricate-button'))
       .find((button) => button.textContent.includes('Review tasks'))
       .click();
     await tick();
@@ -773,7 +773,7 @@ export function registerSystemsCases() {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-table-scroll .manager-button'))
+    Array.from(target.querySelectorAll('.manager-table-scroll .fabricate-button'))
       .find((button) => button.textContent.includes('Review events'))
       .click();
     await tick();
@@ -789,7 +789,7 @@ export function registerSystemsCases() {
     await tick();
     flushSync();
 
-    target.querySelector('.manager-table-scroll .manager-button.is-primary').click();
+    target.querySelector('.manager-table-scroll .fabricate-button.is-primary').click();
     await tick();
     flushSync();
 
@@ -825,7 +825,7 @@ export function registerSystemsCases() {
     assert.ok(
       target.textContent.includes('Create gathering tasks before attaching them to environments.')
     );
-    target.querySelector('[data-gathering-tasks-browser] .manager-button.is-primary').click();
+    target.querySelector('[data-gathering-tasks-browser] .fabricate-button.is-primary').click();
     await tick();
     flushSync();
 
@@ -881,7 +881,7 @@ export function registerSystemsCases() {
     // The Recipe Editor was removed, so the empty state no longer offers a
     // Create Recipe button.
     assert.equal(
-      target.querySelector('.manager-table-scroll .manager-button.is-primary'),
+      target.querySelector('.manager-table-scroll .fabricate-button.is-primary'),
       null,
       'empty recipe state should not offer a create button'
     );
@@ -926,7 +926,7 @@ export function registerSystemsCases() {
       false
     );
 
-    Array.from(target.querySelectorAll('.manager-setup-links .manager-button'))
+    Array.from(target.querySelectorAll('.manager-setup-links .fabricate-button'))
       .find((button) => button.textContent.includes('Add components'))
       .click();
     await tick();
@@ -1000,7 +1000,7 @@ export function registerSystemsCases() {
     // wrong layer: an essence is a world record, and the route out is the setup card's own copy
     // plus the rail's Essence Catalogue entry.
     assert.ok(
-      !target.querySelector('.manager-header-actions .manager-button'),
+      !target.querySelector('.manager-header-actions .fabricate-button'),
       'the Essence Rules header carries no action on an empty system either'
     );
     assert.equal(
@@ -1039,6 +1039,10 @@ export function registerSystemsCases() {
     await tick();
     flushSync();
 
+    assert.ok(
+      Boolean(target.querySelector(':scope .fabricate-pagination .fabricate-icon-button')),
+      'the pager steps through the shared icon button'
+    );
     target.querySelector('[data-pagination-next]').click();
     await tick();
     flushSync();
@@ -1191,7 +1195,7 @@ export function registerSystemsCases() {
       'the resolution-mode card is no longer on System Overview'
     );
 
-    target.querySelector('[data-feature-key="gathering"] .manager-status-toggle').click();
+    target.querySelector('[data-feature-key="gathering"] .fabricate-toggle').click();
 
     assert.ok(
       calls.some(
@@ -1613,7 +1617,7 @@ export function registerSystemsCases() {
     assert.ok(blockerLink, 'the blocker banner exposes an open-overview link');
     // Audit row 8's forgotten role (issue 1118). This is a "go and look at that" link inside a
     // callout that already carries the alarm — the triangle, the title and the body copy — and
-    // at the base `.manager-button` weight it competed with the sentence explaining it. Ghost
+    // at the base `.fabricate-button` weight it competed with the sentence explaining it. Ghost
     // is the ruling `component/ComponentEditorHeader.svelte` states for its own Back: a
     // secondary verb beside something that outranks it.
     assert.ok(
@@ -1705,7 +1709,7 @@ export function registerSystemsCases() {
     const tile = target.querySelector('[data-feature-key="salvage"]');
     assert.ok(tile, 'the salvage feature toggle renders in System Settings');
     // The default fixture has salvage on, so toggling sends false.
-    tile.querySelector('.manager-status-toggle').click();
+    tile.querySelector('.fabricate-toggle').click();
     assert.ok(
       calls.some(
         (call) => call[0] === 'toggleFeature' && call[1] === 'salvage' && call[2] === false
@@ -1732,7 +1736,7 @@ export function registerSystemsCases() {
     const tile = target.querySelector('[data-feature-key="salvage"]');
     assert.ok(tile, 'the salvage toggle still renders so the GM can turn salvage back on');
     assert.equal(
-      tile.querySelector('.manager-status-toggle').getAttribute('aria-pressed'),
+      tile.querySelector('.fabricate-toggle').getAttribute('aria-pressed'),
       'false',
       'the salvage toggle reads as off'
     );
@@ -2226,7 +2230,7 @@ export function registerSystemsCases() {
     const card = target.querySelector('.manager-currency-unit-card');
     assert.ok(card.querySelector('[data-world-currency-unit="gp"]'), 'gp unit should render');
     assert.equal(
-      card.querySelectorAll('.manager-currency-provider-managed-summary .manager-icon-button')
+      card.querySelectorAll('.manager-currency-provider-managed-summary .fabricate-icon-button')
         .length,
       0,
       'no edit/delete icon buttons in read-only summary'
@@ -2443,7 +2447,7 @@ export function registerSystemsCases() {
     assert.equal(target.querySelector('[data-feature-key="outcomeRouting"]'), null);
 
     // Resolution-mode rollback moved to the Crafting Settings page (issue 511).
-    const gathering = target.querySelector('[data-feature-key="gathering"] .manager-status-toggle');
+    const gathering = target.querySelector('[data-feature-key="gathering"] .fabricate-toggle');
     assert.equal(gathering.getAttribute('aria-pressed'), 'true');
     gathering.click();
     await Promise.resolve();

@@ -114,7 +114,7 @@ test('Tool Breakage keeps three shared radio cards wide and stacks them inside t
 });
 
 test('manager character modifier search suggestions keep icons in row flow', () => {
-  const searchIconBlock = blockFor('.fabricate-search.manager-search > i');
+  const searchIconBlock = blockFor('.fabricate-search.fabricate-search > i');
   const characterModifierSuggestionBlock = blockFor(
     '.fabricate-manager .manager-tag-suggestion.manager-character-modifier-add-suggestion'
   );
@@ -127,7 +127,7 @@ test('manager character modifier search suggestions keep icons in row flow', () 
     'search field leading icon should remain positioned inside the input chrome'
   );
   assert.equal(
-    css.includes('.fabricate-search.manager-search i {\n  position: absolute;'),
+    css.includes('.fabricate-search.fabricate-search i {\n  position: absolute;'),
     false,
     'search icon positioning must not catch suggestion icons inside search popovers'
   );
@@ -207,7 +207,7 @@ test('manager character modifier search suggestions render with availability-sty
               </section>
 
               <section>
-                <label class="fabricate-search manager-search is-compact manager-character-modifier-add-search">
+                <label class="fabricate-search is-compact manager-character-modifier-add-search">
                   <i class="fa-solid fa-search" aria-hidden="true"></i>
                   <input type="search" value="wis" role="combobox" aria-label="Search character modifiers">
                 </label>
@@ -391,8 +391,8 @@ test("the checks rail follows the Tool Studio's inspector convention", () => {
 
 test('Tool replacement Component picker resists Foundry button height and image overrides', () => {
   const triggerBlock = blockFor(
-    '.fabricate-button.manager-button.manager-salvage-component-trigger,\n' +
-      '.fabricate-button.manager-button.manager-tool-replacement-component-trigger'
+    '.fabricate-button.fabricate-button.manager-salvage-component-trigger,\n' +
+      '.fabricate-button.fabricate-button.manager-tool-replacement-component-trigger'
   );
   const portraitBlock = blockFor(
     '.fabricate-manager .manager-salvage-component-trigger .manager-travel-portrait,\n' +
@@ -421,7 +421,7 @@ test('Tool library pins a full-width pagination footer outside its scrolling res
   const scrollBlock = blockFor('.fabricate-manager .manager-tools-library-scroll');
   const footerBlock = blockFor('.fabricate-manager .manager-tools-browser-pagination');
   const paginationBlock = blockFor(
-    '.fabricate-manager .manager-tools-browser-pagination .manager-pagination'
+    '.fabricate-manager .manager-tools-browser-pagination .fabricate-pagination'
   );
 
   assert.ok(mainBlock.includes('padding: 0;'));
@@ -491,7 +491,7 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
 
     const edges = await checksRollEdges(
       page,
-      'fabricate-card manager-inspector-card manager-checks-card'
+      'fabricate-card manager-checks-card'
     );
     assert.equal(
       edges.rowLeft,
@@ -521,7 +521,7 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
     assert.equal(edges.listPaddingRight, '0px');
 
     // MUTATION PROOF, same page: reintroducing the defect.
-    const broken = await checksRollEdges(page, 'fabricate-card manager-inspector-card');
+    const broken = await checksRollEdges(page, 'fabricate-card');
     assert.notEqual(
       broken.rowLeft,
       broken.radioLeft,
@@ -569,7 +569,7 @@ test('both interpolated card fixtures are rooted at the class the primitive emit
   // TWO fixed arms and TWO controls.
   assert.deepEqual(
     [...new Set(wrapperArguments)].sort(compareStrings),
-    [`${root} manager-inspector-card`, `${root} manager-inspector-card manager-checks-card`],
+    [root, `${root} manager-checks-card`],
     'every interpolated card fixture must carry the family root; the control arms remove the ' +
       'CALLER class and nothing else, because "the primitive unrooted" is a different mutation ' +
       'from the one those tests are proofs of'
@@ -587,7 +587,7 @@ test('CraftingCheckEditor really wraps the routed tier list in the checks-card c
     withoutComments(craftingCheckEditor),
     /<InspectorCard class="manager-checks-card" data-routed-tiers="">/,
     'the routed tier section must carry manager-checks-card, or it falls back to the bare ' +
-      '.manager-inspector-card shell and its own 12px padding re-insets the tier row'
+      '.fabricate-card shell and its own 12px padding re-insets the tier row'
   );
 });
 
@@ -601,7 +601,7 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
 
     const fixed = await modifiersCombinationRuleMetrics(
       page,
-      'fabricate-card manager-inspector-card manager-checks-card'
+      'fabricate-card manager-checks-card'
     );
     assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
     // The library's `<OptionCards>` states padding 12px and radius 11px, so the primitive owns them.
@@ -612,7 +612,7 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
     // MUTATION PROOF, same page: reintroducing the defect.
     const broken = await modifiersCombinationRuleMetrics(
       page,
-      'fabricate-card manager-inspector-card'
+      'fabricate-card'
     );
     assert.notEqual(
       broken.cardRadius,
@@ -649,7 +649,7 @@ test('CraftingModifierCatalogueCard really wraps its card in the checks-card con
     withoutComments(modifierCatalogueSource),
     /<InspectorCard\s+class="manager-checks-card"\s+data-crafting-modifier-catalogue=/,
     'the modifiers card must carry manager-checks-card, or it falls back to the bare ' +
-      '.manager-inspector-card shell and the combination-rule cards fall back to the generic scale'
+      '.fabricate-card shell and the combination-rule cards fall back to the generic scale'
   );
 });
 
@@ -975,16 +975,16 @@ test('the validation summary paints every status class it can emit, and only tho
 });
 
 test('the locked activation indicator offers no hover affordance', async () => {
-  // `.manager-status-toggle.is-locked` is a `<span role="img">`: an indicator, not a control.
+  // `.fabricate-toggle.is-locked` is a `<span role="img">`: an indicator, not a control.
   const context = await openLayoutContext({ viewport: { width: 600, height: 300 } });
   const page = await context.newPage();
   try {
     await page.setContent(
       `<style>${css}</style><div class="fabricate-manager">` +
-        `<button type="button" class="fabricate-toggle manager-status-toggle is-on" id="live">` +
+        `<button type="button" class="fabricate-toggle is-on" id="live">` +
         `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
         `<span class="manager-status-toggle-label">On</span></button>` +
-        `<span class="fabricate-toggle manager-status-toggle is-locked is-on" role="img" aria-label="Check is on" id="locked">` +
+        `<span class="fabricate-toggle is-locked is-on" role="img" aria-label="Check is on" id="locked">` +
         `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
         `<span class="manager-status-toggle-label">On</span></span>` +
         `</div>`
@@ -1106,7 +1106,7 @@ test('the band-strip hint keeps its 20px separation from the first tier row', as
     await page.setContent(
       `<style>${css}</style>` +
         '<div class="fabricate-manager">' +
-        '<section class="fabricate-card manager-inspector-card manager-checks-card" data-outcome-bands>' +
+        '<section class="fabricate-card manager-checks-card" data-outcome-bands>' +
         '<div class="manager-checks-card-body is-roomy">' +
         '<p class="manager-muted" data-outcome-band-strip-hint>' +
         'Drag or arrow-key a band edge to move its threshold.</p>' +
@@ -1436,7 +1436,7 @@ test('a Modifiers card button renders exactly like the tool studio button of the
     // measured the same as the converted one, the primitive would be changing nothing and
     // every assertion below would pass vacuously.
     const unconverted =
-      '<button type="button" class="manager-button is-danger" data-probe="card-unconverted"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>';
+      '<button type="button" class="fabricate-button is-danger" data-probe="card-unconverted"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>';
 
     await page.setContent(`
       <!doctype html>
@@ -1581,27 +1581,27 @@ test('the Checks rail states its own control type scale instead of inheriting on
                   <div class="manager-environment-workspace">
                     <div class="manager-environment-tab-panel"></div>
                     <aside class="manager-inspector manager-environment-inspector manager-checks-rail" data-checks-rail="crafting">
-                      <section class="fabricate-card manager-inspector-card" data-checks-preview-as>
+                      <section class="fabricate-card" data-checks-preview-as>
                         <div class="fabricate-picker manager-travel-picker manager-checks-preview-actor">
                           <button type="button" data-probe="preview-actor" data-checks-preview-actor
-                            class="fabricate-button manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger">
+                            class="fabricate-button manager-travel-picker-trigger manager-checks-preview-actor-trigger">
                             <i class="fas fa-user-slash"></i><span class="manager-travel-picker-value">No actor</span>
                           </button>
                         </div>
                         ${previewRecordControl('preview-record', 'manager-checks-preview-record-select')}
-                        <label class="fabricate-field manager-field">
+                        <label class="fabricate-field">
                           <span>Result difficulties</span>
                           <input type="text" data-probe="preview-difficulties" value="6, 9, 14">
                         </label>
                       </section>
-                      <section class="fabricate-card manager-inspector-card" data-checks-simulator>
+                      <section class="fabricate-card" data-checks-simulator>
                         <div class="manager-checks-simulator">
                           <button type="button" data-probe="roll" data-checks-simulator-roll
-                            class="fabricate-button manager-button fab-manager-button is-primary manager-checks-simulator-roll">
+                            class="fabricate-button fab-manager-button is-primary manager-checks-simulator-roll">
                             <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
                           </button>
                           <button type="button" data-probe="roll-unconverted"
-                            class="manager-button is-primary">
+                            class="fabricate-button is-primary">
                             <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
                           </button>
                         </div>
@@ -1613,7 +1613,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
               <!-- OUTSIDE the rail, on purpose: the INPUT is the rail rule's negative control on the
                    leg it kept, and the second picker is the converted control's own. -->
               <div class="fabricate fabricate-manager" data-fabricate-theme="dark">
-                <label class="fabricate-field manager-field">
+                <label class="fabricate-field">
                   <input type="text" data-probe="field-input-elsewhere" value="6, 9, 14">
                 </label>
                 ${previewRecordControl('record-trigger-elsewhere', '')}
@@ -1623,7 +1623,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
                   <span class="manager-checks-preview-against-label">Preview against</span>
                   ${previewRecordControl('preview-against', '', 'inline', 'data-preview-against-select')}
                 </div>
-                <div class="fabricate-field manager-field manager-checks-band-record">
+                <div class="fabricate-field manager-checks-band-record">
                   <span>Preview against</span>
                   ${previewRecordControl('band-record', '', 'toolbar', 'data-simple-band-record')}
                 </div>
@@ -1648,7 +1648,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
               height: Math.round(element.getBoundingClientRect().height),
               root: Math.round(picker?.getBoundingClientRect().width ?? 0),
               field: Math.round(
-                element.closest('.manager-field')?.getBoundingClientRect().width ?? 0
+                element.closest('.fabricate-field')?.getBoundingClientRect().width ?? 0
               ),
             },
           ];
@@ -1688,7 +1688,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
     assert.equal(measured['preview-record'].fontSize, '11.52px', 'at the rung’s own literal');
 
     // THE TWO WIDTH COUNTERPARTS the conversion owes the card bodies, measured rather than read off
-    // the sheet: `.fabricate-field.manager-field select` is element-typed and reaches no `<button>`,
+    // the sheet: `.fabricate-field.fabricate-field select` is element-typed and reaches no `<button>`,
     // so without them a full-width editor field is a hug-content button that resizes per value.
     assert.equal(measured['preview-against'].root, 260, 'the Outcomes row grows to its 260px cap');
     assert.equal(
@@ -1737,13 +1737,13 @@ test('the modifier row gives every field room for its longest content at every m
     const stepper = (bound) =>
       `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-world-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
     const boundField = (bound, caption) =>
-      `<div class="fabricate-field manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
+      `<div class="fabricate-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
     // The icon field's picker root element.
     const editor = `
       <div class="manager-modifier-body manager-character-modifier-editor">
         <div class="manager-modifier-name-row">
-          <div class="fabricate-field manager-field manager-modifier-icon-field"><span>Icon</span><div class="fabricate-picker manager-travel-picker fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div></div>
-          <label class="fabricate-field manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
+          <div class="fabricate-field manager-modifier-icon-field"><span>Icon</span><div class="fabricate-picker manager-travel-picker fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div></div>
+          <label class="fabricate-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
           <div class="manager-modifier-bounds-row" data-world-modifier-bounds="mod-probe">
             ${boundField('min', 'Minimum')}${boundField('max', 'Maximum')}
           </div>

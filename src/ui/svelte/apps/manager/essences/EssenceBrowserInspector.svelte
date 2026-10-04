@@ -272,7 +272,7 @@
      past the fold, so the rail's one loud control was invisible in every captured frame. -->
 <section class="manager-essence-inspector-section" data-essence-section="actions">
   <!-- The three verbs render through `InspectorActionButton`, the extracted point-of-arrival
-       button for every right inspector. The primary was `.manager-button.is-primary`, the SUCCESS
+       button for every right inspector. The primary was `.fabricate-button.is-primary`, the SUCCESS
        family, so `Edit essence` painted green where the design's primary is the accent. -->
   <!--
     NO DUPLICATE. `store.duplicateEssence` minted a SYSTEM-owned essence with its own name, icon and
@@ -421,27 +421,27 @@
 
      `:global()` AND CHAINED, for the reason `ItemPageInspector` states: the class rides a `class`
      prop onto an element THIS component does not write, so it carries no `svelte-<hash>`, and
-     `.manager-inspector-card` is chained so the selector stays at (0,2,0). */
-  :global(.manager-inspector-card.manager-essence-shared) {
+     `.fabricate-card` is chained so the selector stays at (0,2,0). */
+  :global(.fabricate-card.manager-essence-shared) {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
   }
 
   /* Colour only: `.manager-link-button` owns the shape and paints muted, and this link takes the
-     accent because it LEAVES the screen. Compounded through `.manager-inspector-card` so the rule
+     accent because it LEAVES the screen. Compounded through `.fabricate-card` so the rule
      is (0,3,0) and beats the global outright rather than tying and being decided by injection order.
      WHOLLY `:global()`, not a global ancestor with a scoped descendant — the form that looks right
      and quietly changes the cascade — because the ANCESTOR is what stopped matching. */
-  :global(.manager-inspector-card.manager-essence-shared .manager-essence-shared-link) {
+  :global(.fabricate-card.manager-essence-shared .manager-essence-shared-link) {
     color: var(--fab-accent);
     font-weight: 600;
   }
 
-  :global(.manager-inspector-card.manager-essence-shared .manager-essence-shared-link:hover) {
+  :global(.fabricate-card.manager-essence-shared .manager-essence-shared-link:hover) {
     color: var(--fab-text);
   }
 
-  :global(.manager-inspector-card.manager-essence-shared .manager-essence-shared-link i) {
+  :global(.fabricate-card.manager-essence-shared .manager-essence-shared-link i) {
     font-size: 0.6rem;
   }
 
@@ -470,7 +470,7 @@
     opacity: 0.72;
   }
 
-  /* A BARE COLUMN, NOT A STACK OF BOXES. Every section wore `.manager-inspector-card` and four of
+  /* A BARE COLUMN, NOT A STACK OF BOXES. Every section wore `.fabricate-card` and four of
      them CONTAIN cards, so one border became three nested ones. The rail is a column on the pane's
      own surface with a micro-label per section, and only the things that ARE objects keep a box, as
      `RecipeBrowserInspector` already does. THE SHARED-DEFINITION CALLOUT KEEPS ITS BOX, because it

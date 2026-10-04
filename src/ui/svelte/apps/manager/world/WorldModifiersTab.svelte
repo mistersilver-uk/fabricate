@@ -235,7 +235,7 @@
       </div>
       <!-- Both header verbs go through the shared primitive (issue 1096). `Add modifier`
            keeps its primary role; `Seed presets` stays NEUTRAL, which is what its bare
-           `manager-button` already rendered. -->
+           hand-written button class already rendered. -->
       <div class="manager-character-modifier-card-header-actions">
         <Button role="primary" onclick={handleAdd}>
           <i class="fa-solid fa-plus" aria-hidden="true"></i>
@@ -520,7 +520,7 @@
                       {rollNote(entry)}
                     </p>
                   {/if}
-                  <!-- Both verbs carried a BARE `manager-button` before issue 1096: `Delete
+                  <!-- Both verbs carried a bare hand-written button class before issue 1096: `Delete
                        modifier` was painted as a neutral action while the identical verb in
                        the Tool Studio is danger. The roles are copied from `ToolEditView`'s
                        header rather than chosen here. -->

@@ -267,7 +267,7 @@ describe('the Preview-as control (issue 1096 shipped it as a SLOT; this fills it
 
   it('rolls through the studio BUTTON PRIMITIVE, not a hand-written class string', async () => {
     // Reported as "the roll button does not match the studio's button". The cause is not a
-    // missing rule: `manager-button is-primary` matches no rule stating a type size, so the
+    // missing rule: `fabricate-button is-primary` matches no rule stating a type size, so the
     // label took Foundry's 14px app base while every converted button in the studio read at
     // the primitive's 11.52px. `fab-manager-button` is what `Button` emits and is the
     // only class the type-scale rule keys on, so its presence IS the conversion.

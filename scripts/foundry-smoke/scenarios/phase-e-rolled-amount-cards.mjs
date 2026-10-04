@@ -50,7 +50,7 @@ const RESULT_ROW = '.fabricate-manager [data-recipe-tab="results"] [data-recipe-
 const TASK_RESULT_ROW =
   '.fabricate-manager [data-gathering-task-results="straight"] [data-recipe-result-item]';
 const FORMULA = '[data-recipe-option-formula]';
-const HEADER_BUTTON = '.fabricate-manager .manager-header-actions .manager-button';
+const HEADER_BUTTON = '.fabricate-manager .manager-header-actions .fabricate-button';
 
 /** One named step: its body's detail on success, its message on failure. */
 async function runStep(ctx, step, body) {

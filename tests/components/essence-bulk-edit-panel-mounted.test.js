@@ -118,7 +118,7 @@ const impactRowEl = (root, name) => root.querySelector(`[data-essence-bulk-impac
 const impactRow = (root, name) => impactRowEl(root, name).textContent.trim();
 
 const deleteButton = (root) =>
-  root.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
+  root.querySelector('[data-essence-bulk-delete-card] .fabricate-button.is-danger');
 
 const applyButton = (root) => root.querySelector('[data-essence-bulk-apply]');
 
@@ -393,7 +393,7 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
   it('sits inside the delete card that scopes it to the inspector-action label size', async () => {
     // happy-dom cannot compute the cascade (see essence-studio-fidelity.test.js for the
     // source-level font-size pin), but it CAN prove the structural half of that fix: the
-    // button the scoped `.fab-bulk-delete-card :global(.manager-button)` rule targets is
+    // button the scoped `.fab-bulk-delete-card :global(.fabricate-button)` rule targets is
     // actually a descendant of that card, in both the idle and armed states.
     const root = await harness.mount(props(SELECTION));
     assert.ok(

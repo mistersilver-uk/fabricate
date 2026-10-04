@@ -154,7 +154,7 @@ describe('RecipeBrowser mounted behavior', () => {
     });
 
     const input = target.querySelector('.crafting-browser-search input');
-    assert.ok(input.closest('.fabricate-search.manager-search'), 'the shared search field');
+    assert.ok(input.closest('.fabricate-search'), 'the shared search field');
     input.value = 'heal';
     input.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();

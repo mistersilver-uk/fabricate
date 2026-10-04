@@ -772,7 +772,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
       { selector: '[data-recipe-add="routing-option"]' },
     ],
@@ -1080,7 +1080,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-gathering-nav-tasks' },
       {
         selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-task-check-modifiers]', scroll: true },
     ],
@@ -1173,15 +1173,15 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-vocabulary-panel="recipeCategories"]',
-        target: '[data-category-id] .manager-icon-button',
+        target: '[data-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentCategories"]',
-        target: '[data-component-category-id] .manager-icon-button',
+        target: '[data-component-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentTags"]',
-        target: '[data-tag-id] .manager-icon-button',
+        target: '[data-tag-id] .fabricate-icon-button',
       },
     ],
     kinds: ['manager', 'tags'],
@@ -1229,7 +1229,7 @@ export const CASES = Object.freeze([
         // `:not(.is-danger)` is load-bearing: an unreferenced row's delete wears `is-danger` and
         // fires in one click with no confirm, which would mutate the fixture mid-capture.
         selector:
-          '[data-vocabulary-panel="componentCategories"] [data-component-category-id] .manager-icon-button:not(.is-danger)',
+          '[data-vocabulary-panel="componentCategories"] [data-component-category-id] .fabricate-icon-button:not(.is-danger)',
       },
     ],
     expectView: 'tags',
@@ -1238,15 +1238,15 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-vocabulary-panel="recipeCategories"]',
-        target: '[data-category-id] .manager-icon-button',
+        target: '[data-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentCategories"]',
-        target: '[data-component-category-id] .manager-icon-button',
+        target: '[data-component-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentTags"]',
-        target: '[data-tag-id] .manager-icon-button',
+        target: '[data-tag-id] .fabricate-icon-button',
       },
     ],
     kinds: ['manager', 'tags', 'responsive'],

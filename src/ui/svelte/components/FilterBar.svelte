@@ -29,9 +29,7 @@
 <script>
   let { children = undefined, ariaLabel = undefined, class: extraClass = '', ...rest } = $props();
 
-  const classes = $derived(
-    ['fabricate-filter-bar', 'manager-toolbar', extraClass].filter(Boolean).join(' ')
-  );
+  const classes = $derived(['fabricate-filter-bar', extraClass].filter(Boolean).join(' '));
 </script>
 
 <section class={classes} aria-label={ariaLabel} {...rest}>{@render children?.()}</section>

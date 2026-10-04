@@ -74,13 +74,13 @@ function header(subtitle, title = 'Nimithernian Institute for the Arcane') {
   </div>
   <div class="manager-header-actions" aria-label="Actions">
     <span class="manager-chip is-warning is-action" data-downtime-chrome-status>Unsaved</span>
-    <button type="button" class="fabricate-button manager-button fab-manager-button is-ghost" data-action="back">
+    <button type="button" class="fabricate-button fab-manager-button is-ghost" data-action="back">
       <i class="fas fa-arrow-left"></i><span>All factions</span>
     </button>
-    <button type="button" class="fabricate-button manager-button fab-manager-button is-danger" data-action="delete">
+    <button type="button" class="fabricate-button fab-manager-button is-danger" data-action="delete">
       <i class="fas fa-trash"></i><span>Delete faction</span>
     </button>
-    <button type="button" class="fabricate-button manager-button fab-manager-button is-primary" data-action="save">
+    <button type="button" class="fabricate-button fab-manager-button is-primary" data-action="save">
       <i class="fas fa-floppy-disk"></i><span>Save faction</span>
     </button>
   </div>
@@ -135,7 +135,7 @@ async function measure(subtitle, title) {
     return await page.evaluate(() => {
       const round = (element) => Math.round(element.getBoundingClientRect().height);
       const chip = document.querySelector('.manager-chip');
-      const buttons = [...document.querySelectorAll('.manager-header-actions .manager-button')];
+      const buttons = [...document.querySelectorAll('.manager-header-actions .fabricate-button')];
       const subline = document.querySelector('.manager-subtitle');
       const style = getComputedStyle(subline);
       return {
@@ -185,7 +185,7 @@ const CHIP_CLUSTERS = [
 <header class="manager-header">
   <div class="manager-header-actions" aria-label="Actions">
     <span class="${chipClass}" title="Unsaved">Unsaved</span>
-    <button type="button" class="fabricate-button manager-button fab-manager-button is-ghost">
+    <button type="button" class="fabricate-button fab-manager-button is-ghost">
       <i class="fas fa-arrow-left"></i><span>Back</span>
     </button>
   </div>
@@ -200,7 +200,7 @@ const CHIP_CLUSTERS = [
     <h3 class="manager-card-title">Identity</h3>
     <div class="manager-action-group">
       <span class="${chipClass}" title="Unsaved">Unsaved</span>
-      <button type="submit" class="fabricate-button manager-button fab-manager-button is-primary">
+      <button type="submit" class="fabricate-button fab-manager-button is-primary">
         <i class="fas fa-save"></i><span>Save details</span>
       </button>
     </div>
@@ -236,7 +236,7 @@ async function measureCluster(markup) {
       };
       return {
         chip: geometry(document.querySelector('.manager-chip')),
-        button: geometry(document.querySelector('.manager-button')),
+        button: geometry(document.querySelector('.fabricate-button')),
       };
     });
   } finally {

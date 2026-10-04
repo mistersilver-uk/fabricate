@@ -207,7 +207,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
       assert.equal(header.getAttribute('aria-expanded'), 'true', 'groups default to expanded');
     }
     assert.equal(root.querySelector('[data-recipe-filter-chip]'), null, 'no filter starts active');
-    assert.equal(root.querySelector('.manager-pagination'), null, 'the fixture fits one page');
+    assert.equal(root.querySelector('.fabricate-pagination'), null, 'the fixture fits one page');
   });
 
   it('renders the rows as a list of cards, not a table', async () => {
@@ -239,6 +239,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     assert.equal(renderedRows(), 12, 'the default page holds all twelve');
     assert.equal(countText(), '12 recipes', 'a wholly-shown group says it once, not "12 of 12"');
 
+    assert.ok(Boolean(root.querySelector('.fabricate-pagination')), 'twelve rows render the pager');
     chooseSelectOption(root, '[data-pagination-size]', '10');
 
     assert.equal(renderedRows(), 10, 'page 1 of a 10-row page');
@@ -698,7 +699,7 @@ describe('RecipesBrowserView lock and enable controls', () => {
     for (const id of ['r1', 'r2']) {
       const row = root.querySelector(`[data-recipe-id="${id}"]`);
       assert.ok(row.querySelector('[data-recipe-lock]'), 'the lock control is present');
-      assert.ok(row.querySelector('.manager-status-toggle'), 'the enable toggle is present');
+      assert.ok(row.querySelector('.fabricate-toggle'), 'the enable toggle is present');
       // Duplicate / Delete stay inspector-only (issue 643).
       assert.equal(row.querySelector('.manager-action-group'), null, 'the row carries no action group');
     }
@@ -721,7 +722,7 @@ describe('RecipesBrowserView lock and enable controls', () => {
     for (const id of ['r1', 'r2']) {
       const editButton = root.querySelector(`[data-recipe-id="${id}"] [data-recipe-edit]`);
       assert.ok(editButton, 'the row carries its own Edit pencil');
-      assert.ok(editButton.classList.contains('manager-icon-button'), 'styled like the Books & Scrolls row edit');
+      assert.ok(editButton.classList.contains('fabricate-icon-button'), 'styled like the Books & Scrolls row edit');
       assert.ok(editButton.querySelector('i.fa-pen'), 'the Edit affordance is a pen, matching Books & Scrolls');
     }
 
@@ -951,7 +952,7 @@ describe('RecipesBrowserView lifted browser state', () => {
 
     assert.equal(root.querySelector('[data-recipe-flash]'), null, 'no flash before a refusal');
 
-    root.querySelector('[data-recipe-id="r1"] .manager-status-toggle').click();
+    root.querySelector('[data-recipe-id="r1"] .fabricate-toggle').click();
     flushSync();
 
     assert.equal(calls.length, 1);
@@ -1142,10 +1143,16 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
 
     assert.equal(
-      root.querySelectorAll('.manager-inspector-card').length,
+      root.querySelectorAll('.fabricate-card').length,
       0,
       'a panel inside a window does not also need five boxes'
     );
+    // This proves only that the selector can match. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
+    const box = root.ownerDocument.createElement('div');
+    box.innerHTML = '<section class="fabricate-card"></section>';
+    assert.equal(box.querySelectorAll('.fabricate-card').length, 1, 'the selector can count a card');
     assert.equal(
       root.textContent.includes('Recipe details'),
       false,
@@ -1364,7 +1371,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
 
     assert.match(root.textContent, /Set up recipes/);
-    root.querySelector('.manager-button.is-primary').click();
+    root.querySelector('.fabricate-button.is-primary').click();
     flushSync();
     assert.equal(addComponents, 1);
   });

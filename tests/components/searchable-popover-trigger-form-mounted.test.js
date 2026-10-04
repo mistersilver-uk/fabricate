@@ -70,7 +70,6 @@ describe('1371 SearchablePopover — the Button trigger form', () => {
       triggerClasses(),
       [
         'fabricate-button',
-        'manager-button',
         'fab-manager-button',
         'is-size-38',
         'manager-world-component-register-action',
@@ -86,7 +85,6 @@ describe('1371 SearchablePopover — the Button trigger form', () => {
     await mountPicker({ triggerButton: { role: 'danger', fullWidth: true } });
     assert.deepEqual(triggerClasses(), [
       'fabricate-button',
-      'manager-button',
       'fab-manager-button',
       'is-danger',
       'is-full-width',
@@ -97,7 +95,7 @@ describe('1371 SearchablePopover — the Button trigger form', () => {
   it('drops an unrecognised role and rung rather than emitting a dead class', async () => {
     // The primitive's own closed-set contract, read through this form.
     await mountPicker({ triggerButton: { role: 'lavender', size: '37' } });
-    assert.deepEqual(triggerClasses(), ['fabricate-button', 'manager-button', 'fab-manager-button']);
+    assert.deepEqual(triggerClasses(), ['fabricate-button', 'fab-manager-button']);
     harness.remount();
   });
 

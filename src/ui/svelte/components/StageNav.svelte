@@ -99,7 +99,7 @@
      already shared; `font-size` was not, so the arrows - which are `IconButton`s, painted by a
      sheet that sets no size on their glyph - inherited the surrounding body type and drew a
      chevron half again as tall as the digits inside identical boxes. */
-  :global(.fabricate-icon-button.manager-icon-button.fab-stage-nav-arrow),
+  :global(.fabricate-icon-button.fabricate-icon-button.fab-stage-nav-arrow),
   .fab-stage-nav-number {
     box-sizing: border-box;
     width: 26px;

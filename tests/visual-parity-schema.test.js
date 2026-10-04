@@ -99,7 +99,7 @@ test('edge agreement is measured, not assumed', async (subtests) => {
 
   await subtests.test('the 12px inset that motivated the rule is NOT within the tolerance', () => {
     // The shipped defect: `CraftingCheckEditor` wrapped its tier list in the bare
-    // `.manager-inspector-card` shell, whose 12px padding inset every tier row past the
+    // `.fabricate-card` shell, whose 12px padding inset every tier row past the
     // Difficulty card's content above it. Every region on that screen still measured right.
     const edges = {
       'roll-card-body': { left: 464, right: 1366 },

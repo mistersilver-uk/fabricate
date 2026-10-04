@@ -493,7 +493,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       const rowsRegion = column?.querySelector('.manager-scoped-list-rows');
       const list = column?.querySelector('.manager-scoped-list');
       if (!column || !rowsRegion || !list) return { rendered: false };
-      const pagination = column.querySelector('.manager-pagination');
+      const pagination = column.querySelector('.fabricate-pagination');
       return {
         rendered: true,
         hasPagination: Boolean(pagination),
@@ -555,7 +555,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         };
       });
       const rowBox = row.getBoundingClientRect();
-      const search = row.querySelector('.manager-search');
+      const search = row.querySelector('.fabricate-search');
       const band = document.querySelector('[data-scoped-list-selection-toolbar]');
       const bandBox = band ? band.getBoundingClientRect() : null;
       const bandStyle = band ? getComputedStyle(band) : null;
@@ -827,7 +827,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         `${box.columnBottom}: it floated up under the last row instead of staying at the foot`
     );
     // ── AND THE PAGER IS NOT THE THING THAT GREW ────────────────────────────────────────────
-    // `.manager-scoped-list-column > :global(.manager-pagination) { flex: 0 0 auto }` is ungated
+    // `.manager-scoped-list-column > :global(.fabricate-pagination) { flex: 0 0 auto }` is ungated
     // by the assertion above, because a pager that fills the column also ends at the column's
     // foot. The slack belongs to the rows region — that is what puts the footer at the bottom
     // rather than making the footer tall — so it is stated separately.

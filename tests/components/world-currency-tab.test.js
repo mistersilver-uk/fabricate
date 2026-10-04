@@ -659,7 +659,7 @@ describe('WorldCurrencyTab validation copy (issue 1493)', () => {
 
     // The provider's hint is the primitive's own note line.
     assert.ok(
-      root.querySelector(provider).closest('.manager-field').querySelector('.fabricate-select-note'),
+      root.querySelector(provider).closest('.fabricate-field').querySelector('.fabricate-select-note'),
       'the provider hint renders through `hint=`, under the control'
     );
     assert.ok(

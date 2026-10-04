@@ -107,7 +107,7 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
     // for a validation-disabled switch. Named `toggleTitle` because `title` is already
     // the card heading — a collision the retrofit would otherwise hit.
     const target = await mountCard({ toggleTitle: 'Resolve the issues on the Validation tab.', disabled: true });
-    const button = target.querySelector('button.manager-status-toggle');
+    const button = target.querySelector('button.fabricate-toggle');
     assert.equal(button.getAttribute('title'), 'Resolve the issues on the Validation tab.');
     assert.equal(button.disabled, true);
     assert.equal(
@@ -120,7 +120,7 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
 
   it('an empty toggleTitle emits NO title attribute', async () => {
     const target = await mountCard();
-    assert.equal(target.querySelector('button.manager-status-toggle').hasAttribute('title'), false);
+    assert.equal(target.querySelector('button.fabricate-toggle').hasAttribute('title'), false);
     cardHarness.remount();
   });
 
@@ -184,7 +184,7 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
   it('the switch it COMPOSES keeps its own root and takes none of this family`s', async () => {
     // The card owns the glyph, the copy and the state class; `StatusToggle` owns the track.
     const target = await mountCard();
-    const button = target.querySelector('button.manager-status-toggle');
+    const button = target.querySelector('button.fabricate-toggle');
     assert.ok(Boolean(button), 'the composed switch must render');
     assert.ok(
       button.classList.contains('fabricate-toggle'),
@@ -205,10 +205,10 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
 
   it('the switch carries aria-pressed and no role=switch', async () => {
     const on = await mountCard({ on: true });
-    assert.equal(on.querySelector('button.manager-status-toggle').getAttribute('aria-pressed'), 'true');
+    assert.equal(on.querySelector('button.fabricate-toggle').getAttribute('aria-pressed'), 'true');
     cardHarness.remount();
     const off = await mountCard({ on: false });
-    const button = off.querySelector('button.manager-status-toggle');
+    const button = off.querySelector('button.fabricate-toggle');
     assert.equal(button.getAttribute('aria-pressed'), 'false');
     assert.equal(button.getAttribute('role'), null, 'the repo uses no role=switch anywhere');
     cardHarness.remount();
@@ -323,7 +323,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     assert.ok(node.querySelector('.manager-recipe-status-icon[aria-hidden="true"]'));
     assert.ok(node.querySelector('.manager-recipe-status-copy > .manager-recipe-status-title'));
     assert.ok(node.querySelector('.manager-recipe-status-copy > .manager-recipe-status-sub'));
-    const button = node.querySelector('button.manager-status-toggle');
+    const button = node.querySelector('button.fabricate-toggle');
     assert.ok(button, 'the switch is a plain button');
     assert.equal(button.getAttribute('role'), null, 'aria-pressed is the house pattern, not role=switch');
     assert.ok(

@@ -445,7 +445,7 @@ export function registerRailCases() {
       ]
     );
     assert.equal(
-      Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).some(
+      Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button')).some(
         (button) => button.textContent.includes('Open current admin')
       ),
       false,
@@ -1589,7 +1589,7 @@ export function registerRailCases() {
       const backToLibrary = await clickForClearDelta(
         calls,
         () =>
-          Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).find(
+          Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button')).find(
             (button) => button.textContent.includes('Back to recipes')
           ),
         'Back to recipes'

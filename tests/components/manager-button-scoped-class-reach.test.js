@@ -57,20 +57,24 @@ function compiledCss(file, source) {
 const PRIMITIVES = Object.freeze([
   Object.freeze({
     tag: 'Button',
-    contractClasses: ['manager-button', 'fab-manager-button'],
+    contractClasses: ['fabricate-button', 'fab-manager-button'],
     minimumTokens: 20,
   }),
-  Object.freeze({ tag: 'IconButton', contractClasses: ['manager-icon-button'], minimumTokens: 10 }),
+  Object.freeze({
+    tag: 'IconButton',
+    contractClasses: ['fabricate-icon-button'],
+    minimumTokens: 10,
+  }),
   // The manager's card shell. Its call sites pass FEWER bespoke tokens than either button's —
   // 13 across 20 components as issue 1427 lands — because a card's modifier is usually the
   // only class it carries, so the floor is lower without being weaker.
   Object.freeze({
     tag: 'InspectorCard',
-    contractClasses: ['manager-inspector-card'],
+    contractClasses: ['fabricate-card'],
     minimumTokens: 8,
   }),
   // `<Field>` (issue 1428), and the widest sweep this guard has scanned.
-  Object.freeze({ tag: 'Field', contractClasses: ['manager-field'], minimumTokens: 20 }),
+  Object.freeze({ tag: 'Field', contractClasses: ['fabricate-field'], minimumTokens: 20 }),
   // The manager's filter bar and its search field (issue 1039). The bar is the sharpest entry
   // on this table so far, because its dead rule was LOCATED IN ADVANCE and is still the silent
   // kind: `scoped/EntityListInspectorFrame.svelte` states
@@ -80,10 +84,10 @@ const PRIMITIVES = Object.freeze([
   // is 1, for a stronger version of the same reason — only two of its nineteen sites carry a
   // bespoke class, and both of those rules live in `styles/fabricate.css` rather than in a
   // scoped block.
-  Object.freeze({ tag: 'FilterBar', contractClasses: ['manager-toolbar'], minimumTokens: 5 }),
+  Object.freeze({ tag: 'FilterBar', contractClasses: ['fabricate-filter-bar'], minimumTokens: 5 }),
   Object.freeze({
     tag: 'SearchField',
-    contractClasses: ['manager-search'],
+    contractClasses: ['fabricate-search'],
     minimumTokens: 1,
   }),
   // THE editor validation surface (issue 1444).
@@ -117,7 +121,6 @@ const PRIMITIVES = Object.freeze([
     contractClasses: [
       'fabricate-action-menu',
       'fabricate-action-menu-panel',
-      'manager-action-menu',
       'manager-action-menu-panel',
       'manager-action-menu-item',
     ],

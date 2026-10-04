@@ -24,7 +24,7 @@
   - No `aria-label` on the section: the inner `VocabularyPanel` section is the landmark, and a
     second one would name the same region twice.
   - `hint` is always empty: the head's SUBLINE is the line under the title, and a hint as well would draw two.
-  - The toolbar's `:global` repair stays chained onto `.manager-toolbar`: the class sits on a
+  - The toolbar's `:global` repair stays chained onto `.fabricate-filter-bar`: the class sits on a
     component tag, and a bare (0,1,0) would win ties it has no business in.
   - Pinned by `tests/components/world-vocabulary-control-row-cascade.test.js` and
     `tests/manager-browser-view-state-contract.test.js`.
@@ -131,7 +131,7 @@
     background: var(--fab-bg-1);
   }
 
-  /* The four control-row repairs, all `:global` and the toolbar's chained onto `.manager-toolbar`:
+  /* The four control-row repairs, all `:global` and the toolbar's chained onto `.fabricate-filter-bar`:
      the class sits on a component tag, and a bare (0,1,0) would win ties it has no business in. */
 
   /* THE ADD FORM RUNS FLUSH, because the PANEL is the card now; its own fill sits two rungs above
@@ -150,14 +150,14 @@
   /* EVERY CONTROL SITS ONE RAMP RUNG BELOW THE PANEL, which is a relationship rather than a
      colour: left alone they inherit the control rung, which is the PANEL's own fill. */
   :global(.manager-vocabulary-shell-panel .fabricate-select-trigger),
-  :global(.manager-vocabulary-shell-panel .manager-search input),
+  :global(.manager-vocabulary-shell-panel .fabricate-search input),
   :global(.manager-vocabulary-shell-panel .manager-vocabulary-form input) {
     background: var(--fab-bg-0);
   }
 
-  /* THE BAND IS FLATTENED: `.manager-toolbar`'s fill and bottom hairline read inside a panel card
+  /* THE BAND IS FLATTENED: `.fabricate-filter-bar`'s fill and bottom hairline read inside a panel card
      as a lit raised strip the reference does not draw. REMOVED rather than replaced. */
-  :global(.manager-vocabulary-shell-panel .manager-toolbar.manager-scoped-list-toolbar) {
+  :global(.manager-vocabulary-shell-panel .fabricate-filter-bar.manager-scoped-list-toolbar) {
     padding: 0;
     border-bottom: 0;
     background: transparent;

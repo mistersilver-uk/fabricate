@@ -1083,7 +1083,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker="potions"><div class="fabricate-picker manager-travel-picker fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger icon-only manager-vocabulary-icon-trigger"><span class="essence-icon-picker-preview"><i class="fas fa-folder"></i></span><span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span></button></div></span>
       <div class="manager-vocabulary-main"><strong>Potions</strong></div>
       <span class="manager-chip is-warning"><i class="fas fa-link"></i>8 references</span>
-      <button type="button" class="fabricate-icon-button manager-icon-button"><i class="fas fa-trash"></i></button>
+      <button type="button" class="fabricate-icon-button"><i class="fas fa-trash"></i></button>
     </div>`;
     await page.setContent(
       withChipHash(

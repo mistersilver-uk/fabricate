@@ -84,7 +84,7 @@ export function rawSitesIn(source, filename, classPattern) {
 
 /**
  * @typedef {object} AdoptionContractSpec
- * @property {string} label names the clauses, e.g. `manager-toolbar`
+ * @property {string} label names the clauses, e.g. `fabricate-filter-bar`
  * @property {string} tag the primitive's tag name, e.g. `FilterBar`
  * @property {string} primitive repo-relative POSIX path to the primitive itself
  * @property {string} contractClass the class only the primitive may write on a rendered element

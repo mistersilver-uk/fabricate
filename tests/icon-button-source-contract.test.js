@@ -6,11 +6,11 @@ import path from 'node:path';
 import { definePrimitiveSourceContract } from './helpers/primitiveSourceContract.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
-/** The class only the primitive may write. */
-const CONTRACT_CLASS = 'manager-icon-button';
-
-/** The class `styles/fabricate.css` roots the control's rules at (issue 1502). */
-const ROOT_CLASS = 'fabricate-icon-button';
+/**
+ * The class only the primitive may write, and the root `styles/fabricate.css` paints the control
+ * from (issues 1502 and 1507).
+ */
+const CONTRACT_CLASS = 'fabricate-icon-button';
 
 const PRIMITIVE = 'src/ui/svelte/components/IconButton.svelte';
 
@@ -63,8 +63,8 @@ const contract = definePrimitiveSourceContract({
   callSiteFloor: 28,
 
   primitiveEmits: {
-    // Three tokens, each asserted separately (issue 1502).
-    source: Object.freeze([`'${CONTRACT_CLASS}'`, `'${ROOT_CLASS}'`, 'data-keyboard-focus="true"']),
+    // Two tokens, each asserted separately (issue 1502).
+    source: Object.freeze([`'${CONTRACT_CLASS}'`, 'data-keyboard-focus="true"']),
     otherwise:
       'the primitive no longer emits something it is the single source of, so a clause here is ' +
       'policing a token that reaches nothing',
@@ -82,12 +82,12 @@ const contract = definePrimitiveSourceContract({
 
   classOnlyRemedy:
     'a manager icon button is an `<IconButton>`, never a hand-written ' +
-    '`class="manager-icon-button"`. A per-site modifier travels as a pass-through on the ' +
+    '`class="fabricate-icon-button"`. A per-site modifier travels as a pass-through on the ' +
     '`class` prop, the accessible name is the required `ariaLabel` prop, and a per-site ' +
     '`data-*` hook rides the rest spread — see `IconButton.svelte`',
 
   restatementRemedy:
-    'the primitive emits `type="button"` and `manager-icon-button` itself, and takes the ' +
+    'the primitive emits `type="button"` and `fabricate-icon-button` itself, and takes the ' +
     'accessible name as `ariaLabel`. Restating any of them from a call site re-opens the ' +
     'convention this component exists to close',
 
@@ -115,17 +115,15 @@ test('every deferred hand-rolled carrier writes the root class the sheet paints 
     const attributes = [...source.matchAll(/class="([^"]*)"/g)].map((match) =>
       match[1].split(/\s+/).filter(Boolean)
     );
-    const rooted = attributes.filter(
-      (tokens) => tokens[0] === ROOT_CLASS && tokens[1] === CONTRACT_CLASS
-    ).length;
+    const rooted = attributes.filter((tokens) => tokens[0] === CONTRACT_CLASS).length;
 
     assert.equal(
       rooted,
       carrier.count,
       `${carrier.file} holds ${carrier.count} deferred hand-rolled icon buttons and leads ` +
-        `${rooted} class attributes with \`${ROOT_CLASS}\` then \`${CONTRACT_CLASS}\`, in ` +
-        'that order. Each one must, or it loses every rule in `styles/fabricate.css` that ' +
-        'paints it, silently — the control keeps its shape in the DOM and loses it on screen'
+        `${rooted} class attributes with \`${CONTRACT_CLASS}\`. Each one must, or it loses ` +
+        'every rule in `styles/fabricate.css` that paints it, silently — the control keeps its ' +
+        'shape in the DOM and loses it on screen'
     );
   }
 });

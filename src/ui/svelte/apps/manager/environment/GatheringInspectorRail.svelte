@@ -229,7 +229,7 @@
   />
 {:else if currentView === 'environments' && activeGatheringInspectorTab}
   <section
-    class="fabricate-card manager-inspector-card"
+    class="fabricate-card"
     data-gathering-inspector-placeholder={activeGatheringInspectorTab.id}
   >
     <div class="manager-inspector-title-row is-hero-large">
@@ -250,7 +250,7 @@
     </p>
   </section>
 {:else if selectedEnvironment}
-  <section class="fabricate-card manager-inspector-card">
+  <section class="fabricate-card">
     <img
       class={`manager-environment-preview ${hasEnvironmentImage(selectedEnvironment) ? '' : 'is-fallback'}`}
       src={environmentImage(selectedEnvironment)}
@@ -278,7 +278,7 @@
     </p>
   </section>
 
-  <section class="fabricate-card manager-inspector-card">
+  <section class="fabricate-card">
     <h3 class="manager-card-title">
       {text('FABRICATE.Admin.Manager.Environment.Details', 'Environment details')}
     </h3>
@@ -305,7 +305,7 @@
   </section>
 
   {#if environmentDirtyFor(selectedEnvironment) || environmentInvalidFor(selectedEnvironment) || environmentSaveError}
-    <section class="fabricate-card manager-inspector-card">
+    <section class="fabricate-card">
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Environment.DraftState', 'Draft state')}
       </h3>

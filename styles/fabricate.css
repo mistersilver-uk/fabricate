@@ -1242,47 +1242,47 @@
 }
 
 /* Header actions (Back, Delete, Save/Create) share one compact scale: a label a notch below body text so the toolbar reads as chrome, not content (issue 1118). */
-.fabricate-manager .manager-header-actions .manager-button {
+.fabricate-manager .manager-header-actions .fabricate-button {
   /* 0.72rem (~11.5px) matches the prototype's header buttons (issue 643 audit). */
   font-size: 0.72rem;
 }
 
 /* The page's single loudest action (Create recipe, Create system) keeps the heavier weight and roomier padding so the green Save wins the eye (§F6). */
-.fabricate-manager .manager-header-actions .manager-button.is-primary {
+.fabricate-manager .manager-header-actions .fabricate-button.is-primary {
   padding: 0 var(--fab-space-4);
   font-weight: 700;
 }
 
-/* ── The tool studio's treatment, released from its ancestor ── `Button.svelte` emits `fab-manager-button` beside `manager-button`, and the rules below re-declare the tool studio's values against that class with NO ancestor requirement (issue 1096). */
+/* ── The tool studio's treatment, released from its ancestor ── `Button.svelte` emits `fab-manager-button` beside `fabricate-button`, and the rules below re-declare the tool studio's values against that class with NO ancestor requirement (issue 1096). */
 
-/* THE RADIUS JOINS THE HEIGHT (issue 1371, maintainer ruling M12a). This rule declared the 34px control and no corner, so every converted manager button fell through to the base `.fabricate-button.manager-button` rule's 6px — and `design-system/spec.md`'s radius ladder puts 6 on a chip AT OR BELOW 24px and 9 on a control in the 34-38px band. */
-.fabricate-button.manager-button.fab-manager-button {
+/* THE RADIUS JOINS THE HEIGHT (issue 1371, maintainer ruling M12a). This rule declared the 34px control and no corner, so every converted manager button fell through to the base `.fabricate-button.fabricate-button` rule's 6px — and `design-system/spec.md`'s radius ladder puts 6 on a chip AT OR BELOW 24px and 9 on a control in the 34-38px band. */
+.fabricate-button.fabricate-button.fab-manager-button {
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   border-radius: 9px;
   font-size: 0.72rem;
 }
 
-.fabricate-button.manager-button.fab-manager-button.is-primary {
+.fabricate-button.fabricate-button.fab-manager-button.is-primary {
   padding: 0 var(--fab-space-4);
   font-weight: 700;
 }
 
 /* The ghost's RESTING border is the difference that matters: the base `.is-ghost` is borderless until hover, while the tool studio's Back button keeps a border so it reads as a button before the pointer arrives (§F6) (issue 1118). */
-.fabricate-button.manager-button.fab-manager-button.is-ghost:not(:disabled) {
+.fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled) {
   border-color: var(--fab-border);
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-button.manager-button.fab-manager-button.is-ghost:not(:disabled):hover {
+.fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled):hover {
   border-color: var(--fab-border);
   color: var(--fab-text);
   background: var(--fab-surface-soft);
 }
 
 /* The `dashed` role (issue 1096): the append action at the foot of a list (issue 1118). */
-.fabricate-button.manager-button.fab-manager-button.is-dashed {
+.fabricate-button.fabricate-button.fab-manager-button.is-dashed {
   display: flex;
 
   /* A pinned HEIGHT, not just a floor: the glyph and the label together measure 35px, so a `min-height` alone let the button stand one pixel over the prototype's 34. */
@@ -1298,21 +1298,21 @@
   font-weight: 600;
 }
 
-/* Paint only, and qualified: see the invariant at `.manager-button:disabled` below. */
-.fabricate-button.manager-button.fab-manager-button.is-dashed:not(:disabled) {
+/* Paint only, and qualified: see the invariant at `.fabricate-button:disabled` below. */
+.fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled) {
   border-color: var(--fab-border-strong);
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-button.manager-button.fab-manager-button.is-dashed:not(:disabled):hover {
+.fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled):hover {
   border-color: var(--fab-accent-border);
   color: var(--fab-text);
   background: var(--fab-surface-soft);
 }
 
 /* `fullWidth`, split out of the `dashed` role that used to carry it (issue 1118). */
-.fabricate-button.manager-button.fab-manager-button.is-full-width {
+.fabricate-button.fabricate-button.fab-manager-button.is-full-width {
   width: 100%;
 }
 
@@ -1649,7 +1649,7 @@
 }
 
 /* ══ Checks Studio visual parity with the standalone prototype ══ Every rule below is a MEASURED value, not a chosen one: `tests/fixtures/checks-studio-parity.json` records the prototype's computed styles per named region (issue 1096). */
-.fabricate-card.manager-inspector-card.manager-checks-card {
+.fabricate-card.fabricate-card.manager-checks-card {
   gap: 0;
   padding: 0;
   overflow: hidden;
@@ -1725,7 +1725,7 @@
 }
 
 /* The head's action, LINK-STYLED. `Button` is still the primitive — it owns the `<button>` semantics, the type and the disabled contract — and this is an extra-class rule in the global sheet, which is the adaptation route that component's header names. */
-.fabricate-button.manager-button.fab-manager-button.manager-checks-card-head-link {
+.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link {
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
@@ -1750,15 +1750,15 @@
 }
 
 /* The INK is split out and qualified, and the split states which of the declarations above are a RESET and which is paint (issue 1118). */
-.fabricate-button.manager-button.fab-manager-button.manager-checks-card-head-link:not(:disabled) {
+.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link:not(:disabled) {
   color: var(--fab-accent);
 }
 
-.fabricate-button.manager-button.fab-manager-button.manager-checks-card-head-link > i {
+.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link > i {
   font-size: 9px;
 }
 
-.fabricate-button.manager-button.fab-manager-button.manager-checks-card-head-link:not(:disabled):hover {
+.fabricate-button.fabricate-button.fab-manager-button.manager-checks-card-head-link:not(:disabled):hover {
   color: var(--fab-text);
   background: none;
   text-decoration: underline;
@@ -2048,7 +2048,7 @@
   width: 100%;
 }
 
-/* The simple editor's half of the same control, a stacked `.manager-field` column rather than an inline row, so the full width is stated on the trigger the `toolbar` rung leaves hugging (issue 1510). `.fabricate-field.manager-field select` supplied it until the conversion and is element-typed, so it reaches no `<button>`. */
+/* The simple editor's half of the same control, a stacked `.fabricate-field` column rather than an inline row, so the full width is stated on the trigger the `toolbar` rung leaves hugging (issue 1510). `.fabricate-field.fabricate-field select` supplied it until the conversion and is element-typed, so it reaches no `<button>`. */
 .fabricate-manager .manager-checks-band-record .fabricate-select-trigger {
   width: 100%;
 }
@@ -2121,7 +2121,7 @@
 }
 
 /* The outcome list's own append action, which lives outside that list so it is reachable from the zero state too (issue 1097 follow-up); full width, as the tier list's footer adder is. */
-.fabricate-button.manager-button.manager-checks-outcome-add {
+.fabricate-button.fabricate-button.manager-checks-outcome-add {
   width: 100%;
   margin-top: 6px;
 }
@@ -2138,8 +2138,8 @@
   min-width: 0;
 }
 
-/* (0,4,0), which is what it takes to beat `.manager-button.fab-manager-button.is-dashed`'s 34px height (issue 1118). */
-.fabricate-manager .manager-checks-trigger-presets .manager-button.fab-manager-button.is-dashed {
+/* (0,4,0), which is what it takes to beat `.fabricate-button.fab-manager-button.is-dashed`'s 34px height (issue 1118). */
+.fabricate-manager .manager-checks-trigger-presets .fabricate-button.fab-manager-button.is-dashed {
   flex: 0 1 auto;
   height: 30px;
   min-height: 0;
@@ -2150,7 +2150,7 @@
 /* The fill is SPLIT OUT and qualified, and the split is the whole point (issue 1118). */
 .fabricate-manager
   .manager-checks-trigger-presets
-  .manager-button.fab-manager-button.is-dashed:not(:disabled) {
+  .fabricate-button.fab-manager-button.is-dashed:not(:disabled) {
   background: var(--fab-bg-0);
 }
 
@@ -2223,7 +2223,7 @@
   width: 158px;
 }
 
-/* The studio's remove action: a subtle danger icon button, 26px square, not the manager's 34px `.manager-icon-button`. The converted tier list's delete is `SortableList`'s own since issue 1512; the outcome list in `CraftingCheckEditor.svelte` still draws this one. */
+/* The studio's remove action: a subtle danger icon button, 26px square, not the manager's 34px `.fabricate-icon-button`. The converted tier list's delete is `SortableList`'s own since issue 1512; the outcome list in `CraftingCheckEditor.svelte` still draws this one. */
 .fabricate-manager .manager-checks-tier-row .manager-checks-tier-remove,
 .fabricate-manager .manager-checks-trigger-head .manager-checks-trigger-remove {
   appearance: none;
@@ -2281,7 +2281,7 @@
   background: var(--fab-bg-0);
 }
 
-.fabricate-manager .manager-checks-rail .manager-inspector-card {
+.fabricate-manager .manager-checks-rail .fabricate-card {
   gap: var(--fab-space-2);
   padding: 12px 13px;
   border: 1px solid var(--fab-border);
@@ -2366,13 +2366,13 @@
 }
 
 /* The switch in this card is a full-width ROW, live or locked. The shared control caps itself at 78px because it normally sits at the end of a list row beside its own label, and a card whose whole content is the switch and its reading is not that: at 78px the card's sentence ellipsised to `Che…`, which is what the cap is for everywhere else and a defect here. */
-.fabricate-manager .manager-checks-active-card .manager-status-toggle {
+.fabricate-manager .manager-checks-active-card .fabricate-toggle {
   width: 100%;
   max-width: none;
 }
 
 /* The LOCKED reading reuses the shipped switch's own track and knob — same meaning, same drawing — and adds only that there is nothing to press. */
-.fabricate-toggle.manager-status-toggle.is-locked {
+.fabricate-toggle.fabricate-toggle.is-locked {
   cursor: default;
 }
 
@@ -2405,7 +2405,7 @@
 }
 
 /* ── The rail's LISTS ── `THIS CHECK` and `ALL CHECKS` are ONE card of compact rows each, not a stack of bordered cards. */
-.fabricate-manager .manager-checks-rail .manager-inspector-card.is-rail-list {
+.fabricate-manager .manager-checks-rail .fabricate-card.is-rail-list {
   gap: 3px;
   padding: 9px 11px;
 }
@@ -2514,8 +2514,8 @@
   font-size: 8px;
 }
 
-/* ── The rail's CONTROLS ── `PREVIEW AS` is the only card in this rail a GM operates rather than reads, and its two controls were the one part of it nothing had measured: a `.manager-field` control takes that wrapper's 0.82rem/700 by INHERITANCE, and inheritance is invisible to a per-region parity comparison because no rule declares it anywhere. */
-.fabricate-manager .manager-checks-rail .manager-field input {
+/* ── The rail's CONTROLS ── `PREVIEW AS` is the only card in this rail a GM operates rather than reads, and its two controls were the one part of it nothing had measured: a `.fabricate-field` control takes that wrapper's 0.82rem/700 by INHERITANCE, and inheritance is invisible to a per-region parity comparison because no rule declares it anywhere. */
+.fabricate-manager .manager-checks-rail .fabricate-field input {
   font-size: 11.5px;
   font-weight: 500;
 }
@@ -2526,14 +2526,14 @@
 }
 
 /* The "Preview as" ACTOR PICKER is a `SearchablePopover` rather than a native `<select>` (issue 1097 follow-up), because the list is a world's player characters and a flat native list of them is unusable past a handful. */
-.fabricate-button.manager-button.manager-checks-preview-actor-trigger {
+.fabricate-button.fabricate-button.manager-checks-preview-actor-trigger {
   width: 100%;
   font-size: 11.5px;
   font-weight: 500;
 }
 
 /* The simulator's roll action. It renders through `Button`, so its type scale and tone come from the primitive; what stays here is the FOUNDRY RESET the primitive cannot carry — core's `button` rule centres content and pins a fixed height, and this button is a full-width icon+label pair inside a card rather than a chrome control. */
-.fabricate-button.manager-button.fab-manager-button.manager-checks-simulator-roll {
+.fabricate-button.fabricate-button.fab-manager-button.manager-checks-simulator-roll {
   justify-content: center;
   width: 100%;
   height: auto;
@@ -3006,8 +3006,8 @@
   gap: 8px;
 }
 
-/* THIS STUDIO'S FIELD SCALE, restated in scope rather than moved onto the manager-wide `.manager-field` — the same move `.manager-checks-flag-list` and the Validation route already make with their own shared surfaces. */
-.fabricate-manager .manager-checks-trigger-body .manager-field > span {
+/* THIS STUDIO'S FIELD SCALE, restated in scope rather than moved onto the manager-wide `.fabricate-field` — the same move `.manager-checks-flag-list` and the Validation route already make with their own shared surfaces. */
+.fabricate-manager .manager-checks-trigger-body .fabricate-field > span {
   color: var(--fab-text-subtle);
   font-size: 8px;
   font-weight: 700;
@@ -3015,13 +3015,13 @@
   text-transform: uppercase;
 }
 
-.fabricate-manager .manager-checks-trigger-body .manager-field {
+.fabricate-manager .manager-checks-trigger-body .fabricate-field {
   gap: 5px;
 }
 
 .fabricate-manager
   .manager-checks-trigger-body
-  .manager-field
+  .fabricate-field
   input:not(.fab-stepper-input):not([type="radio"]):not([type="range"]) {
   height: 32px;
   padding: 0 8px;
@@ -4097,7 +4097,7 @@
   margin-left: auto;
 }
 
-.fabricate-manager .manager-character-modifier-row-bounds .manager-field {
+.fabricate-manager .manager-character-modifier-row-bounds .fabricate-field {
   flex: 1 1 80px;
   min-width: 0;
 }
@@ -4109,7 +4109,7 @@
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-character-modifier-override-row .manager-status-toggle {
+.fabricate-manager .manager-character-modifier-override-row .fabricate-toggle {
   max-width: 100px;
 }
 
@@ -4132,7 +4132,7 @@
 }
 
 /* ONE RULE, MERGED. The first four declarations were written in a LIST shared with `.manager-section-header`, which is how the toolbar and the page header a view drew under it kept the same padding and rule line (issue 1515). */
-.fabricate-filter-bar.manager-toolbar {
+.fabricate-filter-bar.fabricate-filter-bar {
   min-width: 0;
   padding: var(--fab-space-3);
   border-bottom: 1px solid var(--fab-border);
@@ -4143,7 +4143,7 @@
   background: var(--fab-overlay-light-03);
 }
 
-.fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary)) {
+.fabricate-filter-bar.fabricate-filter-bar:not(:has(.manager-toolbar-primary)) {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -4170,7 +4170,7 @@
   width: 100%;
 }
 
-.fabricate-search.manager-search {
+.fabricate-search.fabricate-search {
   position: relative;
   flex: 1 1 260px;
   min-width: 180px;
@@ -4186,7 +4186,7 @@
   font-weight: 700;
 }
 
-.fabricate-search.manager-search input {
+.fabricate-search.fabricate-search input {
   width: 100%;
   min-width: 0;
   height: 34px;
@@ -4317,7 +4317,7 @@
   background: var(--fab-overlay-light-12);
 }
 
-.fabricate-search.manager-search > i {
+.fabricate-search.fabricate-search > i {
   position: absolute;
   top: 50%;
   left: 11px;
@@ -4326,8 +4326,8 @@
   pointer-events: none;
 }
 
-/* Chained onto `fab-manager-button` (0,4,0) in issue 1118, for the reason `.manager-button.fab-manager-button.manager-checks-card-head-link` gives verbatim: a bare `.manager-clear-filters` is (0,2,0) and loses OUTRIGHT to the primitive's (0,3,0) control, which would have taken this button's 30px floor to 34px, its 0.78rem to 0.72rem and its compact padding to the standard control's — six times over, in six browser toolbars. */
-.fabricate-button.manager-button.fab-manager-button.manager-clear-filters {
+/* Chained onto `fab-manager-button` (0,4,0) in issue 1118, for the reason `.fabricate-button.fab-manager-button.manager-checks-card-head-link` gives verbatim: a bare `.manager-clear-filters` is (0,2,0) and loses OUTRIGHT to the primitive's (0,3,0) control, which would have taken this button's 30px floor to 34px, its 0.78rem to 0.72rem and its compact padding to the standard control's — six times over, in six browser toolbars. */
+.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters {
   margin-left: auto;
   padding: 0 var(--fab-space-2);
   min-height: 30px;
@@ -4335,12 +4335,12 @@
   font-weight: 600;
 }
 
-.fabricate-button.manager-button.fab-manager-button.manager-clear-filters:not(:disabled) {
+.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters:not(:disabled) {
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-pagination.manager-pagination {
+.fabricate-pagination.fabricate-pagination {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4396,7 +4396,7 @@
 }
 
 /* Compact rails opt in; the default browse pager keeps its full three-part layout. */
-.fabricate-pagination.manager-pagination.is-compact {
+.fabricate-pagination.fabricate-pagination.is-compact {
   flex-wrap: nowrap;
   gap: var(--fab-space-2);
   padding: var(--fab-space-2) 0 0;
@@ -4416,7 +4416,7 @@
   flex: 0 0 auto;
 }
 
-.fabricate-pagination.manager-pagination.is-compact .manager-icon-button {
+.fabricate-pagination.fabricate-pagination.is-compact .fabricate-icon-button {
   width: 26px;
   height: 26px;
   min-height: 26px;
@@ -4634,8 +4634,8 @@
 }
 
 /* Close the Foundry BLEED on the Component Studio's own roles (issue 676). */
-.fabricate-manager[data-manager-view="components"] .manager-search input,
-.fabricate-manager[data-manager-view="components"] .manager-toolbar .manager-button {
+.fabricate-manager[data-manager-view="components"] .fabricate-search input,
+.fabricate-manager[data-manager-view="components"] .fabricate-filter-bar .fabricate-button {
   font-size: var(--fab-recipe-control-font);
 }
 
@@ -4849,7 +4849,7 @@
 }
 
 /* The row's three actions are GHOST icons. Duplicate and Delete are real capabilities and are kept, but their CHROME is not: three bordered buttons beside a bordered lock, a switch and a pill made every row read as a toolbar and squeezed the cluster to ~420px, truncating every description to about 28 characters (issue 643). */
-.fabricate-icon-button.manager-icon-button.is-ghost {
+.fabricate-icon-button.fabricate-icon-button.is-ghost {
   width: 28px;
   height: 28px;
   min-height: 28px;
@@ -4860,18 +4860,18 @@
   font-size: 0.68rem;
 }
 
-.fabricate-icon-button.manager-icon-button.is-ghost:not(:disabled):hover,
-.fabricate-icon-button.manager-icon-button.is-ghost:focus-visible {
+.fabricate-icon-button.fabricate-icon-button.is-ghost:not(:disabled):hover,
+.fabricate-icon-button.fabricate-icon-button.is-ghost:focus-visible {
   color: var(--fab-text);
   background: var(--fab-surface-raised);
 }
 
-.fabricate-icon-button.manager-icon-button.is-ghost.is-danger {
+.fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger {
   color: var(--fab-text-subtle);
 }
 
-.fabricate-icon-button.manager-icon-button.is-ghost.is-danger:not(:disabled):hover,
-.fabricate-icon-button.manager-icon-button.is-ghost.is-danger:focus-visible {
+.fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:not(:disabled):hover,
+.fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:focus-visible {
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }
@@ -5129,15 +5129,15 @@
 }
 
 /* The Component Studio's toolbar is the SAME bar: ruling 1 makes the recipe treatment win wherever the two disagree, so the component browser joins every rule below rather than re-deriving a second, drifting filter bar (issues 676, 1036). */
-.fabricate-manager .manager-recipe-toolbar .manager-search input,
-.fabricate-manager .manager-component-toolbar .manager-search input,
-.fabricate-manager .manager-essence-toolbar .manager-search input {
+.fabricate-manager .manager-recipe-toolbar .fabricate-search input,
+.fabricate-manager .manager-component-toolbar .fabricate-search input,
+.fabricate-manager .manager-essence-toolbar .fabricate-search input {
   font-size: var(--fab-recipe-control-font);
 }
 
 /* The search field takes the selects' 9px radius rather than the shared 6px, so the bar does not mix two corner radii across adjacent controls. */
-.fabricate-manager .manager-component-toolbar .manager-search input,
-.fabricate-manager .manager-essence-toolbar .manager-search input {
+.fabricate-manager .manager-component-toolbar .fabricate-search input,
+.fabricate-manager .manager-essence-toolbar .fabricate-search input {
   border-radius: 9px;
 }
 
@@ -5220,8 +5220,8 @@
 }
 
 /* The grouping switch is a FILTER control, not a row's On/Off status cell, so it opts out of the shared 78px status-cell cap (issue 676). */
-.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle],
-.fabricate-manager .manager-component-filter-row .manager-status-toggle[data-component-group-by-category] {
+.fabricate-manager .manager-recipe-filter-row .fabricate-toggle[data-recipe-group-toggle],
+.fabricate-manager .manager-component-filter-row .fabricate-toggle[data-component-group-by-category] {
   width: auto;
   min-width: 0;
   max-width: none;
@@ -5262,10 +5262,10 @@
   white-space: nowrap;
 }
 
-/* The direction toggle sat at the base `.manager-button` scale (16px/700, 6px radius) — bold and boxy next to the compact 0.72rem segmented toggles and the SORT BY micro-label, so it read as oversized (issues 676, 1118). */
-.fabricate-button.manager-button.fab-manager-button.manager-recipe-sort-direction,
-.fabricate-button.manager-button.fab-manager-button.manager-component-sort-direction,
-.fabricate-button.manager-button.fab-manager-button[data-essence-sort-direction] {
+/* The direction toggle sat at the base `.fabricate-button` scale (16px/700, 6px radius) — bold and boxy next to the compact 0.72rem segmented toggles and the SORT BY micro-label, so it read as oversized (issues 676, 1118). */
+.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-sort-direction,
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-sort-direction,
+.fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction] {
   gap: var(--fab-space-chip);
   height: 34px;
   min-height: 34px;
@@ -5343,12 +5343,12 @@
   min-width: 0;
 }
 
-/* These chain `.manager-button` into the selector (raising specificity to 0,3,0) so they beat the base `.fabricate-button.manager-button` rule declared LATER in this file (0,2,0) — which otherwise wins on source order and repaints every one of them the dark overlay surface, collapsing Edit's accent fill and Delete's danger text into the same flat button (issues 643, 1118). */
+/* These chain the doubled root and `fab-manager-button` into the selector (0,4,0) so they beat the base `.fabricate-button.fabricate-button` rule declared LATER in this file (0,2,0) — which otherwise wins on source order and repaints every one of them the dark overlay surface, collapsing Edit's accent fill and Delete's danger text into the same flat button (issues 643, 1118). */
 
 /* Dark secondary: the panel surface, a subtle border, normal text. The font-size and weight match the Edit button so all three action buttons read at one size. */
-.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-duplicate,
-.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-copy,
-.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-unlink {
+.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-duplicate,
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-copy,
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-unlink {
   width: 100%;
   min-height: 36px;
   justify-content: center;
@@ -5356,16 +5356,16 @@
   font-weight: 700;
 }
 
-.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-duplicate:not(:disabled),
-.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-copy:not(:disabled),
-.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-unlink:not(:disabled) {
+.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-duplicate:not(:disabled),
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-copy:not(:disabled),
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-unlink:not(:disabled) {
   border-color: var(--fab-border);
   background: var(--fab-bg-2);
 }
 
 /* Accent primary: the loudest control on the panel. Both rows stay role-LESS (issue 1118): the accent fill is this panel's own treatment, not the `primary` role's Save green. */
-.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-edit,
-.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-edit {
+.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit,
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit {
   width: 100%;
   min-height: 38px;
   justify-content: center;
@@ -5373,24 +5373,24 @@
   font-weight: 700;
 }
 
-.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled),
-.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled) {
+.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled),
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled) {
   border-color: var(--fab-accent-border);
   color: var(--fab-on-accent);
   background: var(--fab-accent);
 }
 
-.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover,
-.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-edit:focus-visible,
-.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled):hover,
-.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-edit:focus-visible {
+.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover,
+.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:focus-visible,
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled):hover,
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:focus-visible {
   border-color: var(--fab-accent);
   background: var(--fab-accent-strong);
 }
 
 /* Dark danger button: the same surface as Duplicate, but danger-red text and a subtly danger-tinted border so it reads as destructive without shouting louder than Edit (issue 1118). */
-.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-delete,
-.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-delete {
+.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-delete,
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-delete {
   width: 100%;
   min-height: 36px;
   justify-content: center;
@@ -5398,14 +5398,14 @@
   font-weight: 700;
 }
 
-.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-delete:not(:disabled),
-.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-delete:not(:disabled) {
+.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-delete:not(:disabled),
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-delete:not(:disabled) {
   background: var(--fab-bg-2);
 }
 
-/* `:focus-visible` ONLY. The hover half was byte-identical to `.manager-button.is-danger:not(:disabled):hover`, which states the same three values at (0,5,0) and therefore wins outright; keyboard focus has no such companion, so this is the one state the pair still has to declare for itself. */
-.fabricate-button.manager-button.fab-manager-button.manager-recipe-browser-inspector-delete:focus-visible,
-.fabricate-button.manager-button.fab-manager-button.manager-component-browser-inspector-delete:focus-visible {
+/* `:focus-visible` ONLY. The hover half was byte-identical to `.fabricate-button.is-danger:not(:disabled):hover`, which states the same three values at (0,5,0) and therefore wins outright; keyboard focus has no such companion, so this is the one state the pair still has to declare for itself. */
+.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-delete:focus-visible,
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-delete:focus-visible {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
@@ -5645,7 +5645,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-icon-button.manager-icon-button.manager-recipe-step-nav {
+.fabricate-icon-button.fabricate-icon-button.manager-recipe-step-nav {
   flex: 0 0 auto;
   width: 26px;
   height: 26px;
@@ -5866,7 +5866,7 @@
 }
 
 /* Switch. The state colour now lives on the TRACK, and the button itself is a bare flex row rather than a tinted pill — so the control reads as a switch rather than a badge, and the row it sits in stays calm (issue 643). */
-.fabricate-toggle.manager-status-toggle {
+.fabricate-toggle.fabricate-toggle {
   --fab-toggle-track: var(--fab-bg-3);
   --fab-toggle-track-border: var(--fab-border-strong);
   --fab-toggle-knob: var(--fab-text-secondary);
@@ -5894,13 +5894,13 @@
 }
 
 /* ONE ACCENT FOR BOTH POSITIONS. The switch used to change HUE when it changed meaning: off drew a TAN knob on a neutral track and on drew a GREEN track, so the manager's most semantically loaded control said "off" in the accent family and "on" in the success family (issue 1373). */
-.fabricate-toggle.manager-status-toggle.is-on {
+.fabricate-toggle.fabricate-toggle.is-on {
   --fab-toggle-track: var(--fab-accent);
   --fab-toggle-track-border: var(--fab-accent-border);
   --fab-toggle-knob: var(--fab-on-accent);
 }
 
-.fabricate-toggle.manager-status-toggle.is-off {
+.fabricate-toggle.fabricate-toggle.is-off {
   --fab-toggle-track: var(--fab-surface-raised);
   --fab-toggle-track-border: var(--fab-border);
   --fab-toggle-knob: var(--fab-text-subtle);
@@ -5909,7 +5909,7 @@
 }
 
 /* Danger-active state: the depleted "delete the token" toggle carries `is-danger` alongside `is-on` so the irreversible-delete signal lands on the toggle itself (the adjacent `manager-chip is-danger` alert reinforces it). */
-.fabricate-toggle.manager-status-toggle.is-danger {
+.fabricate-toggle.fabricate-toggle.is-danger {
   --fab-toggle-track: var(--fab-danger);
   --fab-toggle-track-border: var(--fab-danger-border);
   --fab-toggle-knob: var(--fab-on-accent);
@@ -5918,17 +5918,17 @@
 }
 
 /* Hover affordance. The switch sets `border: 0` on the BUTTON, which left the old hover rule (a `border-color` on the button itself) inert — every switch in the manager (components, essences, tools, gathering, environments, books, access) had no hover response at all (issues 643, 1096). */
-.fabricate-toggle.manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track {
+.fabricate-toggle.fabricate-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track {
   border-color: color-mix(in srgb, var(--fab-toggle-track-border) 55%, var(--fab-text));
   background: color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-text));
 }
 
-.fabricate-toggle.manager-status-toggle:focus {
+.fabricate-toggle.fabricate-toggle:focus {
   outline: none;
   box-shadow: none;
 }
 
-.fabricate-toggle.manager-status-toggle:focus-visible {
+.fabricate-toggle.fabricate-toggle:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
   box-shadow: none;
@@ -5960,7 +5960,7 @@
   transition: transform 150ms ease, background-color 150ms ease;
 }
 
-.fabricate-toggle.manager-status-toggle.is-on .manager-status-toggle-knob {
+.fabricate-toggle.fabricate-toggle.is-on .manager-status-toggle-knob {
   transform: translateX(14px);
 }
 
@@ -6689,7 +6689,7 @@
   color: var(--fab-danger-text);
 }
 
-.fabricate-manager .manager-vocabulary-confirm .manager-button {
+.fabricate-manager .manager-vocabulary-confirm .fabricate-button {
   flex: none;
 }
 
@@ -6711,16 +6711,16 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-vocabulary-form-fields > .manager-field {
+.fabricate-manager .manager-vocabulary-form-fields > .fabricate-field {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.fabricate-manager .manager-vocabulary-form-fields > .manager-button {
+.fabricate-manager .manager-vocabulary-form-fields > .fabricate-button {
   flex: none;
 }
 
-/* The icon field is a 34px picker tile, not a text box, so it must NOT take the growing `flex` the rule above hands every `.manager-field` in this row — that left a dead gap between the tile and the Add button (issue 878). */
+/* The icon field is a 34px picker tile, not a text box, so it must NOT take the growing `flex` the rule above hands every `.fabricate-field` in this row — that left a dead gap between the tile and the Add button (issue 878). */
 .fabricate-manager .manager-vocabulary-form-fields > .manager-vocabulary-icon-field {
   flex: 0 0 auto;
 }
@@ -6753,7 +6753,7 @@
   flex: none;
 }
 
-.fabricate-manager .manager-vocabulary-row > .manager-icon-button {
+.fabricate-manager .manager-vocabulary-row > .fabricate-icon-button {
   flex: 0 0 34px;
 }
 
@@ -6886,7 +6886,7 @@
   margin-top: var(--fab-space-3);
 }
 
-/* The two `.manager-button` child rules that used to sit here are RETIRED (issue 1036, maintainer round 2). */
+/* The two `.fabricate-button` child rules that used to sit here are RETIRED (issue 1036, maintainer round 2). */
 
 .fabricate-manager .manager-essence-source-thumb {
   display: inline-grid;
@@ -7477,7 +7477,7 @@
 /* THE TWO TEXT ACTIONS' TRAILING-EDGE GROUPING IS NOT HERE, AND IT CANNOT BE. */
 
 /* The control type scale. See reason 2 in the block header. */
-.fabricate-manager .manager-scoped-list-toolbar .manager-search input {
+.fabricate-manager .manager-scoped-list-toolbar .fabricate-search input {
   border-radius: 9px;
   font-size: var(--fab-recipe-control-font);
 }
@@ -7601,7 +7601,7 @@
   min-height: 0;
 }
 
-.fabricate-field.manager-field.span-2 {
+.fabricate-field.fabricate-field.span-2 {
   grid-column: 1 / -1;
 }
 
@@ -7685,7 +7685,7 @@
   min-width: 0;
 }
 
-.fabricate-field.manager-field {
+.fabricate-field.fabricate-field {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-chip);
@@ -7695,15 +7695,15 @@
   font-weight: 700;
 }
 
-.fabricate-field.manager-field.is-wide {
+.fabricate-field.fabricate-field.is-wide {
   grid-column: 1 / -1;
 }
 
 /* A FIELD'S VALUE IS NOT ITS CAPTION (issue 1373, world Tool parity round). */
 .fabricate-manager[data-manager-view='world-tool-entry']
-  .manager-field
+  .fabricate-field
   input:not(.fab-stepper-input),
-.fabricate-manager[data-manager-view='world-tool-entry'] .manager-field textarea {
+.fabricate-manager[data-manager-view='world-tool-entry'] .fabricate-field textarea {
   font-weight: 400;
 }
 
@@ -8101,7 +8101,7 @@
   background: var(--fab-overlay-light-04);
 }
 
-/* The manager's control treatment. NOTE the vehicle: it is the `.manager-field` WRAPPER that styles the control, not the `.manager-input` class the markup puts on the control itself — `.manager-input` has no rule anywhere in this file and never has (issue 1371). */
+/* The manager's control treatment. NOTE the vehicle: it is the `.fabricate-field` WRAPPER that styles the control, not the `.manager-input` class the markup puts on the control itself — `.manager-input` has no rule anywhere in this file and never has (issue 1371). */
 
 /* FIELD'S OWN ELEMENT-TYPED CHROME, and it is a SECOND rule rather than a widened floor (issues 1508, 1510). */
 .fabricate-field input[type="text"],
@@ -8117,9 +8117,9 @@
 }
 
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome (48px wide, 22px tall, transparent) from its component-scoped \3c style> (issue 883). */
-.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio'], [type='checkbox']):not([type='range']),
-.fabricate-field.manager-field select,
-.fabricate-field.manager-field textarea {
+.fabricate-field.fabricate-field input:not(.fab-stepper-input):not([type='radio'], [type='checkbox']):not([type='range']),
+.fabricate-field.fabricate-field select,
+.fabricate-field.fabricate-field textarea {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
@@ -8129,13 +8129,13 @@
 }
 
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood 36px tall with 8px of side padding instead of the 28px/0 the control asks for (issue 1523). */
-.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio'], [type='checkbox']):not([type='range']),
-.fabricate-field.manager-field select {
+.fabricate-field.fabricate-field input:not(.fab-stepper-input):not([type='radio'], [type='checkbox']):not([type='range']),
+.fabricate-field.fabricate-field select {
   height: 36px;
   padding: 0 var(--fab-space-2);
 }
 
-.fabricate-field.manager-field select:disabled {
+.fabricate-field.fabricate-field select:disabled {
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
@@ -8250,7 +8250,7 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-recipe-steps-editor .manager-field textarea {
+.fabricate-manager .manager-recipe-steps-editor .fabricate-field textarea {
   min-height: 46px;
 }
 
@@ -8271,8 +8271,8 @@
   list-style: none;
 }
 
-.fabricate-manager .manager-checks-tier-add > .manager-button,
-.fabricate-manager .manager-salvage-stage-add > .manager-button,
+.fabricate-manager .manager-checks-tier-add > .fabricate-button,
+.fabricate-manager .manager-salvage-stage-add > .fabricate-button,
 .fabricate-manager .manager-recipe-ingredient-set-add > .manager-recipe-add-result {
   flex: 1 1 auto;
 }
@@ -8321,7 +8321,7 @@
 }
 
 /* The deep-link out of a recipe tab to the canonical authoring screen — "Manage access" on the Access tab, "Open Books & Scrolls" on the Books & Scrolls tab (issue 1118). */
-.fabricate-button.manager-button.fab-manager-button.manager-recipe-tab-action {
+.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-tab-action {
   align-self: flex-start;
 }
 
@@ -8453,20 +8453,20 @@
 }
 
 /* Quiet ghost button (used by the header Back and the Validation "View" links) (issue 1118). */
-.fabricate-button.manager-button.is-ghost:not(:disabled) {
+.fabricate-button.fabricate-button.is-ghost:not(:disabled) {
   border-color: transparent;
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-button.manager-button.is-ghost:not(:disabled):hover {
+.fabricate-button.fabricate-button.is-ghost:not(:disabled):hover {
   border-color: var(--fab-border);
   color: var(--fab-text);
   background: var(--fab-surface-soft);
 }
 
 /* The dashed add-button, RECONCILED with the primitive's `dashed` role (issue 1118). */
-.fabricate-button.manager-button.is-dashed {
+.fabricate-button.fabricate-button.is-dashed {
   display: flex;
   height: 34px;
   min-height: 34px;
@@ -8478,13 +8478,13 @@
   font-weight: 600;
 }
 
-.fabricate-button.manager-button.is-dashed:not(:disabled) {
+.fabricate-button.fabricate-button.is-dashed:not(:disabled) {
   border-color: var(--fab-border-strong);
   color: var(--fab-text-muted);
   background: transparent;
 }
 
-.fabricate-button.manager-button.is-dashed:not(:disabled):hover {
+.fabricate-button.fabricate-button.is-dashed:not(:disabled):hover {
   border-color: var(--fab-accent-border);
   color: var(--fab-text);
   background: var(--fab-surface-soft);
@@ -8734,7 +8734,7 @@
   list-style: none;
 }
 
-/* The full-width dashed add-set / add-stage row (§C6) is no longer expressed by a recipe-namespaced class (issue 1118): `.manager-button.is-dashed.manager-recipe-add-full` is retired here, and its four call sites take the primitive's `fullWidth` capability instead. */
+/* The full-width dashed add-set / add-stage row (§C6) is no longer expressed by a recipe-namespaced class (issue 1118): `.fabricate-button.is-dashed.manager-recipe-add-full` is retired here, and its four call sites take the primitive's `fullWidth` capability instead. */
 
 /* Danger-bordered dashed panel for an outcome that produces nothing (§C5). */
 .fabricate-manager .manager-recipe-result-empty {
@@ -8816,8 +8816,8 @@
 }
 
 /* The one component-picker trigger, for the component pickers that are not a requirement row: both salvage yield rows and the tool replacement (issue 676). */
-.fabricate-button.manager-button.manager-salvage-component-trigger,
-.fabricate-button.manager-button.manager-tool-replacement-component-trigger {
+.fabricate-button.fabricate-button.manager-salvage-component-trigger,
+.fabricate-button.fabricate-button.manager-tool-replacement-component-trigger {
   justify-content: flex-start;
   width: max-content;
   min-width: 0;
@@ -8860,7 +8860,7 @@
 
 /* Extra separation between the trailing controls, on top of the row's 12px gap: a read-only fact, a deep link and a delete packed at 8px read as one undifferentiated clump (issue 1286). The reorder rocker left both rows at issue 1512, so its two selectors went with it. */
 .fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-edit,
-.fabricate-manager .manager-salvage-stage-row > .manager-icon-button,
+.fabricate-manager .manager-salvage-stage-row > .fabricate-icon-button,
 .fabricate-manager .manager-recipe-stage-row .manager-recipe-stage-edit {
   margin-left: var(--fab-space-1);
 }
@@ -9734,17 +9734,17 @@
   background: var(--fab-danger-soft);
 }
 
-.fabricate-button.manager-button.is-subtle {
+.fabricate-button.fabricate-button.is-subtle {
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-field.manager-field textarea {
+.fabricate-field.fabricate-field textarea {
   min-height: 92px;
   padding: var(--fab-space-2) var(--fab-space-2);
   resize: vertical;
 }
 
-.fabricate-field.manager-field small,
+.fabricate-field.fabricate-field small,
 .fabricate-manager .manager-feature-tile small {
   color: var(--fab-text-muted);
   font-size: 0.76rem;
@@ -9833,7 +9833,7 @@
 
 .fabricate-manager .manager-nav,
 .fabricate-manager .manager-rail-block,
-.fabricate-card.manager-inspector-card {
+.fabricate-card.fabricate-card {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
@@ -10106,7 +10106,7 @@
 }
 
 /* The header's premium unlock action. It is deliberately NOT `.is-primary`: that variant is the green Save treatment, and a promotional unlock in Save-green would read as the page's commit action (issues 1185, 1118). */
-.fabricate-button.manager-button.fab-manager-button.manager-downtime-unlock {
+.fabricate-button.fabricate-button.fab-manager-button.manager-downtime-unlock {
   min-height: 34px;
   padding: 0 14px;
   border-radius: 8px;
@@ -10114,8 +10114,8 @@
   font-weight: 600;
 }
 
-/* Split from the geometry above for the invariant at `.manager-button:disabled`. */
-.fabricate-button.manager-button.fab-manager-button.manager-downtime-unlock:not(:disabled) {
+/* Split from the geometry above for the invariant at `.fabricate-button:disabled`. */
+.fabricate-button.fabricate-button.fab-manager-button.manager-downtime-unlock:not(:disabled) {
   border-color: var(--fab-accent-border);
   color: var(--fab-on-accent);
   background: var(--fab-accent);
@@ -10346,7 +10346,7 @@
   background: var(--fab-warning);
 }
 
-.fabricate-card.manager-inspector-card {
+.fabricate-card.fabricate-card {
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 8px;
@@ -10450,8 +10450,8 @@
 }
 
 /* THE FAMILY'S SHARED BASE BLOCK: the lowest-specificity (0,2,0) rule of BOTH button families, and the control contract every carrier gets for free. */
-.fabricate-button.manager-button,
-.fabricate-icon-button.manager-icon-button {
+.fabricate-button.fabricate-button,
+.fabricate-icon-button.fabricate-icon-button {
   appearance: none;
   -webkit-appearance: none;
   box-sizing: border-box;
@@ -10470,8 +10470,8 @@
 }
 
 /* THE DISABLED INVARIANT. A switched-off manager button paints from this rule, whatever role it carries — so every rule that states a role's RESTING paint is qualified `:not(:disabled)`, here and above, and none of them relies on standing later in the sheet than this one (issues 1118, 1502). */
-.fabricate-button.manager-button:disabled,
-.fabricate-icon-button.manager-icon-button:disabled {
+.fabricate-button.fabricate-button:disabled,
+.fabricate-icon-button.fabricate-icon-button:disabled {
   border-color: var(--fab-overlay-light-12);
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
@@ -10479,7 +10479,7 @@
   opacity: 0.62;
 }
 
-.fabricate-button.manager-button {
+.fabricate-button.fabricate-button {
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   font-weight: 700;
@@ -10498,79 +10498,79 @@
 }
 
 /* Twelve manager buttons are anchors, not buttons (issue 1118): docs links, the premium unlock, the explainer card's links. */
-.fabricate-button.manager-button:is(a) {
+.fabricate-button.fabricate-button:is(a) {
   text-decoration: none;
 }
 
-.fabricate-button.manager-button.is-primary:not(:disabled) {
+.fabricate-button.fabricate-button.is-primary:not(:disabled) {
   border-color: var(--fab-success-border);
   color: var(--fab-on-success);
   background: var(--fab-success);
 }
 
-.fabricate-icon-button.manager-icon-button.is-primary:not(:disabled) {
+.fabricate-icon-button.fabricate-icon-button.is-primary:not(:disabled) {
   border-color: var(--fab-success-border);
   color: var(--fab-success-text);
 }
 
-.fabricate-button.manager-button.is-danger:not(:disabled),
-.fabricate-icon-button.manager-icon-button.is-danger:not(:disabled) {
+.fabricate-button.fabricate-button.is-danger:not(:disabled),
+.fabricate-icon-button.fabricate-icon-button.is-danger:not(:disabled) {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
 }
 
 /* The armed half of the inline two-step row confirmation. This is the product's first SOLID `--fab-danger` surface, which is why `--fab-on-danger` exists at all: `--fab-on-accent` fails 4.5:1 against `--fab-danger` in foundry-native and is marginal in ironblood-forge, and `--fab-danger-text` fails everywhere (issue 785). */
-.fabricate-button.manager-button.is-danger.is-armed {
+.fabricate-button.fabricate-button.is-danger.is-armed {
   border-color: var(--fab-danger);
   color: var(--fab-on-danger);
   background: var(--fab-danger);
 }
 
-.fabricate-button.manager-button.is-danger.is-armed:not(:disabled):hover {
+.fabricate-button.fabricate-button.is-danger.is-armed:not(:disabled):hover {
   border-color: var(--fab-danger);
   color: var(--fab-on-danger);
   background: var(--fab-danger);
 }
 
 /* The `warning` role's treatment. It has a call site now (issue 1118, task 9), and that call site CANNOT CURRENTLY RENDER — both halves matter, so both are written down (issues 1315, 1422). */
-.fabricate-button.manager-button.is-warning-action:not(:disabled) {
+.fabricate-button.fabricate-button.is-warning-action:not(:disabled) {
   border-color: var(--fab-warning-border);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-button.manager-button:not(:disabled):hover,
-.fabricate-icon-button.manager-icon-button:not(:disabled):hover {
+.fabricate-button.fabricate-button:not(:disabled):hover,
+.fabricate-icon-button.fabricate-icon-button:not(:disabled):hover {
   border-color: var(--fab-border-strong);
   background: var(--fab-overlay-light-10);
 }
 
-.fabricate-button.manager-button.is-primary:not(:disabled):hover {
+.fabricate-button.fabricate-button.is-primary:not(:disabled):hover {
   border-color: var(--fab-success-border);
   color: var(--fab-on-success);
   background: var(--fab-success-strong);
 }
 
-.fabricate-icon-button.manager-icon-button.is-primary:not(:disabled):hover {
+.fabricate-icon-button.fabricate-icon-button.is-primary:not(:disabled):hover {
   border-color: var(--fab-success-border);
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
 }
 
-.fabricate-button.manager-button.is-danger:not(:disabled):hover,
-.fabricate-icon-button.manager-icon-button.is-danger:not(:disabled):hover {
+.fabricate-button.fabricate-button.is-danger:not(:disabled):hover,
+.fabricate-icon-button.fabricate-icon-button.is-danger:not(:disabled):hover {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }
 
-.fabricate-button.manager-button.is-warning-action:not(:disabled):hover {
+.fabricate-button.fabricate-button.is-warning-action:not(:disabled):hover {
   border-color: var(--fab-warning-focus);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-icon-button.manager-icon-button {
+.fabricate-icon-button.fabricate-icon-button {
   width: 34px;
   height: 34px;
   padding: 0;
@@ -10578,7 +10578,7 @@
 }
 
 /* Opt-in compact dismiss: the owner sets the flex basis as well as the box. */
-.fabricate-icon-button.manager-icon-button.is-size-24 {
+.fabricate-icon-button.fabricate-icon-button.is-size-24 {
   box-sizing: border-box;
   width: 24px;
   height: 24px;
@@ -10589,7 +10589,7 @@
 }
 
 /* The banded Modal's close (maintainer ruling 2026-09-28); its paint is `Modal`'s. */
-.fabricate-icon-button.manager-icon-button.is-size-26 {
+.fabricate-icon-button.fabricate-icon-button.is-size-26 {
   box-sizing: border-box;
   width: 26px;
   height: 26px;
@@ -10615,7 +10615,7 @@
 }
 
 /* THE PAGER'S ARROW BOX, and it is PAGINATION'S rule rather than IconButton's (issue 1502). */
-.fabricate-pagination.manager-pagination .manager-icon-button {
+.fabricate-pagination.fabricate-pagination .fabricate-icon-button {
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
@@ -10624,8 +10624,8 @@
   border-radius: 7px;
 }
 
-.fabricate-icon-button.manager-icon-button i,
-.fabricate-button.manager-button i {
+.fabricate-icon-button.fabricate-icon-button i,
+.fabricate-button.fabricate-button i {
   position: static;
   margin: 0;
 }
@@ -10638,9 +10638,9 @@
   align-items: center;
 }
 
-/* The shared.manager-search is `flex: 1 1 260px` for the horizontal filter bar; inside a vertical roster column that flex-grow stretches the search box tall (and floats its absolutely-positioned icon mid-gap) (issues 511, 785). */
-.fabricate-manager .manager-access-roster .manager-search,
-.fabricate-manager .manager-knowledge-roster .manager-search {
+/* The shared.fabricate-search is `flex: 1 1 260px` for the horizontal filter bar; inside a vertical roster column that flex-grow stretches the search box tall (and floats its absolutely-positioned icon mid-gap) (issues 511, 785). */
+.fabricate-manager .manager-access-roster .fabricate-search,
+.fabricate-manager .manager-knowledge-roster .fabricate-search {
   flex: 0 0 auto;
   min-width: 0;
 }
@@ -11046,7 +11046,7 @@
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
-/* The full width the narrowed rules above can no longer supply, stated once for the four converted fields that want it: each is a stacked `.manager-field` column and the `form` rung deliberately leaves its trigger hugging. The respawn interval's unit picker is not one of them and refuses it in the component's own `<style>` (issue 1510). */
+/* The full width the narrowed rules above can no longer supply, stated once for the four converted fields that want it: each is a stacked `.fabricate-field` column and the `form` rung deliberately leaves its trigger hugging. The respawn interval's unit picker is not one of them and refuses it in the component's own `<style>` (issue 1510). */
 .fabricate-manager .manager-gathering-task-edit-view .manager-task-field-select .fabricate-select-trigger {
   width: 100%;
 }
@@ -11065,7 +11065,7 @@
   resize: vertical;
 }
 
-.fabricate-manager .manager-gathering-task-edit-view .manager-search input:not([type="checkbox"]):not([type="radio"]) {
+.fabricate-manager .manager-gathering-task-edit-view .fabricate-search input:not([type="checkbox"]):not([type="radio"]) {
   height: 34px;
   padding: 0 34px;
 }
@@ -11282,7 +11282,7 @@
   line-height: 1.35;
 }
 
-.fabricate-manager .manager-task-core-status .manager-status-toggle {
+.fabricate-manager .manager-task-core-status .fabricate-toggle {
   max-width: 64px;
 }
 
@@ -11455,7 +11455,7 @@
   gap: var(--fab-space-3);
 }
 
-/* The drops summary card has no rule of its own. It used to restate the whole `.manager-inspector-card` contract — a stack with `gap: var(--fab-space-2)`, a 1px `--fab-border` edge and an 8px radius were all the same values the shell already declares — and then diverged on the only two it changed: `--fab-bg-3` instead of the shell's `--fab-overlay-light-04` fill, and 16px of horizontal padding instead of 12px (issue 883). */
+/* The drops summary card has no rule of its own. It used to restate the whole `.fabricate-card` contract — a stack with `gap: var(--fab-space-2)`, a 1px `--fab-border` edge and an 8px radius were all the same values the shell already declares — and then diverged on the only two it changed: `--fab-bg-3` instead of the shell's `--fab-overlay-light-04` fill, and 16px of horizontal padding instead of 12px (issue 883). */
 
 .fabricate-manager .manager-task-drops-summary-list {
   display: flex;
@@ -11578,7 +11578,7 @@
   min-width: 0;
 }
 
-.fabricate-search.manager-search.is-compact {
+.fabricate-search.fabricate-search.is-compact {
   width: min(220px, 30%);
   min-height: 32px;
 }
@@ -11591,14 +11591,14 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-task-drop-controls .manager-search.is-compact {
+.fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact {
   flex: 1 1 260px;
   width: min(320px, 34vw);
   min-width: min(220px, 100%);
   max-width: 320px;
 }
 
-.fabricate-manager .manager-task-drop-controls .manager-search.is-compact input {
+.fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact input {
   padding-left: 36px;
 }
 
@@ -11611,13 +11611,13 @@
   min-width: min(420px, 100%);
 }
 
-.fabricate-manager .manager-task-component-browser-controls .manager-search.is-compact {
+.fabricate-manager .manager-task-component-browser-controls .fabricate-search.is-compact {
   position: relative;
   width: 100%;
   min-width: 0;
 }
 
-.fabricate-manager .manager-task-component-browser-controls .manager-search.is-compact input {
+.fabricate-manager .manager-task-component-browser-controls .fabricate-search.is-compact input {
   padding-left: 36px;
 }
 
@@ -11746,7 +11746,7 @@
   background: var(--fab-overlay-light-03);
 }
 
-.fabricate-manager .manager-task-component-browser-footer .manager-pagination {
+.fabricate-manager .manager-task-component-browser-footer .fabricate-pagination {
   padding: 0;
   border-top: 0;
   background: transparent;
@@ -11808,7 +11808,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-task-required-tools-search .manager-search {
+.fabricate-manager .manager-task-required-tools-search .fabricate-search {
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -11888,7 +11888,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-task-required-tools-footer .manager-pagination {
+.fabricate-manager .manager-task-required-tools-footer .fabricate-pagination {
   padding: 0;
   border-top: 0;
   background: transparent;
@@ -11912,7 +11912,7 @@
   background: var(--fab-overlay-light-03);
 }
 
-.fabricate-manager .manager-task-drop-footer .manager-pagination {
+.fabricate-manager .manager-task-drop-footer .fabricate-pagination {
   flex: 1 1 auto;
   justify-content: flex-end;
   gap: var(--fab-space-2);
@@ -12445,7 +12445,7 @@
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-drop-editor-card .manager-field {
+.fabricate-manager .manager-drop-editor-card .fabricate-field {
   display: grid;
   gap: var(--fab-space-chip);
   min-width: 0;
@@ -12459,18 +12459,18 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-drop-editor-actions .manager-button {
+.fabricate-manager .manager-drop-editor-actions .fabricate-button {
   justify-content: center;
   min-width: 0;
 }
 
 /* The inspector's controls run at 28px, a notch under the standard 34px control, because they sit in a 300px column beside a rate slider (issue 1118). */
-.fabricate-manager .manager-drop-inspector-stack .manager-button.fab-manager-button {
+.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fab-manager-button {
   min-height: 28px;
   padding: 0 var(--fab-space-2);
 }
 
-.fabricate-manager .manager-drop-inspector-stack .manager-icon-button {
+.fabricate-manager .manager-drop-inspector-stack .fabricate-icon-button {
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
@@ -12490,19 +12490,19 @@
   font: inherit;
 }
 
-.fabricate-manager .manager-drop-inspector-stack .manager-search input {
+.fabricate-manager .manager-drop-inspector-stack .fabricate-search input {
   height: 28px;
   min-height: 28px;
   padding-block: 0;
 }
 
-.fabricate-manager .manager-character-modifier-row-card .manager-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
+.fabricate-manager .manager-character-modifier-row-card .fabricate-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
   height: 28px;
   min-height: 28px;
   padding: var(--fab-space-2xs) var(--fab-space-2);
 }
 
-.fabricate-manager .manager-drop-editor-condition-modifier-card .manager-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
+.fabricate-manager .manager-drop-editor-condition-modifier-card .fabricate-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
   height: 28px;
   min-height: 28px;
   padding: var(--fab-space-2xs) var(--fab-space-2);
@@ -12701,7 +12701,7 @@
   height: 36px;
 }
 
-/* The current-value picker fills its card, as the native select did from `.fabricate-field.manager-field select`, which is element-typed and reaches no `<button>` (issue 1510). Its height is the `form` rung's 38 rather than the retired 36 the add row keeps: the two sit in separate stacked rows of the card, so they never stand side by side. */
+/* The current-value picker fills its card, as the native select did from `.fabricate-field.fabricate-field select`, which is element-typed and reaches no `<button>` (issue 1510). Its height is the `form` rung's 38 rather than the retired 36 the add row keeps: the two sit in separate stacked rows of the card, so they never stand side by side. */
 .fabricate-manager .manager-condition-current .fabricate-select-trigger {
   width: 100%;
 }
@@ -13007,8 +13007,8 @@
   max-width: 160px;
 }
 
-.fabricate-toggle.manager-status-toggle.is-disabled,
-.fabricate-toggle.manager-status-toggle:disabled {
+.fabricate-toggle.fabricate-toggle.is-disabled,
+.fabricate-toggle.fabricate-toggle:disabled {
   cursor: not-allowed;
 }
 
@@ -13073,7 +13073,7 @@
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-setup-links .manager-button {
+.fabricate-manager .manager-setup-links .fabricate-button {
   flex: 1 1 112px;
   justify-content: center;
   text-decoration: none;
@@ -13098,7 +13098,7 @@
     flex-wrap: wrap;
   }
 
-  .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-search.is-compact {
+  .fabricate-manager[data-manager-view="gathering-task-edit"] .fabricate-search.is-compact {
     flex: 1 1 180px;
     width: auto;
   }
@@ -13124,7 +13124,7 @@
     min-width: 0;
   }
 
-  .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-task-drop-controls .manager-search.is-compact {
+  .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-task-drop-controls .fabricate-search.is-compact {
     width: auto;
     max-width: none;
   }
@@ -13404,7 +13404,7 @@
   }
 
   .fabricate-manager .manager-toolbar-primary,
-  .fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary)),
+  .fabricate-filter-bar.fabricate-filter-bar:not(:has(.manager-toolbar-primary)),
   .fabricate-manager .manager-header-actions,
   .fabricate-manager .manager-action-group {
     justify-content: flex-start;
@@ -13420,11 +13420,11 @@
     flex-direction: column;
   }
 
-  .fabricate-search.manager-search.is-compact {
+  .fabricate-search.fabricate-search.is-compact {
     width: 100%;
   }
 
-  .fabricate-search.manager-search {
+  .fabricate-search.fabricate-search {
     flex-basis: 100%;
   }
 
@@ -13619,9 +13619,9 @@
 }
 
 /* The Tool Studio editor's Back/Delete/Save cluster is canonical for action-button scale, so the GM Knowledge surface's row actions (Expend/Delete/Erase memory) and its per-character reset cluster join it rather than restating the values (issue 1118). */
-.fabricate-manager .manager-tool-edit-actions .manager-button,
-.fabricate-manager .manager-knowledge-row-actions .manager-button,
-.fabricate-manager .manager-knowledge-reset-actions .manager-button {
+.fabricate-manager .manager-tool-edit-actions .fabricate-button,
+.fabricate-manager .manager-knowledge-row-actions .fabricate-button,
+.fabricate-manager .manager-knowledge-reset-actions .fabricate-button {
   min-height: 34px;
   padding: 0 var(--fab-space-3);
   font-size: 0.72rem;
@@ -13882,7 +13882,7 @@
   color: var(--fab-success-text);
 }
 
-/* The tool how-it-works card rules are gone: the Tool Studio's explainer is now the shared `ExplainerCard.svelte`, which wears the manager's own `.manager-inspector-card` shell and `.manager-card-title` heading instead of restating a bordered card and a fourth heading scale, and keeps its remaining rules in its own scoped block (issue 881). */
+/* The tool how-it-works card rules are gone: the Tool Studio's explainer is now the shared `ExplainerCard.svelte`, which wears the manager's own `.fabricate-card` shell and `.manager-card-title` heading instead of restating a bordered card and a fourth heading scale, and keeps its remaining rules in its own scoped block (issue 881). */
 
 /* ── THE SYSTEM-SCOPE BAND AND THE RULE CARDS ── The Tool rules editor's `Overview` tab is gone (identity is world scope's), and the two controls a crafting system genuinely authors that are not rules — its enable switch and its display-label override — open the `Breakage` tab as a band instead (issue 1373). */
 .fabricate-manager .manager-tool-system-scope {
@@ -14001,7 +14001,7 @@
   line-height: 1.5;
 }
 
-.fabricate-manager .manager-tool-rule-card-head .manager-status-toggle {
+.fabricate-manager .manager-tool-rule-card-head .fabricate-toggle {
   grid-column: 2;
   grid-row: 1 / span 2;
   justify-self: end;
@@ -14644,7 +14644,7 @@
     width: 100%;
   }
 
-  .fabricate-manager .manager-tool-edit-actions .manager-button {
+  .fabricate-manager .manager-tool-edit-actions .fabricate-button {
     flex: 1 1 140px;
   }
 
@@ -14774,7 +14774,7 @@
   line-height: 1.55;
 }
 
-/* The custom salvage DC is the only numeric control in this block; its siblings are a full-width preset `<select>` and a manage-presets button, so the cap goes on the stepper rather than on the `.manager-field` around it (issue 1050). */
+/* The custom salvage DC is the only numeric control in this block; its siblings are a full-width preset `<select>` and a manage-presets button, so the cap goes on the stepper rather than on the `.fabricate-field` around it (issue 1050). */
 .fabricate-manager [data-salvage-dc-override] .fab-stepper {
   max-width: 160px;
 }
@@ -15051,7 +15051,7 @@
   margin-top: var(--fab-space-2xs);
 }
 
-/* The full width the three converted pickers in this column no longer inherit (issue 1510): `.fabricate-field.manager-field select` supplied it and is element-typed, so it reaches no `<button>`, and the `form` rung deliberately leaves its trigger hugging. One rule off the shared wrapper class, which has three emitters. */
+/* The full width the three converted pickers in this column no longer inherit (issue 1510): `.fabricate-field.fabricate-field select` supplied it and is element-typed, so it reaches no `<button>`, and the `form` rung deliberately leaves its trigger hugging. One rule off the shared wrapper class, which has three emitters. */
 .fabricate-manager .manager-environment-context-field .fabricate-select-trigger {
   width: 100%;
 }
@@ -15352,7 +15352,7 @@
   min-width: 0;
 }
 
-.fabricate-field.manager-field.is-disabled {
+.fabricate-field.fabricate-field.is-disabled {
   opacity: 0.6;
 }
 
@@ -15692,7 +15692,7 @@
 }
 
 /* ── THE SHARED OVERFLOW ACTION MENU ── This family used to be `.manager-environment-comp-menu*`, rooted at `.fabricate-manager` and named for ONE of its two callers (issue 1477). */
-.fabricate-action-menu.manager-action-menu {
+.fabricate-action-menu.fabricate-action-menu {
   position: relative;
   min-width: 0;
 }
@@ -15997,7 +15997,7 @@
   background: var(--fab-overlay-dark-16);
 }
 
-.fabricate-manager .manager-environment-drop-adjustment-row > .manager-button {
+.fabricate-manager .manager-environment-drop-adjustment-row > .fabricate-button {
   grid-column: 1 / -1;
   justify-self: end;
 }
@@ -16990,7 +16990,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-realm-env-column .manager-search {
+.fabricate-manager .manager-realm-env-column .fabricate-search {
   flex: 0 0 auto;
 }
 
@@ -17049,7 +17049,7 @@
   color: var(--fab-text);
 }
 
-.fabricate-manager .manager-realm-env-row .manager-icon-button {
+.fabricate-manager .manager-realm-env-row .fabricate-icon-button {
   flex: 0 0 auto;
 }
 
@@ -17169,7 +17169,7 @@
   padding: 0;
 }
 
-.fabricate-manager .manager-travel-parties .manager-travel-parties-pagination .manager-pagination {
+.fabricate-manager .manager-travel-parties .manager-travel-parties-pagination .fabricate-pagination {
   width: 100%;
   box-sizing: border-box;
   margin: 0;
@@ -17293,7 +17293,7 @@
   width: 100%;
 }
 
-.fabricate-button.manager-button.manager-travel-parties-override-trigger {
+.fabricate-button.fabricate-button.manager-travel-parties-override-trigger {
   justify-content: space-between;
   gap: var(--fab-space-2);
   width: 100%;
@@ -17769,7 +17769,7 @@
   margin-inline-start: auto;
 }
 
-/* THE LABELLED FORM. `.manager-field` and its `> span` caption are already declared in this sheet, so the column, its gap and the caption's kicker treatment are inherited rather than restated. */
+/* THE LABELLED FORM. `.fabricate-field` and its `> span` caption are already declared in this sheet, so the column, its gap and the caption's kicker treatment are inherited rather than restated. */
 .fabricate-select-note {
   color: var(--fab-text-subtle);
   font-size: 10.5px;
@@ -18065,13 +18065,13 @@
 }
 
 /* THE ANCESTOR IS NAMED BY ITS CLASS, NOT BY ITS ATTRIBUTE (issues 1508, 1515). */
-.fabricate-manager .manager-tools-library-card .manager-search {
+.fabricate-manager .manager-tools-library-card .fabricate-search {
   flex: 1 1 auto;
   min-width: 0;
 }
 
 /* ── THE SEARCH FIELD STATES ITS OWN TYPE ── `proto:2510` gives the box `height: 32px; padding: 0 11px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 8px`, and `proto:2512` gives the input `font: 500 11.5px var(--sans)` (issue 1373). */
-.fabricate-manager .manager-tools-library-card .manager-search input {
+.fabricate-manager .manager-tools-library-card .fabricate-search input {
   height: 30px;
   border-radius: 8px;
   background: var(--fab-surface-soft);
@@ -18080,7 +18080,7 @@
 }
 
 /* `proto:2511`: `font-size: 10px; color: var(--subtle)`. */
-.fabricate-manager .manager-tools-library-card .manager-search > i {
+.fabricate-manager .manager-tools-library-card .fabricate-search > i {
   color: var(--fab-text-subtle);
   font-size: 10px;
 }
@@ -18112,7 +18112,7 @@
   padding: 0;
 }
 
-.fabricate-manager .manager-tools-browser-pagination .manager-pagination {
+.fabricate-manager .manager-tools-browser-pagination .fabricate-pagination {
   width: 100%;
   box-sizing: border-box;
 }
@@ -18153,7 +18153,7 @@
   text-align: left;
 }
 
-/* ONE LEG, NOT TWO. The row's enable switch is a `StatusToggle` now, and the primitive's family already writes this exact pair — `.fabricate-toggle.manager-status-toggle: focus-visible`, the same 2px accent outline at the same 2px offset — so a second copy under this screen's own class would out-specify the family's ring with a byte-identical one and make the switch's focus state a thing two files decide (issue 1515). */
+/* ONE LEG, NOT TWO. The row's enable switch is a `StatusToggle` now, and the primitive's family already writes this exact pair — `.fabricate-toggle.fabricate-toggle: focus-visible`, the same 2px accent outline at the same 2px offset — so a second copy under this screen's own class would out-specify the family's ring with a byte-identical one and make the switch's focus state a thing two files decide (issue 1515). */
 .fabricate-manager .manager-tools-select-target:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
@@ -18232,7 +18232,7 @@
   font-weight: 600;
 }
 
-/* `:not(:disabled)` because this states the role's RESTING PAINT, and the invariant the `.manager-button:disabled` block records is that a switched-off manager button paints from that rule whatever role or container it carries. */
+/* `:not(:disabled)` because this states the role's RESTING PAINT, and the invariant the `.fabricate-button:disabled` block records is that a switched-off manager button paints from that rule whatever role or container it carries. */
 .fabricate-manager[data-manager-view="tools"]
   .manager-tool-browser-inspector
   [data-tool-inspector-edit-world]:not(:disabled) {
@@ -18249,7 +18249,7 @@
 }
 
 /* Double-quoted, deliberately. `manager-layout.test.js` DERIVES the container list for its disabled-paint probe from this sheet, and its attribute matcher reads double quotes only, so a single-quoted route attribute here takes this container out of that gate silently — the test reports it as unmaterializable rather than letting it go unprobed, which is how this was found. */
-.fabricate-manager[data-manager-view="tools"] .manager-tool-inspector-foot .manager-button {
+.fabricate-manager[data-manager-view="tools"] .manager-tool-inspector-foot .fabricate-button {
   min-height: 34px;
   border-radius: 9px;
   font-size: 12px;
@@ -18387,7 +18387,7 @@
   overflow: hidden;
 }
 
-/* The roster's `.manager-search` override is authored alongside the Access roster's, which needs the identical `flex: 0 0 auto`. */
+/* The roster's `.fabricate-search` override is authored alongside the Access roster's, which needs the identical `flex: 0 0 auto`. */
 
 .fabricate-manager .manager-knowledge-roster-scroll {
   flex: 1 1 auto;
@@ -18700,7 +18700,7 @@
     flex-direction: column;
   }
 
-  .fabricate-manager .manager-knowledge-reset-actions > .manager-button {
+  .fabricate-manager .manager-knowledge-reset-actions > .fabricate-button {
     flex: 1 1 auto;
   }
 }
@@ -18714,9 +18714,9 @@
 
 /* THE ROWS AND THE PAGER LOSE THEIR FILLS. The border is what makes a row a row here, which is the prototype's own construction; a fill on top of a pane one rung darker is what made five near-identical greys on one screen. */
 .fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row,
-.fabricate-manager[data-manager-view='world-essences'] .manager-pagination,
+.fabricate-manager[data-manager-view='world-essences'] .fabricate-pagination,
 .fabricate-manager[data-manager-view='essences'] .manager-essence-row,
-.fabricate-manager[data-manager-view='essences'] .manager-pagination {
+.fabricate-manager[data-manager-view='essences'] .fabricate-pagination {
   background: transparent;
 }
 
@@ -18744,7 +18744,7 @@
   background: var(--fab-bg-0);
 }
 
-.fabricate-manager[data-manager-view='essences'] .manager-inspector .manager-inspector-card {
+.fabricate-manager[data-manager-view='essences'] .manager-inspector .fabricate-card {
   background: transparent;
 }
 
@@ -18756,8 +18756,8 @@
 }
 
 /* THE BROWSER TOOLBAR STRIP IS FLUSH, NOT A RAISED BAND. Last of the surface inversions on these screens, and the same one just corrected on the secondary buttons — ours raised a region the prototype leaves level. */
-.fabricate-manager[data-manager-view='world-essences'] .manager-toolbar,
-.fabricate-manager[data-manager-view='essences'] .manager-toolbar {
+.fabricate-manager[data-manager-view='world-essences'] .fabricate-filter-bar,
+.fabricate-manager[data-manager-view='essences'] .fabricate-filter-bar {
   border-bottom: 0;
   background: transparent;
 }
@@ -18823,9 +18823,9 @@
 
 /* THE ROWS AND THE PAGER LOSE THEIR FILLS, so the 1px border is what makes a row a row — the reference’s own construction on both list screens. */
 .fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row,
-.fabricate-manager[data-manager-view='world-tools'] .manager-pagination,
+.fabricate-manager[data-manager-view='world-tools'] .fabricate-pagination,
 .fabricate-manager[data-manager-view='tools'] .manager-tools-row,
-.fabricate-manager[data-manager-view='tools'] .manager-pagination {
+.fabricate-manager[data-manager-view='tools'] .fabricate-pagination {
   background: transparent;
 }
 
@@ -18850,12 +18850,12 @@
   background: var(--fab-bg-1);
 }
 
-.fabricate-manager[data-manager-view='tools'] .manager-inspector .manager-inspector-card {
+.fabricate-manager[data-manager-view='tools'] .manager-inspector .fabricate-card {
   background: transparent;
 }
 
 /* THE WORLD TOOLS CATALOGUE'S TOOLBAR STRIP IS FLUSH TOO (issue 1373). */
-.fabricate-manager[data-manager-view='world-tools'] .manager-toolbar {
+.fabricate-manager[data-manager-view='world-tools'] .fabricate-filter-bar {
   border-bottom: 0;
   background: transparent;
 }
@@ -18897,7 +18897,7 @@
 
 /* ── THE WORLD COMPONENT CATALOGUE'S ROW STATES ── A NEW BLOCK, APPENDED (issue 1371). */
 .fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row,
-.fabricate-manager[data-manager-view='world-components'] .manager-pagination {
+.fabricate-manager[data-manager-view='world-components'] .fabricate-pagination {
   background: transparent;
 }
 
@@ -19227,7 +19227,7 @@
 }
 
 /* THE 28px CONTROL RUNG the reference uses for every in-card action — Copy, Unlink, Add alias. */
-.fabricate-button.manager-component-entry-mini-action.manager-button.fab-manager-button {
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-2);
@@ -19236,8 +19236,8 @@
   font-weight: 600;
 }
 
-/* PAINT IS QUALIFIED, GEOMETRY IS NOT — the split the primitive's disabled contract requires: switching a control off must take its colours from `.manager-button:disabled` and keep the shape it had when enabled. */
-.fabricate-button.manager-component-entry-mini-action.manager-button.fab-manager-button:not(:disabled) {
+/* PAINT IS QUALIFIED, GEOMETRY IS NOT — the split the primitive's disabled contract requires: switching a control off must take its colours from `.fabricate-button:disabled` and keep the shape it had when enabled. */
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border);
   color: var(--fab-text-secondary);
@@ -19371,7 +19371,7 @@
 }
 
 /* The head's trailing action: 30px is a rung and stays 30, with radius 7. */
-.fabricate-button.manager-component-entry-head-action.manager-button.fab-manager-button {
+.fabricate-button.manager-component-entry-head-action.fabricate-button.fab-manager-button {
   flex: 0 0 auto;
   height: 30px;
   min-height: 30px;
@@ -19384,7 +19384,7 @@
   font-weight: 600;
 }
 
-.fabricate-button.manager-component-entry-head-action.manager-button.fab-manager-button:not(:disabled) {
+.fabricate-button.manager-component-entry-head-action.fabricate-button.fab-manager-button:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border-strong);
   color: var(--fab-text);
@@ -19405,12 +19405,12 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-component-entry-systems-search .manager-search {
+.fabricate-manager .manager-component-entry-systems-search .fabricate-search {
   flex: 0 0 auto;
   min-width: 0;
 }
 
-.fabricate-manager .manager-component-entry-systems-search .manager-search input {
+.fabricate-manager .manager-component-entry-systems-search .fabricate-search input {
   width: 190px;
   height: 30px;
   background: var(--fab-surface-soft);
@@ -19504,7 +19504,7 @@
   gap: var(--fab-space-chip);
 }
 
-.fabricate-button.manager-component-entry-system-rules.manager-button.fab-manager-button {
+.fabricate-button.manager-component-entry-system-rules.fabricate-button.fab-manager-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-3);
@@ -19515,14 +19515,14 @@
   font-weight: 600;
 }
 
-.fabricate-button.manager-component-entry-system-rules.manager-button.fab-manager-button:not(:disabled) {
+.fabricate-button.manager-component-entry-system-rules.fabricate-button.fab-manager-button:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border);
   color: var(--fab-text-secondary);
 }
 
 /* A DASHED GHOST, NOT A FILLED GREEN PRIMARY. This is the maintainer's stated example: round 3 drew a 146px `is-primary` button on the accent fill with a hint paragraph beside it, and the reference draws a 28px transparent control with a dashed `--fab-border-strong` hairline. */
-.fabricate-button.manager-component-entry-system-add.manager-button.fab-manager-button {
+.fabricate-button.manager-component-entry-system-add.fabricate-button.fab-manager-button {
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-3);
@@ -19533,14 +19533,14 @@
   font-weight: 600;
 }
 
-.fabricate-button.manager-component-entry-system-add.manager-button.fab-manager-button:not(:disabled) {
+.fabricate-button.manager-component-entry-system-add.fabricate-button.fab-manager-button:not(:disabled) {
   background: transparent;
   border-color: var(--fab-border-strong);
   color: var(--fab-text-secondary);
 }
 
 /* THE EXIT ICON: a 26px square in the row's own clothing (`proto:944`), not a labelled danger button. */
-.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger {
+.fabricate-manager .manager-component-entry-row-actions .fabricate-button.is-danger {
   width: 26px;
   min-width: 26px;
   height: 26px;
@@ -19552,7 +19552,7 @@
   font-size: 0.625rem;
 }
 
-.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger:not(:disabled) {
+.fabricate-manager .manager-component-entry-row-actions .fabricate-button.is-danger:not(:disabled) {
   background: var(--fab-surface-soft);
   border-color: var(--fab-border);
   color: var(--fab-text-subtle);
@@ -19560,14 +19560,14 @@
 
 .fabricate-manager
   .manager-component-entry-row-actions
-  .manager-button.is-danger.is-armed:not(:disabled) {
+  .fabricate-button.is-danger.is-armed:not(:disabled) {
   width: auto;
   padding: 0 var(--fab-space-2);
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
 }
 
-.fabricate-manager .manager-component-entry-row-actions .manager-button.is-danger > span:empty {
+.fabricate-manager .manager-component-entry-row-actions .fabricate-button.is-danger > span:empty {
   display: none;
 }
 
@@ -19619,7 +19619,7 @@
 }
 
 /* The armed danger control at the 34px rung (32 is retired), radius 9, transparent on the card's own danger hairline rather than the sheet's filled danger treatment. */
-.fabricate-manager .manager-component-entry-danger-body .manager-button.is-danger {
+.fabricate-manager .manager-component-entry-danger-body .fabricate-button.is-danger {
   flex: 0 0 auto;
   height: 34px;
   min-height: 34px;
@@ -19631,7 +19631,7 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-component-entry-danger-body .manager-button.is-danger:not(:disabled) {
+.fabricate-manager .manager-component-entry-danger-body .fabricate-button.is-danger:not(:disabled) {
   background: transparent;
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
@@ -20136,7 +20136,7 @@
 /* `proto:1316`: the callout's one exit — a 30px control on `--fab-bg-1` behind a `border-strong` hairline. */
 
 /* `.fab-manager-button` IS CHAINED, and it is load-bearing rather than tidiness. */
-.fabricate-button.manager-button.fab-manager-button.manager-component-identity-exit {
+.fabricate-button.fabricate-button.fab-manager-button.manager-component-identity-exit {
   flex: 0 0 auto;
   gap: var(--fab-space-chip);
   height: 30px;
@@ -20371,7 +20371,7 @@
   background: var(--fab-accent);
 }
 
-/* The grip takes `IconButton`'s `is-size-24` box; only its cursor and colour are this family's. Compounded on the composed root because `.fabricate-icon-button.manager-icon-button` is (0,2,0) and a bare family class would lose to it — `fabricate-icon-button` is a namespace root of the primitive this one composes, never an application root. */
+/* The grip takes `IconButton`'s `is-size-24` box; only its cursor and colour are this family's. Compounded on the composed root because `.fabricate-icon-button.fabricate-icon-button` is (0,2,0) and a bare family class would lose to it — `fabricate-icon-button` is a namespace root of the primitive this one composes, never an application root. */
 .fabricate-icon-button.fabricate-sortable-list-grip {
   border-color: transparent;
   color: var(--fab-text-subtle);
@@ -20521,7 +20521,7 @@
 /* ── WHY THREE OF THIS SCREEN'S CONTROLS ARE STYLED BY A PROP AND NOT BY THIS FILE ── The lock pill (`proto:834`), the world-tag run (`proto:5401`) and the systems filter (`proto:5457`) are the entry's three primitive-drawn controls, and NONE of their type or paint can be written here, at any specificity (issue 1506). */
 
 /* ── A4. `Unlink Item` IS INKED AS THE DESTRUCTIVE HALF OF THE PAIR (`proto:5417`) ── Copy and Unlink share one geometry and one surface, and the reference separates them by INK alone: Unlink carries the danger edge and the danger text while it is still linked, and falls back to the neutral pair once there is nothing left to unlink. */
-.fabricate-button.manager-component-entry-mini-action.manager-button.fab-manager-button[data-scoped-entry-source-unlink]:not(
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button[data-scoped-entry-source-unlink]:not(
     :disabled
   ) {
   border-color: var(--fab-danger-border);
@@ -20529,13 +20529,13 @@
 }
 
 /* `Add alias` STATES WHETHER IT WILL DO ANYTHING (`proto:5436-5438`). With an empty field the reference draws it transparent on a plain hairline in the disabled ink; with a uuid typed it lifts onto `surface-soft` behind a strong edge in the full text ink. */
-.fabricate-button.manager-component-entry-mini-action.manager-button.fab-manager-button[data-scoped-entry-alias-add]:disabled {
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button[data-scoped-entry-alias-add]:disabled {
   background: transparent;
   border-color: var(--fab-border);
   color: var(--fab-text-disabled);
 }
 
-.fabricate-button.manager-component-entry-mini-action.manager-button.fab-manager-button[data-scoped-entry-alias-add]:not(
+.fabricate-button.manager-component-entry-mini-action.fabricate-button.fab-manager-button[data-scoped-entry-alias-add]:not(
     :disabled
   ) {
   background: var(--fab-surface-soft);
@@ -20568,14 +20568,14 @@
 
 /* === issue 1371 r8-prim — the shared primitives' opt-in sizes, and the two corners the M12a edit would otherwise have moved off the ladder. === */
 
-/* THE TWO CONVERTED SITES BELOW THE 34-38px BAND. `.manager-button.fab-manager-button` now declares the 34-38px rung's 9px corner, and both of these declare a height under that band and no corner of their own, so without this they would take a 34px control's corner at 30px and 28px. */
-.fabricate-button.manager-button.fab-manager-button.manager-clear-filters,
-.fabricate-manager .manager-drop-inspector-stack .manager-button.fab-manager-button {
+/* THE TWO CONVERTED SITES BELOW THE 34-38px BAND. `.fabricate-button.fab-manager-button` now declares the 34-38px rung's 9px corner, and both of these declare a height under that band and no corner of their own, so without this they would take a 34px control's corner at 30px and 28px. */
+.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters,
+.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fab-manager-button {
   border-radius: 7px;
 }
 
 /* ── THE 38px CONTROL SIZE (issue 1371, maintainer ruling M12b) ── 38 IS A RUNG (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired), and the reference draws the catalogue toolbar's search and membership filter and the system rules list's search and two filters at 38px (`proto:577-578`, `proto:1053-1055`) against the 34px these controls ship at (issue 1504). */
-.fabricate-search.manager-search.is-size-38 input {
+.fabricate-search.fabricate-search.is-size-38 input {
   height: 38px;
   border-radius: 9px;
 }
@@ -20611,7 +20611,7 @@
 }
 
 /* ── THE ROW'S OPEN CONTROL IS A 28px PEN (gap-list row 17) ── `proto:609` draws a 28x28 square on a 7px corner, titled `Open catalogue entry`. */
-.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row .manager-icon-button {
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row .fabricate-icon-button {
   width: 28px;
   height: 28px;
   border-radius: 7px;
@@ -20660,7 +20660,7 @@
 /* === issue 1371 r9-prim2 — the manager button's opt-in 38px rung. === */
 
 /* ── THE 38px BUTTON (issue 1371, gap-list rows 1 and 22) ── 38 IS A RUNG (`openspec/specs/design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired), and the reference draws the world component catalogue's `+ Register item` (`proto:570`) and the system's `+ Add from catalogue` (`proto:1046`) at 38 against the 34 this control ships at. */
-.fabricate-button.manager-button.fab-manager-button.is-size-38 {
+.fabricate-button.fabricate-button.fab-manager-button.is-size-38 {
   min-height: 38px;
 }
 
@@ -20679,7 +20679,7 @@
 
 /* `proto:1067`: the Asc/Desc toggle at `600 11px var(--sans)` in `--text2`. */
 .fabricate-manager[data-manager-view="components"]
-  .manager-button.fab-manager-button.manager-component-sort-direction {
+  .fabricate-button.fab-manager-button.manager-component-sort-direction {
   color: var(--fab-text-secondary);
   font-size: 11px;
 }
@@ -20692,12 +20692,12 @@
 /* === issue 1371 r16-cat — the world Component catalogue's foot pager, second pass (maintainer ruling M21, superseding r13-cat's M19 rule that stood here). === */
 
 /* ── THE PAGER IS A FULL-WIDTH BAND BY CONSTRUCTION NOW (M21) ── M19 ("the pagination footer on the component browser is not full width") was closed in r13 by bleeding the pager through the list column's `--fab-space-4` inset with three negative margins. */
-.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-column > .manager-pagination {
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-column > .fabricate-pagination {
   background: var(--fab-overlay-light-03);
 }
 
 /* ── THE BULK DOCK'S DELETE, AT THE ENTRY'S RUNG, ON EVERY BULK PANEL (M24) ── `proto:5340` (the world panel) and `proto:5638` (the system panel) draw the dock's destructive action `height:34px; border-radius:8px; font:700 11px` on a `--danger-soft` fill inside a `--danger-border` hairline, as ONE 11px line. */
-.fabricate-manager .fab-bulk-edit-dock .manager-button.is-danger {
+.fabricate-manager .fab-bulk-edit-dock .fabricate-button.is-danger {
   display: flex;
   gap: var(--fab-space-2);
   align-items: center;
@@ -20717,14 +20717,14 @@
 }
 
 /* ONE LINE, as the reference draws it: a label longer than the rail ellipsises rather than wrapping the 34px control into a 48px one. */
-.fabricate-manager .fab-bulk-edit-dock .manager-button.is-danger > span {
+.fabricate-manager .fab-bulk-edit-dock .fabricate-button.is-danger > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.fabricate-manager .fab-bulk-edit-dock .manager-button.is-danger:not(:disabled):not(.is-armed) {
+.fabricate-manager .fab-bulk-edit-dock .fabricate-button.is-danger:not(:disabled):not(.is-armed) {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);

@@ -256,7 +256,7 @@
   /* Only the field's row sizing is stated here; the global rule sizes it for a toolbar. Chained
      `:global`, because the class travels to `SearchField`'s own `<label>`, and the chain
      keeps the specificity at (0,2,0), which is what the scoped form compiled to. */
-  :global(.manager-search.manager-scoped-roster-search) {
+  :global(.fabricate-search.manager-scoped-roster-search) {
     flex: 0 0 auto;
     width: 100%;
     min-width: 0;
@@ -264,14 +264,14 @@
   }
 
   /* AND ITS FIELD IS THE CARD'S SIZE, NOT THE TOOLBAR'S: 28px, a published control-height rung. */
-  :global(.manager-search.manager-scoped-roster-search input) {
+  :global(.fabricate-search.manager-scoped-roster-search input) {
     height: 28px;
     min-height: 28px;
   }
 
   /* AND IT IS A WELL WHERE A CALLER ASKS FOR ONE, SELECTED ON A SECOND CLASS rather than the one
      every caller passes — which is how round 4's well landed on two other lanes' catalogues. */
-  :global(.manager-search.manager-scoped-roster-search-well input) {
+  :global(.fabricate-search.manager-scoped-roster-search-well input) {
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     background: var(--fab-bg-1);
@@ -344,7 +344,7 @@
   }
 
   /* THE 34px CONTROL IS WHY THE ~36px ROW TAKES A RULE. Scoped, so no other danger button moves. */
-  .manager-scoped-roster-system :global(.manager-button.is-danger) {
+  .manager-scoped-roster-system :global(.fabricate-button.is-danger) {
     min-height: 26px;
     padding: 0 var(--fab-space-2);
   }
@@ -375,7 +375,7 @@
      scoped compound it can prove unused, but not one whose only failing part is `:global()`, so
      this would have compiled clean. The pager is a BORDERED ROW (`proto:2037`), and the `border`
      SHORTHAND is what removes the shipped `border-top`. */
-  .manager-scoped-roster-card > :global(.manager-pagination) {
+  .manager-scoped-roster-card > :global(.fabricate-pagination) {
     flex: 0 0 auto;
     flex-wrap: nowrap;
     gap: var(--fab-space-2);
@@ -393,7 +393,7 @@
     white-space: nowrap;
   }
 
-  .manager-scoped-roster :global(.manager-pagination-nav .manager-icon-button) {
+  .manager-scoped-roster :global(.manager-pagination-nav .fabricate-icon-button) {
     width: 24px;
     height: 24px;
     min-height: 24px;

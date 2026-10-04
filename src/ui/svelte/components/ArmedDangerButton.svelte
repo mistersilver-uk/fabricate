@@ -22,10 +22,10 @@
 
   Invariants:
   - It is a real `<button type="button">`, and it WRITES THE FAMILY ROOT, `fabricate-button`, FIRST:
-    it is a consumer of the `manager-button`
+    it is a consumer of the `fabricate-button`
     CSS contract rather than of `Button.svelte` — a deferral
-    `tests/manager-button-source-contract.test.js` pins — and a carrier spelling `manager-button`
-    without the root matches nothing in the family. It is shared without being a family root of its
+    `tests/manager-button-source-contract.test.js` pins — and a carrier without that root matches
+    nothing in the family. It is shared without being a family root of its
     own, which `openspec/specs/design-system/spec.md` admits.
   - It does NOT emit `data-keyboard-focus`, so it still lets Foundry's Space and arrow bindings fire
     while it holds focus. Adding it is a real behaviour change; its row stays in the formless-button
@@ -112,7 +112,7 @@
 <button
   bind:this={element}
   type="button"
-  class="fabricate-button manager-button is-danger"
+  class="fabricate-button is-danger"
   class:is-armed={armed}
   data-armed={armed ? 'true' : 'false'}
   data-busy={inFlight ? 'true' : 'false'}

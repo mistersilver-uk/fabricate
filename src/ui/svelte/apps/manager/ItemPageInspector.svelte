@@ -386,9 +386,9 @@
      This half of the sweep was the LOUD one — the component spreads no attributes onto a regular
      element, so the compiler pruned the descendant rule and `lint:svelte:warnings` named it. The
      bare rule beside it did NOT warn and was equally dead, so both are repaired.
-     `.manager-inspector-card` is chained rather than left off so the selector stays at (0,2,0),
+     `.fabricate-card` is chained rather than left off so the selector stays at (0,2,0),
      exactly where the scoped form put it. */
-  :global(.manager-inspector-card.manager-books-scrolls-quick-limits) {
+  :global(.fabricate-card.manager-books-scrolls-quick-limits) {
     margin: 0;
   }
 
@@ -399,7 +399,7 @@
      and the compiler emits a bare `.svelte-<hash>` instead, taking the rule from (0,3,0) to
      (0,4,0). Measured, not assumed. Inside the `:global()` it stays at (0,3,0), and the ancestor
      compound is written by nothing but this component, so the match set is unchanged. */
-  :global(.manager-inspector-card.manager-books-scrolls-quick-limits .manager-rule-row) {
+  :global(.fabricate-card.manager-books-scrolls-quick-limits .manager-rule-row) {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -416,7 +416,9 @@
      bare `:global(.manager-books-scrolls-edit-action)` would be (0,1,0); naming the ancestor
      and both primitive classes puts all three declarations at (0,4,0), which is decided by
      specificity rather than by which sheet the browser loaded last. */
-  :global(.fabricate-manager .manager-button.fab-manager-button.manager-books-scrolls-edit-action) {
+  :global(
+    .fabricate-manager .fabricate-button.fab-manager-button.manager-books-scrolls-edit-action
+  ) {
     width: 100%;
     justify-content: center;
     margin-top: auto;

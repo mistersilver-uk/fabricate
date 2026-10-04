@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 
 const PRIMARY_SELECTOR = [
-  '.manager-button.is-primary',
+  '.fabricate-button.is-primary',
   'button.is-primary',
   '[data-crafting-craft]:not(.is-ghost)',
   '[data-gathering-attempt]',

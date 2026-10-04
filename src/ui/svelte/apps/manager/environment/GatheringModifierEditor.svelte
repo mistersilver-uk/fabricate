@@ -124,7 +124,7 @@
   {@const pickerSelection = modifierPickerSelection(kind)}
   {@const attachedModifiers = gatheringConditionModifierRows(row, kind)}
   <section
-    class="fabricate-card manager-inspector-card manager-drop-editor-condition-modifier-card"
+    class="fabricate-card manager-drop-editor-condition-modifier-card"
     {...hook('conditionModifiers', kind)}
   >
     <header class="manager-character-modifier-row-card-header">
@@ -134,7 +134,7 @@
       </div>
     </header>
     <div class="manager-condition-modifier-add-row" {...hook('conditionModifierPicker', kind)}>
-      <label class="fabricate-field manager-field manager-condition-modifier-picker">
+      <label class="fabricate-field manager-condition-modifier-picker">
         <span class="visually-hidden"
           >{text(
             'FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel',
@@ -159,7 +159,7 @@
       </label>
       <button
         type="button"
-        class="fabricate-icon-button manager-icon-button"
+        class="fabricate-icon-button"
         aria-label={text(
           'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
           'Add modifier'
@@ -221,7 +221,7 @@
             </label>
             <button
               type="button"
-              class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
+              class="fabricate-icon-button is-danger manager-character-modifier-row-reference-delete"
               aria-label={text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
                 'Delete modifier'
@@ -249,10 +249,7 @@
   </section>
 {/each}
 
-<section
-  class="fabricate-card manager-inspector-card manager-character-modifier-row-card"
-  {...hook('characterModifiers')}
->
+<section class="fabricate-card manager-character-modifier-row-card" {...hook('characterModifiers')}>
   <header class="manager-character-modifier-row-card-header">
     <div class="manager-character-modifier-row-card-heading">
       <h3 class="manager-card-title">
@@ -271,7 +268,7 @@
   </header>
   <div class="manager-character-modifier-add-search-row">
     <label
-      class="fabricate-search manager-search is-compact manager-character-modifier-add-search"
+      class="fabricate-search is-compact manager-character-modifier-add-search"
       {...hook('characterModifierSearch')}
     >
       <i class="fas fa-search" aria-hidden="true"></i>
@@ -370,7 +367,7 @@
           </label>
           <button
             type="button"
-            class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
+            class="fabricate-icon-button is-danger manager-character-modifier-row-reference-delete"
             aria-label={text(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
               'Delete character modifier reference'
@@ -388,7 +385,7 @@
         <div class="manager-character-modifier-override-row">
           <button
             type="button"
-            class={`fabricate-toggle manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
+            class={`fabricate-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
             aria-pressed={hasOverride}
             aria-label={text(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
@@ -420,7 +417,7 @@
             )}
           </p>
           <label
-            class="fabricate-field manager-field"
+            class="fabricate-field"
             for={`${idPrefix}-character-modifier-${ref.id}-expression`}
           >
             <span

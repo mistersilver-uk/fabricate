@@ -475,7 +475,7 @@ export default {
         if (
           (await page
             .locator(
-              '.fabricate-manager .manager-section-header .manager-button:has-text("Import")'
+              '.fabricate-manager .manager-section-header .fabricate-button:has-text("Import")'
             )
             .count()) > 0
         ) {
@@ -484,7 +484,7 @@ export default {
         if (
           (await page
             .locator(
-              '.fabricate-manager .manager-section-header .manager-button:has-text("Create")'
+              '.fabricate-manager .manager-section-header .fabricate-button:has-text("Create")'
             )
             .count()) > 0
         ) {

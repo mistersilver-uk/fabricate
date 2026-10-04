@@ -1,4 +1,4 @@
-/** The END STATE of the `.manager-toolbar` and `.manager-search` conversions (issue 1039). */
+/** The END STATE of the `.fabricate-filter-bar` and `.fabricate-search` conversions (issue 1039). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -10,7 +10,7 @@ const FIELD_PATH = 'src/ui/svelte/components/SearchField.svelte';
 /** The bar has NO allowlist, and the empty array is the claim rather than an omission. */
 const RAW_TOOLBAR_ALLOWLIST = Object.freeze([]);
 
-/** The two `.manager-search` sites that are not this primitive, with their exact counts. */
+/** The two `.fabricate-search` sites that are not this primitive, with their exact counts. */
 const RAW_SEARCH_ALLOWLIST = Object.freeze([
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
@@ -64,26 +64,26 @@ function detectorSource({ contract, prefixed, tag }) {
 }
 
 const toolbar = definePrimitiveAdoptionContract({
-  label: 'manager-toolbar',
+  label: 'fabricate-filter-bar',
   tag: 'FilterBar',
   primitive: TOOLBAR_PATH,
-  contractClass: 'manager-toolbar',
+  contractClass: 'fabricate-filter-bar',
   allowlist: RAW_TOOLBAR_ALLOWLIST,
   // 11 sites in 11 components as this lands. 8 is a real floor with headroom.
   callSiteFloor: 8,
   fileFloor: 8,
   detectorFixture: {
     source: detectorSource({
-      contract: 'manager-toolbar',
+      contract: 'fabricate-filter-bar',
       prefixed: 'manager-toolbar-pills',
       tag: 'FilterBar',
     }),
     expected: 2,
-    lowered: ['<section class="manager-toolbar">', '<section class="manager-bar">'],
+    lowered: ['<section class="fabricate-filter-bar">', '<section class="manager-bar">'],
     loweredExpected: 1,
   },
   rawRemedy:
-    'these components hand-roll the `.manager-toolbar` bar that ' +
+    'these components hand-roll the `.fabricate-filter-bar` bar that ' +
     '`src/ui/svelte/components/FilterBar.svelte` owns. Render `<FilterBar ' +
     'ariaLabel={…}>` instead — a per-site modifier travels as a pass-through on the `class` ' +
     'prop, the row `<div>` stays at the call site because `BulkSelectionToolbar` renders its ' +
@@ -97,26 +97,26 @@ const toolbar = definePrimitiveAdoptionContract({
 });
 
 const field = definePrimitiveAdoptionContract({
-  label: 'manager-search',
+  label: 'fabricate-search',
   tag: 'SearchField',
   primitive: FIELD_PATH,
-  contractClass: 'manager-search',
+  contractClass: 'fabricate-search',
   allowlist: RAW_SEARCH_ALLOWLIST,
   // 26 sites in 23 components at issue 2157; the floors below keep headroom under that count.
   callSiteFloor: 14,
   fileFloor: 12,
   detectorFixture: {
     source: detectorSource({
-      contract: 'manager-search',
+      contract: 'fabricate-search',
       prefixed: 'manager-search-row',
       tag: 'SearchField',
     }),
     expected: 2,
-    lowered: ['<section class="manager-search">', '<section class="manager-box">'],
+    lowered: ['<section class="fabricate-search">', '<section class="manager-box">'],
     loweredExpected: 1,
   },
   rawRemedy:
-    'these components hand-roll the `.manager-search` pill that ' +
+    'these components hand-roll the `.fabricate-search` pill that ' +
     '`src/ui/svelte/components/SearchField.svelte` owns. Render `<SearchField ' +
     'ariaLabel={…} placeholder={…}>` instead — `density="compact"` emits `is-compact`, a bespoke class ' +
     'travels on `class`, a label hook rides the rest spread and an INPUT hook goes in ' +
@@ -171,8 +171,8 @@ test('no call site restates the class the primitive emits itself', () => {
   // token is emitted twice, and the convention this component exists to close is back.
   const offenders = [];
   for (const [{ tag, sites }, contract] of [
-    [NAMED[0], 'manager-toolbar'],
-    [NAMED[1], 'manager-search'],
+    [NAMED[0], 'fabricate-filter-bar'],
+    [NAMED[1], 'fabricate-search'],
   ]) {
     for (const site of sites) {
       const declared = site.attribute('class');

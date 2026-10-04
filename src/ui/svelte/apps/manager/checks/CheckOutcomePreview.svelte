@@ -121,7 +121,7 @@
     {/if}
 
     <!-- THE STUDIO'S BUTTON PRIMITIVE, not a hand-written class string: a bare
-             `manager-button is-primary` matches no rule stating a type size, so the label lands on
+             `fabricate-button is-primary` matches no rule stating a type size, so the label lands on
              Foundry's inherited app base while every other button reads at the primitive's size —
              the drift `Button` exists to end, and one a remembered class string cannot be
              checked for. A CONVERSION, not a wrapper: the element below is already the button. -->

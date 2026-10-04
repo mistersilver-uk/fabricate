@@ -60,7 +60,7 @@ async function settleAnnouncement() {
 }
 
 const card = (root) => root.querySelector('[data-recipe-bulk-delete-card]');
-const button = (root) => card(root).querySelector('.manager-button.is-danger');
+const button = (root) => card(root).querySelector('.fabricate-button.is-danger');
 const row = (root, key) => card(root).querySelector(`[data-recipe-bulk-impact-row="${key}"]`);
 const live = (root) => card(root).querySelector('[data-recipe-bulk-delete-announce]');
 

@@ -104,7 +104,7 @@
     </div>
   </div>
 {:else if selectedEvent && !editing}
-  <section class="fabricate-card manager-inspector-card" data-gathering-event-inspector>
+  <section class="fabricate-card" data-gathering-event-inspector>
     <div class="manager-inspector-title-row is-hero-large">
       <img
         class="manager-recipe-preview"
@@ -138,7 +138,7 @@
     </p>
   </section>
 
-  <section class="fabricate-card manager-inspector-card">
+  <section class="fabricate-card">
     <h3 class="manager-card-title">
       {text('FABRICATE.Admin.Manager.Environment.Events.Details', 'Event details')}
     </h3>
@@ -184,10 +184,7 @@
     </div>
   </section>
 
-  <section
-    class="fabricate-card manager-inspector-card manager-event-environment-usage-card"
-    data-event-environment-usage
-  >
+  <section class="fabricate-card manager-event-environment-usage-card" data-event-environment-usage>
     <h3 class="manager-card-title">
       {text(
         'FABRICATE.Admin.Manager.Environment.Events.UsedInEnvironmentsCard',

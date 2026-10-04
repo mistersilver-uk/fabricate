@@ -116,9 +116,9 @@ const PRIMITIVES = Object.freeze([
     name: 'ActionMenu',
     components: Object.freeze(['src/ui/svelte/components/ActionMenu.svelte']),
     roots: Object.freeze(['fabricate-action-menu', 'fabricate-action-menu-panel']),
-    family: 'manager-action-menu[\\w-]*',
+    family: 'fabricate-action-menu|manager-action-menu-[\\w-]+',
     anchors: Object.freeze([
-      'manager-action-menu',
+      'fabricate-action-menu',
       'manager-action-menu-panel',
       'manager-action-menu-item',
     ]),
@@ -133,7 +133,6 @@ const PRIMITIVES = Object.freeze([
     familyFloor: 8,
     ownedFloor: 8,
     mirrored: Object.freeze([
-      Object.freeze({ anchor: 'manager-action-menu', root: 'fabricate-action-menu' }),
       Object.freeze({ anchor: 'manager-action-menu-panel', root: 'fabricate-action-menu-panel' }),
     ]),
   }),
@@ -168,8 +167,8 @@ const PRIMITIVES = Object.freeze([
     components: Object.freeze(['src/ui/svelte/components/Button.svelte']),
     roots: Object.freeze(['fabricate-button']),
     // Two exact class names, not a shared prefix.
-    family: 'manager-button|fab-manager-button',
-    anchors: Object.freeze(['manager-button', 'fab-manager-button']),
+    family: 'fabricate-button|fab-manager-button',
+    anchors: Object.freeze(['fabricate-button', 'fab-manager-button']),
     // COMPOSES its family in `const classes = $derived([…])` (`Button.svelte`) rather
     // than in markup — `classesWrittenBy` and the root-emission clause's `attributes` local both
     // read `composedClassRegion` for this entry as well as the (here, empty) markup region.
@@ -179,31 +178,29 @@ const PRIMITIVES = Object.freeze([
     familyFloor: 75,
     ownedFloor: 26,
     mirrored: Object.freeze([
-      Object.freeze({ anchor: 'manager-button', root: 'fabricate-button' }),
+      Object.freeze({ anchor: 'fab-manager-button', root: 'fabricate-button' }),
     ]),
   }),
   Object.freeze({
     name: 'IconButton',
     components: Object.freeze(['src/ui/svelte/components/IconButton.svelte']),
     roots: Object.freeze(['fabricate-icon-button']),
-    family: 'manager-icon-button',
-    anchors: Object.freeze(['manager-icon-button']),
+    family: 'fabricate-icon-button',
+    anchors: Object.freeze(['fabricate-icon-button']),
     composesClasses: true,
     // Measured today: 1 written, 22 family selectors, 15 owned — 5 caller-ancestor exempt.
     writtenFloor: 1,
     familyFloor: 18,
     ownedFloor: 13,
-    mirrored: Object.freeze([
-      Object.freeze({ anchor: 'manager-icon-button', root: 'fabricate-icon-button' }),
-    ]),
+    mirrored: Object.freeze([]),
   }),
   Object.freeze({
     name: 'Pagination',
     components: Object.freeze(['src/ui/svelte/components/Pagination.svelte']),
     roots: Object.freeze(['fabricate-pagination']),
-    family: 'manager-pagination[\\w-]*',
+    family: 'fabricate-pagination|manager-pagination-[\\w-]+',
     anchors: Object.freeze([
-      'manager-pagination',
+      'fabricate-pagination',
       'manager-pagination-summary',
       'manager-pagination-nav',
       'manager-pagination-page',
@@ -213,9 +210,7 @@ const PRIMITIVES = Object.freeze([
     writtenFloor: 4,
     familyFloor: 15,
     ownedFloor: 5,
-    mirrored: Object.freeze([
-      Object.freeze({ anchor: 'manager-pagination', root: 'fabricate-pagination' }),
-    ]),
+    mirrored: Object.freeze([]),
   }),
   Object.freeze({
     // ── THE NINTH ENTRY, AND THE FIRST WHOSE FAMILY IS ITSELF `fabricate-`-PREFIXED (issue 1504).
@@ -285,10 +280,10 @@ const PRIMITIVES = Object.freeze([
     components: Object.freeze(['src/ui/svelte/components/Field.svelte']),
     roots: Object.freeze(['fabricate-field']),
     // One exact class name. `manager-field-error` is a CALLER's class and is deliberately outside
-    // this pattern — `pickerSelectors` anchors on `\.manager-field(?![\w-])`, so a rule naming
+    // this pattern — `pickerSelectors` anchors on `\.fabricate-field(?![\w-])`, so a rule naming
     // it never enters this family and stays caller-owned.
-    family: 'manager-field',
-    anchors: Object.freeze(['manager-field']),
+    family: 'fabricate-field',
+    anchors: Object.freeze(['fabricate-field']),
     // COMPOSES its family in `const classes = $derived([…])` (`Field.svelte`) rather than in
     // markup: the host is a `<svelte:element … class={classes}>`, an identifier the plain
     // extractor cannot read.
@@ -297,7 +292,7 @@ const PRIMITIVES = Object.freeze([
     writtenFloor: 1,
     familyFloor: 24,
     ownedFloor: 8,
-    mirrored: Object.freeze([Object.freeze({ anchor: 'manager-field', root: 'fabricate-field' })]),
+    mirrored: Object.freeze([]),
   }),
   Object.freeze({
     // ── SEARCHFIELD (issue 1508). Owns its own `<input type="search">`.
@@ -305,17 +300,15 @@ const PRIMITIVES = Object.freeze([
     components: Object.freeze(['src/ui/svelte/components/SearchField.svelte']),
     roots: Object.freeze(['fabricate-search']),
     // One exact class name; `manager-tag-search`.
-    family: 'manager-search',
-    anchors: Object.freeze(['manager-search']),
+    family: 'fabricate-search',
+    anchors: Object.freeze(['fabricate-search']),
     // `SIZE_CLASSES` (`is-size-38`) needs no reader.
     composesClasses: true,
     // Measured before this change landed: 1 written, 31 family selectors, 10 owned.
     writtenFloor: 1,
     familyFloor: 27,
     ownedFloor: 6,
-    mirrored: Object.freeze([
-      Object.freeze({ anchor: 'manager-search', root: 'fabricate-search' }),
-    ]),
+    mirrored: Object.freeze([]),
   }),
   Object.freeze({
     // ── FILTERBAR (issue 1508). The manager's filter bar, rooted at the class it emits.
@@ -328,18 +321,16 @@ const PRIMITIVES = Object.freeze([
     roots: Object.freeze(['fabricate-filter-bar']),
     // One exact class name. `manager-toolbar-pills` (`fabricate.css:4194`) and
     // `manager-toolbar-primary` are CALLER classes: `pickerSelectors` anchors on
-    // `\.manager-toolbar(?![\w-])`, so neither enters this family.
-    family: 'manager-toolbar',
-    anchors: Object.freeze(['manager-toolbar']),
+    // `\.fabricate-filter-bar(?![\w-])`, so neither enters this family.
+    family: 'fabricate-filter-bar',
+    anchors: Object.freeze(['fabricate-filter-bar']),
     // COMPOSES its family in `const classes = $derived([…])` rather than in markup.
     composesClasses: true,
     // Measured at this commit: 1 written, 7 family selectors, 1 owned.
     writtenFloor: 1,
     familyFloor: 7,
     ownedFloor: 1,
-    mirrored: Object.freeze([
-      Object.freeze({ anchor: 'manager-toolbar', root: 'fabricate-filter-bar' }),
-    ]),
+    mirrored: Object.freeze([]),
   }),
   Object.freeze({
     // ── INSPECTORCARD (issue 1508). The manager's card shell, rooted at the class it emits.
@@ -347,16 +338,14 @@ const PRIMITIVES = Object.freeze([
     components: Object.freeze(['src/ui/svelte/components/InspectorCard.svelte']),
     roots: Object.freeze(['fabricate-card']),
     // One exact class name. `manager-checks-card`.
-    family: 'manager-inspector-card',
-    anchors: Object.freeze(['manager-inspector-card']),
+    family: 'fabricate-card',
+    anchors: Object.freeze(['fabricate-card']),
     composesClasses: true,
     // Measured at this commit: 1 written, 7 family selectors, 2 owned.
     writtenFloor: 1,
     familyFloor: 6,
     ownedFloor: 1,
-    mirrored: Object.freeze([
-      Object.freeze({ anchor: 'manager-inspector-card', root: 'fabricate-card' }),
-    ]),
+    mirrored: Object.freeze([]),
   }),
   Object.freeze({
     // ── STATUSTOGGLE (issue 1508). The manager's on/off switch, rooted at the class it emits.
@@ -364,9 +353,9 @@ const PRIMITIVES = Object.freeze([
     components: Object.freeze(['src/ui/svelte/components/StatusToggle.svelte']),
     roots: Object.freeze(['fabricate-toggle']),
     // TWO prefixes, because this family really is two.
-    family: 'manager-status-toggle[\\w-]*|manager-tool-setting-toggle[\\w-]*',
+    family: 'fabricate-toggle|manager-status-toggle-[\\w-]+|manager-tool-setting-toggle[\\w-]*',
     anchors: Object.freeze([
-      'manager-status-toggle',
+      'fabricate-toggle',
       'manager-status-toggle-track',
       'manager-status-toggle-knob',
       'manager-status-toggle-label',
@@ -382,7 +371,6 @@ const PRIMITIVES = Object.freeze([
     ownedFloor: 15,
     // TWO anchors, and the second matches ZERO fixtures today — measured.
     mirrored: Object.freeze([
-      Object.freeze({ anchor: 'manager-status-toggle', root: 'fabricate-toggle' }),
       Object.freeze({ anchor: 'manager-tool-setting-toggle', root: 'fabricate-toggle' }),
     ]),
   }),
@@ -628,7 +616,7 @@ const PRIMITIVES = Object.freeze([
     family: 'fabricate-sortable-list[\\w-]*',
     namespacedFamily: true,
     // `IconButton`'s own root, inherited because the grip and rocker rules are compounded on it:
-    // `.fabricate-icon-button.manager-icon-button` is (0,2,0) and pins a 34px box. It is a namespace
+    // `.fabricate-icon-button.fabricate-icon-button` is (0,2,0) and pins a 34px box. It is a namespace
     // root of the primitive this one composes, never an application root.
     inheritedRoots: Object.freeze(['fabricate-icon-button']),
     anchors: Object.freeze([
@@ -914,7 +902,7 @@ function pickerSelectors(written, primitive) {
  * A COMPOUND that names a caller's own container by an application root QUALIFIED BY AN
  * ATTRIBUTE — `.fabricate-manager[data-manager-view='essences']` — rather than by a caller CLASS.
  * Narrow on purpose: an attribute that qualifies the FAMILY's own compound —
- * `.fabricate-button.manager-button.fab-manager-button[data-essence-sort-direction]` — is not an
+ * `.fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]` — is not an
  * application root at all, and this must not fire on it; that selector stays gate-owned and
  * re-rooted like its unattributed siblings.
  *
@@ -928,12 +916,30 @@ function namesCallersOwnContainer(compound, primitive) {
   );
 }
 
+/**
+ * A class ANOTHER entry's namespace owns, and this one's does not: the container of a composing
+ * primitive, which is that primitive's caller-side rule rather than this one's. Issue 1507 gave
+ * nine families their roots as their only class, so `.fabricate-pagination .fabricate-icon-button`
+ * is the pager's rule exactly as its earlier spelling was; it is still an application root by name.
+ */
+const isOtherPrimitiveClass = (cls, primitive) =>
+  !isNamespaceClass(cls, primitive) &&
+  PRIMITIVES.some((entry) => entry !== primitive && isNamespaceClass(cls, entry));
+
+/** The container exemption holds only when no real application root also leads the selector. */
 function isPrimitiveOwned(selector, written, primitive) {
   if (compoundsOf(selector).some((compound) => namesCallersOwnContainer(compound, primitive))) {
     return false;
   }
-  return classesOf(selector)
-    .filter((cls) => !isApplicationRoot(cls, primitive))
+  const classes = classesOf(selector);
+  const appRooted = classes.some(
+    (cls) => isApplicationRoot(cls, primitive) && !isOtherPrimitiveClass(cls, primitive)
+  );
+  return classes
+    .filter(
+      (cls) =>
+        !isApplicationRoot(cls, primitive) || (!appRooted && isOtherPrimitiveClass(cls, primitive))
+    )
     .every((cls) => written.has(cls) || isNamespaceClass(cls, primitive) || cls.startsWith('is-'));
 }
 
@@ -1209,7 +1215,7 @@ test('the composed-class region is read from the actual array literal, not the m
   const managerButton = PRIMITIVES.find((entry) => entry.name === 'Button');
   const managerButtonRegion = composedClassRegion(managerButton.components[0]);
   assert.ok(
-    managerButtonRegion.includes("'manager-button'") &&
+    managerButtonRegion.includes("'fabricate-button'") &&
       managerButtonRegion.includes("'fab-manager-button'"),
     `${managerButton.components[0]}'s composed-class array no longer contains the literals ` +
       '`classesWrittenBy` reads for Button, so a reader that stops finding the array ' +
@@ -1219,7 +1225,7 @@ test('the composed-class region is read from the actual array literal, not the m
   const iconButton = PRIMITIVES.find((entry) => entry.name === 'IconButton');
   const iconButtonRegion = composedClassRegion(iconButton.components[0]);
   assert.ok(
-    iconButtonRegion.includes("'manager-icon-button'"),
+    iconButtonRegion.includes("'fabricate-icon-button'"),
     `${iconButton.components[0]}'s composed-class array no longer contains the literal ` +
       '`classesWrittenBy` reads for IconButton, so a reader that stops finding the array would ' +
       'examine an empty family instead of reporting the regression'
@@ -1283,26 +1289,23 @@ test('the class-map reader is what puts the per-host class in the family, and it
   );
 
   const family = (entry, written) => pickerSelectors(written, entry);
-  const lost = family(toggle, withMap).filter(
-    (selector) => !family(withoutMap, without).includes(selector)
-  );
-  assert.deepEqual(
-    lost.sort(),
-    ['.fabricate-toggle.manager-tool-setting-toggle'],
-    'dropping the class map must take the checkbox host`s own 34px box out of the family ' +
-      'altogether — that selector names no other class this primitive writes, so without the ' +
-      'reader nothing in this file examines it at all'
-  );
 
-  // AND THE OWNERSHIP HALF: the `:has()` ring stays IN the family without the map (it enters
-  // through `-toggle-input`) but is judged CALLER-owned there, because the host class it also
-  // names is not in `written`. Two rules unexamined, by two different mechanisms, from one
+  // THE OWNERSHIP HALF. The checkbox host`s own 34px box and the `:has()` ring on it both stay IN
+  // the family without the map — the box through the root, which since issue 1507 is the switch`s
+  // only class, and the ring through `-toggle-input` — but both are judged CALLER-owned there,
+  // because the host class they also name is not in `written`. Two rules unexamined, from one
   // missing reader.
   const ownedWith = family(toggle, withMap).filter((selector) =>
     isPrimitiveOwned(selector, withMap, toggle)
   );
   const ownedWithout = family(withoutMap, without).filter((selector) =>
     isPrimitiveOwned(selector, without, withoutMap)
+  );
+  assert.ok(
+    ownedWith.includes('.fabricate-toggle.manager-tool-setting-toggle') &&
+      !ownedWithout.includes('.fabricate-toggle.manager-tool-setting-toggle'),
+    'dropping the class map must take the checkbox host`s own 34px box out of the owned set, ' +
+      'or this file never examines where that rule is rooted'
   );
   assert.equal(
     ownedWith.length - ownedWithout.length,
@@ -1479,7 +1482,7 @@ test('the status card`s root stays off every rule the switch owns', () => {
     [],
     'a selector names both `ToggleCard`s family and `StatusToggle`s. The switch is COMPOSED, so ' +
       'its chrome is its own primitive`s: a rule rooted at `.fabricate-toggle-card` that reaches ' +
-      'a `manager-status-toggle*` class is gated on the Toggle entry, because that root is an ' +
+      'a `fabricate-toggle*` class is gated on the Toggle entry, because that root is an ' +
       'APPLICATION root by name to it. Deepen the override at the card`s own root instead.'
   );
 
@@ -1516,7 +1519,7 @@ test('the application-root-attribute clause names a caller’s own container', (
   const pagination = PRIMITIVES.find((entry) => entry.name === 'Pagination');
 
   // FIRES: an application root qualified by a per-view attribute is a caller's own container,
-  // exactly like the four shipped `[data-manager-view=…] .manager-pagination` overrides.
+  // exactly like the four shipped `[data-manager-view=…] .fabricate-pagination` overrides.
   assert.ok(
     namesCallersOwnContainer(".fabricate-manager[data-manager-view='world-essences']", pagination),
     'the clause no longer fires on an application root qualified by a per-view attribute, so the ' +
@@ -1528,7 +1531,7 @@ test('the application-root-attribute clause names a caller’s own container', (
   // family compound, which must stay gate-owned and re-rooted like its unattributed siblings.
   assert.ok(
     !namesCallersOwnContainer(
-      '.fabricate-button.manager-button.fab-manager-button[data-essence-sort-direction]',
+      '.fabricate-button.fabricate-button.fab-manager-button[data-essence-sort-direction]',
       managerButton
     ),
     'the clause fires on an attribute that qualifies the family’s own compound rather than an ' +
@@ -1553,10 +1556,32 @@ test('the application-root-attribute clause names a caller’s own container', (
     callerContainerSelectors.length >= 4,
     `only ${callerContainerSelectors.length} Pagination selectors were recognised by the ` +
       'application-root-attribute clause, against a floor of 4 — the `[data-manager-view=…] ' +
-      '.manager-pagination` overrides, of which the sheet holds six today. A lower number means ' +
+      '.fabricate-pagination` overrides, of which the sheet holds six today. A lower number means ' +
       'the clause has stopped recognising ' +
       'them and they would wrongly enter the owned set below.'
   );
+});
+
+test('another entry’s root is a caller container only when no application root leads', () => {
+  const owns = (name, selector) => {
+    const primitive = PRIMITIVES.find((entry) => entry.name === name);
+    return isPrimitiveOwned(selector, classesWrittenBy(primitive), primitive);
+  };
+  assert.ok(
+    !owns('IconButton', '.fabricate-pagination .fabricate-icon-button'),
+    'the pager’s rule over the button it composes is read as IconButton’s own, so the gate would ' +
+      'demand the pager drop its root from its own rule'
+  );
+  for (const [name, selector] of [
+    ['Button', '.fabricate-manager .fabricate-card .fabricate-button.fab-manager-button'],
+    ['StatusToggle', '.fabricate-manager .fabricate-sortable-list .fabricate-toggle'],
+  ]) {
+    assert.ok(
+      owns(name, selector),
+      `\`${selector}\` leads with \`fabricate-manager\`, yet the composing primitive’s class ` +
+        `exempts it, so the gated clause never sees a rule that paints ${name} only in the manager`
+    );
+  }
 });
 
 test('every rule a primitive owns is rooted at the primitive, not at an application', () => {
@@ -1622,26 +1647,6 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
       'fixture depict a converted site and the discrimination clause would pass vacuously.',
   }),
   Object.freeze({
-    file: 'tests/components/field-source-contract.test.js',
-    primitive: 'Field',
-    attributeCount: 2,
-    elementCount: 2,
-    why:
-      'the raw-site detector fixtures, which exist to prove the contract finds a hand-written ' +
-      '`class="manager-field"` that never went through `<Field>`. Namespacing them would make ' +
-      'them depict a CONVERTED site and the detector clause would pass vacuously.',
-  }),
-  Object.freeze({
-    file: 'tests/components/manager-filter-bar-source-contract.test.js',
-    primitive: 'SearchField',
-    attributeCount: 1,
-    elementCount: 1,
-    why:
-      'the raw-site detector fixture for the search half of the filter-bar contract, for the same ' +
-      'reason: it depicts an unconverted `class="manager-search"` on purpose. Keyed by ' +
-      '`file|primitive` because this one file holds a second family\'s detector too.',
-  }),
-  Object.freeze({
     file: 'tests/components/editor-tabs-adoption-contract.test.js',
     primitive: 'EditorTabs',
     attributeCount: 1,
@@ -1653,17 +1658,6 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
       'token is deliberately NOT, and the lowered probe — and namespacing any of them would make ' +
       'the fixture depict a CONVERTED site, at which point the contract counts 0 raw sites and ' +
       'passes over a tree that could have any number.',
-  }),
-  Object.freeze({
-    file: 'tests/components/manager-filter-bar-source-contract.test.js',
-    primitive: 'FilterBar',
-    attributeCount: 1,
-    elementCount: 1,
-    why:
-      'the raw-site detector fixture for the BAR half of the same file, which depicts an ' +
-      'unconverted `class="manager-toolbar"` on purpose. This is the second of the two entries ' +
-      'that made the ledger `file|primitive` rather than `file`: one file, two families, two ' +
-      'independently counted detector fixtures.',
   }),
 ]);
 
@@ -1773,10 +1767,11 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   }
 
   assert.ok(
-    attributes >= 182,
+    attributes >= 131,
     `only ${attributes} fixture class attributes copy a primitive's root markup, against a floor ` +
-      'of 182. A lower number means the scan is not reading the fixtures and the assertion below ' +
-      'holds over nothing. RE-MEASURED at issue 1509 phase 4: 203 today, against the 195 before ' +
+      'of 131. A lower number means the scan is not reading the fixtures and the assertion below ' +
+      'holds over nothing. RE-MEASURED at issue 1507: 146 today. At issue 1509 phase 4: 203, ' +
+      'against the 195 before ' +
       '`ToggleCard` and `ItemDropZone` joined the array. EIGHT arrived and NOT ONE of them was ' +
       'already in the tree: both families had a fixture population of ZERO in this clause and in ' +
       'the ancestry clause alike before this change — measured, and published as the answer ' +

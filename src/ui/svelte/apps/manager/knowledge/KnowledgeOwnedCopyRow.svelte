@@ -6,7 +6,7 @@
   - Only `spent` disables Expend — `inert` does not gate the craft path, so refusing here would apply
     a gate the engine does not. An UNCAPPED copy disables it too: expending would write nothing.
   - The spent-row dim is scoped to the identity/meta column and MUST NOT reach the action cluster,
-    where `.manager-button:disabled`'s own `opacity: 0.62` would composite it to ~0.38.
+    where `.fabricate-button:disabled`'s own `opacity: 0.62` would composite it to ~0.38.
 
   Props: copy, armedToken (the surface's single armed token), onExpend, onDelete, onArm, onDisarm.
 -->

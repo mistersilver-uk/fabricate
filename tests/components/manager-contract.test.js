@@ -712,7 +712,7 @@ describe('CraftingSystemManager source contract', () => {
   // Same-named systems are disambiguated through the shared helper (issue 346). The rows, their
   // identity buttons and the status switch are driven by the mounted systems and rail cases.
   // `<StatusToggle`, not the class literal (issue 1040): the row's switch renders through the
-  // shared primitive, which is the only thing under `src/` that writes `manager-status-toggle`,
+  // shared primitive, which is the only thing under `src/` that writes `fabricate-toggle`,
   // so a search for the class would read 0 while the control is present and correct.
   defineStructureContract('disambiguates same-named systems in the library', SYSTEMS_BROWSER, {
     declaresProp: ['systemsLoading', 'onToggleSystemEnabled'],
@@ -1621,7 +1621,7 @@ describe('CraftingSystemManager source contract', () => {
       'https://mistersilver-uk.github.io/fabricate/crafting/recipes/',
     ],
     spellsExactly: ['FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'],
-    spellsNo: ['manager-inspector-card', 'Recipe.Details'],
+    spellsNo: ['fabricate-card', 'Recipe.Details'],
   });
 
   // Both routes into the editor, and the two header actions that are not on this header.
@@ -1769,6 +1769,11 @@ describe('CraftingSystemManager source contract', () => {
   // The per-system condition shortcut card moved with the systems inspector chain (issue 1721).
   defineStructureContract('draws the global condition shortcuts', SYSTEM_BROWSER_INSPECTOR, {
     names: ['selectedGatheringConditionShortcuts'],
+    // A hand-written card, so the recipe inspector's `spellsNo` card shell reads a token the
+    // reader can find. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
+    spells: ['fabricate-card'],
     calls: ['buildSelectedGatheringConditionShortcuts'],
     writes: ['data-systems-gathering-conditions', 'data-systems-gathering-condition'],
   });

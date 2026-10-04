@@ -548,8 +548,8 @@
 
   /* `:global()` AND CHAINED (issue 1427's rule): this class sits on an `<InspectorCard>` tag, so
      Svelte stamps no hash onto it and prunes the local selector, which `lint:svelte:warnings`
-     fails on. `.manager-inspector-card` is chained for the specificity the hash carried. */
-  :global(.manager-inspector-card.manager-world-tool-break-card) {
+     fails on. `.fabricate-card` is chained for the specificity the hash carried. */
+  :global(.fabricate-card.manager-world-tool-break-card) {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);

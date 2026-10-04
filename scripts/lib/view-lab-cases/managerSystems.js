@@ -19,7 +19,7 @@ export const CASES = Object.freeze([
       { selector: '.manager-recipe-row .manager-recipe-identity' },
       { selector: '.manager-recipe-group [data-group-header]' },
       { selector: '.manager-recipe-browser-inspector [data-recipe-action="edit"]' },
-      { selector: '.manager-header-actions .manager-button.is-ghost' },
+      { selector: '.manager-header-actions .fabricate-button.is-ghost' },
     ],
     expectView: 'recipes',
     kinds: ['manager', 'recipes'],
@@ -56,7 +56,7 @@ export const CASES = Object.freeze([
     steps: [
       {
         selector:
-          '.manager-system-row[data-system-id="lab-smithing"] .manager-icon-button[aria-haspopup="menu"]',
+          '.manager-system-row[data-system-id="lab-smithing"] .fabricate-icon-button[aria-haspopup="menu"]',
       },
     ],
     expectView: 'systems',

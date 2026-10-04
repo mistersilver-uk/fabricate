@@ -144,7 +144,7 @@ export const CASES = Object.freeze([
     expectView: 'essences',
     // The frame must show the live action, not the inert one.
     expectSelector:
-      '.fabricate-manager [data-essence-bulk-delete-card] .manager-button.is-danger:not([disabled])',
+      '.fabricate-manager [data-essence-bulk-delete-card] .fabricate-button.is-danger:not([disabled])',
     kinds: ['manager', 'essences'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
@@ -188,7 +188,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
     ],
     expectView: 'essence-edit',
     kinds: ['manager', 'essences'],
@@ -213,7 +213,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
       { selector: '[data-scoped-copy-rules]', scroll: true },
     ],
     expectView: 'essence-edit',
@@ -239,7 +239,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
       { selector: '[data-essence-tab="validation"]' },
     ],
     expectView: 'essence-edit',

@@ -58,7 +58,7 @@ describe('ComponentInventoryColumn (mounted)', () => {
       onSearch: (value) => calls.push(value)
     });
     const input = target.querySelector('.alchemy-inventory-search input');
-    assert.ok(input.closest('.fabricate-search.manager-search'), 'the shared search field');
+    assert.ok(input.closest('.fabricate-search'), 'the shared search field');
     assert.ok(input, 'the search input renders');
     input.value = 'ash';
     input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
@@ -154,7 +154,7 @@ describe('KnownRecipesColumn (mounted)', () => {
       },
     });
     const input = target.querySelector(':scope .alchemy-known-search input');
-    assert.ok(input.closest('.fabricate-search.manager-search'));
+    assert.ok(input.closest('.fabricate-search'));
     input.value = 'vig';
     input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
     assert.deepEqual(calls, ['vig']);

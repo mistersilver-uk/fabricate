@@ -648,7 +648,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
     });
 
     const cards = [...target.querySelectorAll('.crafting-shopping-card')];
-    assert.ok(cards.every((card) => card.matches('section.fabricate-card.manager-inspector-card')));
+    assert.ok(cards.every((card) => card.matches('section.fabricate-card')));
     assert.ok(target.querySelector('.crafting-shopping-clear.fab-manager-button.is-ghost'));
     const kickers = [...target.querySelectorAll('.crafting-shopping-card .fab-kicker')];
     assert.equal(

@@ -686,11 +686,11 @@
      `VIEW_RECIPES` maps a change to the tool views alone. The first row's box is `FilterBar`'s,
      which states the wrap, centring and gap for every browse screen; what remains is the grow. */
 
-  /* `:global()` on the FIELD half only (issue 1039): `.manager-search` sits on a
+  /* `:global()` on the FIELD half only (issue 1039): `.fabricate-search` sits on a
      `<SearchField>` tag rather than an element this component writes, so Svelte stamps no
      `svelte-<hash>` and prunes the whole selector, failing `lint:svelte:warnings`. The ANCESTOR half
      stays local, keeping the same three components of specificity. */
-  [data-manager-tools-search] :global(.manager-search) {
+  [data-manager-tools-search] :global(.fabricate-search) {
     flex: 1 1 150px;
     min-width: 0;
   }

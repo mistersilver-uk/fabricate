@@ -57,7 +57,7 @@ function bodiesOf(selector) {
 }
 
 describe('M12a — a manager button takes the corner its height is on', () => {
-  const PRIMITIVE = '.fabricate-button.manager-button.fab-manager-button';
+  const PRIMITIVE = '.fabricate-button.fabricate-button.fab-manager-button';
 
   it('publishes both ladders, so the numbers below are read and not restated', () => {
     // Non-vacuity for the whole file.
@@ -86,7 +86,7 @@ describe('M12a — a manager button takes the corner its height is on', () => {
     // The negative control. If the base rule had been edited instead.
     const base = rules().find(
       (rule) =>
-        rule.selector === '.fabricate-button.manager-button, .fabricate-icon-button.manager-icon-button'
+        rule.selector === '.fabricate-button.fabricate-button, .fabricate-icon-button.fabricate-icon-button'
     );
     assert.ok(base, 'the shared base control rule is still spelled as one selector list');
     assert.equal(pixels(valueOf(base.body, 'border-radius')), 6, 'the base control is still on 6px');
@@ -141,8 +141,8 @@ describe('M12a — a manager button takes the corner its height is on', () => {
       convertedButtonsBelowTheBand().map((entry) => [entry.selector, entry])
     );
     for (const selector of [
-      '.fabricate-button.manager-button.fab-manager-button.manager-clear-filters',
-      '.fabricate-manager .manager-drop-inspector-stack .manager-button.fab-manager-button'
+      '.fabricate-button.fabricate-button.fab-manager-button.manager-clear-filters',
+      '.fabricate-manager .manager-drop-inspector-stack .fabricate-button.fab-manager-button'
     ]) {
       const entry = bySelector.get(selector);
       assert.ok(entry, `\`${selector}\` is still a converted button below the band`);
@@ -176,7 +176,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   });
   after(() => harness.teardown());
 
-  const fieldRule = '.fabricate-search.manager-search.is-size-38 input';
+  const fieldRule = '.fabricate-search.fabricate-search.is-size-38 input';
   // The converted select triggers' opt-in: the scoped catalogue's lead row and the component
   // toolbar's two filters, one member per host bar.
   const triggerRule =
@@ -208,7 +208,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
 
   it('and the shipped controls it overrides are still 34px, so the opt-in is a real change', () => {
     // Non-vacuity again, and a specificity claim.
-    assert.equal(pixels(valueOf(bodiesOf('.fabricate-search.manager-search input')[0], 'height')), 34);
+    assert.equal(pixels(valueOf(bodiesOf('.fabricate-search.fabricate-search input')[0], 'height')), 34);
     // The scoped catalogue's own shipped 34 is the `<Select>`'s `toolbar` rung since issue 1504,
     // not the narrowed `.manager-scoped-list-toolbar select` rule — that one paints the one
     // route still rendering a native select there, and this row's controls are triggers now.
@@ -232,7 +232,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
     // THIS EQUALITY IS ALSO THE FAMILY'S ROOT-EMISSION PROOF ON THE RENDERED DOM (issue 1508).
     assert.equal(
       root.querySelector('label').className.replace(/ ?svelte-[a-z0-9]+/g, ''),
-      'fabricate-search manager-search',
+      'fabricate-search',
       'a field that does not ask for a rung is the family root plus the hook class and nothing else'
     );
     harness.remount();
@@ -246,7 +246,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
     });
     assert.equal(
       root.querySelector('label').className.replace(/ ?svelte-[a-z0-9]+/g, ''),
-      'fabricate-search manager-search is-compact is-size-38 manager-access-roster-search',
+      'fabricate-search is-compact is-size-38 manager-access-roster-search',
       'the family root leads, then the hook class, then the rung between the density and the caller class, which is where every hand-rolled site already writes its own extra'
     );
     harness.remount();
@@ -266,7 +266,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   it('names the class as a LITERAL, so the dead-rule gate can see a customer for the sheet rule', () => {
     // `scripts/lib/stylesheetLiveClasses.js` never widens an `is-`/`has-` class through a
     // positional wildcard, so a class this component only ever BUILT from a template would leave
-    // `.manager-search.is-size-38 input` looking like a rule with no caller.
+    // `.fabricate-search.is-size-38 input` looking like a rule with no caller.
     const source = readFileSync(resolve(repoRoot, FIELD), 'utf8');
     const script = source.slice(source.indexOf('<script>'), source.indexOf('</script>'));
     assert.match(script, /'is-size-38'/, 'the class is written out, not composed');
@@ -274,7 +274,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
 
   // ── THE BUTTON TAKES THE SAME RUNG, AND THE SAME TOKEN (issue 1371, round 6) ───────────────
   const BUTTON = 'src/ui/svelte/components/Button.svelte';
-  const buttonRule = '.fabricate-button.manager-button.fab-manager-button.is-size-38';
+  const buttonRule = '.fabricate-button.fabricate-button.fab-manager-button.is-size-38';
 
   it('gives the button the rung and NOT a second corner, because 34 and 38 share one', () => {
     const [body] = bodiesOf(buttonRule);
@@ -287,7 +287,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
       null,
       'the rung restates a corner the primitive already declares for this whole band'
     );
-    const [primitive] = bodiesOf('.fabricate-button.manager-button.fab-manager-button');
+    const [primitive] = bodiesOf('.fabricate-button.fabricate-button.fab-manager-button');
     assert.equal(
       pixels(valueOf(primitive, 'border-radius')),
       9,
@@ -300,7 +300,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   });
 
   it('and the shipped button it overrides is still 34px, so the opt-in is a real change', () => {
-    const [primitive] = bodiesOf('.fabricate-button.manager-button.fab-manager-button');
+    const [primitive] = bodiesOf('.fabricate-button.fabricate-button.fab-manager-button');
     assert.equal(pixels(valueOf(primitive, 'min-height')), 34);
     // A specificity claim, not a source-order one.
     assert.equal((buttonRule.match(/\.[\w-]+/g) ?? []).length, 4);
@@ -368,7 +368,7 @@ describe('M12a — the inspector rail’s action button takes the corner its hei
 
 describe('epic 1997 — the banded Modal frame and the Select glyph (rulings 2026-09-28)', () => {
   it('pins the rung rule the close takes: IconButton’s 26px square in the module sheet', () => {
-    const [box] = bodiesOf('.fabricate-icon-button.manager-icon-button.is-size-26');
+    const [box] = bodiesOf('.fabricate-icon-button.fabricate-icon-button.is-size-26');
     for (const property of ['width', 'height', 'min-width', 'min-height']) {
       assert.equal(pixels(valueOf(box, property)), 26, `the rung states a 26px ${property}`);
     }

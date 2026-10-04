@@ -65,7 +65,7 @@ function shortWindowRailMarkup(navItems) {
           <nav class="manager-nav">${items}</nav>
         </aside>
         <main class="manager-main"><div class="manager-table-scroll">Rows</div></main>
-        <aside class="manager-inspector"><section class="fabricate-card manager-inspector-card">Inspector</section></aside>
+        <aside class="manager-inspector"><section class="fabricate-card">Inspector</section></aside>
       </div>
     </div>`;
 }
@@ -157,18 +157,18 @@ function elementForCompound(compound) {
 }
 
 /**
- * The ancestor chain a manager-button selector names, or `null` when it names none.
+ * The ancestor chain a fabricate-button selector names, or `null` when it names none.
  *
  * @param {string} selector one selector from a rule's prelude
  * @returns {{id: string, root: object, chain: Array<object>}|null|'unmaterializable'}
  */
 function ancestorContextIn(selector) {
   const one = selector.trim().replaceAll(/\s+/g, ' ');
-  if (!one.includes('.manager-button')) return null;
+  if (!one.includes('.fabricate-button')) return null;
   // A comma inside `:is(…)`/`:not(…)` would have been split by the caller.
   if ((one.match(/\(/g) || []).length !== (one.match(/\)/g) || []).length) return null;
   const compounds = one.split(/\s*>\s*|\s+/).filter(Boolean);
-  if (!compounds.at(-1).includes('.manager-button')) return null;
+  if (!compounds.at(-1).includes('.fabricate-button')) return null;
   const ancestors = compounds.slice(1, -1);
   if (ancestors.length === 0) return null;
   if (/[+~]/.test(one)) return 'unmaterializable';

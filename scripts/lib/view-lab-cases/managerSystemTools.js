@@ -236,7 +236,7 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-manager-tools-search]',
-        target: '[data-manager-tools-search] .manager-toolbar',
+        target: '[data-manager-tools-search] .fabricate-filter-bar',
       },
     ],
     position: { width: 1280, height: 720 },
@@ -281,7 +281,7 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-manager-tools-search]',
-        target: '[data-manager-tools-search] .manager-toolbar',
+        target: '[data-manager-tools-search] .fabricate-filter-bar',
       },
     ],
     expectCenterHit: '.manager-tools-sort-direction',

@@ -323,7 +323,7 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
       // Spliced before the LAST `</div></section>`, which closes the dock and the panel.
       const dockClose = rendered.markup.lastIndexOf('</div></section>');
       const probe =
-        '<div class="fab-bulk-inset-danger-probe"><button type="button" class="manager-button is-danger" data-danger-probe=""><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Remove 2 components from The Herbalist\u{2019}s Compendium of Forgotten Remedies and Sundries…</span></button></div>';
+        '<div class="fab-bulk-inset-danger-probe"><button type="button" class="fabricate-button is-danger" data-danger-probe=""><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Remove 2 components from The Herbalist\u{2019}s Compendium of Forgotten Remedies and Sundries…</span></button></div>';
       // AND THE DOCK IS GIVEN ITS FOOT COLUMN (`has-foot`).
       const markupWithFoot = (
         dockClose === -1

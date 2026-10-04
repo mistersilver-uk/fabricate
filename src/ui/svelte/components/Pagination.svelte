@@ -14,7 +14,7 @@
   | `density` | `'default'` \| `'compact'` | `'default'` | `compact` keeps a browse rail's bar on one row; the full page sentence stays in the accessibility tree. |
 
   Invariants:
-  - THE ROOT `<section>` CARRIES `fabricate-pagination` AHEAD OF `manager-pagination`, written inline
+  - THE ROOT `<section>` CARRIES `fabricate-pagination`, written inline
     because this component composes nothing. THE `<nav>` IS NOT THE ROOT: the descendant rules
     resolve through the `<section>`, so a root there would leave the summary and per-page label
     unpainted. The family declares its own focus pair for the BUTTONS it contains, buttons only,
@@ -84,7 +84,7 @@
 
 {#if showPagination}
   <section
-    class="fabricate-pagination manager-pagination"
+    class="fabricate-pagination"
     class:is-compact={compact}
     data-pagination-compact={compact || undefined}
     aria-label={ariaLabel || text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}

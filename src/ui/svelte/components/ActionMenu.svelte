@@ -173,7 +173,7 @@
 </script>
 
 <div
-  class="fabricate-action-menu manager-action-menu"
+  class="fabricate-action-menu"
   bind:this={menuRoot}
   use:dismissOnOutsideClick={{
     enabled: open,

@@ -713,7 +713,7 @@
      `Button.svelte` records the same trap and the same two repairs; this rule stays in
      this file rather than moving to `styles/fabricate.css` because it has exactly one call
      site, and it is CHAINED with the primitive's own class so it is not a bare global. */
-  :global(.manager-status-toggle.manager-recipe-item-satisfied-toggle) {
+  :global(.fabricate-toggle.manager-recipe-item-satisfied-toggle) {
     flex: 0 0 auto;
     margin-left: auto;
   }

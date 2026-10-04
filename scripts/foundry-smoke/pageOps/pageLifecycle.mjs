@@ -485,19 +485,19 @@ export async function exerciseManagerPointerTargets(page, systemId) {
   );
   await softClick(page.locator('.fabricate-manager .manager-scope-return'), { trial: true });
   await softClick(
-    page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Import")'),
+    page.locator('.fabricate-manager .manager-header-actions .fabricate-button:has-text("Import")'),
     { trial: true }
   );
   await softClick(
-    page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Export")'),
+    page.locator('.fabricate-manager .manager-header-actions .fabricate-button:has-text("Export")'),
     { trial: true }
   );
   await softClick(
-    page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Create")'),
+    page.locator('.fabricate-manager .manager-header-actions .fabricate-button:has-text("Create")'),
     { trial: true }
   );
   const rowActionButtons = page.locator(
-    `${managerSystemRowSelector(systemId)} .manager-icon-button`
+    `${managerSystemRowSelector(systemId)} .fabricate-icon-button`
   );
   for (let index = 0; index < (await rowActionButtons.count()); index += 1) {
     await rowActionButtons.nth(index).click({ trial: true });
@@ -520,7 +520,7 @@ export async function selectSmokeSystemInManager(page, systemId) {
 export async function exerciseManagerSystemEditPointerTargets(page, systemId) {
   if ((await page.locator('.fabricate-manager #manager-system-name').count()) === 0) {
     let editButton = page
-      .locator(`${managerSystemRowSelector(systemId)} .manager-icon-button`)
+      .locator(`${managerSystemRowSelector(systemId)} .fabricate-icon-button`)
       .nth(0);
     if ((await editButton.count()) === 0) {
       const systemsBreadcrumb = page
@@ -540,7 +540,7 @@ export async function exerciseManagerSystemEditPointerTargets(page, systemId) {
         .first()
         .waitFor({ state: 'visible', timeout: 5000 });
       editButton = page
-        .locator(`${managerSystemRowSelector(systemId)} .manager-icon-button`)
+        .locator(`${managerSystemRowSelector(systemId)} .fabricate-icon-button`)
         .nth(0);
     }
     await editButton.click();
@@ -564,7 +564,7 @@ export async function exerciseManagerSystemEditPointerTargets(page, systemId) {
   });
   await softClick(
     page.locator(
-      '.fabricate-manager .manager-header-actions .manager-button:has-text("Back to systems")'
+      '.fabricate-manager .manager-header-actions .fabricate-button:has-text("Back to systems")'
     ),
     { trial: true }
   );
@@ -604,15 +604,15 @@ export async function exerciseManagerEnvironmentPointerTargets(page) {
     .first();
   await azureRow.waitFor({ state: 'visible', timeout: 5000 });
   await azureRow.locator('.manager-environment-identity').click();
-  await softClick(azureRow.locator('.manager-status-toggle'), { trial: true });
-  await softClick(azureRow.locator('.manager-icon-button').nth(0), { trial: true });
-  await softClick(azureRow.locator('.manager-icon-button').nth(1), { trial: true });
-  await softClick(azureRow.locator('.manager-icon-button').nth(2), { trial: true });
+  await softClick(azureRow.locator('.fabricate-toggle'), { trial: true });
+  await softClick(azureRow.locator('.fabricate-icon-button').nth(0), { trial: true });
+  await softClick(azureRow.locator('.fabricate-icon-button').nth(1), { trial: true });
+  await softClick(azureRow.locator('.fabricate-icon-button').nth(2), { trial: true });
   // Reordering happens via composition-list drag-and-drop; row no longer has
   // standalone move-up / move-down icon buttons.
   await softClick(
     page.locator(
-      '.fabricate-manager .manager-header-actions .manager-button:has-text("Create environment")'
+      '.fabricate-manager .manager-header-actions .fabricate-button:has-text("Create environment")'
     ),
     { trial: true }
   );

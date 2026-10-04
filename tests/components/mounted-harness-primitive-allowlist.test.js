@@ -50,7 +50,7 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   // THE manager's labelled push-button (issue 1096). It is the sharpest entry on this list
-  // after `Chip`: `manager-button` is a CSS convention repeated across more than sixty
+  // after `Chip`: the button class is a CSS convention repeated across more than sixty
   // components, so every step of the conversion sweep drops this primitive into another
   // mounted tree. Two screens use it today — the Modifiers card in `SystemEditView` and the
   // Tool Studio header, which is the authority the primitive reproduces — and they already

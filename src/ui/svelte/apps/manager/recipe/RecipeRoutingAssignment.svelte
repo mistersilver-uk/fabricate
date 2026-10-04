@@ -81,7 +81,7 @@
       <SearchablePopover
         options={pickerOptions}
         pickerClass="manager-recipe-component-picker manager-recipe-routing-picker"
-        triggerClass="fabricate-button manager-button is-subtle manager-recipe-routing-add-trigger"
+        triggerClass="fabricate-button is-subtle manager-recipe-routing-add-trigger"
         triggerIcon="fas fa-plus"
         triggerLabel={addLabel}
         ariaLabel={addLabel}

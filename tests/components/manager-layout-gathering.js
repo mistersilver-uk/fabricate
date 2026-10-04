@@ -452,7 +452,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-task-component-browser-footer'
   );
   const componentBrowserFooterPaginationBlock = blockFor(
-    '.fabricate-manager .manager-task-component-browser-footer .manager-pagination'
+    '.fabricate-manager .manager-task-component-browser-footer .fabricate-pagination'
   );
   const componentPillsBlock = blockFor('.fabricate-manager .manager-task-component-pills');
   // Three classes since issue 883: the pill is a `Chip`.
@@ -465,14 +465,14 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   const dropControlsBlock = blockFor('.fabricate-manager .manager-task-drop-controls');
   const dropSearchBlock = blockFor(
-    '.fabricate-manager .manager-task-drop-controls .manager-search.is-compact'
+    '.fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact'
   );
   const dropSearchInputBlock = blockFor(
-    '.fabricate-manager .manager-task-drop-controls .manager-search.is-compact input'
+    '.fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact input'
   );
   const dropFooterBlock = blockFor('.fabricate-manager .manager-task-drop-footer');
   const dropFooterPaginationBlock = blockFor(
-    '.fabricate-manager .manager-task-drop-footer .manager-pagination'
+    '.fabricate-manager .manager-task-drop-footer .fabricate-pagination'
   );
   const dropScrollBlock = blockFor(
     '.fabricate-manager .manager-task-drops-card .manager-table-scroll'
@@ -627,16 +627,16 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-drop-editor-card .manager-drop-count-editor[data-gathering-drop-inspector-count] input[type="text"]'
   );
   const dropInspectorButtonBlock = blockFor(
-    '.fabricate-manager .manager-drop-inspector-stack .manager-button'
+    '.fabricate-manager .manager-drop-inspector-stack .fabricate-button'
   );
   const dropInspectorIconButtonBlock = blockFor(
-    '.fabricate-manager .manager-drop-inspector-stack .manager-icon-button'
+    '.fabricate-manager .manager-drop-inspector-stack .fabricate-icon-button'
   );
   const dropInspectorSearchInputBlock = blockFor(
-    '.fabricate-manager .manager-drop-inspector-stack .manager-search input'
+    '.fabricate-manager .manager-drop-inspector-stack .fabricate-search input'
   );
   const dropInspectorCharacterFieldBlock = blockFor(
-    '.fabricate-manager .manager-character-modifier-row-card .manager-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]))'
+    '.fabricate-manager .manager-character-modifier-row-card .fabricate-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]))'
   );
   const dropInspectorCharacterOperatorBlock = blockFor(
     '.fabricate-manager .manager-character-modifier-operator-select select'
@@ -1476,7 +1476,7 @@ test('a range input inside the gathering edit views stays transparent for the sl
 
 // The gathering task library's inspector rail stacks three cards.
 // "Drops summary" and "Used in environments". The middle one restated the whole
-// `.manager-inspector-card` contract and then diverged on the two values it changed — a
+// `.fabricate-card` contract and then diverged on the two values it changed — a
 // `--fab-bg-3` fill instead of the shell's, and 16px of horizontal padding instead
 // of 12px — so it read as a different KIND of card from its neighbours.
 test('the gathering inspector rail cards render as one card, not three treatments', async () => {
@@ -1487,16 +1487,16 @@ test('the gathering inspector rail cards render as one card, not three treatment
       `<style>${css}</style>` +
         '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
         '<aside class="manager-inspector" style="width:320px">' +
-        '<section class="fabricate-card manager-inspector-card" data-card="details">' +
+        '<section class="fabricate-card" data-card="details">' +
         '<h3 class="manager-card-title">Gathering task details</h3><p>Three facts</p>' +
         '</section>' +
-        '<section class="fabricate-card manager-inspector-card" data-task-drops-summary data-card="drops">' +
+        '<section class="fabricate-card" data-task-drops-summary data-card="drops">' +
         '<h3 class="manager-card-title">Drops summary</h3>' +
         '<div class="manager-task-drops-summary-list"><span class="manager-task-drop-summary-chip">' +
         '<span class="manager-task-drop-summary-label">Nightshade</span>' +
         '<strong class="manager-task-drop-summary-percent">80%</strong></span></div>' +
         '</section>' +
-        '<section class="fabricate-card manager-inspector-card manager-task-environment-usage-card" data-card="usage">' +
+        '<section class="fabricate-card manager-task-environment-usage-card" data-card="usage">' +
         '<h3 class="manager-card-title">Used in environments</h3><p>Not used yet.</p>' +
         '</section>' +
         '</aside></div>'
@@ -1577,9 +1577,9 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
       percentHeight: 28,
       markup:
         '<aside class="manager-inspector manager-drop-inspector-stack" style="width:320px">' +
-        '<section class="fabricate-card manager-inspector-card manager-drop-editor-card">' +
+        '<section class="fabricate-card manager-drop-editor-card">' +
         '<div class="manager-drop-editor-values">' +
-        '<label class="fabricate-field manager-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>' +
+        '<label class="fabricate-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>' +
         `<span>Drop chance</span>${CHANCE_SLIDER_FIXTURE}</label>` +
         '</div></section></aside>',
     },
@@ -1587,7 +1587,7 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
       name: 'gathering event editor',
       // 36px, and deliberately NOT normalised to the inspector's 28px. This field is a
       // full-width form control in a normal editor card, so it takes the manager standard
-      // `.manager-field` height; 28px is the DENSE treatment for a table cell and the
+      // `.fabricate-field` height; 28px is the DENSE treatment for a table cell and the
       // inspector rail. The divergence pre-dates this conversion and is a real difference
       // of context, not a second spelling of one control (issue 883).
       percentHeight: 36,
@@ -1595,7 +1595,7 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
         '<main class="manager-main manager-gathering-event-edit-view" style="width:640px">' +
         '<section class="manager-task-availability-card" data-gathering-event-drop-rate>' +
         '<div class="manager-task-availability-row">' +
-        '<label class="fabricate-field manager-field manager-drop-rate-editor">' +
+        '<label class="fabricate-field manager-drop-rate-editor">' +
         `<span>Drop rate (%)</span>${CHANCE_SLIDER_FIXTURE}</label>` +
         '</div></section></main>',
     },
@@ -1889,8 +1889,8 @@ const TRAVEL_REALM_ROWS = Array.from(
 ).join('');
 
 const TRAVEL_REALMS_PANE = `<div class="manager-gathering-panel manager-travel-realms" data-travel-panel="realms">
-  <section class="fabricate-filter-bar manager-toolbar manager-travel-realms-toolbar">
-    <label class="fabricate-search manager-search"><i class="fas fa-search"></i
+  <section class="fabricate-filter-bar manager-travel-realms-toolbar">
+    <label class="fabricate-search"><i class="fas fa-search"></i
       ><input type="search" placeholder="Search realms..." /></label>
   </section>
   <div class="manager-table-scroll">
@@ -1955,7 +1955,7 @@ async function measureTravelPane({ width, height }, paneMarkup, probes) {
       };
       const pane = document.querySelector('[data-travel-panel]');
       const scroller = pane.querySelector(':scope > .manager-table-scroll');
-      const pager = pane.querySelector(':scope > .manager-pagination');
+      const pager = pane.querySelector(':scope > .fabricate-pagination');
       const paneStyle = getComputedStyle(pane);
       return {
         boxes: Object.fromEntries(selectors.map((selector) => [selector, edges(selector)])),
@@ -1985,15 +1985,15 @@ test('World Travel Realms puts a full-bleed filter bar over the 12px browse body
     const at = `${size.width}x${size.height}`;
     const report = await measureTravelPane(size, TRAVEL_REALMS_PANE, [
       '.manager-travel-realms-toolbar',
-      '.manager-travel-realms-toolbar .manager-search',
+      '.manager-travel-realms-toolbar .fabricate-search',
       '.manager-travel-realms-row',
-      '.manager-pagination',
+      '.fabricate-pagination',
     ]);
     const { main, pane, boxes } = report;
     const toolbar = boxes['.manager-travel-realms-toolbar'];
-    const search = boxes['.manager-travel-realms-toolbar .manager-search'];
+    const search = boxes['.manager-travel-realms-toolbar .fabricate-search'];
     const row = boxes['.manager-travel-realms-row'];
-    const pager = boxes['.manager-pagination'];
+    const pager = boxes['.fabricate-pagination'];
 
     assert.ok(report.scrollerClearsItsContent, `${at}: the list must not overflow its scroller`);
     assert.deepEqual(report.paneBorders, [0, 0, 0, 0], `${at}: the pane draws no card border`);

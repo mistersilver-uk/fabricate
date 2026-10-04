@@ -803,7 +803,7 @@ export function registerWorldScopeCases() {
       'parties',
       'the full-width layout is scoped to the World Parties route'
     );
-    const createButton = target.querySelector('.manager-header-actions .manager-button.is-primary');
+    const createButton = target.querySelector('.manager-header-actions .fabricate-button.is-primary');
     assert.equal(createButton.disabled, false);
     assert.ok(target.querySelector('[data-party-realm-override-unavailable]'));
     assert.equal(target.querySelector('[data-party-realm-evidence-unavailable]'), null);

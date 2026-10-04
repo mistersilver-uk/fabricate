@@ -240,10 +240,10 @@ export function registerRecipesCases() {
     assert.ok(target.textContent.includes('Restores a small amount of health.'));
     assert.ok(target.textContent.includes('Player visibility'));
     const enabledRecipeToggle = target.querySelector(
-      '[data-recipe-id="r1"] .manager-status-toggle'
+      '[data-recipe-id="r1"] .fabricate-toggle'
     );
     const disabledRecipeToggle = target.querySelector(
-      '[data-recipe-id="r2"] .manager-status-toggle'
+      '[data-recipe-id="r2"] .fabricate-toggle'
     );
     assert.ok(enabledRecipeToggle, 'enabled recipe row should render the shared status toggle');
     assert.ok(disabledRecipeToggle, 'disabled recipe row should render the shared status toggle');
@@ -280,7 +280,7 @@ export function registerRecipesCases() {
     );
 
     assert.equal(
-      target.querySelector('.manager-pagination'),
+      target.querySelector('.fabricate-pagination'),
       null,
       'pagination should hide while filtered row count is below the page size'
     );
@@ -337,10 +337,16 @@ export function registerRecipesCases() {
     );
     // The inspector is ONE column on the panel background, not five nested boxes.
     assert.equal(
-      target.querySelectorAll('.manager-recipe-browser-inspector .manager-inspector-card').length,
+      target.querySelectorAll('.manager-recipe-browser-inspector .fabricate-card').length,
       0,
       'the inspector sections are micro-labels on the panel, not nested cards'
     );
+    // This proves only that the selector can match. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
+    const rail = target.ownerDocument.createElement('div');
+    rail.innerHTML = '<aside class="manager-recipe-browser-inspector"><section class="fabricate-card"></section></aside>';
+    assert.ok(Boolean(rail.querySelector(':scope .manager-recipe-browser-inspector .fabricate-card')), 'it can match');
     assert.equal(
       target.querySelector('[data-recipe-inspector]').textContent.includes('Recipe details'),
       false,
@@ -354,11 +360,11 @@ export function registerRecipesCases() {
       'recipe inspector hero should render the resolved recipe image, not only a glyph'
     );
 
-    const search = target.querySelector('.manager-toolbar input[type="search"]');
+    const search = target.querySelector('.fabricate-filter-bar input[type="search"]');
     search.value = 'elixir';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
-    target.querySelector('[data-recipe-id="r2"] .manager-status-toggle').click();
+    target.querySelector('[data-recipe-id="r2"] .fabricate-toggle').click();
 
     // Duplicate and Delete moved to the inspector (issue 643).
     target.querySelector('[data-recipe-id="r2"] .manager-recipe-identity').click();
@@ -449,7 +455,7 @@ export function registerRecipesCases() {
     );
     // The recipe-edit header now follows the task/environment convention.
     const recipeEditButtons = Array.from(
-      target.querySelectorAll('.manager-header-actions .manager-button')
+      target.querySelectorAll('.manager-header-actions .fabricate-button')
     );
     assert.ok(
       !recipeEditButtons.some((button) => button.textContent.includes('Cancel')),
@@ -526,7 +532,7 @@ export function registerRecipesCases() {
 
     // Return via Back to recipes.
     const backButton = Array.from(
-      target.querySelectorAll('.manager-header-actions .manager-button')
+      target.querySelectorAll('.manager-header-actions .fabricate-button')
     ).find((button) => button.textContent.includes('Back to recipes'));
     assert.ok(backButton, 'the editor offers Back to recipes');
     backButton.click();
@@ -607,6 +613,10 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
+    assert.ok(
+      Boolean(target.querySelector('.fabricate-pagination')),
+      'past one page the shared pager renders'
+    );
     chooseSelectOption(target, '[data-pagination-size]', 10);
     await tick();
     flushSync();
@@ -626,7 +636,7 @@ export function registerRecipesCases() {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit');
 
     const backButton = Array.from(
-      target.querySelectorAll('.manager-header-actions .manager-button')
+      target.querySelectorAll('.manager-header-actions .fabricate-button')
     ).find((button) => button.textContent.includes('Back to recipes'));
     backButton.click();
     await tick();
@@ -731,7 +741,7 @@ export function registerRecipesCases() {
     flushSync();
 
     const createButton = Array.from(
-      target.querySelectorAll('.manager-header-actions .manager-button')
+      target.querySelectorAll('.manager-header-actions .fabricate-button')
     ).find((button) => button.textContent.includes('Create recipe'));
     assert.ok(createButton, 'recipes header should offer a Create recipe control');
     createButton.click();
@@ -954,7 +964,7 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+    Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button'))
       .find((button) => button.textContent.includes('Back to recipes'))
       .click();
     await tick();
@@ -979,7 +989,7 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+    Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button'))
       .find((button) => button.textContent.includes('Back to recipes'))
       .click();
     await tick();
@@ -1011,7 +1021,7 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+    Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button'))
       .find((button) => button.textContent.includes('Back to recipes'))
       .click();
     await tick();
@@ -1040,7 +1050,7 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    Array.from(target.querySelectorAll('.manager-header-actions .manager-button'))
+    Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button'))
       .find((button) => button.textContent.includes('Back to recipes'))
       .click();
     await tick();

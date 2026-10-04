@@ -1055,7 +1055,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
    * 44, with 32 / 36 / 40 retired); the field publishes it as a size prop, and the two filter
    * triggers take it from this bar's own member of the folded `is-size-38` trigger rule.
    */
-  const FIELD_SELECTOR = '.manager-search.is-size-38 input';
+  const FIELD_SELECTOR = '.fabricate-search.is-size-38 input';
   const SELECT_SELECTOR = '.manager-component-toolbar .is-size-38 .fabricate-select-trigger';
 
   function metalWithFire() {
@@ -1139,7 +1139,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     }
   });
 
-  it('and the bar still wears `manager-toolbar`, which is what makes that host real', async () => {
+  it('and the bar still wears `fabricate-filter-bar`, which is what makes that host real', async () => {
     // Non-vacuity for the selector above: it is two classes and an element.
     const root = await browser.mount({
       itemCards: metalWithFire(),
@@ -1149,7 +1149,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     const bar = root.querySelector('[data-component-toolbar]');
     assert.ok(Boolean(bar), 'the bar renders');
     assert.ok(
-      bar.classList.contains('manager-toolbar'),
+      bar.classList.contains('fabricate-filter-bar'),
       'the section carries the shared bar class the 38px select rule is scoped to'
     );
     assert.ok(

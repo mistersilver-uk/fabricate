@@ -83,7 +83,7 @@ describe('Workbench (mounted)', () => {
     for (const name of ['fab-manager-button', 'is-primary', 'is-full-width']) {
       assert.ok(brew.classList.contains(name), `Brew carries ${name}`);
     }
-    assert.equal(target.querySelectorAll('.manager-button.is-primary').length, 1, 'one primary');
+    assert.equal(target.querySelectorAll('.fabricate-button.is-primary').length, 1, 'one primary');
     const clear = target.querySelector('[data-alchemy-clear]');
     assert.ok(clear.classList.contains('fab-manager-button') && clear.classList.contains('is-ghost'));
     assert.equal(clear.disabled, false);

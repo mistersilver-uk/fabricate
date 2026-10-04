@@ -31,7 +31,7 @@
 </script>
 
 <section
-  class="fabricate-card manager-inspector-card manager-travel-inspector"
+  class="fabricate-card manager-travel-inspector"
   class:is-empty={(travelTab === 'realms' && !realm) || (travelTab === 'map' && !mapRegion)}
   data-gathering-inspector-travel
   data-travel-inspector={travelTab}
@@ -60,7 +60,7 @@
         </Button>
       </div>
 
-      <section class="fabricate-card manager-inspector-card">
+      <section class="fabricate-card">
         <RealmNameField
           name={realm.name}
           disabled={travelSaving}
@@ -68,7 +68,7 @@
         />
       </section>
 
-      <section class="fabricate-card manager-inspector-card">
+      <section class="fabricate-card">
         <h3 class="manager-card-title">
           <i class="fas fa-seedling" aria-hidden="true"></i>
           {text('FABRICATE.Admin.Manager.Travel.Realms.EnvironmentsCardTitle', 'Environments')}
@@ -96,7 +96,7 @@
         {/if}
       </section>
 
-      <section class="fabricate-card manager-inspector-card">
+      <section class="fabricate-card">
         <h3 class="manager-card-title">
           <i class="fas fa-people-group" aria-hidden="true"></i>
           {text('FABRICATE.Admin.Manager.Travel.Realms.PartiesCardTitle', 'Parties in this realm')}
@@ -136,7 +136,7 @@
     {/if}
   {:else if travelTab === 'map'}
     {#if mapRegion}
-      <section class="fabricate-card manager-inspector-card manager-map-link-region-card">
+      <section class="fabricate-card manager-map-link-region-card">
         <div class="manager-inspector-title-row">
           <span
             class="manager-inspector-icon manager-map-link-inspector-swatch"
@@ -158,7 +158,7 @@
         </div>
       </section>
 
-      <section class="fabricate-card manager-inspector-card">
+      <section class="fabricate-card">
         <h3 class="manager-card-title">
           <i class="fas fa-link" aria-hidden="true"></i>
           {text(
@@ -196,7 +196,7 @@
         {/if}
       </section>
 
-      <section class="fabricate-card manager-inspector-card">
+      <section class="fabricate-card">
         <h3 class="manager-card-title">
           <i class="fas fa-map-location-dot" aria-hidden="true"></i>
           {text(
@@ -226,7 +226,7 @@
         {/if}
       </section>
 
-      <section class="fabricate-card manager-inspector-card">
+      <section class="fabricate-card">
         <h3 class="manager-card-title">
           <i class="fas fa-people-group" aria-hidden="true"></i>
           {text(

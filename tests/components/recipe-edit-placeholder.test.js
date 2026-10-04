@@ -79,8 +79,8 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
   // The three inspector actions are FULL-WIDTH buttons.
   it('renders the three inspector actions as full-width buttons', () => {
     const block = inspectorActionBlock();
-    // The literal `class="manager-button ` is gone from this file entirely (issue 1118): the
-    // primitive emits `fabricate-button manager-button fab-manager-button` from its own
+    // A hand-written button class literal is gone from this file entirely (issue 1118): the
+    // primitive emits `fabricate-button fab-manager-button` from its own
     // `.join(' ')`, and each site passes only its BESPOKE class through the appending `class`
     // prop. So the three are counted by the class each one still contributes — the class the
     // rules below are keyed on — rather than by a string the component no longer writes.
@@ -96,22 +96,22 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
       );
     }
     assert.equal(
-      block.includes('class="manager-button'),
+      block.includes('class="fabricate-button'),
       false,
       'and no site in this group writes the convention class by hand any more'
     );
     // Each of the three is full width, and that is a CASCADE question.
     for (const selector of [
-      '.fabricate-button.manager-button.manager-recipe-browser-inspector-duplicate',
-      '.fabricate-button.manager-button.manager-recipe-browser-inspector-edit',
-      '.fabricate-button.manager-button.manager-recipe-browser-inspector-delete'
+      '.fabricate-button.fabricate-button.manager-recipe-browser-inspector-duplicate',
+      '.fabricate-button.fabricate-button.manager-recipe-browser-inspector-edit',
+      '.fabricate-button.fabricate-button.manager-recipe-browser-inspector-delete'
     ]) {
       const pattern = selector
         .replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
         .replaceAll(/\s+/g, String.raw`\s+`)
         .replaceAll(
-          String.raw`\.manager-button`,
-          String.raw`\.manager-button(?:\.fab-manager-button)?`
+          String.raw`\.fabricate-button`,
+          String.raw`\.fabricate-button(?:\.fab-manager-button)?`
         );
       const rule = css.match(new RegExp(String.raw`${pattern}[^{}]*\{[^}]*\}`));
       assert.ok(rule, `${selector} should own a rule`);

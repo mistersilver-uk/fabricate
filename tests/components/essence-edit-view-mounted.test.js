@@ -323,7 +323,7 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     );
 
     // 2. one square clear button became the Tool Studio's grouped pair.
-    const actions = card.querySelectorAll('.manager-item-drop-zone-actions .manager-icon-button');
+    const actions = card.querySelectorAll('.manager-item-drop-zone-actions .fabricate-icon-button');
     assert.equal(actions.length, 2, 'copy source uuid and unlink, grouped and right-aligned');
     actions[0].click();
     flushSync();

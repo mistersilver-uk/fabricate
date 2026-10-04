@@ -39,7 +39,7 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 test('manager pagination footer uses scoped chrome with stable summary, nav, and per-page controls', () => {
-  const block = blockFor('.fabricate-pagination.manager-pagination');
+  const block = blockFor('.fabricate-pagination.fabricate-pagination');
 
   assert.ok(block.includes('display: flex;'), 'pagination footer should layout horizontally');
   assert.ok(
@@ -234,12 +234,12 @@ test('all three browser sort-direction toggles render as one control', async () 
     // discriminator this test used to prove the toolbar rule had reached its fixture at all: 9px
     // against the bare primitive's 6px. The primitive is 9px now, so that half of the control has
     // been superseded rather than lost — `fontWeight` still discriminates (600 against 700), and
-    // this probe carries the family ROOT and `manager-button` WITHOUT `fab-manager-button`, which
+    // this probe carries the family ROOT and `fabricate-button` WITHOUT `fab-manager-button`, which
     // is what an unconverted hand-written button is and is still on the base rule's 6px. So the
     // corner is measured in a real browser on both sides of the conversion boundary instead.
-    // `ComponentComplicationsSection.svelte` passes `triggerClass="fabricate-button manager-button"`
+    // `ComponentComplicationsSection.svelte` passes `triggerClass="fabricate-button"`
     // to `SearchablePopover`, so this is population B as well as the unconverted half of a pair.
-    const unconverted = `<button type="button" class="fabricate-button manager-button" data-probe="unconverted"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
+    const unconverted = `<button type="button" class="fabricate-button" data-probe="unconverted"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
 
     await page.setContent(`
       <!doctype html>
@@ -254,7 +254,7 @@ test('all three browser sort-direction toggles render as one control', async () 
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="fabricate-filter-bar manager-toolbar">${toggles}${bare}${unconverted}</div>
+            <div class="fabricate-filter-bar">${toggles}${bare}${unconverted}</div>
           </main>
         </body>
       </html>
@@ -297,7 +297,7 @@ test('all three browser sort-direction toggles render as one control', async () 
 
     // M12a, measured: the CONVERTED control is on the 34-38px band's 9px corner and the
     // unconverted hand-written button is still on the base rule's 6px, so the ruling moved the
-    // primitive and not the whole `.manager-button` family.
+    // primitive and not the whole `.fabricate-button` family.
     assert.equal(measured.bare.borderRadius, '9px', 'a converted manager button paints the band corner');
     assert.equal(
       measured.unconverted.borderRadius,
@@ -995,8 +995,8 @@ test('the shared Select paints identically in both areas, and beats the paint it
                    trigger beside the search field and the direction toggle, which are measured
                    in the same row. -->
               <div class="manager-vocabulary-shell-panel">
-                <div class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar">
-                  <div class="fabricate-search manager-search"><input type="text" data-probe="shipped-search"></div>
+                <div class="fabricate-filter-bar manager-scoped-list-toolbar">
+                  <div class="fabricate-search"><input type="text" data-probe="shipped-search"></div>
                   <div class="fabricate-picker manager-travel-picker fabricate-select"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-probe="shipped-select" data-select-size="toolbar"><span class="manager-travel-picker-value fabricate-select-value">Name</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
                   <button type="button" class="manager-scoped-list-direction" data-probe="shipped-direction"
                     ><i class="fas fa-arrow-up" aria-hidden="true"></i><span>Asc</span></button>
@@ -1043,14 +1043,14 @@ test('the shared Select paints identically in both areas, and beats the paint it
       return {
         triggers: Object.fromEntries(
           ['player', 'manager'].flatMap((area) =>
-            rungs.map((rung) => [`${area}-${rung}`, trigger(`${area}-${rung}`)])
+            rungs.map((rung) => [`${area}:${rung}`, trigger(`${area}-${rung}`)])
           )
         ),
         panels: {
-          'player-inline': panel('player-panel-inline'),
-          'manager-inline': panel('manager-panel-inline'),
-          'player-form': panel('player-panel-form'),
-          'manager-toolbar': panel('manager-panel-toolbar'),
+          'player:inline': panel('player-panel-inline'),
+          'manager:inline': panel('manager-panel-inline'),
+          'player:form': panel('player-panel-form'),
+          'manager:toolbar': panel('manager-panel-toolbar'),
         },
         rows: {
           alignItems: of('player-row-inline').alignItems,
@@ -1084,7 +1084,7 @@ test('the shared Select paints identically in both areas, and beats the paint it
     // ── THE THREE RUNGS, IN BOTH AREAS, IDENTICALLY ─────────────────────────────────────────
     for (const rung of SELECT_RUNGS) {
       for (const area of ['player', 'manager']) {
-        const measured = report.triggers[`${area}-${rung.rung}`];
+        const measured = report.triggers[`${area}:${rung.rung}`];
         const where = `${area} ${rung.rung}`;
         assert.ok(
           Math.abs(measured.height - rung.height) <= 1,
@@ -1114,8 +1114,8 @@ test('the shared Select paints identically in both areas, and beats the paint it
       }
 
       assert.deepEqual(
-        report.triggers[`player-${rung.rung}`],
-        report.triggers[`manager-${rung.rung}`],
+        report.triggers[`player:${rung.rung}`],
+        report.triggers[`manager:${rung.rung}`],
         `the ${rung.rung} rung is the SAME control in both areas, on every measured axis — which ` +
           'is the claim a shared primitive makes and the one a manager-rooted family cannot'
       );
@@ -1123,19 +1123,19 @@ test('the shared Select paints identically in both areas, and beats the paint it
 
     // The literal's whole observable consequence, stated as its own clause.
     assert.equal(
-      report.triggers['player-toolbar'].fontSize,
+      report.triggers['player:toolbar'].fontSize,
       '11.52px',
       'the toolbar rung ships a LITERAL 0.72rem, so it is 11.52px with no manager ancestor'
     );
     assert.notEqual(
-      report.triggers['player-toolbar'].fontSize,
+      report.triggers['player:toolbar'].fontSize,
       '14px',
       'and not the inherited app base, which is what an area-scoped property read would give'
     );
 
     // ── THE PANEL BEATS (0,2,0) ON ONE ELEMENT, TWICE ───────────────────────────────────────
     for (const rung of SELECT_RUNGS) {
-      const key = Object.keys(report.panels).find((name) => name.endsWith(`-${rung.rung}`));
+      const key = Object.keys(report.panels).find((name) => name.endsWith(`:${rung.rung}`));
       assert.equal(
         report.panels[key].radius,
         '11px',
@@ -1146,14 +1146,14 @@ test('the shared Select paints identically in both areas, and beats the paint it
       assert.equal(report.panels[key].maxWidth, rung.maxWidth, `${key}: and its own ceiling`);
     }
     assert.equal(
-      report.panels['player-inline'].minWidth,
+      report.panels['player:inline'].minWidth,
       '96px',
       'an inline panel opens at its own 96px floor rather than at the sheet`s 240px, which is ' +
         'the defect: a 240px panel over a list of two-digit page sizes'
     );
     assert.deepEqual(
-      report.panels['player-inline'],
-      report.panels['manager-inline'],
+      report.panels['player:inline'],
+      report.panels['manager:inline'],
       'and the panel is the same box in both areas'
     );
 
@@ -1194,7 +1194,7 @@ test('the shared Select paints identically in both areas, and beats the paint it
         '`normal`, which is OFF the published ramp'
     );
     assert.equal(
-      report.triggers['manager-toolbar'].fontWeight,
+      report.triggers['manager:toolbar'].fontWeight,
       '500',
       'so the toolbar line`s SIZE is intact across the conversion and only its WEIGHT moves'
     );
@@ -1671,8 +1671,8 @@ test('the bulk-panel and toolbar triggers own their own pointer targets', async 
                     class="fas fa-chevron-down" aria-hidden="true"></i></button>
                 </div>
               </div>
-              <div class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar">
-                <div class="fabricate-search manager-search"><input type="text" data-scoped-list-search></div>
+              <div class="fabricate-filter-bar manager-scoped-list-toolbar">
+                <div class="fabricate-search"><input type="text" data-scoped-list-search></div>
                 <div class="fabricate-picker manager-travel-picker fabricate-select">
                   <button
                     type="button"

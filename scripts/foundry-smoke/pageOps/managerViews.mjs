@@ -460,7 +460,7 @@ export async function captureRecipeEditorRoundtrip(ctx, craftingSetup) {
     // Return to the browser: the category filter chip and the collapsed group both survive.
     await page
       .locator(
-        '.fabricate-manager .manager-header-actions .manager-button:has-text("Back to recipes")'
+        '.fabricate-manager .manager-header-actions .fabricate-button:has-text("Back to recipes")'
       )
       .first()
       .click();
@@ -545,7 +545,7 @@ export async function assertManagerLayoutStable(page, label) {
         '.manager-knowledge-learned-row',
         '[data-manager-tool-id]',
         '[data-tool-edit-view]',
-        '.manager-inspector-card',
+        '.fabricate-card',
         '.manager-system-edit-form',
         '.manager-edit-card',
         '.manager-toggle-row',

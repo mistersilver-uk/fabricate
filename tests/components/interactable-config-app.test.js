@@ -666,7 +666,7 @@ describe('InteractableConfigRoot body', () => {
   it('paints the on position with the themed accent token', () => {
     // `styles/fabricate.css` is the shipped global sheet rather than a component's scoped block.
     assert.ok(
-      /\.fabricate-toggle\.manager-status-toggle\.is-on\s*\{[^}]*var\(--fab-accent\)/.test(sheetSource),
+      /\.fabricate-toggle\.fabricate-toggle\.is-on\s*\{[^}]*var\(--fab-accent\)/.test(sheetSource),
       'the on position is painted with the themed accent token'
     );
   });

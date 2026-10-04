@@ -981,7 +981,7 @@ describe('RecipeBulkEditPanel in-flight apply (issue 1010)', () => {
  * three sentences the impact prop turns into, and which ids the confirm hands back.
  */
 const deleteCard = (root) => root.querySelector('[data-recipe-bulk-delete-card]');
-const deleteButton = (root) => deleteCard(root).querySelector('.manager-button.is-danger');
+const deleteButton = (root) => deleteCard(root).querySelector('.fabricate-button.is-danger');
 const impactRow = (root, key) => root.querySelector(`[data-recipe-bulk-impact-row="${key}"]`);
 
 const FULL_IMPACT = {
