@@ -176,6 +176,9 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte',
   ...KIND_MENU_COMPILED_MODULES,
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
@@ -465,6 +468,12 @@ async function pickPopoverOption(target, trigger, optionPattern) {
   [...document.querySelectorAll('.manager-travel-option')]
     .find((option) => optionPattern.test(option.textContent))
     .click();
+  await flushRender();
+}
+
+// Press a result set's `Result` adder; with one kind offered it appends an empty row directly.
+async function addResultRow(target, scope = '') {
+  target.querySelector(`${scope} [data-recipe-add="result-item"]`.trim()).click();
   await flushRender();
 }
 
@@ -1625,8 +1634,8 @@ describe('RecipeEditView (mounted)', () => {
     clickTab(target, 'results');
     await flushRender();
 
-    // Author the (id-less placeholder) first group by adding a result item.
-    await pickPopoverOption(target, '[data-recipe-add="result-item"]', /Mountain Herb/);
+    // Author the (id-less placeholder) first group by adding a result row.
+    await addResultRow(target);
 
     const patch = patches.at(-1);
     assert.ok(patch.resultGroups, 'the first edit materializes the result groups');
@@ -2675,7 +2684,7 @@ describe('RecipeEditView (mounted)', () => {
       !emptyAdd.closest('.fabricate-sortable-list'),
       'following the message it now sits under, because there is no list to be a footer of'
     );
-    await pickPopoverOption(empty.target, '[data-recipe-add="result-item"]', /Mountain Herb/);
+    await addResultRow(empty.target);
     assert.equal(
       empty.patches.at(-1).resultGroups[0].results.length,
       1,
@@ -2762,23 +2771,18 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('progressive: re-adding a component appends a duplicate quantity-less entry (no merge)', async () => {
+  it('progressive: adding a stage appends an unnamed quantity-less entry (no merge)', async () => {
     const { target, patches } = await mountProgressiveResults([
       { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
     ]);
-    // Re-pick the component the group already holds.
-    await pickPopoverOption(
-      target,
-      '[data-recipe-result-set-id="grp-1"] .manager-recipe-add-component-trigger',
-      /Mountain Herb/
-    );
-    assert.equal(patches.length, 1, 'adding the duplicate patches the recipe once');
+    await addResultRow(target, '[data-recipe-result-set-id="grp-1"]');
+    assert.equal(patches.length, 1, 'adding a stage patches the recipe once');
     const results = patches.at(-1).resultGroups[0].results;
-    assert.equal(results.length, 2, 'the duplicate is appended as a second entry, not merged');
+    assert.equal(results.length, 2, 'the stage is appended as a second entry, not merged');
     assert.deepEqual(
       results.map((r) => r.componentId),
-      ['cmp-herb', 'cmp-herb'],
-      'both ordered entries reference the same component'
+      ['cmp-herb', null],
+      'the new stage names nothing until its own field does'
     );
     assert.equal(results[0].quantity, 1, 'the existing entry is untouched (no quantity bump)');
     assert.equal(
@@ -5768,20 +5772,16 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('adds a result item to a group via the Add item popover (with an eager id)', async () => {
+  it('adds an unnamed result row to a group through the Result adder (with an eager id)', async () => {
     const { target, patches } = await mountResultGroups([
       { id: 'grp-1', name: 'Primary', results: [] },
     ]);
-    await pickPopoverOption(
-      target,
-      '[data-recipe-result-set-id="grp-1"] .manager-recipe-add-component-trigger',
-      /Mountain Herb/
-    );
-    assert.equal(patches.length, 1, 'adding an item patches the recipe');
+    await addResultRow(target, '[data-recipe-result-set-id="grp-1"]');
+    assert.equal(patches.length, 1, 'adding a row patches the recipe');
     const items = patches[0].resultGroups[0].results;
     assert.equal(items.length, 1, 'the group has one result item');
     assert.ok(items[0].id, 'the item carries an eager id');
-    assert.equal(items[0].componentId, 'cmp-herb');
+    assert.equal(items[0].componentId, null, 'its own field names it');
     assert.equal(items[0].quantity, 1, 'the item defaults to quantity 1');
     editHarness.remount();
   });
@@ -5798,7 +5798,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('bumps quantity (capped) instead of duplicating when the same component is re-added', async () => {
+  it('never bumps an existing row: a recipe result set appends an empty one (issue 1773)', async () => {
     const { target, patches } = await mountResultGroups([
       {
         id: 'grp-1',
@@ -5806,18 +5806,47 @@ describe('RecipeEditView (mounted)', () => {
         results: [{ id: 'res-1', componentId: 'cmp-herb', quantity: 1 }],
       },
     ]);
-    await pickPopoverOption(
-      target,
-      '[data-recipe-result-set-id="grp-1"] .manager-recipe-add-component-trigger',
-      /Mountain Herb/
-    );
-    assert.equal(patches.length, 1, 're-adding the same component patches the recipe');
+    await addResultRow(target, '[data-recipe-result-set-id="grp-1"]');
+    assert.equal(patches.length, 1, 'adding patches the recipe');
     const items = patches[0].resultGroups[0].results;
-    assert.equal(items.length, 1, 'no duplicate item appended');
-    assert.equal(items[0].quantity, 2, 'the existing item quantity is bumped to 2');
-    assert.equal(items[0].id, 'res-1', 'the bumped item keeps its normalized id');
-    assert.equal(items[0].componentId, 'cmp-herb', 'the bumped item keeps its component');
+    assert.deepEqual(items[0], { id: 'res-1', componentId: 'cmp-herb', quantity: 1 });
+    assert.equal(items.length, 2, 'a second row is appended');
+    assert.equal(items[1].componentId, null);
     editHarness.remount();
+  });
+
+  // The editor threads what a result may name besides a component (issue 1773): a prop the
+  // wrapper does not forward silently leaves a result set offering component alone.
+  it('offers currency and knowledge results only where the editor is told the system can award them', async () => {
+    const offered = async (props) => {
+      const { target } = await mountResultGroups([{ id: 'grp-1', name: 'Primary', results: [] }], {
+        props,
+      });
+      const adder = target.querySelector(':scope [data-recipe-result-set-id="grp-1"] [data-recipe-add="result-item"]');
+      if (adder.getAttribute('aria-haspopup') !== 'menu') {
+        editHarness.remount();
+        return ['component'];
+      }
+      adder.click();
+      await flushRender();
+      const kinds = [...document.querySelectorAll(':scope .manager-recipe-result-menu [role="menuitem"]')].map(
+        (entry) => entry.getAttribute('data-recipe-add')
+      );
+      editHarness.remount();
+      return kinds.map((hook) => hook.replace('result-', ''));
+    };
+    const AWARDS = {
+      currencyUnits: [{ id: 'gp', label: 'Gold' }],
+      currencyEnabled: true,
+      recipeOptions: [{ id: 'r-sword', name: 'Forge Sword' }],
+      knowledgeObservable: true,
+    };
+    assert.deepEqual(await offered(AWARDS), ['component', 'currency', 'knowledge']);
+    assert.deepEqual(await offered({ ...AWARDS, currencyEnabled: false }), ['component', 'knowledge']);
+    assert.deepEqual(await offered({ ...AWARDS, knowledgeObservable: false }), ['component', 'currency']);
+    assert.deepEqual(await offered({ ...AWARDS, currencyUnits: [], knowledgeObservable: false }), [
+      'component',
+    ]);
   });
 
   it('names a result in a pill with its image and no clear, and names an unnamed one from the search', async () => {
@@ -5999,11 +6028,11 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-result-simple]'),
       'the simple result wrapper renders an empty placeholder'
     );
-    await pickPopoverOption(target, '.manager-recipe-add-component-trigger', /Mountain Herb/);
+    await addResultRow(target);
     assert.equal(patches.length, 1, 'the first edit writes the single-element groups array');
     assert.equal(patches[0].resultGroups.length, 1, 'a single group materializes');
     const addedItem = patches[0].resultGroups[0].results[0];
-    assert.equal(addedItem.componentId, 'cmp-herb', 'the group holds the added item');
+    assert.equal(addedItem.componentId, null, 'the group holds the added, unnamed item');
     assert.equal(addedItem.quantity, 1);
     assert.ok(addedItem.id, 'the added item carries an eager id');
     editHarness.remount();
@@ -6027,13 +6056,13 @@ describe('RecipeEditView (mounted)', () => {
 
   it('round-trips authored resultGroups through Recipe.fromJSON().toJSON(), keeping componentId/quantity', async () => {
     const { target, patches } = await mountResultGroups([
-      { id: 'grp-1', name: 'Primary', results: [] },
+      { id: 'grp-1', name: 'Primary', results: [{ id: 'res-open', componentId: null, quantity: 1 }] },
     ]);
-    await pickPopoverOption(
-      target,
-      '[data-recipe-result-set-id="grp-1"] .manager-recipe-add-component-trigger',
-      /Pure Water/
-    );
+    const field = target.querySelector(':scope [data-recipe-result-item] [data-recipe-option-search]');
+    field.focus();
+    await typeInto(field, 'Pure');
+    document.querySelector('[data-recipe-option-suggestion="cmp-water"]').click();
+    await flushRender();
     const authored = patches.at(-1).resultGroups;
     // The Recipe model assigns ids via global foundry.utils.randomID().
     const hadFoundry = 'foundry' in globalThis;

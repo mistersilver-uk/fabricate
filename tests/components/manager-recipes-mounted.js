@@ -889,6 +889,47 @@ export function registerRecipesCases() {
     ]);
   });
 
+  // Issue 1773: the root hands the editor the system's recipes and its learning observability,
+  // so a knowledge result is offered exactly where a learned entry can become visible.
+  it('offers a knowledge result, naming the system’s recipes, only where learning is observable', async () => {
+    const resultKindsFor = async (visibilityMode) => {
+      const target = await openRecipeEditor([], {
+        selectedSystemOverrides: { resolutionMode: 'simple', visibilityMode },
+        selectedCurrency: { enabled: true, units: [{ id: 'gp', label: 'Gold' }] },
+      });
+      target.querySelector('#recipe-tab-results').click();
+      await tick();
+      flushSync();
+      target.querySelector('[data-recipe-add="result-item"]').click();
+      await tick();
+      flushSync();
+      const entries = [...target.querySelectorAll(':scope .manager-recipe-result-menu [role="menuitem"]')];
+      return { target, kinds: entries.map((entry) => entry.getAttribute('data-recipe-add')) };
+    };
+    const { target, kinds } = await resultKindsFor('knowledge');
+    assert.deepEqual(kinds, ['result-component', 'result-currency', 'result-knowledge']);
+    target
+      .querySelector(':scope .manager-recipe-result-menu [data-recipe-add="result-knowledge"]')
+      .click();
+    await tick();
+    flushSync();
+    const rows = [...target.querySelectorAll('[data-recipe-result-item]')];
+    const field = rows.at(-1).querySelector('[data-recipe-option-search]');
+    field.focus();
+    field.value = 'heal';
+    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(
+      document.querySelector('[data-recipe-option-suggestion="r1"]'),
+      'the taught recipe is searched from the system’s own recipes'
+    );
+    assert.deepEqual((await resultKindsFor('global')).kinds, [
+      'result-component',
+      'result-currency',
+    ]);
+  });
+
   it('gives a step seeded by switching to multi-step a stable id (so step-scoped edits route to the step, not the recipe)', async () => {
     const calls = [];
     const target = await openRecipeEditor(calls, {

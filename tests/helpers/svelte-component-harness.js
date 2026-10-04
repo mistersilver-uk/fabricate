@@ -239,6 +239,7 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
   'src/ui/svelte/apps/manager/recipe/resultRows.js',
+  'src/ui/svelte/util/recipeCurrency.js',
   'src/systems/characterModifierPrerequisiteCopy.js',
   'src/systems/characterPrerequisites.js',
   'src/utils/scalars.js',
@@ -256,7 +257,13 @@ export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte'
+  'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+  // Issue 1773: a recipe result set's one adder.
+  'src/ui/svelte/components/Button.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte'
 ]);
 
 // THE ONE TONE MAP the retired status pill's call sites read (issue 1506). THE QUANTITY READINGS

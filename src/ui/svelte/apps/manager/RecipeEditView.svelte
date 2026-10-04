@@ -35,23 +35,23 @@
 
   let {
     recipe = null,
-    // Whether the system mode allows more than one ingredient set (issue 643), so the Ingredients
-    // tab's single-set view can show the "Add ingredient set" promotion affordance.
+    // Whether the mode allows more than one ingredient set: the single-set view's promotion (643).
     canAddSet = false,
     // Alchemy Simple two-slot result editor (issue 554).
     alchemySimple = false,
-    // A simple-resolution system with the check enabled also gets the reserved-failure two-slot
-    // result editor (issue 643).
+    // A simple system with the check enabled also gets the reserved-failure two slots (issue 643).
     simpleFailureSlot = false,
     saving = false,
     saveFailed = false,
     onPickImagePath = null,
     currencyUnits = [],
-    // Whether the currency feature is ENABLED, not merely seeded with preset units. Defaults true,
-    // so a caller that only passes units keeps the pre-gate behaviour.
+    // Whether the currency feature is ENABLED, not merely seeded with units; true keeps a caller
+    // passing only units on the pre-gate behaviour.
     currencyEnabled = true,
-    // Whether the time-requirements feature is ENABLED (issue 714). Defaults true, so a caller
-    // that omits it keeps the pre-gate always-authorable behaviour.
+    // The system's recipes a knowledge result may teach, offered while learning is observable.
+    recipeOptions = [],
+    knowledgeObservable = false,
+    // Whether time requirements are ENABLED (issue 714); true keeps an omitting caller authoring.
     timeRequirementsEnabled = true,
     toolsLibrary = [],
     componentOptions = [],
@@ -67,8 +67,7 @@
     // `bySubject` gives the recipe anything to author at all.
     craftingModifierPolicy = 'addAll',
     craftingModifierDefaultIds = [],
-    // The system's pick cap (issue 1055). `null`, NOT a number: absence is the "unlimited" value,
-    // and a numeric default here would cap every unasked system.
+    // The system's pick cap (issue 1055): `null` is "unlimited", so no numeric default caps one.
     craftingModifierMaxPicks = null,
     craftingModifierInertCause = '',
     onOpenChecks = () => {},
@@ -80,14 +79,13 @@
     routingProvider = null,
     routedOutcomeTierOptions = [],
     routedOutcomeTiersDefined = false,
-    // Whether the failure-result policy permits results on a failed check (issue 1098): it makes
-    // `routedOutcomeTierOptions` above the UNFILTERED list, and names the policy as a remedy.
+    // The failure-result policy permits results on a failed check (issue 1098): the tiers above are
+    // then UNFILTERED, and the policy is named as a remedy.
     routedFailureResultsAllowed = false,
     // Alchemy enable-blocker inputs (issue 549), for the Validation tab and the toggle gate.
     alchemy = null,
     signatureConflicts = [],
-    // Progressive systems award a recipe's results in order, so the Results tab exposes
-    // drag-reorder on the result rows. Other modes ignore result order.
+    // Progressive systems award results in order, so only there the result rows reorder.
     progressive = false,
     // `component.difficulty` is consumed by recipes, salvage, gathering AND system validation, so
     // a progressive result row deep-links to the component editor rather than stepping it here.
@@ -95,11 +93,9 @@
     // The SYSTEM's resolution mode. Never per-recipe: the banner reports it on every tab and
     // routes to Crafting Settings, which is the only place it can change.
     resolutionMode = 'simple',
-    // The system's craftingEffect matrix row, gating the Access and Books & Scrolls tabs (issue
-    // 676). NOT named `effect`.
+    // The craftingEffect matrix row gating the Access and Books & Scrolls tabs (676); not `effect`.
     visibilityEffect = { showAccess: false, showBooksScrolls: true },
-    // Access tab inputs. RESOLVED rows (never ids) — the store resolves them, because a granted id
-    // resolves over EVERY world actor, not the player-character roster.
+    // Access tab inputs: rows the store RESOLVED over EVERY world actor, never ids.
     accessPlayers = [],
     accessCharacters = [],
     // Books & Scrolls tab inputs (the recipe-item definition library + the unlink).
@@ -542,6 +538,10 @@
             isMultiStep={collapsed ? false : isMultiStep}
             {collapsed}
             {componentOptions}
+            {currencyUnits}
+            {currencyEnabled}
+            {recipeOptions}
+            {knowledgeObservable}
             {routingProvider}
             {progressive}
             {onOpenComponent}

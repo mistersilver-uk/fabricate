@@ -285,22 +285,30 @@ Its anatomy is the kind FIRST and the value second:
 [plate] [kind select] [name field] [fixed | rolled] [amount] [or…] [remove]
 ```
 
-The fixed-or-rolled toggle is drawn on result rows alone; a progressive result row draws neither it nor an amount, and carries its stage's read-only DC and its Edit link where the remove would be, because a stage's delete is its ordered list's own.
+The fixed-or-rolled toggle is drawn on component and currency result rows alone, and a knowledge result row draws no amount, because a recipe is taught once; a progressive result row draws neither the toggle nor an amount, and carries its stage's read-only DC and its Edit link where the remove would be, because a stage's delete is its ordered list's own.
 
 - **A result's amount is fixed or rolled.**
 Rolled swaps the stepper for a roll expression in the same slot, at the same width and height, so the toggle moves nothing else in the row; Fixed removes the expression from the result and keeps its quantity, and switching back restores what was typed.
 Opening Rolled and typing nothing writes nothing.
 The expression's placeholder is a dice expression and names no roll-data path, and its hint says a missing character value counts as 0.
 An expression that cannot be rolled, or can never award a positive amount, is marked invalid on the row with its reason on a line of its own, and the save refuses it.
-- **A flat result row names its component and cannot clear it.**
+- **A flat result row names its subject and cannot clear it.**
 Its name field has no clear: a flat result is re-pointed by removing it and adding another, while a progressive stage swaps its component in place so that it keeps its position in the order.
-Adding a component the set already produces raises that row's quantity, unless that row's amount is rolled, in which case a second row is added.
+On a gathering task's or a salvage set's results, adding a component the set already produces raises that row's quantity, unless that row's amount is rolled, in which case a second row is added.
+- **A recipe result set adds through one `Result` adder.**
+It is a dashed button over the kind menu, headed **"Add a result"** and offering the set's kinds, and it appends directly when the set offers one kind.
+The row it appends carries its kind and no value, so it never raises another row's quantity, and focus moves to that row's name field.
+A non-progressive set offers `component`, `currency` where the system takes part in currency and the world has units, and `knowledge` where learned knowledge is observable; a progressive set offers `component` alone.
+- **A currency result opens its naming body; a knowledge result states what it teaches.**
+Once a currency result names its unit, a body beneath the row offers **"Call it"** and **"Why they get it"**, both optional, and a closing line states what the player sees, or "No description — the player just sees" the unit when both are empty.
+No other kind opens it, and an ingredient row never does.
+A knowledge result draws one help line beneath it saying that crafting teaches the recipe and that a player who cannot already see the taught recipe reads "Unknown recipe" in its place.
 - **A result row too narrow for one line wraps by rule, never by overflow.**
 Where its list is narrower than one line needs, a flat row puts its plate, kind and name on the first line with the remove at its end, the toggle and amount on the second at the stepper's width, and any error across the row below.
 A stage row moves its DC and Edit below rather than squeeze its name under the name's minimum, and moves the name below the kind where even that does not fit.
 
 - **Each kind carries its own tint, on every glyph the row draws for its subject.**
-The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence and currency are four distinct hues — so a mixed list reads as one list with four marks in it.
+The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence, currency and knowledge are five distinct hues — so a mixed list reads as one list with a mark per kind in it.
 The tint is on the MARK and never on the tile or the pill, which would make four rows of four kinds read as four differently-coloured cards.
 - **No row carries a `REQUIRED` badge.**
 A choice group states OR in its own `ANY ONE OF` pill, so every row OUTSIDE a group is AND-required by position and a per-row badge restates what the absence of the group already says.
@@ -350,7 +358,8 @@ The menu and the adders are drawn from one list, so they offer the same kinds in
 Choosing a kind turns a bare requirement into its box and so removes the trigger the menu would return focus to, so focus moves to the new alternative's name field, a tag alternative's being its `+ Tag`, rather than falling to the document, where Foundry's keybindings take the keys.
 Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
 
-The menu is a COMPACT PANEL OF KINDS rather than a picker of records, and its scale says so: a fixed 150px panel inset on its own frame, headed by an uppercase **"Accept instead"** eyebrow, over four entries that read from their own left edge.
+The menu is a COMPACT PANEL OF KINDS rather than a picker of records, and its scale says so: a fixed 150px panel inset on its own frame, headed by an uppercase eyebrow, over entries that read from their own left edge.
+The eyebrow is the caller's: **"Accept instead"** on ingredients, and **"Add an alternative"** or **"Add a result"** on results.
 The header is what lets each entry be one word.
 The verb belongs to the panel, so an entry states only the kind it appends — `Component`, `Tag`, `Essence`, `Currency` — and never repeats "Add", "alternative" or a synonym for the row's own vocabulary.
 It is the shared action menu, a `role="menu"` of commands named by that eyebrow, and never the shared picker, whose listbox would announce four kinds as values to select.

@@ -22,6 +22,8 @@
     // undeletable "On a failed check" set — instead of the generic add/remove list.
     alchemySimple = false,
     componentOptions = [],
+    // `recipeResultKinds(…)`: what a result row offers and names, forwarded to every group card.
+    resultKinds = null,
     // Result routing (routed systems only): `ingredientSets` builds the per-result-set options
     // and assignments, `outcomeTierOptions` is the system's routed-check tiers.
     routingProvider = null,
@@ -162,6 +164,7 @@
       <RecipeResultGroupCard
         group={alchemySuccessGroup}
         {componentOptions}
+        {resultKinds}
         {onOpenComponent}
         hideRemove={true}
         staticLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AlchemyOnSuccess', 'On success')}
@@ -170,6 +173,7 @@
       <RecipeResultGroupCard
         group={alchemyFailureGroup}
         {componentOptions}
+        {resultKinds}
         {onOpenComponent}
         reserved={true}
         hideRemove={true}
@@ -188,6 +192,7 @@
         group={simpleGroup}
         chromeless={true}
         {componentOptions}
+        {resultKinds}
         {progressive}
         {isTerminalStep}
         {onOpenComponent}
@@ -219,6 +224,7 @@
           <RecipeResultGroupCard
             {group}
             {componentOptions}
+            {resultKinds}
             {routingProvider}
             {progressive}
             {isTerminalStep}

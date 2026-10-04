@@ -8289,8 +8289,7 @@
 }
 
 .fabricate-manager .manager-checks-tier-add > .fabricate-button,
-.fabricate-manager .manager-salvage-stage-add > .fabricate-button,
-.fabricate-manager .manager-recipe-ingredient-set-add > .manager-recipe-add-result {
+.fabricate-manager .manager-salvage-stage-add > .fabricate-button {
   flex: 1 1 auto;
 }
 
@@ -9244,6 +9243,13 @@
   color: var(--fab-info);
 }
 
+/* The fifth hue (issue 1773): a taught recipe, which only a result awards. */
+.fabricate-manager .manager-recipe-option-lead.is-knowledge,
+.fabricate-manager .manager-recipe-option-mark.is-knowledge,
+.fabricate-action-menu-panel button.manager-action-menu-item.is-knowledge > i {
+  color: var(--fab-tag-rose);
+}
+
 /* THE KIND PICKER (`proto:2248`), which is what makes the row retypeable in place. The class rides the shared `<Select>`'s ROOT since issue 1510, so it states the row's slot and nothing else: the `inline` rung paints the 30px box, the 7px corner, the `--fab-bg-2` fill and the type. */
 .fabricate-manager .manager-recipe-option-kind {
   flex: 0 0 auto;
@@ -9599,6 +9605,53 @@
 /* A result row's name keeps a stated minimum: the field is the row's only flexible item, and below this the row wraps its controls instead of shrinking the name to an ellipsis. */
 .fabricate-manager .manager-recipe-ingredient-option-row.is-result .manager-recipe-option-name-field {
   min-width: 140px;
+}
+
+/* A recipe's reward row offers `Recipe knowledge`, so its kind slot is the specimen's 150px and grows rather than ellipsise a longer word. */
+.fabricate-manager .manager-recipe-ingredient-option-row.is-reward .manager-recipe-option-kind {
+  width: auto;
+  min-width: 150px;
+}
+
+/* A reward row's body spans the row below its controls: a currency's naming body on its own inset band, or a knowledge row's help line. */
+.fabricate-manager .manager-recipe-ingredient-option-row > .manager-recipe-reward-body {
+  display: grid;
+  flex: 0 0 calc(100% + 2 * var(--fab-space-2));
+  order: 5;
+  gap: var(--fab-space-2);
+  box-sizing: border-box;
+  margin: 0 calc(-1 * var(--fab-space-2)) calc(-1 * var(--fab-space-2));
+  padding: var(--fab-space-2) var(--fab-space-3) var(--fab-space-3);
+  border-top: 1px solid var(--fab-border);
+  border-radius: 0 0 7px 7px;
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-recipe-reward-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-reward-fields > .manager-recipe-reward-label {
+  flex: 0 0 170px;
+}
+
+.fabricate-manager .manager-recipe-reward-fields > .manager-recipe-reward-reason {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-ingredient-option-row > .manager-recipe-reward-hint {
+  flex: 0 0 100%;
+  order: 5;
+  margin: 0;
+  font-size: 0.7rem;
+}
+
+.fabricate-manager .manager-recipe-reward-closing {
+  margin: 0;
+  font-size: 0.7rem;
 }
 
 /* A flat result row's list is the container its row wraps against (issue 1516). */

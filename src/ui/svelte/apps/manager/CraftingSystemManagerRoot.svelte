@@ -140,6 +140,7 @@
   } from './gatheringDisplay.js';
   import RecipeEditView from './RecipeEditView.svelte';
   import { craftingEffect } from './crafting/craftingVisibility.js';
+  import { isLearnedKnowledgeObservable } from '../../../../systems/learnedKnowledgeObservability.js';
   import SystemBrowserInspector from './SystemBrowserInspector.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
@@ -928,15 +929,12 @@
     return store.getRecipeSignatureConflicts?.(recipeDraft.id, recipeDraft) || [];
   });
 
-  // --- Recipe editor context rail (issue 643 §4b) --------------------------------
-  // The recipe editor's Access / Books & Scrolls tabs are MODE-CONDITIONAL off the same
-  // craftingEffect matrix the nav and Crafting Settings read, so there is exactly one
-  // source of truth for which conditional surface a visibility mode implies.
+  // The recipe editor's Access / Books & Scrolls tabs are MODE-CONDITIONAL off the craftingEffect
+  // matrix the nav and Crafting Settings read: one source for what a visibility mode implies.
   const recipeVisibilityEffect = $derived(
     craftingEffect(selectedSystem?.visibilityMode || 'knowledge')
   );
-  // Resolution happens in the STORE (the tab never touches ids): granted characters resolve over
-  // EVERY world actor, not the player-character roster.
+  // Resolved in the STORE over EVERY world actor, not the roster; the tab never touches ids.
   const recipeAccessRoster = $derived(
     store.resolveRecipeAccess?.(recipeDraft?.access, {
       players: $viewState.worldUsers || [],
@@ -5685,6 +5683,8 @@
         onPickImagePath={services?.pickImagePath}
         currencyUnits={selectedCurrencyUnits}
         currencyEnabled={selectedCurrencyEnabled}
+        recipeOptions={$viewState.recipes || []}
+        knowledgeObservable={isLearnedKnowledgeObservable(selectedSystem)}
         timeRequirementsEnabled={selectedTimeRequirementsEnabled}
         toolsLibrary={recipeToolsLibrary}
         componentOptions={selectedSystem?.managedItemOptions || []}

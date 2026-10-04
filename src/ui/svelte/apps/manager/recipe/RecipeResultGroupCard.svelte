@@ -1,10 +1,11 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  One result group, each item a `PickerRow` naming a component with a fixed or rolled amount, or on
-  a progressive stage a DC and an Edit link in its `trailing`, emitted as a shallow-updated copy
-  through `onChange(nextGroup)` with an id and a `componentId` on every item it creates. An empty
-  group or a component-less item is gated at the save path (`Recipe.validate`), not here, and on a
-  non-terminal step an empty group is a finished state rather than a draft (issue 1907).
+  One result group, each item a `PickerRow` naming a component, a currency or a taught recipe, with
+  a fixed or rolled amount, or on a progressive stage a component with a DC and an Edit link in its
+  `trailing`, emitted as a shallow-updated copy through `onChange(nextGroup)`. Every item it
+  creates carries an id and its kind's empty subject (`RecipeResultAdder`). An empty group or an
+  unnamed item is gated at the save path (`Recipe.validate`), not here, and on a non-terminal step
+  an empty group is a finished state rather than a draft (issue 1907).
 
   Invariants:
   - Rows are keyed by item id, because a row's Fixed | Rolled state is per instance — pinned by
@@ -14,10 +15,10 @@
 <script>
   import { localizeOr } from '../../../util/localizeOr.js';
   import PickerRow from './PickerRow.svelte';
-  import { fromValue, toValue } from './pickerRowKinds.js';
-  import { componentCatalogue, resultAmountInvalid, withAddedResult } from './resultRows.js';
+  import { emptyResult, fromValue, toValue } from './pickerRowKinds.js';
+  import { recipeResultKinds, resultAmountInvalid } from './resultRows.js';
+  import RecipeResultAdder from './RecipeResultAdder.svelte';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
-  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';
   import SortableList from '../../../components/SortableList.svelte';
   import RecipeStageComplicationBand from './RecipeStageComplicationBand.svelte';
@@ -26,6 +27,9 @@
     group = {},
     chromeless = false,
     componentOptions = [],
+    // `recipeResultKinds(…)` from `resultRows.js`: the kinds a flat row offers and names. Absent,
+    // a row offers `component` alone; a progressive stage always does.
+    resultKinds = null,
     // Routed result routing (non-chromeless only): 'ingredientSet' assigns ingredient sets
     // (`ingredientSet.resultGroupId`), 'check' assigns routed-check outcome tiers
     // (`group.checkOutcomeIds`), and otherwise a free-text result-set name is shown.
@@ -117,9 +121,8 @@
     onChange({ ...group, checkOutcomeIds: checkOutcomeIds.filter((tierId) => tierId !== id) });
   }
 
-  // A result names a component and nothing else until `Result.kind` lands (issue 1773).
-  const RESULT_KINDS = ['component'];
-  const catalogue = $derived(componentCatalogue(componentOptions));
+  const offer = $derived(resultKinds ?? recipeResultKinds({ componentOptions }));
+  const kinds = $derived(progressive ? ['component'] : offer.kinds);
 
   function componentFor(item) {
     return (componentOptions || []).find((option) => option.id === item?.componentId) || null;
@@ -136,14 +139,6 @@
     localizeOr('FABRICATE.Admin.Manager.Recipe.RemoveNamed', 'Remove {name}', {
       name: componentNameFor(item),
     });
-
-  const componentPickerOptions = $derived(
-    (componentOptions || []).map((option) => ({
-      id: option.id,
-      label: option.name,
-      img: option.img,
-    }))
-  );
 
   function newId() {
     const random = globalThis.foundry?.utils?.randomID;
@@ -163,14 +158,11 @@
     onChange({ ...group, results: results.filter((_, i) => i !== index) });
   }
 
-  // Progressive always appends: its award loop ignores `quantity` entirely, so repeating a
-  // component IS how the GM asks for more of it.
-  function addItem(id) {
-    if (progressive) {
-      onChange({ ...group, results: [...results, { id: newId(), componentId: id }] });
-      return;
-    }
-    onChange({ ...group, results: withAddedResult(results, id, newId()) });
+  // Always appends, the row naming its own subject: a recipe set never bumps a quantity, and a
+  // progressive award loop ignores `quantity`, so repeating a component asks for more of it.
+  function addItem(kind) {
+    const added = progressive ? { id: newId(), componentId: null } : emptyResult(kind, newId());
+    onChange({ ...group, results: [...results, added] });
   }
 
   // THE THREE-WAY EMPTY HINT, a guard chain rather than nested ternaries, and its ORDER is the
@@ -332,8 +324,8 @@
         {#snippet row(item, index)}
           <PickerRow
             value={toValue(item)}
-            kinds={RESULT_KINDS}
-            {catalogue}
+            {kinds}
+            catalogue={offer.catalogue}
             amount={false}
             removable={false}
             class="is-result"
@@ -360,13 +352,15 @@
         {#each results as item, index (item?.id || index)}
           <PickerRow
             value={toValue(item)}
-            kinds={RESULT_KINDS}
-            {catalogue}
+            {kinds}
+            catalogue={offer.catalogue}
+            readonlyKinds={offer.readonlyKinds}
             rollable
+            reward
             clearable={false}
             removeHook="result-item"
             invalid={resultAmountInvalid(item, localizeOr)}
-            class="is-result"
+            class="is-result is-reward"
             data-recipe-result-item=""
             onChange={(value) => updateItem(index, fromValue(item, value))}
             onRemove={() => removeItem(index)}
@@ -415,33 +409,13 @@
 {/snippet}
 
 {#snippet resultAdder()}
-  <SearchablePopover
-    options={componentPickerOptions}
-    pickerClass="manager-recipe-component-picker manager-recipe-add-component"
-    triggerClass="fabricate-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
-    triggerIcon="fas fa-plus"
-    triggerLabel={progressive
+  <RecipeResultAdder
+    {kinds}
+    count={results.length}
+    label={progressive
       ? localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
-      : localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
-    ariaLabel={progressive
-      ? localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
-      : localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
-    triggerAddMarker="result-item"
-    panelLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-    searchPlaceholder={localizeOr(
-      'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-      'Search components...'
-    )}
-    searchLabel={localizeOr(
-      'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-      'Search components...'
-    )}
-    emptyHint={localizeOr(
-      'FABRICATE.Admin.Manager.Recipe.NoComponentsDefined',
-      'No components defined'
-    )}
-    showChevron={false}
-    onSelect={(id) => addItem(id)}
+      : ''}
+    onAdd={addItem}
   />
 {/snippet}
 
