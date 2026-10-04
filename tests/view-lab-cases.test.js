@@ -1932,6 +1932,8 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       // Issue 1779 — the wrapped strip's last tab, appended last so it neither moves the index
       // above nor ties the companion frame for this route's surface-coverage slot.
       'manager-world-downtime-narrow-settings',
+      // Issue 1779 — the wide strip's first tab described, appended last for the same reason.
+      'manager-world-downtime-tracking-described',
     ]
   );
   // The Core-preview frames and the premium-installed frame prove DIFFERENT things and cannot share
@@ -1953,18 +1955,26 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
   const companionChrome = named('manager-world-downtime-test-companion-chrome');
   const rollup = named('manager-world-downtime-test-companion-rollup');
   const cases = allCases.filter((entry) => !withCompanion.includes(entry));
-  // The one Core frame that proves the STRIP's pointer target, reached by clicking that tab.
-  const STRIP_HIT_CASE_ID = 'manager-world-downtime-narrow-settings';
-  const stripHit = getCaseById(STRIP_HIT_CASE_ID);
-  assert.equal(stripHit.expectCenterHit, '[data-downtime-tab="settings"]');
-  assert.deepEqual(stripHit.steps.at(-1), { selector: '[data-downtime-tab="settings"]' });
+  // The Core frames that prove the strip's pointer target, each reached by clicking that tab and
+  // taking no CTA step after it, so the pointer leaves the tab's description showing.
+  const STRIP_HIT_TABS = {
+    'manager-world-downtime-narrow-settings': 'settings',
+    'manager-world-downtime-tracking-described': 'tracking',
+  };
+  for (const [caseId, tabId] of Object.entries(STRIP_HIT_TABS)) {
+    const stripHit = getCaseById(caseId);
+    assert.equal(stripHit.expectCenterHit, `[data-downtime-tab="${tabId}"]`);
+    assert.deepEqual(stripHit.steps.at(-1), { selector: `[data-downtime-tab="${tabId}"]` });
+    assert.ok(!stripHit.expectClick, `${caseId} takes no CTA click after the tab`);
+    assert.ok(stripHit.expectVisible.startsWith(`[data-downtime-tooltip="${tabId}"]`));
+  }
   for (const viewCase of cases) {
     assert.equal(viewCase.expectView, 'world-downtime');
     assert.ok(viewCase.expectNoHorizontalOverflow);
     assert.ok(viewCase.expectOverflowY);
     assert.ok(viewCase.expectVisible, `${viewCase.id} proves its keyboard tooltip is visible`);
     assert.equal(viewCase.expectContained.length, 2, `${viewCase.id} checks both World rail icons`);
-    if (viewCase.id === STRIP_HIT_CASE_ID) continue;
+    if (Object.hasOwn(STRIP_HIT_TABS, viewCase.id)) continue;
     assert.equal(
       viewCase.expectCenterHit,
       '.downtime-preview:not([hidden]) .downtime-cta',
@@ -2051,6 +2061,12 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       `${viewCase.id} expects the shipped ${tabKey} tooltip verbatim`
     );
   }
+  assert.ok(
+    getCaseById('manager-world-downtime-tracking-described').expectVisible.includes(
+      downtimeTabs.Tracking.Tooltip
+    ),
+    'the described frame expects the shipped Tracking tooltip verbatim'
+  );
 
   // Issue 1185 — the premium-installed frame.
   assert.equal(premium.expectView, 'world-downtime');

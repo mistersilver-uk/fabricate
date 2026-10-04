@@ -354,8 +354,8 @@ test('(a) the older overrides still name the frame that renders their state', ()
     ],
     [
       'src/ui/svelte/components/EditorTabs.svelte',
-      'manager-world-downtime-tracking',
-      'the frame that draws the premium padlock and a showing description',
+      'manager-world-downtime-tracking-described',
+      'the frame that draws the premium padlock and the wide strip`s description above its own tab',
     ],
     [
       'src/ui/svelte/components/EditorTabs.svelte',
