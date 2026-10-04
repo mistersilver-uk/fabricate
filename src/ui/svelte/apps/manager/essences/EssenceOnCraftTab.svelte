@@ -188,8 +188,7 @@
 
 <div class="manager-essence-tab-stack" data-essence-tab-panel={scoped ? 'rules' : 'oncraft'}>
   {#if !scoped}
-    <!-- THE CREATE DRAFT'S PRIMER, dropped on the rules screen where each card explains itself
-         and the shared-definition callout says which layer is which. -->
+    <!-- The create draft's primer; the rules screen's cards and shared definition explain themselves. -->
     <Callout
       icon="fas fa-circle-question"
       title={text(
