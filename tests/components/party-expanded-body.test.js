@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -13,6 +16,8 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-party-body-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
+    'src/ui/svelte/apps/manager/recordPickerOptions.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
@@ -33,7 +38,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
-    'src/ui/svelte/apps/manager/PartyNameField.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/apps/manager/InlineRenameField.svelte',
     'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
     'src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte',
     'src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte',

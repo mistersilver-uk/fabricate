@@ -317,6 +317,8 @@ Useful flags: `--json`, `--include <moduleId>`, `--bucket <name>`, `--channel <n
 - `node scripts/rotate-tester-secrets.mjs` rotates every tester path segment in one pass, across this repository and the premium sibling.
 It reads both committed release configs to derive which repository secrets each tester group's segment is written to, so no Patreon tier name is hard-coded here.
 It is **dry-run by default** and writes nothing until `--apply`; `--group <name>` narrows to one group, and refuses when that group's secret also serves groups you did not name.
+Each new segment is `<label>-<32 hex characters>`, where the label defaults to the current UTC month and year (`oct2026`) so a feed's month is readable from its URL; `--label <text>` overrides it, for example when rotating at the end of one month for the next.
+The label is part of the secret value, so a rotation sets it with no committed config edit, and it adds no entropy: all of the unguessability is in the hex.
 Useful flags: `--group <name>`, `--config <path>`, and `--premium-config <path>` when the premium sibling is not checked out beside this repository.
 `--no-premium` inspects this repository alone and is **refused together with `--apply`**, because rotating one repository leaves the other on the old segment and splits one cohort across two prefixes.
 Rotation is a cohort migration, never hygiene: it deletes nothing and republishes nothing, so every superseded prefix keeps serving its last manifest and the cohort on it silently stops receiving updates rather than failing.

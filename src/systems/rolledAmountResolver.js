@@ -1,4 +1,7 @@
+import { normalizeQuantityFormula, quantityFormulaErrors } from '../models/Result.js';
 import { diceEngine } from '../utils/rollFormulaRollability.js';
+
+import { resolveSalvageCheck } from './salvageCheckUsability.js';
 
 /**
  * The one seam turning a result's authored amount into the integer awarded (issue 1645).
@@ -29,6 +32,8 @@ export async function resolveRolledAmount(
   }
   return { amount: Math.max(0, Math.floor(total)), rolled: { formula, total }, roll };
 }
+
+const actorData = (actor) => actor?.getRollData?.() ?? {};
 
 /** Whether `formula` totals finitely against `rollData` with every die at its maximum and at its
  *  minimum; a throw (a path resolving to text) is not finite. */
@@ -76,7 +81,44 @@ export function validateCraft(recipe, actor, modeService) {
     ...(recipe.resultGroups ?? []),
     ...(recipe.steps ?? []).flatMap((step) => step?.resultGroups ?? []),
   ]);
-  const errors = rolledAmountRefusals([...groups], Roll, actor?.getRollData?.() ?? {});
+  const errors = rolledAmountRefusals([...groups], Roll, actorData(actor));
+  return { valid: errors.length === 0, errors };
+}
+
+/** The `quantityFormulaErrors` floor over every result `salvage` authors; no `Roll` reports none. */
+export function salvageResultAmountErrors(salvage, Roll) {
+  return (salvage?.resultGroups ?? [])
+    .flatMap((group) => group?.results ?? [])
+    .flatMap((result) =>
+      quantityFormulaErrors(normalizeQuantityFormula(result?.quantityFormula), Roll)
+    )
+    .map((error) => `Salvage result ${error}`);
+}
+
+/** The floor's `Roll` for `system`'s salvage: none under progressive, whose award drops formulas. */
+const salvageAmountRoll = (system) =>
+  resolveSalvageCheck(system).mode === 'progressive' ? null : diceEngine();
+
+/** Throws when an enabled `salvage`, authored under `system`, fails the amount floor; the save is
+ *  refused. A disabled one is never salvaged, so it is not floored. */
+export function assertSalvageAmounts(salvage, system) {
+  if (salvage?.enabled !== true) return;
+  const errors = salvageResultAmountErrors(salvage, salvageAmountRoll(system));
+  if (errors.length > 0) throw new Error(`Invalid salvage: ${errors.join(', ')}`);
+}
+
+/**
+ * `modeService.validateSalvage`, then the amount floor and `rolledAmountRefusals` against `actor`
+ * over a non-progressive salvage's results, so a salvage refuses before it consumes anything.
+ */
+export function validateSalvage({ component, system, actor }, modeService) {
+  const modes = modeService ?? globalThis.game?.fabricate?.getResolutionModeService?.();
+  const validation = modes?.validateSalvage?.(component, system) ?? { valid: true, errors: [] };
+  const Roll = salvageAmountRoll(system);
+  if (!validation.valid || !Roll) return validation;
+  const floor = salvageResultAmountErrors(component?.salvage, Roll);
+  const groups = component?.salvage?.resultGroups;
+  const errors = floor.length > 0 ? floor : rolledAmountRefusals(groups, Roll, actorData(actor));
   return { valid: errors.length === 0, errors };
 }
 

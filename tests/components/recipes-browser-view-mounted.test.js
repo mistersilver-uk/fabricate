@@ -28,7 +28,7 @@ import {
 import { chipToneOf } from '../helpers/chipTone.js';
 // Issue 1515: the blocked-enable strip is a `<Notice>`.
 import { getCaseById } from '../../scripts/lib/viewLabCases.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -38,6 +38,7 @@ const RECIPE_RAW_MODULES = [
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/utils/recipeCategories.js',
@@ -496,21 +497,21 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
       const root = await browser.mount({ recipes: [recipe], resolutionMode: mode });
       const io = root.querySelector('[data-recipe-io]');
       assert.match(io.textContent, /2 in/, `${mode} still reports the ingredient count`);
-      assert.match(io.textContent, /3 groups/, `${mode} reports result GROUPS`);
+      assert.match(io.textContent, /3 sets/, `${mode} reports result SETS`);
       assert.equal(io.textContent.includes('out'), false, `${mode} must not invent an outputs count`);
       assert.ok(io.querySelector('.manager-recipe-io-routed'), `${mode} shows the routing glyph`);
       browser.remount();
     }
   });
 
-  it('says "1 group", never "1 groups"', async () => {
+  it('says "1 set", never "1 sets"', async () => {
     const root = await browser.mount({
       recipes: [makeRecipe({ resultGroupCount: 1 })],
       resolutionMode: 'routedByCheck'
     });
     const io = root.querySelector('[data-recipe-io]').textContent;
-    assert.match(io, /1 group\b/);
-    assert.equal(/1 groups/.test(io), false);
+    assert.match(io, /1 set\b/);
+    assert.equal(/1 sets/.test(io), false);
   });
 
   it('shows the projected check DC in the mono face', async () => {

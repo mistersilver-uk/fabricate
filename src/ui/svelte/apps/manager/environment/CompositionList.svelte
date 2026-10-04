@@ -5,7 +5,7 @@
     DEFAULT_GATHERING_EVENT_IMG,
     DEFAULT_GATHERING_TASK_IMG,
   } from '../../../../../gatheringImageDefaults.js';
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import ActionMenu from '../../../components/ActionMenu.svelte';
   import RuntimeStatePill from './RuntimeStatePill.svelte';
   import CompositionStatePill from './CompositionStatePill.svelte';
@@ -48,11 +48,6 @@
     return Number.isFinite(raw) && raw >= 0 ? raw : 1;
   }
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   const defaultImg = $derived(
     kind === 'event' ? DEFAULT_GATHERING_EVENT_IMG : DEFAULT_GATHERING_TASK_IMG
   );
@@ -64,13 +59,16 @@
     return (
       entry?.record?.name ||
       entry?.id ||
-      text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Unnamed', 'Unnamed')
+      localizeOr('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Unnamed', 'Unnamed')
     );
   }
   function recordDescription(entry) {
     return (
       String(entry?.record?.description || '').trim() ||
-      text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription', 'No description')
+      localizeOr(
+        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription',
+        'No description'
+      )
     );
   }
 
@@ -81,9 +79,8 @@
   }
 
   // The INCLUDED vocabulary, from its one home (issue 1321). It answers "does the Included
-  // list show this", which is a different question from "does it compose" even though issue 1315
-  // leaves the two sets with the same four members: `includedNotMatching` belongs here because a
-  // manual pick composes whether or not it matches, and the GM still needs to see which is which.
+  // list show this", not "does it compose", though issue 1315 gives both sets the same four
+  // members: `includedNotMatching` is here because a manual pick composes matching or not.
   const included = $derived(
     records.filter((entry) => ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState))
   );
@@ -118,21 +115,16 @@
     )
   );
   $effect(() => {
-    if (
-      nonMatchingPageIndex > 0 &&
-      nonMatchingPageIndex * nonMatchingPageSize >= nonMatching.length
-    ) {
-      nonMatchingPageIndex = 0;
-    }
+    if (nonMatchingPageIndex * nonMatchingPageSize >= nonMatching.length) nonMatchingPageIndex = 0;
   });
 
   const includedTitle = $derived(
     mode === 'manual'
-      ? text(
+      ? localizeOr(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.IncludedInEnvironment',
           'Included in this environment'
         )
-      : text(
+      : localizeOr(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.IncludedByMatchHeading',
           'Included by match'
         )
@@ -140,36 +132,33 @@
 
   const unit = $derived(
     kind === 'event'
-      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.EventsUnit', 'events')
-      : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.TasksUnit', 'tasks')
+      ? localizeOr('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.EventsUnit', 'events')
+      : localizeOr('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.TasksUnit', 'tasks')
   );
   const recordColumnLabel = $derived(
     kind === 'event'
-      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColEvent', 'Event')
-      : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColTask', 'Task')
+      ? localizeOr('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColEvent', 'Event')
+      : localizeOr('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColTask', 'Task')
   );
 
   // ── THE FOUR OVERFLOW MENUS, AS DATA (issue 1477) ────────────────────────────────────────
-  // The four hand-rolled `role="menu"` blocks this file carried are one `<ActionMenu>` each now,
-  // and the only thing that ever differed between them was WHICH VERBS they offered. So the
-  // difference is expressed as four item lists rather than as four copies of a menu, and the
-  // shared primitive owns the ARIA and the keyboard contract that all four had to restate.
-  //
+  // The four hand-rolled `role="menu"` blocks are one `<ActionMenu>` each now; only WHICH VERBS
+  // they offered ever differed, so that is four item lists, and the shared primitive owns the
+  // ARIA and keyboard contract all four had to restate.
   // Every `data-action` hook is preserved verbatim — `include`, `force-include`, `exclude`,
-  // `restore` — because mounted suites and the View Lab's automatic-force-add case address these
-  // rows by them. They ride the primitive's per-item `data` map, which is spread onto the item
-  // button before the primitive's own attributes.
+  // `restore` — because mounted suites and the View Lab's automatic-force-add case address rows
+  // by them. They ride the primitive's per-item `data` map, spread onto the item button first.
   const moreActionsLabel = $derived(
-    text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')
+    localizeOr('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')
   );
 
   function openSourceLabel() {
     return kind === 'event'
-      ? text(
+      ? localizeOr(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
           'Open source event'
         )
-      : text(
+      : localizeOr(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
           'Open source task'
         );
@@ -179,13 +168,13 @@
     return { id: 'open-source', label: openSourceLabel(), icon: 'fas fa-up-right-from-square' };
   }
 
-  // The library gate precedes both composition modes, so a disabled record offers a NOTE rather
-  // than a verb. It is a disabled `menuitem` with no icon: the primitive renders the icon cell
-  // regardless, which is what keeps its label in the same text column as every other row.
+  // The library gate precedes both composition modes, so a disabled record offers a NOTE, not a
+  // verb: a disabled `menuitem` with no icon (the primitive renders the icon cell regardless,
+  // keeping its label in the same text column).
   function libraryDisabledNote() {
     return {
       id: 'library-disabled',
-      label: text(
+      label: localizeOr(
         'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote',
         'Enable in library first'
       ),
@@ -201,11 +190,11 @@
       id: 'exclude',
       label:
         mode === 'manual'
-          ? text(
+          ? localizeOr(
               'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Remove',
               'Remove from environment'
             )
-          : text(
+          : localizeOr(
               'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude',
               'Exclude from environment'
             ),
@@ -218,11 +207,9 @@
 
   // The Available-to-add and Non-matching menus are ONE SHAPE offering two different verbs: an add
   // verb when the row can be composed, the library note when the library gate blocks it, and
-  // Open source either way. Stated once, because the two are otherwise token-identical bodies
-  // differing only in their predicates and their verb — which is a copy the SonarCloud duplication
-  // gate counts and, more to the point, is how the four menus in this file drifted apart before.
-  // Each caller keeps its OWN predicate at its own call site, so the two questions ("does manual
-  // mode allow a plain add?" and "does automatic mode allow a force?") stay visible.
+  // Open source either way. Stated once: token-identical bodies are a copy the SonarCloud
+  // duplication gate counts, and are how the four menus drifted apart before. Each caller keeps
+  // its OWN predicate at its own call site, so the two questions stay visible.
   function gatedAddMenuItems(verb, allowed, blockedByLibrary) {
     const items = [];
     if (allowed) items.push(verb);
@@ -235,7 +222,10 @@
     return gatedAddMenuItems(
       {
         id: 'include',
-        label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include', 'Include'),
+        label: localizeOr(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include',
+          'Include'
+        ),
         icon: 'fas fa-plus',
         data: { 'data-action': 'include' },
       },
@@ -249,7 +239,10 @@
       openSourceItem(),
       {
         id: 'restore',
-        label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore', 'Restore'),
+        label: localizeOr(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore',
+          'Restore'
+        ),
         icon: 'fas fa-rotate-left',
         data: { 'data-action': 'restore' },
       },
@@ -260,7 +253,10 @@
     return gatedAddMenuItems(
       {
         id: 'force-include',
-        label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add'),
+        label: localizeOr(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd',
+          'Force add'
+        ),
         icon: 'fas fa-plus',
         data: { 'data-action': 'force-include' },
       },
@@ -269,9 +265,8 @@
     );
   }
 
-  // ONE dispatcher for all four menus, because the verbs are shared across them: `open-source`
-  // appears in every one and `include` in two. A per-menu handler would be four copies of this
-  // switch with different subsets, which is how the four menus drifted apart in the first place.
+  // ONE dispatcher for all four menus: `open-source` appears in every one and `include` in two,
+  // and a per-menu handler would be four copies of this switch with different subsets.
   function runMenuAction(id, entry) {
     if (id === 'open-source') onOpenSource(kind, entry.id);
     else if (id === 'include') onInclude(kind, entry.id);
@@ -287,8 +282,8 @@
   }
 
   // The caller's per-record state, on the row element the primitive owns (issue 1512), under the
-  // caller's own family class: a state rule keyed on the primitive's row class behind an
-  // application root is the app-rooting the rooting requirement refuses.
+  // caller's own family class: a rule keyed on the primitive's row class behind an application
+  // root is the app-rooting the rooting requirement refuses.
   function includedRowClasses(entry) {
     return [
       'manager-environment-comp-entry',
@@ -304,10 +299,9 @@
     return entry?.compositionState === 'candidate' ? 'candidate' : 'non-matching';
   }
 
-  // This list is manual-mode only (its section is gated on `mode === 'manual'`), and manual
-  // mode composes exactly what the GM picks, matching or not. So a non-matching record is
-  // plainly added here — there is no filter for a force to override, and no `'force-include'`
-  // for this function to return. Force add belongs to automatic mode's Non-matching section.
+  // This list is manual-mode only (gated on `mode === 'manual'`), which composes exactly what the
+  // GM picks, matching or not. So a non-matching record is plainly added here: no filter for a
+  // force to override, no `'force-include'` to return. Force add belongs to automatic mode.
   // `libraryDisabled` is still not addable: the library gate precedes both modes.
   function availableRowAction(entry) {
     if (entry?.compositionState === 'candidate' || entry?.compositionState === 'notMatching')
@@ -341,16 +335,19 @@
       <span></span>
       <span>{recordColumnLabel}</span>
       {#if showBlindWeights}<span
-          >{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColWeight', 'Weight')}</span
+          >{localizeOr(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColWeight',
+            'Weight'
+          )}</span
         >{/if}
       <span
-        >{text(
+        >{localizeOr(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColOverride',
           'Override'
         )}</span
       >
       <span
-        >{text(
+        >{localizeOr(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColRuntime',
           'Runtime state'
         )}</span
@@ -366,11 +363,11 @@
         compact
         icon={kind === 'event' ? 'fas fa-masks-theater' : 'fas fa-list-check'}
         title={kind === 'event'
-          ? text(
+          ? localizeOr(
               'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoIncludedEvents',
               'No events are available in this environment yet.'
             )
-          : text(
+          : localizeOr(
               'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoIncludedTasks',
               'No tasks are available in this environment yet.'
             )}
@@ -420,7 +417,10 @@
                     step={1}
                     fill
                     {...stepperLabels(
-                      text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight', 'Weight')
+                      localizeOr(
+                        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight',
+                        'Weight'
+                      )
                     )}
                     inputProps={{ 'data-composition-weight': entry.id }}
                     onChange={(weight) => onWeightChange(entry.id, weight)}
@@ -429,11 +429,11 @@
                 <span
                   class="manager-environment-comp-weight-percent"
                   data-composition-weight-percent={entry.id}
-                  title={text(
+                  title={localizeOr(
                     'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.WeightPercentage',
                     'Selection share'
                   )}
-                  aria-label={text(
+                  aria-label={localizeOr(
                     'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.WeightPercentage',
                     'Selection share'
                   )}>{formatWeightPercentage(entry.id)}</span
@@ -452,11 +452,11 @@
                   class="is-danger manager-environment-comp-quick-action"
                   data-quick-action="exclude"
                   data-action="exclude"
-                  ariaLabel={text(
+                  ariaLabel={localizeOr(
                     'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove',
                     'Remove'
                   )}
-                  title={text(
+                  title={localizeOr(
                     'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove',
                     'Remove'
                   )}
@@ -482,7 +482,7 @@
     <section class="manager-environment-comp-section" data-section="available-to-add">
       <header class="manager-environment-comp-band">
         <h4>
-          {text(
+          {localizeOr(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.AvailableToAdd',
             'Available to add'
           )}
@@ -494,11 +494,11 @@
           compact
           icon="fas fa-circle-plus"
           title={kind === 'event'
-            ? text(
+            ? localizeOr(
                 'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoAvailableEventsToAdd',
                 'No matching or non-matching events to add.'
               )
-            : text(
+            : localizeOr(
                 'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoAvailableTasksToAdd',
                 'No matching or non-matching tasks to add.'
               )}
@@ -541,11 +541,11 @@
                     class="is-primary manager-environment-comp-quick-action"
                     data-quick-action="include"
                     data-action="include"
-                    ariaLabel={text(
+                    ariaLabel={localizeOr(
                       'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd',
                       'Add'
                     )}
-                    title={text(
+                    title={localizeOr(
                       'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd',
                       'Add'
                     )}
@@ -572,7 +572,7 @@
     <section class="manager-environment-comp-section" data-section="excluded">
       <header class="manager-environment-comp-band">
         <h4>
-          {text(
+          {localizeOr(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ExcludedFromEnvironment',
             'Excluded from this environment'
           )}
@@ -583,7 +583,7 @@
         <EmptyState
           compact
           icon="fas fa-ban"
-          title={text(
+          title={localizeOr(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoExcluded',
             'Nothing is excluded.'
           )}
@@ -634,7 +634,7 @@
                   >
                     <i class="fas fa-rotate-left" aria-hidden="true"></i>
                     <span
-                      >{text(
+                      >{localizeOr(
                         'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore',
                         'Restore'
                       )}</span
@@ -652,7 +652,7 @@
     <section class="manager-environment-comp-section" data-section="non-matching">
       <header class="manager-environment-comp-band">
         <h4>
-          {text(
+          {localizeOr(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NonMatching',
             'Non-matching'
           )}
@@ -664,11 +664,11 @@
           compact
           icon="fas fa-filter-circle-xmark"
           title={kind === 'event'
-            ? text(
+            ? localizeOr(
                 'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoNonMatchingEvents',
                 'No non-matching or disabled events.'
               )
-            : text(
+            : localizeOr(
                 'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoNonMatchingTasks',
                 'No non-matching or disabled tasks.'
               )}
@@ -736,7 +736,7 @@
                     >
                       <i class="fas fa-plus" aria-hidden="true"></i>
                       <span
-                        >{text(
+                        >{localizeOr(
                           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd',
                           'Force add'
                         )}</span
@@ -744,7 +744,7 @@
                     </Button>
                   {:else if entry.compositionState === 'libraryDisabled'}
                     <span class="manager-muted manager-environment-comp-disabled-note"
-                      >{text(
+                      >{localizeOr(
                         'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote',
                         'Enable in library first'
                       )}</span
@@ -752,11 +752,11 @@
                   {/if}
                   <IconButton
                     ariaLabel={kind === 'event'
-                      ? text(
+                      ? localizeOr(
                           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
                           'Open source event'
                         )
-                      : text(
+                      : localizeOr(
                           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
                           'Open source task'
                         )}

@@ -34,7 +34,8 @@
 <script>
   import Field from './Field.svelte';
   import SearchablePopover from './SearchablePopover.svelte';
-  import { formatList, localize } from '../util/foundryBridge.js';
+  import { formatList } from '../util/foundryBridge.js';
+  import { localizeOr } from '../util/localizeOr.js';
 
   let {
     options = [],
@@ -55,17 +56,6 @@
 
   let open = $state(false);
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
-  function format(key, fallback, data) {
-    const translated = localize(key, data);
-    if (translated && translated !== key) return translated;
-    return fallback.replace(/\{(\w+)\}/g, (_match, name) => String(data?.[name] ?? ''));
-  }
-
   const allOptions = $derived(Array.isArray(options) ? options : []);
   const selected = $derived(Array.isArray(selectedIds) ? selectedIds : []);
   const selectedOptions = $derived(allOptions.filter((option) => selected.includes(option.id)));
@@ -74,7 +64,7 @@
   function optionLabel(option) {
     return (
       option.label ||
-      text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierUnnamed', 'Unnamed modifier')
+      localizeOr('FABRICATE.Admin.Manager.Checks.Crafting.ModifierUnnamed', 'Unnamed modifier')
     );
   }
 
@@ -82,18 +72,21 @@
     if (selectedOptions.length === 0) {
       return (
         noneSelectedLabel ||
-        text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillNone', 'No modifiers selected.')
+        localizeOr(
+          'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillNone',
+          'No modifiers selected.'
+        )
       );
     }
     const names = formatList(selectedOptions.map((option) => optionLabel(option)));
     if (selectedOptions.length === 1) {
-      return format(
+      return localizeOr(
         'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillSelectedOne',
         '1 modifier selected: {names}',
         { names }
       );
     }
-    return format(
+    return localizeOr(
       'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillSelected',
       '{count} modifiers selected: {names}',
       { count: selectedOptions.length, names }
@@ -101,7 +94,8 @@
   });
 
   const menuButtonLabel = $derived(
-    triggerLabel || text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAdd', 'Add modifier')
+    triggerLabel ||
+      localizeOr('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAdd', 'Add modifier')
   );
 
   const menuOptions = $derived(
@@ -155,7 +149,7 @@
     triggerProps={{ 'data-modifier-pill-menu-button': '' }}
     {disabled}
     emptyHint={allSelectedLabel ||
-      text(
+      localizeOr(
         'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
         'All modifiers selected.'
       )}
@@ -171,7 +165,7 @@
           class="manager-availability-remove"
           data-keyboard-focus="true"
           {disabled}
-          aria-label={`${text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillRemove', 'Remove')} ${optionLabel(option)}`}
+          aria-label={`${localizeOr('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillRemove', 'Remove')} ${optionLabel(option)}`}
           data-modifier-pill-remove={option.id}
           onclick={(event) => remove(option.id, event)}
         >
@@ -181,7 +175,7 @@
     {:else}
       <span class="manager-muted manager-availability-any">
         {noneSelectedLabel ||
-          text(
+          localizeOr(
             'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillNone',
             'No modifiers selected.'
           )}

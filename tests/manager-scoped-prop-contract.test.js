@@ -140,8 +140,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './downtime/worldDowntimePreviewProvider.js',
   // Added by issue 1707, which moved the gathering, travel and environment inspector branch out
   // of the root. The rail owns the whole chain, so it — not the root — imports the four leaves,
-  // `GatheringModifierEditor`, `GatheringRuleLimitStepper`, `ChanceSlider`, `RealmNameField` and
-  // `CharacterModifierBoundsRow`, and the root no longer reads `DEFAULT_GATHERING_EVENT_IMG`.
+  // `GatheringModifierEditor`, `GatheringRuleLimitStepper`, `ChanceSlider` and `InlineRenameField`,
+  // and the root no longer reads `DEFAULT_GATHERING_EVENT_IMG`.
   './environment/GatheringInspectorRail.svelte',
   './essences/EssenceBehaviorPreview.svelte',
   './essences/EssenceBrowserInspector.svelte',

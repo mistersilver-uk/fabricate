@@ -65,11 +65,14 @@ import {
   unreadProps,
 } from './structureShapes.js';
 
-/** Every `text(key, fallback)` a component states with both arguments spelled out. */
+/** The callee names a localized `(key, fallback)` pair goes through: the shared `localizeOr`, or a leftover local `text`. */
+const LOCALIZE_CALLEES = new Set(['localizeOr', 'text']);
+
+/** Every `localizeOr(key, fallback)` a component states with both arguments spelled out. */
 function staticTextCalls(component) {
   const calls = [];
   for (const node of walkNodes(component)) {
-    if (calledName(node) !== 'text') continue;
+    if (!LOCALIZE_CALLEES.has(calledName(node))) continue;
     const [key, fallback] = node.arguments;
     if (typeof key?.value !== 'string' || typeof fallback?.value !== 'string') continue;
     if (key.type === 'Literal' && fallback.type === 'Literal') {
@@ -163,7 +166,9 @@ function inOperatorKeys(node, objectName) {
 function comparesToLiteral(node, value) {
   for (const inner of walkNodes(node)) {
     if (inner.type !== 'BinaryExpression') continue;
-    if ([inner.left, inner.right].some((side) => side?.type === 'Literal' && side.value === value)) {
+    if (
+      [inner.left, inner.right].some((side) => side?.type === 'Literal' && side.value === value)
+    ) {
       return true;
     }
   }
@@ -216,7 +221,9 @@ function callsWithArgument(node, [name, argument]) {
 function callsWithLiteral(node, [name, value]) {
   for (const inner of walkNodes(node)) {
     if (inner.type !== 'CallExpression' || calledName(inner) !== name) continue;
-    if (inner.arguments.some((argument) => argument?.type === 'Literal' && argument.value === value))
+    if (
+      inner.arguments.some((argument) => argument?.type === 'Literal' && argument.value === value)
+    )
       return true;
   }
   return false;
@@ -241,7 +248,8 @@ const sortedNames = (names) => [...names].sort((a, b) => a.localeCompare(b)).joi
 function fallsBackFrom(node, [callee, constructorName]) {
   for (const inner of walkNodes(node)) {
     if (inner.type !== 'LogicalExpression' || !['??', '||'].includes(inner.operator)) continue;
-    if (inner.right?.type !== 'NewExpression' || inner.right.callee?.name !== constructorName) continue;
+    if (inner.right?.type !== 'NewExpression' || inner.right.callee?.name !== constructorName)
+      continue;
     if (callNames(inner.left).has(callee)) return true;
   }
   return false;
@@ -335,10 +343,10 @@ const importsNameUnaliased = (node, [specifier, name]) =>
       )
   );
 
-/** The `(key, fallback)` pair a `return text(key, fallback);` states, or `[]` for any other. */
+/** The `(key, fallback)` pair a `return localizeOr(key, fallback);` states, or `[]` for any other. */
 function returnedTextArguments(node) {
   const call = node?.type === 'ReturnStatement' ? node.argument : undefined;
-  if (calledName(call) !== 'text') return [];
+  if (!LOCALIZE_CALLEES.has(calledName(call))) return [];
   const [key, fallback] = call.arguments.map((argument) =>
     argument?.type === 'Literal' ? argument.value : undefined
   );
@@ -422,7 +430,8 @@ function claimsOverCode(code) {
     property: ([key, value]) => propertyValues(code, key).includes(value),
     key: (name) => propertyKeys(code).has(name),
     callers: ([name, members]) => sitesCalling(code, name) === sortedNames(members),
-    fnCallers: ([name, fns]) => sitesCalling(code, name, 'FunctionDeclaration') === sortedNames(fns),
+    fnCallers: ([name, fns]) =>
+      sitesCalling(code, name, 'FunctionDeclaration') === sortedNames(fns),
     fallsBack: (pair) => fallsBackFrom(code, pair),
     contains: (source) => shapeCount(code, source) > 0,
     takes: (parameters) => takesParameters(code, parameters),
@@ -504,7 +513,8 @@ function structureOf(target) {
     typeof target === 'string' ? { file: target } : target;
   const binding = fn ?? constant;
   // A property path narrows one key at a time: `['world-essence-entry', 'confirm']`.
-  const narrow = (scope) => [property ?? []].flat().reduce((node, name) => propertyAst(node, name), scope);
+  const narrow = (scope) =>
+    [property ?? []].flat().reduce((node, name) => propertyAst(node, name), scope);
   if (file.endsWith('.svelte')) {
     const component = componentAstOf(file);
     if (!binding && !record) {

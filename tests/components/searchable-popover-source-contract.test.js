@@ -103,7 +103,7 @@ const popover = definePrimitiveAdoptionContract({
     'rest spread, where a bare `data-x` arrives as the boolean `true` and renders `="true"`. ' +
     'Presence selectors resolve either way, which is why the mounted suites and the smoke ' +
     'steps that use them would not catch it. The same is true of a `triggerProps` entry and of ' +
-    'an option`s `data` map: spell the value `\'\'`',
+    "an option`s `data` map: spell the value `''`",
 });
 
 /**
@@ -117,15 +117,18 @@ function snippetTriggerName(site) {
   const snippet = site.snippetSource('trigger');
   if (!snippet) return null;
   let found = null;
-  walkTemplate(parse(snippet, { modern: true, filename: 'trigger-snippet.svelte' }).fragment, (node) => {
-    if (found || node.type !== 'RegularElement') return;
-    const attributes = node.attributes ?? [];
-    if (attributes.every((attribute) => attribute.type !== 'SpreadAttribute')) return;
-    const label = attributes.find(
-      (attribute) => attribute.type === 'Attribute' && attribute.name === 'aria-label'
-    );
-    if (label) found = snippet.slice(label.start, label.end);
-  });
+  walkTemplate(
+    parse(snippet, { modern: true, filename: 'trigger-snippet.svelte' }).fragment,
+    (node) => {
+      if (found || (node.type !== 'RegularElement' && node.type !== 'Component')) return;
+      const attributes = node.attributes ?? [];
+      if (attributes.every((attribute) => attribute.type !== 'SpreadAttribute')) return;
+      const label = attributes.find(
+        (attribute) => attribute.type === 'Attribute' && attribute.name === 'aria-label'
+      );
+      if (label) found = snippet.slice(label.start, label.end);
+    }
+  );
   return found;
 }
 
@@ -241,10 +244,10 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
   const snippetSites = popover.callSites.filter((site) => site.snippetSource('trigger'));
   assert.equal(
     snippetSites.length,
-    3,
-    `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; three do — ` +
-      '`IconPicker`, `EssenceSourceSelector` and, since issue 1513, ' +
-      '`apps/crafting/ComponentSourcesBar`. A different number means the route has gained or ' +
+    4,
+    `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; four do — ` +
+      '`IconPicker`, `EssenceSourceSelector`, `apps/crafting/ComponentSourcesBar` (issue 1513) ' +
+      "and `ComponentEditView`'s salvage adder (issue 1516). A different number means the route has gained or " +
       'lost a caller and the figures in this file need re-measuring. The third took the route ' +
       'for a reason neither of the first two states: its trigger is a 40px dashed well sized to ' +
       'the row of portrait buttons beside it, and the rule that draws it is in the CALLER`s ' +
@@ -290,7 +293,10 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
     'the reader accepts an `aria-label` on an element that does not receive the spread, so a ' +
       'nameless trigger inside a labelled wrapper would pass'
   );
-  const named = decoy.replace('<button {...attributes}>', '<button aria-label="Go" {...attributes}>');
+  const named = decoy.replace(
+    '<button {...attributes}>',
+    '<button aria-label="Go" {...attributes}>'
+  );
   assert.notEqual(named, decoy, 'the discrimination control did not perturb the fixture');
   assert.ok(
     snippetTriggerName({ snippetSource: () => named }),
@@ -336,9 +342,7 @@ test('every popover names its trigger and the panel that opens', () => {
   for (const site of popover.callSites) {
     // The trigger is named by `ariaLabel` or by a visible `triggerLabel`.
     const triggerName =
-      site.attribute('ariaLabel') ??
-      site.attribute('triggerLabel') ??
-      snippetTriggerName(site);
+      site.attribute('ariaLabel') ?? site.attribute('triggerLabel') ?? snippetTriggerName(site);
     if (!triggerName) unnamed.push(`${site.file}: the trigger has no accessible name`);
     // The panel is named by `panelLabel` or by `panelLabelledBy`.
     const panelName = ['panelLabel', 'panelLabelledBy']

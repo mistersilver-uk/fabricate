@@ -18,7 +18,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -112,6 +112,7 @@ describe('GatheringView mounted behavior', () => {
     // Issue 2008: GatheringView words an additional-dice notice through the prompt presenter.
     for (const modulePath of [
       ...FOUNDRY_BRIDGE_RAW_MODULES,
+      ...LOCALIZE_OR_RAW_MODULES,
       ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
       ...CHECK_TARGET_RAW_MODULES,
       'src/systems/countEvaluation.js',

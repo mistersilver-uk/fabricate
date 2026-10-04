@@ -288,17 +288,20 @@ const FIXTURE = `
                  <div class="fabricate-sortable-list-line">
                   <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
                   <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
-                  <span class="manager-salvage-component-field">
-                    <span class="fabricate-picker manager-travel-picker manager-salvage-component-picker">
-                      <button type="button" class="fabricate-button manager-salvage-component-trigger" data-m="stage-picker">
-                        <span class="manager-travel-portrait"><img src="" alt=""></span>
-                        <span class="manager-travel-picker-value manager-salvage-component-name" data-m="stage-picker-name">Brass Casing</span>
-                        <i class="fas fa-chevron-down"></i>
-                      </button>
+                  <!-- A salvage stage is the requirement row (issue 1516), its DC and Edit link in
+                       the row's trailing controls, as the recipe stage row draws them. -->
+                  <div class="manager-recipe-ingredient-option-row is-component is-result">
+                    <span class="manager-recipe-option-name-field">
+                      <span class="manager-recipe-option-chosen">
+                        <img class="manager-recipe-option-chosen-img" alt="">
+                        <span class="manager-recipe-option-chosen-name" data-m="stage-picker-name">Brass Casing</span>
+                      </span>
                     </span>
-                  </span>
-                  <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
-                  <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
+                    <div class="manager-recipe-option-controls">
+                      <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
+                      <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
+                    </div>
+                  </div>
                   <span class="fabricate-sortable-list-rocker">
                     <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
                   </span>
@@ -433,12 +436,9 @@ const EXPECTED = {
   'micro-label': 8.48, // 0.53rem @ .08em — prototype "ENABLED" eyebrow 8.5px. Near-exact.
   // The ordinal badge is the shared ordered list's as of issue 1512, at the specimen's 10px mono.
   'stage-ordinal': 10,
-  // The yield picker replaced the stage row's native <select> (issue 676). It measures the
-  // SAME 13.12 the select did — the `.fabricate-field`'s 0.82rem, inherited — so swapping a
-  // native control for a popover trigger re-typed nothing. That is the point of checking:
-  // a <button> is exactly the element Foundry's core `button` rule would otherwise size.
-  'stage-picker': 13.12, // 0.82rem — inherits the field size, as the select did
-  'stage-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
+  // The stage names its component in the requirement row's pill (issue 1516), at the size the
+  // recipe stage row's pill reads in `recipe-studio-font-size.test.js`.
+  'stage-picker-name': 11.52, // 0.72rem — the requirement row pill's name
   'stage-dc': 13, // 0.8125rem mono 700 — prototype read-only DC chip 13px mono. Exact.
   // It is the ONLY route to the DC rendered beside it, so it is sized as a real link
   // rather than the 0.56rem speck it shipped as — smaller than its own caption. Raised

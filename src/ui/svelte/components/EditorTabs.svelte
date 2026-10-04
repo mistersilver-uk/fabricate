@@ -37,7 +37,7 @@
     `containerClass` carries, per `openspec/specs/design-system/spec.md`.
 -->
 <script>
-  import { localize } from '../util/foundryBridge.js';
+  import { localizeOr } from '../util/localizeOr.js';
   import Chip from './Chip.svelte';
 
   const DEFAULT_CLASSES = Object.freeze({
@@ -72,11 +72,6 @@
   const panelStem = $derived(panelIdStem || `${idStem}-panel`);
 
   const VEHICLES = new Set(['count', 'issue', 'dot']);
-
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
 
   function normalizeMark(tab, mark) {
     const fallbackTone = tab.id === 'validation' ? 'danger' : 'neutral';
@@ -171,7 +166,7 @@
 <div
   class={`fabricate-tabs ${containerClass}`}
   role="tablist"
-  aria-label={text(ariaLabelKey, ariaLabel)}
+  aria-label={localizeOr(ariaLabelKey, ariaLabel)}
   {...rest}
 >
   {#each tabs as tab, index (tab.id)}
@@ -189,7 +184,7 @@
       onkeydown={(event) => onKeydown(event, index)}
     >
       {#if tab.icon}<i class={tab.icon} aria-hidden="true"></i>{/if}
-      <span>{text(tab.labelKey, tab.label)}</span>
+      <span>{localizeOr(tab.labelKey, tab.label)}</span>
       {#each markList(tab) as mark, markIndex (`${tab.id}-${markIndex}`)}
         {#if mark.vehicle === 'count'}
           <span class="manager-editor-tab-count" {...markAttributes(tab, mark)}>{mark.label}</span>

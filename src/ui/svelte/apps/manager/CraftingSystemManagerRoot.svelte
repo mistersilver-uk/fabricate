@@ -4658,7 +4658,7 @@
       );
     if (summary.resultGroupCount > 0)
       parts.push(
-        text('FABRICATE.Admin.Manager.Component.SalvageResults', '{count} result groups').replace(
+        text('FABRICATE.Admin.Manager.Component.SalvageResults', '{count} result sets').replace(
           '{count}',
           summary.resultGroupCount
         )

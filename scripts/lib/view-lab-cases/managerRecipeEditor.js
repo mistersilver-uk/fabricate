@@ -608,11 +608,42 @@ export const CASES = Object.freeze([
     ],
     expectView: 'recipe-edit',
     // Named on the last kind, not on the panel.
-    expectSelector: '.manager-recipe-or-popover [data-recipe-add="alternative-currency"]',
+    expectSelector:
+      '.fabricate-action-menu-panel.manager-recipe-or-menu [data-recipe-add="alternative-currency"]',
     // The panel is portaled to the manager root, so containment against the scrolling editor pane would be a false claim.
-    expectContained: [{ container: '.fabricate-manager', target: '.manager-recipe-or-popover' }],
+    expectContained: [{ container: '.fabricate-manager', target: '.manager-recipe-or-menu' }],
     // …and it is actually on top: a menu drawn under its row is contained, visible and useless.
-    expectCenterHit: '.manager-recipe-or-popover [data-recipe-add="alternative-component"]',
+    expectCenterHit: '.manager-recipe-or-menu [data-recipe-add="alternative-component"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  // The kind menu opened from the bare row beneath a choice group, so the menu and the box's
+  // `alt <kind>` adders, which state the same kinds in the same order, share one frame.
+  managerCase({
+    id: 'manager-recipe-edit-choice-group-menu',
+    label: 'Manager — Recipe edit ingredients, the kind menu beside a choice group',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-tincture"]' },
+      { selector: '#recipe-tab-ingredients' },
+      { selector: '[data-recipe-any-one-of]', scroll: true },
+      { selector: '[data-recipe-group-id="hb-set-tincture-g3"] .manager-recipe-or-trigger' },
+    ],
+    expectView: 'recipe-edit',
+    // The open menu, headed and named by its heading, while the box keeps its four adders.
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-group].has-alternatives [data-recipe-add="alternative-cost"]) ' +
+      '.fabricate-action-menu-panel.manager-recipe-or-menu:has(.manager-action-menu-heading) ' +
+      '[role="menu"][aria-labelledby] [data-recipe-add="alternative-currency"]',
+    expectContained: [{ container: '.fabricate-manager', target: '.manager-recipe-or-menu' }],
+    expectCenterHit: '.manager-recipe-or-menu [data-recipe-add="alternative-tag"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,

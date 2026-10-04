@@ -15,7 +15,7 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
   ],
   stepResultGroupCountExact: [
     'IssueStepResultGroupCountExact',
-    'Step "{step}" must have exactly 1 result group in {mode} mode',
+    'Step "{step}" must have exactly 1 result set in {mode} mode',
   ],
   stepIngredientSetCountMin: [
     'IssueStepIngredientSetCountMin',
@@ -23,7 +23,7 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
   ],
   stepResultGroupCountMin: [
     'IssueStepResultGroupCountMin',
-    'Step "{step}" must have at least 1 result group in {mode} mode',
+    'Step "{step}" must have at least 1 result set in {mode} mode',
   ],
   stepRequiresOrderedResults: [
     'IssueStepRequiresOrderedResults',
@@ -35,15 +35,15 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
   ],
   ingredientSetInvalidResultGroup: [
     'IssueIngredientSetInvalidResultGroup',
-    'Ingredient set "{set}" maps to a result group that does not exist',
+    'Ingredient set "{set}" maps to a result set that does not exist',
   ],
   routedGroupNameReserved: [
     'IssueRoutedGroupNameReserved',
-    'Result group name "{groupName}" conflicts with reserved routing keyword in step "{step}"',
+    'Result set name "{groupName}" conflicts with reserved routing keyword in step "{step}"',
   ],
   routedGroupNameDuplicate: [
     'IssueRoutedGroupNameDuplicate',
-    'Duplicate result group name "{groupName}" (case-insensitive) in step "{step}" — routed mode requires unique names',
+    'Duplicate result set name "{groupName}" (case-insensitive) in step "{step}" — routed mode requires unique names',
   ],
   // Base structural-integrity issues from the recipe MODEL (issue 595).
   stepMissingIngredientSet: [
@@ -52,7 +52,7 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
   ],
   stepMissingResultGroup: [
     'IssueStepMissingResultGroup',
-    'Step "{step}" must include at least one result group',
+    'Step "{step}" must include at least one result set',
   ],
   timeRequirementInvalid: [
     'IssueTimeRequirementInvalid',
@@ -65,15 +65,15 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
   ],
   outcomeRoutingInvalidResultGroup: [
     'IssueOutcomeRoutingInvalidResultGroup',
-    'Outcome routing "{outcome}" references a result group that does not exist',
+    'Outcome routing "{outcome}" references a result set that does not exist',
   ],
   resultGroupDuplicate: [
     'IssueResultGroupDuplicate',
-    '{location} has a duplicate result group "{group}"',
+    '{location} has a duplicate result set "{group}"',
   ],
   resultGroupEmpty: [
     'IssueResultGroupEmpty',
-    '{location} result group "{group}" must contain at least one result',
+    '{location} result set "{group}" must contain at least one result',
   ],
   resultDuplicate: ['IssueResultDuplicate', '{location} has a duplicate result "{result}"'],
   resultInvalid: ['IssueResultInvalid', '{location} result "{result}": {detail}'],

@@ -8,7 +8,7 @@ import {
   createMountedComponentHarness,
   PLAYER_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -36,7 +36,7 @@ describe('ComponentInventoryColumn (mounted)', () => {
   const harness = createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-alchemy-inventory-',
-    rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+    rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
     compiledModules: [
       // The shared primitives this tree draws.
       ...PLAYER_APP_COMPILED_MODULES,
@@ -112,7 +112,7 @@ describe('KnownRecipesColumn (mounted)', () => {
   const harness = createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-alchemy-known-',
-    rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+    rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
     compiledModules: [
       ...PLAYER_APP_COMPILED_MODULES,
       'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte'
@@ -288,7 +288,7 @@ describe('Alchemy column primitive adoption (issue 1514)', () => {
     const harness = createMountedComponentHarness({
       repoRoot,
       tmpPrefix: 'fabricate-alchemy-inventory-primitives-',
-      rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+      rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
       compiledModules: [
         ...PLAYER_APP_COMPILED_MODULES,
         'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
@@ -349,7 +349,7 @@ describe('Alchemy column primitive adoption (issue 1514)', () => {
     const harness = createMountedComponentHarness({
       repoRoot,
       tmpPrefix: 'fabricate-alchemy-known-primitives-',
-      rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+      rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
       compiledModules: [
         ...PLAYER_APP_COMPILED_MODULES,
         'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte'

@@ -278,7 +278,7 @@ Rows contain Tool identity and removal only: Recipe data exposes no breakage, co
 
 #### The requirement row
 
-ONE row shape authors every requirement and every result, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set and the world Tool entry's copy of that same set, and, on the result side, a recipe's result sets and a gathering task's result sets.
+ONE row shape authors every requirement and every result, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set and the world Tool entry's copy of that same set, and, on the result side, a recipe's result sets, a gathering task's result sets and a component's salvage result sets.
 Its anatomy is the kind FIRST and the value second:
 
 ```text
@@ -295,6 +295,9 @@ An expression that cannot be rolled, or can never award a positive amount, is ma
 - **A flat result row names its component and cannot clear it.**
 Its name field has no clear: a flat result is re-pointed by removing it and adding another, while a progressive stage swaps its component in place so that it keeps its position in the order.
 Adding a component the set already produces raises that row's quantity, unless that row's amount is rolled, in which case a second row is added.
+- **A result row too narrow for one line wraps by rule, never by overflow.**
+Where its list is narrower than one line needs, a flat row puts its plate, kind and name on the first line with the remove at its end, the toggle and amount on the second at the stepper's width, and any error across the row below.
+A stage row moves its DC and Edit below rather than squeeze its name under the name's minimum, and moves the name below the kind where even that does not fit.
 
 - **Each kind carries its own tint, on every glyph the row draws for its subject.**
 The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence and currency are four distinct hues — so a mixed list reads as one list with four marks in it.
@@ -340,15 +343,18 @@ What must hold there is that the tag ARM stays whole: the policy word, the chips
 Every adder creates a row carrying its KIND and no value; the row's own field names it.
 No adder chooses a subject, so none can dedupe against a requirement the set already holds — a GM who names one component twice is told so by the Validation tab, which is where a check the adder cannot make belongs.
 
-A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through a single **"or…" popover** per bare requirement, replacing the loose per-row and footer add-buttons.
+A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through a single **"or…" menu** per bare requirement, replacing the loose per-row and footer add-buttons.
 It is a single flat **"Accept instead"** list of the four real ingredient match types — Component, Tag, Essence, and Currency, in that order — each appended to that requirement as a new OR alternative for the row's own field to fill in.
 A requirement that already holds two or more alternatives renders that choice as four explicit dashed adders at the foot of its box instead, worded `alt component` / `alt tag` / `alt essence` / `alt currency`: inside a choice group every one of them appends an ALTERNATIVE, and `Add component` beside `Add cost` is two verbs for one act.
+The menu and the adders are drawn from one list, so they offer the same kinds in the same order, and no row inside the box draws the `or…` control.
+Choosing a kind turns a bare requirement into its box and so removes the trigger the menu would return focus to, so focus moves to the new alternative's name field, a tag alternative's being its `+ Tag`, rather than falling to the document, where Foundry's keybindings take the keys.
 Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
 
 The menu is a COMPACT PANEL OF KINDS rather than a picker of records, and its scale says so: a fixed 150px panel inset on its own frame, headed by an uppercase **"Accept instead"** eyebrow, over four entries that read from their own left edge.
 The header is what lets each entry be one word.
 The verb belongs to the panel, so an entry states only the kind it appends — `Component`, `Tag`, `Essence`, `Currency` — and never repeats "Add", "alternative" or a synonym for the row's own vocabulary.
-The width is stated by the caller and not left to the shared picker's own floor, which is sized for lists of world components and actors and is wide enough that the panel overflowed the application window.
+It is the shared action menu, a `role="menu"` of commands named by that eyebrow, and never the shared picker, whose listbox would announce four kinds as values to select.
+The width is stated by the caller and not left to the shared menu's own floor, which is sized for a row's overflow commands rather than four one-word kinds.
 
 Each entry's glyph carries its KIND'S OWN TINT, and it is the same declaration that inks the row's plate and its named pill rather than a second table of colours.
 One table per kind — glyph, tint and one-word name — is what keeps the menu, the row's kind select and the row's plate from naming the same four kinds three different ways; two of them had already drifted to different glyphs for a component and for a tag.
@@ -358,7 +364,7 @@ They are drawn at their own two scales: `or…` is a control among controls, lev
 Neither may be rendered through the shared chip primitive: that component declares its own border, ink and fill in a scoped block, which the runtime injects UNLAYERED while `styles/fabricate.css` is imported at `layer(modules)`, so a sheet rule naming any of those three properties for such a control is emitted, matches, and is discarded — leaving both affordances painted as the default filled neutral chip with nothing reporting it.
 
 Currency and Essence appear only when the system can honour them, so the menu never offers a choice the system cannot satisfy.
-Currency-cost affordances — the set-level "Add cost" button, the requirement-level "Add cost" button, and the "or…" popover's Currency choice — render only when the system's currency feature is **enabled** (`requirements.currency.enabled === true`) AND the world configures units, not merely when units exist.
+Currency-cost affordances — the set-level "Add cost" button, the requirement-level "Add cost" button, and the "or…" menu's Currency choice — render only when the system's currency feature is **enabled** (`requirements.currency.enabled === true`) AND the world configures units, not merely when units exist.
 Unit presence alone is not authorisation, and since issue 1278 it is emphatically not: the ladder is WORLD scope, so a world with a fully authored ladder still has systems that do not charge for anything, and the participation toggle is the only thing that says which do.
 Essence appears when the system enables essences.
 An essence alternative may repeat across groups, so it is gated on the system HAVING essences (not on system-minus-already-required).
@@ -403,10 +409,10 @@ The GM component surfaces: the component browser and the component editor.
    Replacing or unlinking a component's source item restamps durable component identity and saves; carrying source fields through the draft's update path would skip that restamping.
 4. The component salvage panel derives its presentation from `salvageResolutionMode` plus salvage-check enablement, gated by `features.salvage` and `component.salvage.enabled`.
    The persisted `routed` token is displayed as "Routed by check".
-5. The result-group editor remains reachable when salvage is disabled.
+5. The result-set editor remains reachable when salvage is disabled.
    Disabling salvage collapses the mode, DC, routing, and reorder chrome only.
-   The per-component enable control is disabled, with a visible explanation, until at least one result group exists; since the add-group control lives in the result-group editor, collapsing that editor would make enabling unreachable.
-   The disabled-state copy distinguishes "no result groups authored yet" from "authored but disabled".
+   The per-component enable control is disabled, with a visible explanation, until at least one result set exists; since the add-set control lives in the result-set editor, collapsing that editor would make enabling unreachable.
+   The disabled-state copy distinguishes "no result sets authored yet" from "authored but disabled".
 6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
    A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
    A "Manage presets" link routes to the system's Checks screen.
@@ -517,23 +523,23 @@ The UI must expose required data fields from `resolution-modes/spec.md`, but mod
 
 - One ingredient set
 - Ingredient-group editor within that set (including OR options)
-- One result group editor
+- One result set editor
 
 ### Routed UI
 
 The routing basis is the system **mode**, not a per-recipe provider: the recipe inspector carries NO result-selection provider selector (it was removed in the routed split — the basis is derived from `routedByIngredients` / `routedByCheck`).
 
 - `routedByIngredients` UI:
-  - Ingredient sets map to result groups via `resultGroupId`.
+  - Ingredient sets map to result sets via `resultGroupId`.
   - Validation enforces deterministic mapping for all satisfiable sets.
   - The crafting check is optional (no provider toggle, no check requirement surfaced here) and is authored via the shared simple pass/fail editor (`SimpleCraftingCheckEditor`, bound to `craftingCheck.simple`).
   - `routedByIngredients` recipes offer the per-recipe "Check tier" (DC-tier) dropdown sourced from `craftingCheck.simple.tiers` when the simple check uses static `dcMode`; they do NOT get the `minSuccessOutcomeId` minimum-success-tier control (which is `routedByCheck + fixed` only).
 - `routedByCheck` UI:
   - Routes by the system crafting-check outcome (the system requires an authored `craftingCheck.routed.rollFormula`).
-  - Result groups carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
+  - Result sets carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
     The `checkOutcomeIds` assignment picker offers **success tiers only** (`success === true`), matching the success-only routing rule (a failure tier never routes and awards nothing).
-  - A step with exactly one result group needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
-- Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-group names.
+  - A step with exactly one result set needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
+- Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-set names.
 
 ### Alchemy check-mode selector (issue 554)
 
@@ -563,7 +569,7 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 
 - alchemy + `simple` → the simple pass/fail editor rendered below the selector, with a LIVE Active switch: simple is OPTIONAL, and turning it off stages `checkMode: "none"`.
 - alchemy + `tiered` → the routed editor below the selector, with the LOCKED always-on reading of the switch and the requiredHint (ungated by `checksEnabled`).
-  Tiered cannot be disabled because it routes result groups by outcome tier and so cannot resolve without a roll.
+  Tiered cannot be disabled because it routes result sets by outcome tier and so cannot resolve without a roll.
 - alchemy + `none` → the shared switched-off panel with its "Turn this check on" action, and a live Active switch reading off.
   Turning it back on stages `checkMode: "simple"`.
 - The Crafting checks help copy describes simple/tiered and the off state.
@@ -571,11 +577,11 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 ### Alchemy Recipe UI (GM Editor)
 
 - Removes the `resultSelection.provider` selector and the Complex/multi-set toggle (retired, issue 554).
-  Ingredient-set vs result-group rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
+  Ingredient-set vs result-set rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
   - **None** → single ingredient set + single result set.
   - **Simple** → a labeled "On success" result set + a reserved, static-labeled ("On a failed check", warning/danger accent), undeletable, empty-by-default failure result set (synthesized in the derived view, persisted on first edit; `Recipe.validate` tolerates its absence).
     No "add result set" beyond the two.
-  - **Tiered** → result groups with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
+  - **Tiered** → result sets with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
 - Shows alchemy-only signature collision diagnostics spanning all recipes in the system.
 - Save remains blocked until all collisions are resolved.
 
@@ -598,7 +604,5 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
   The badge is read-only because the difficulty belongs to the **result** component, whose own editor owns its save lifecycle.
 - A progressive result row — recipe or salvage — renders **no quantity control**, because `resolution-modes` normalizes every awarded progressive entry to a single item; the GM expresses "more of X" by listing X again and ordering the list.
   The `simple` and `routed` salvage rows KEEP their quantity, which those modes award as authored.
-- A salvage result row picks its component through a **searchable popover whose trigger carries the component's image and its name**, not a native `<select>`.
-  The image is required: a `<select>` can only present a text list, on a surface where every other component is shown with its art.
-  The trigger is ONE control over both facts, and an art-less component falls back to a glyph rather than emitting an image element with no source.
-  The popover is portaled to the manager host so it escapes the editor panel's `overflow: hidden`.
+- A salvage result row is **the requirement row**: it names its component through the row's name field, whose named pill carries the component's image and its name, never a native `<select>`.
+  An art-less component falls back to a glyph rather than emitting an image element with no source.

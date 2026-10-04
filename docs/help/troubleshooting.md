@@ -60,7 +60,7 @@ The confirmation prompt runs a dry run first and tells you exactly what will hap
 
 **Likely causes for a recipe being deleted:**
 
-- You narrowed into Simple or Progressive mode (which each expect exactly one ingredient set and one result group) from a recipe that had more than one of either.
+- You narrowed into Simple or Progressive mode (which each expect exactly one ingredient set and one result set) from a recipe that had more than one of either.
 - You moved a multi-step recipe into Alchemy mode, which does not support multi-step recipes.
 
 **Step-by-step checks:**
@@ -319,11 +319,11 @@ Additional causes:
 - **Routed salvage mode** requires:
   - a salvage check roll formula is configured
   - at least one outcome is declared (such as critical, pass, and fail)
-  - the component maps every declared outcome to an existing result group
+  - the component maps every declared outcome to an existing result set
 - **Progressive salvage mode** requires:
   - a progressive salvage check roll formula is configured
   - every result component has a valid positive difficulty value
-- **Simple salvage mode** requires exactly one result group per component.
+- **Simple salvage mode** requires exactly one result set per component.
   Having none, or two or more, is rejected.
 - Salvage is disabled on the component.
 
@@ -334,8 +334,8 @@ Additional causes:
 2. For **Routed** mode:
    - Is a routed salvage check roll formula configured?
    - Are the outcomes defined (such as critical, pass, and fail)?
-   - Does the component map every declared outcome to an existing result group?
-3. For **Simple** mode: does the component have exactly one salvage result group?
+   - Does the component map every declared outcome to an existing result set?
+3. For **Simple** mode: does the component have exactly one salvage result set?
 4. For **Progressive** mode: does each result component have a valid positive difficulty value?
 5. Is salvage enabled on the component you are trying to salvage?
 6. Is the salvage feature enabled on the crafting system?

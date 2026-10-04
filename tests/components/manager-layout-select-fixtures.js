@@ -158,10 +158,8 @@ export const SOURCE_TRIGGER_SITES = [
 //      panel and declares `min-width: 240px`, `max-width: 340px` and `border-radius: 10px`. The
 //      `.fabricate-select*` family lives in THIS SHEET, in the same `layer(modules)` (issue
 //      1504), so there is no layer axis to win on: the panel variant is written in the same
-//      two-compound shape and wins on SOURCE ORDER, exactly as the shipped
-//      `.manager-recipe-or-popover` variant does for the same two declarations. These are the
-//      declarations that prove it landed: an inline panel opening at 240px over a list of
-//      two-digit numbers is the defect.
+//      two-compound shape and wins on SOURCE ORDER. These are the declarations that prove it
+//      landed: an inline panel opening at 240px over a list of two-digit numbers is the defect.
 export const framePath = resolve(
   __dirname,
   '../../src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte'

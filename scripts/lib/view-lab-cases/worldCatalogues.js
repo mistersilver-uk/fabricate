@@ -217,6 +217,16 @@ export const CASES = Object.freeze([
         target: '[data-pagination-page]',
       },
     ],
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-scoped-component-open-entry]',
+          styles:
+            'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
+        },
+      ],
+    },
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     // The placeholder claim is gone (issue 1371): `manager-scoped-prop-contract` pairs the claim with the page's own import.
@@ -630,6 +640,16 @@ export const CASES = Object.freeze([
         target: '[data-scoped-list-inspector-foot]',
       },
     ],
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-scoped-essence-open-entry]',
+          styles:
+            'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
+        },
+      ],
+    },
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
@@ -638,8 +658,6 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
       // The `SYSTEM RULES n / m` panel the shell's inspector composes (issue 1372).
       /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
-      // The inspector's foot action, which this case draws and did not claim (issue 1446).
-      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
       /^src\/ui\/model\/scopedEntityListModel\.js$/,
     ],

@@ -135,7 +135,12 @@ import {
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { postResultCard } from './resultCardPost.js';
-import { resolveRolledAmount, rolledAwardRecord, validateCraft } from './rolledAmountResolver.js';
+import {
+  resolveRolledAmount,
+  rolledAwardRecord,
+  validateCraft,
+  validateSalvage,
+} from './rolledAmountResolver.js';
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import {
   attachAwardReceipts,
@@ -160,6 +165,7 @@ import {
   openSalvageRun,
   publishSalvageFailure,
   publishSalvageSuccess,
+  refuseSalvage,
   resolveSalvageFailure,
   resolveSalvageRunRecord,
   runSalvageCheck,
@@ -6410,11 +6416,9 @@ export class CraftingEngine {
 
   /**
    * The salvage pipeline for a component: validate, tool check, salvage check, failure policy,
-   * consume, create results, record the run.
-   *
-   * It performs no ownership check (issue 675): it resolves `actorUuid` through `fromUuid` and
-   * mutates that actor's Items. The only gate is `Fabricate#salvageComponent`, which takes an
-   * actor id, so no UI may plumb a uuid here.
+   * consume, create results, record the run. It performs no ownership check (issue 675): it
+   * resolves `actorUuid` through `fromUuid` and mutates that actor's Items. The only gate is
+   * `Fabricate#salvageComponent`, which takes an actor id, so no UI may plumb a uuid here.
    *
    * @param {object|null} [options.rollDecision] A pre-resolved roll decision so one prompt drives
    *   every roll of a bulk run (issue 859).
@@ -6425,7 +6429,7 @@ export class CraftingEngine {
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
     const ctx = await this._openSalvageContext(actorUuid, craftingSystemId, componentId, options);
-    if (ctx.refusal) return ctx.refusal;
+    if (ctx.refusal) return refuseSalvage(this, ctx);
     const record = await resolveSalvageRunRecord(this, ctx);
     if (record) return record.result;
     const tools = await validateSalvageTools(this, ctx);
@@ -6461,7 +6465,7 @@ export class CraftingEngine {
   }
 
   /** The Foundry edge, call inputs and component for this salvage; every `refusal` is reached
-   * before any salvage run exists. */
+   * before this call creates or advances a salvage run. */
   async _openSalvageContext(actorUuid, craftingSystemId, componentId, options) {
     const ctx = {
       actorUuid,
@@ -6514,18 +6518,13 @@ export class CraftingEngine {
       return ctx;
     }
 
-    const resolutionService =
-      this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
-    if (resolutionService) {
-      const validation = resolutionService.validateSalvage(ctx.component, ctx.system);
-      if (!validation.valid) {
-        // The same discriminator the misconfigured-check abort carries (issue 859), so a caller
-        // does not read a config error as a rolled failure.
-        ctx.refusal = salvageRefusal(
-          `Invalid salvage configuration: ${validation.errors.join(', ')}`,
-          { misconfigured: true }
-        );
-      }
+    const validation = validateSalvage(ctx, this.resolutionModeService);
+    if (!validation.valid) {
+      // Issue 859's discriminator, so a caller does not read a config error as a rolled failure.
+      ctx.refusal = salvageRefusal(
+        `Invalid salvage configuration: ${validation.errors.join(', ')}`,
+        { misconfigured: true }
+      );
     }
     return ctx;
   }

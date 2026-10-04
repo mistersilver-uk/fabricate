@@ -1,14 +1,18 @@
 /** The world Tool entry, mounted (issue 1373, epic 1357). */
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { tick } from 'svelte';
 
+import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
+  KIND_MENU_COMPILED_MODULES,
+  KIND_MENU_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   TYPEAHEAD_RUNE_MODULES,
   SELECT_COMPILED_MODULES,
@@ -19,7 +23,6 @@ import {
   TOOL_TREE_RAW_MODULES,
   WORLD_TOOL_SCOPE_RAW_MODULES,
 } from '../helpers/toolMountModules.js';
-import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -31,6 +34,8 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...KIND_MENU_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...TOOL_TREE_RAW_MODULES,
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     // The BUFFERED edit this page stages into.
@@ -102,9 +107,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolReplacementTarget.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
+    'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
     'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
     'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+    ...KIND_MENU_COMPILED_MODULES,
     // The per-row match-type segmented control those three render.
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Pagination.svelte',

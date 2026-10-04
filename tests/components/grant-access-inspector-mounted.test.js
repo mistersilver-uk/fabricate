@@ -12,6 +12,7 @@ import {
   ACCESS_ROSTER_SEARCH_MISS_TERM,
   getCaseById
 } from '../../scripts/lib/viewLabCases.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -21,6 +22,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // Issue 1513: the shared `<Pagination>` imports `<Select>`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/utils/recipeCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.

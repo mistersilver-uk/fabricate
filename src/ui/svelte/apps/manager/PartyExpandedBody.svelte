@@ -36,7 +36,7 @@
 -->
 <script>
   import EmptyState from '../../components/EmptyState.svelte';
-  import PartyNameField from './PartyNameField.svelte';
+  import InlineRenameField from './InlineRenameField.svelte';
   import PartyMemberRow from './PartyMemberRow.svelte';
   import PartyAddMemberPanel from './PartyAddMemberPanel.svelte';
   import PartyTravelActorPanel from './PartyTravelActorPanel.svelte';
@@ -227,7 +227,7 @@
     <span class="manager-party-icon" aria-hidden="true"><i class="fas fa-users"></i></span>
 
     <div class="manager-party-identity">
-      <PartyNameField
+      <InlineRenameField
         name={party.name}
         disabled={saving}
         onRename={(name) => onRename(party.id, name)}
