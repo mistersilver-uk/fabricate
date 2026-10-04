@@ -2,7 +2,7 @@
 <!--
   System Overview page. A full-width tabbed shell (mirroring the environment
   editor's EnvironmentEditView) with two tabs: Settings (the system settings form
-  and the issue 454 system-blocker banner) and Validation (the kind-grouped validation
+  and the issue 454 system-blocker warning notice) and Validation (the kind-grouped validation
   issue list rendered by SystemOverviewView). The standalone "Overview" route was
   folded in here; the Settings tab is the default, and callers that want the
   validation list open pass `requestedTab='validation'`. GM-only by construction:
@@ -38,7 +38,7 @@
       blocksSystem: false,
     },
     // The tab the page should open on. The parent bumps `requestedTab` (and a
-    // matching nonce) to request the Validation tab — e.g. from the blocker banner
+    // matching nonce) to request the Validation tab — e.g. from the blocker notice
     // link or a folded-in overview deep link.
     requestedTab = 'settings',
     // Bumped by the parent alongside `requestedTab` so re-requesting the same tab
