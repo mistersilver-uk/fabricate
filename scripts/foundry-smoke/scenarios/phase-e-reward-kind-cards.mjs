@@ -297,6 +297,9 @@ async function craftOnce(ctx, forge, path) {
 /** A path's two crafts: credit and grant, then credit again with the recipe already known. */
 async function proveRewardPath(ctx, forge, path) {
   const first = await craftOnce(ctx, forge, path);
+  // The counter is live only if the grant it watches for registers, so the second craft's zero means.
+  if (first.writes < 1)
+    throw new Error(`the first craft wrote learned recipes ${first.writes} time(s)`);
   const { learned, run } = first.after;
   if (learned?.granted !== true || learned?.grantedBy !== forge.paths[path].recipeName) {
     throw new Error(`the learned entry is ${JSON.stringify(learned)}`);
@@ -326,7 +329,11 @@ async function proveRewardPath(ctx, forge, path) {
       `the learned entry moved: ${JSON.stringify(learned)} -> ${JSON.stringify(second.after.learned)}`
     );
   }
-  return { rolls: [first.total, second.total], effects: run.effects };
+  return {
+    rolls: [first.total, second.total],
+    effects: run.effects,
+    learnedWrites: [first.writes, second.writes],
+  };
 }
 
 async function restoreWorld(ctx, forge) {
@@ -338,9 +345,20 @@ async function restoreWorld(ctx, forge) {
         await game.fabricate.getCurrencyConfigStore?.()?.load?.();
         await crafter.update({ [gpPath]: snapshot.gp });
         await crafter.unsetFlag('fabricate', 'companionEffect').catch(() => {});
-        await crafter.unsetFlag('fabricate', 'fabricate.learnedRecipes').catch(() => {});
+        // A dotted `unsetFlag` key can silently no-op on V14, so the delete is the forced form.
+        const Forced = foundry.data?.operators?.ForcedDeletion;
+        const parent = 'flags.fabricate.fabricate';
+        await crafter.update(
+          Forced
+            ? { [`${parent}.learnedRecipes`]: new Forced() }
+            : { [`${parent}.-=learnedRecipes`]: null }
+        );
         if (snapshot.learned)
           await crafter.setFlag('fabricate', 'fabricate.learnedRecipes', snapshot.learned);
+        const restored = crafter.getFlag('fabricate', 'fabricate.learnedRecipes') ?? null;
+        if (!foundry.utils.objectsEqual(restored ?? {}, snapshot.learned ?? {})) {
+          throw new Error(`learned recipes restored as ${JSON.stringify(restored)}`);
+        }
       },
       { crafterId: ctx.shared.cleanup.crafterId, snapshot: forge.snapshot, gpPath: GP_PATH }
     );
