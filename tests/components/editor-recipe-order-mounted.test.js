@@ -412,6 +412,22 @@ describe('the EDITOR recipe (issue 1522)', () => {
     }
   }
 
+  it('the essence editor`s world rules tab heads its cards with the shared definition', async () => {
+    mountManager();
+    store.viewState.update((state) => ({
+      ...state,
+      worldScope: { ...state.worldScope, essence: worldScopeLeg([{ id: 'water', name: 'Water' }]) },
+    }));
+    await settle();
+    await press(navButton('Essence Rules'), 'Essence Rules');
+    await press(
+      target.querySelector(':scope [data-essence-id="water"] [data-essence-edit="water"]'),
+      'the water edit action'
+    );
+    const [heading] = assertGapRule(target, '[data-recipe-section="enabled"]');
+    assert.ok(heading?.hasAttribute('data-scoped-shared-definition'), 'the heading is the record');
+  });
+
   it('the recipe save-failed notice stays at the notice position on another tab', async () => {
     await EDITORS[`${MANAGER}/RecipeEditView.svelte`].raise();
     await press(target.querySelector('[data-recipe-tab-button="ingredients"]'), 'Ingredients');
