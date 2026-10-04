@@ -89,26 +89,40 @@ const BLOCKED = Object.freeze([
 ]);
 
 describe('BulkEditPanelShell lists blocked rows and reports the write (issue 1782)', () => {
-  it('lists every blocked row with its reason BEFORE Apply', async () => {
+  /** The rows a region lists, as `[id, reason]` pairs in order. */
+  const listed = (region) =>
+    [...region.querySelectorAll('[data-bulk-blocked-row]')].map((row) => [
+      row.getAttribute('data-bulk-blocked-row'),
+      row.textContent.trim(),
+    ]);
+  const pairs = (rows) => rows.map(({ id, reason }) => [id, reason]);
+  const tone = (region) => region.getAttribute('data-notice-tone');
+  const title = (region) => region.querySelector('.fab-notice-title')?.textContent.trim();
+
+  it('lists every blocked row with its reason inside the notice, BEFORE Apply', async () => {
     const root = await shell.mount({ ...BASE, subjectCount: 4, blocked: BLOCKED });
 
     const region = root.querySelector('[data-bulk-blocked]');
     assert.ok(Boolean(region), 'the blocked rows rendered nothing');
+    assert.ok(region.classList.contains('fab-notice'), 'the blocked hook is not on the notice');
     assert.equal(
-      region.querySelector('.fab-notice-title')?.textContent.trim(),
+      title(region),
       '2 of 4 cannot be changed',
       'the notice does not state how many of the subject are skipped'
     );
-    const rows = [...region.querySelectorAll('[data-bulk-blocked-row]')];
     assert.deepEqual(
-      rows.map((row) => [row.getAttribute('data-bulk-blocked-row'), row.textContent.trim()]),
-      BLOCKED.map(({ id, reason }) => [id, reason]),
+      listed(region),
+      pairs(BLOCKED),
       'each blocked row is listed once, in order, with its own reason'
+    );
+    assert.ok(
+      Boolean(region.querySelector('.fab-notice-evidence')?.querySelector('[data-bulk-blocked-row]')),
+      'the reasons render outside the notice, so they do not share its warning edge and fill'
     );
     const apply = root.querySelector('[data-component-bulk-apply]');
     assert.ok(
       Boolean(region.compareDocumentPosition(apply) & Node.DOCUMENT_POSITION_FOLLOWING),
-      'the blocked rows render after Apply, so the GM reads them only once the write is done'
+      'the blocked rows must precede Apply; rendered after it, the GM reads them only once the write is done'
     );
   });
 
@@ -124,39 +138,111 @@ describe('BulkEditPanelShell lists blocked rows and reports the write (issue 178
     assert.ok(!apply.disabled, 'Apply is inert while three records still take the write');
   });
 
-  it('keeps Apply inert when every record in the subject is blocked', async () => {
+  it('keeps Apply inert and says so when every record in the subject is blocked', async () => {
     const root = await shell.mount({ ...BASE, subjectCount: 2, blocked: BLOCKED });
+    const apply = root.querySelector('[data-component-bulk-apply]');
     assert.ok(
-      root.querySelector('[data-component-bulk-apply]').disabled,
+      apply.disabled,
       'Apply is live over a selection it cannot write to, so a no-op reads as success'
+    );
+    assert.equal(
+      apply.textContent.trim(),
+      'Nothing to apply',
+      'an inert Apply over an all-blocked selection still reads as a write'
     );
   });
 
-  it('reports what the write changed in place of the forecast', async () => {
+  it('reads a subjectCount smaller than its blocked list as that list', async () => {
+    // A caller miscount: one record named, two blocked. The clamp keeps the title's arithmetic
+    // whole and still holds Apply inert.
+    const root = await shell.mount({ ...BASE, subjectCount: 1, blocked: BLOCKED });
+    assert.equal(title(root.querySelector('[data-bulk-blocked]')), '2 of 2 cannot be changed');
+    assert.ok(
+      root.querySelector('[data-component-bulk-apply]').disabled,
+      'Apply is live over two blocked records'
+    );
+  });
+
+  it('leaves Apply to canApply and the caller label when no subject is named', async () => {
+    const root = await shell.mount({ ...BASE, blocked: BLOCKED.slice(0, 1) });
+    const apply = root.querySelector('[data-component-bulk-apply]');
+    assert.ok(!apply.disabled, 'a caller that names no subject had every record declared blocked');
+    assert.equal(
+      apply.textContent.trim(),
+      BASE.applyLabel,
+      'the caller’s Apply label lost to a derived one'
+    );
+    assert.equal(
+      title(root.querySelector('[data-bulk-blocked]')),
+      '1 cannot be changed',
+      'with no subject named, the notice invents a total'
+    );
+  });
+
+  it('lists rows that share an id without throwing', async () => {
+    const twins = [
+      { id: 'moonsilver', reason: 'Moonsilver in Smithing is locked.' },
+      { id: 'moonsilver', reason: 'Moonsilver in Alchemy is locked.' },
+    ];
+    const root = await shell.mount({ ...BASE, subjectCount: 3, blocked: twins });
+    assert.deepEqual(listed(root.querySelector('[data-bulk-blocked]')), pairs(twins));
+    shell.remount();
+    const reported = await shell.mount({
+      ...BASE,
+      subjectCount: 3,
+      report: { changed: 1, skipped: twins },
+    });
+    assert.deepEqual(listed(reported.querySelector('[data-bulk-report]')), pairs(twins));
+  });
+
+  it('reports what the write changed in place of the forecast, and states the skips', async () => {
     const report = { changed: 3, skipped: BLOCKED.slice(1) };
     const root = await shell.mount({ ...BASE, subjectCount: 4, blocked: BLOCKED, report });
 
     const region = root.querySelector('[data-bulk-report]');
     assert.ok(Boolean(region), 'the report rendered nothing');
     assert.ok(!root.querySelector('[data-bulk-blocked]'), 'the stale forecast outlived the write');
-    assert.equal(region.querySelector('.fab-notice-title')?.textContent.trim(), 'Changed 3 of 4');
     assert.equal(
-      region.querySelector('.fab-notice').getAttribute('data-notice-tone'),
-      'warning',
-      'a write that skipped a record reads as a clean success'
+      title(region),
+      'Changed 3 of 4; 1 skipped',
+      'the report title does not say what its list is'
     );
+    assert.equal(tone(region), 'warning', 'a write that skipped a record reads as a clean success');
     assert.deepEqual(
-      [...region.querySelectorAll('[data-bulk-blocked-row]')].map((row) => row.textContent.trim()),
+      listed(region).map(([, reason]) => reason),
       [BLOCKED[1].reason],
       'the report lists the record the write skipped, with its reason'
     );
   });
 
-  it('reports a clean write in the success tone', async () => {
-    const root = await shell.mount({ ...BASE, subjectCount: 3, report: { changed: 3 } });
+  it('reports a clean write in the success tone, with or without an empty skip list', async () => {
+    for (const report of [{ changed: 3 }, { changed: 3, skipped: [] }]) {
+      shell.remount();
+      const root = await shell.mount({ ...BASE, subjectCount: 3, report });
+      const region = root.querySelector('[data-bulk-report]');
+      assert.equal(tone(region), 'success', `${JSON.stringify(report)} is a clean write`);
+      assert.equal(title(region), 'Changed 3 of 3');
+      assert.ok(!region.querySelector('[data-bulk-blocked-row]'), 'a clean write listed a skip');
+    }
+  });
+
+  it('warns when the write fell short of the subject with nothing skipped', async () => {
+    const root = await shell.mount({
+      ...BASE,
+      subjectCount: 4,
+      blocked: BLOCKED.slice(0, 1),
+      report: { changed: 3 },
+    });
     const region = root.querySelector('[data-bulk-report]');
-    assert.equal(region.querySelector('.fab-notice').getAttribute('data-notice-tone'), 'success');
-    assert.ok(!region.querySelector('[data-bulk-blocked-row]'), 'a clean write listed a skip');
+    assert.equal(title(region), 'Changed 3 of 4');
+    assert.equal(tone(region), 'warning', 'a record left unchanged reads as a clean success');
+  });
+
+  it('warns when the write changed nothing', async () => {
+    const root = await shell.mount({ ...BASE, report: { changed: 0 } });
+    const region = root.querySelector('[data-bulk-report]');
+    assert.equal(title(region), 'Changed 0 of 0');
+    assert.equal(tone(region), 'warning', 'a no-op write reads as a success');
   });
 });
 
