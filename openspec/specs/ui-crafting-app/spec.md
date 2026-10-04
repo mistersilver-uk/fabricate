@@ -1033,7 +1033,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   It withholds them only for a blind or secret roll, so a private or self roll still shows its roller the evidence.
   A counting check's sentence rows — `Count` (`{q} qualified − {c} cancelled = {n} net`) and a zero pool's `Pool` and `Result` — set in the body face as prose and wrap by word, while its figure rows keep the keyed row's mono (issue 2134); the salvage summary renders the same rows.
   Its tiles and their legend sit on the same neutral ground as its rows rather than on the box's tint, and the legend keys each mark by the very glyph the tile draws, beside the word that names it.
-  A box whose check states evidence also states the outcome: "The result group is produced." on success, and "Nothing is produced; the failure policy applies." on a failure that awarded nothing; a failure that still awarded items states no sentence.
+  A box whose check states evidence also states the outcome: "The result set is produced." on success, and "Nothing is produced; the failure policy applies." on a failure that awarded nothing; a failure that still awarded items states no sentence.
   The salvage summary never states that sentence.
 - The unified player-facing Journal screen (see `ui-journal-app/spec.md` _Journal App (Player)_) is the cross-activity
   home for monitoring and advancing these runs; a direct cross-link from the Run
@@ -1215,7 +1215,7 @@ The player's route to salvage.
   "No check" and "pass/fail" are therefore **one `simple` mode at two usability states**, not two modes.
 - A routed or progressive salvage with **no authored formula** renders a GM-config state, not its authored tiers or stages: the engine aborts such an attempt with zero mutation, so showing the contract would put it under an action that always fails.
 - **Simple multi-group misconfigured state.** A stored-but-not-yet-re-normalized `simple`-mode component with more than one success result group is misconfigured (the engine only ever awards the first group).
-  The builder projects it with `misconfigured: true` and a `misconfiguredReason` discriminator (`'simpleMultiGroup' | 'routedNoFormula' | 'progressiveNoFormula'`); the misconfigured body dispatches on that discriminator — not a binary mode dispatch — so the Simple case renders Simple-specific copy ("more than one salvage result group; Simple mode uses a single group — fix it in the component editor"), and the mode banner is suppressed when misconfigured so a green recycle banner never sits above a "this is broken" body.
+  The builder projects it with `misconfigured: true` and a `misconfiguredReason` discriminator (`'simpleMultiGroup' | 'routedNoFormula' | 'progressiveNoFormula'`); the misconfigured body dispatches on that discriminator — not a binary mode dispatch — so the Simple case renders Simple-specific copy ("more than one salvage result set; Simple mode uses a single set — fix it in the component editor"), and the mode banner is suppressed when misconfigured so a green recycle banner never sits above a "this is broken" body.
   The GM-facing inventory renders this cue; the non-GM visibility gate retains the hard-hide for a still-invalid stored config (justified: the config self-heals on the next system normalize, and the GM gets the cue in two surfaces — the manager overview critical and this body).
   Both surfaces show the working salvage panel once the config re-normalizes to a single success group.
 - **`dcOverride` shifts the simple DC and routed RELATIVE thresholds only.**
