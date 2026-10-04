@@ -146,6 +146,21 @@ export class ResolutionModeService {
     }
   }
 
+  /** A progressive stage awards one COMPONENT by its difficulty, so a result of another kind, or
+   *  whose component has no positive difficulty, is a misconfiguration (issue 1773). */
+  _progressiveResultIssues(system, results) {
+    return results.flatMap((result, index) => {
+      if ((result?.kind ?? 'component') !== 'component') {
+        const message = `Progressive result ${index + 1} must award a component`;
+        return [{ code: null, params: {}, message }];
+      }
+      const difficulty = this._getDifficulty(system, result?.componentId || result?.systemItemId);
+      return Number.isFinite(difficulty) && difficulty >= 1
+        ? []
+        : [buildRecipeActivationIssue('stepResultDifficulty', { result: index + 1 })];
+    });
+  }
+
   /**
    * With `requireComplete: false`, completeness checks (set and group counts, ordered results)
    * are waived so an authoring shell can persist; reference-integrity checks always apply.
@@ -230,17 +245,7 @@ export class ResolutionModeService {
             buildRecipeActivationIssue('stepRequiresOrderedResults', { step: stepLabel })
           );
         }
-        for (const [resultIndex, result] of results.entries()) {
-          const difficulty = this._getDifficulty(
-            system,
-            result?.componentId || result?.systemItemId
-          );
-          if (!Number.isFinite(difficulty) || difficulty < 1) {
-            issues.push(
-              buildRecipeActivationIssue('stepResultDifficulty', { result: resultIndex + 1 })
-            );
-          }
-        }
+        issues.push(...this._progressiveResultIssues(system, results));
       }
     }
 

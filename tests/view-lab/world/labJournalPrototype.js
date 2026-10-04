@@ -321,6 +321,8 @@ export const JOURNAL_PROTOTYPE_BINDINGS = Object.freeze({
   'history-d100-all-miss': 'stone/roll-all-miss',
   'history-gathering-check-failure': 'balehound/fail',
   'history-just-resolved': 'cord/execute',
+  // Issue 1773: the same execute, its stage also paying a labelled credit.
+  'history-just-resolved-rewards': 'cord/execute',
   'history-redacted': 'canonical/disclosure',
   'history-missing-material': 'canonical/missing-evidence',
   'history-gm-deleted-recipe': 'canonical/deleted-recipe',

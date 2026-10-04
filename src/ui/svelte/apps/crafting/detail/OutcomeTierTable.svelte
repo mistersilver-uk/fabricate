@@ -6,11 +6,10 @@
   same result are collapsed into one row, so `tier.names` may list several tiers.
 -->
 <script>
-  import Medallion from '../../../components/Medallion.svelte';
-  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import Kicker from '../../../components/Kicker.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import AwardPill from './AwardPill.svelte';
 
   let { tiers = [] } = $props();
 
@@ -45,11 +44,7 @@
           {#if Array.isArray(tier.awardedResults) && tier.awardedResults.length > 0}
             <ul class="crafting-tier-awards">
               {#each tier.awardedResults as item, awardIndex (item.name + awardIndex)}
-                <li class="crafting-tier-award">
-                  <Medallion {...resolveCraftingArt(item.img)} alt="" size={26} />
-                  <span class="crafting-tier-award-name">{item.name}</span>
-                  <span class="crafting-tier-award-qty">×{item.qty}</span>
-                </li>
+                <AwardPill {item} variant="tier" />
               {/each}
             </ul>
           {/if}
@@ -133,24 +128,5 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-  }
-
-  /* Rectangular pill with rounded corners, matching the rounded-square item image
-     (the shared `Medallion` tile) it wraps. */
-  .crafting-tier-award {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 2px 8px 2px 2px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface);
-    font-size: 12px;
-  }
-
-  .crafting-tier-award-qty {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    color: var(--fab-text-muted);
   }
 </style>

@@ -31,7 +31,7 @@ const CLASS_PROPS = Object.freeze([
 ]);
 
 /**
- * Twenty-two shared primitives, each with the namespace roots it writes and the class family it owns.
+ * Twenty-three shared primitives, each with the namespace roots it writes and the class family it owns.
  */
 const PRIMITIVES = Object.freeze([
   Object.freeze({
@@ -638,6 +638,38 @@ const PRIMITIVES = Object.freeze([
     // No pair, measured rather than omitted: the only class a hand-written fixture of a converted
     // list carries is `manager-checks-tier-row`, which `checks/CraftingCheckEditor.svelte` writes
     // too, so a mirror keyed on it would demand this row class on rows this list does not render.
+    mirrored: Object.freeze([]),
+  }),
+  Object.freeze({
+    // `RuleRow` (issue 1782), born at the primitive like `SortableList`: the trigger card's head,
+    // body and sentence rules moved off `manager-checks-trigger-*` onto the classes it writes.
+    name: 'RuleRow',
+    components: Object.freeze(['src/ui/svelte/components/RuleRow.svelte']),
+    roots: Object.freeze(['fabricate-rule-row']),
+    family: String.raw`fabricate-rule-row[\w-]*`,
+    namespacedFamily: true,
+    anchors: Object.freeze([
+      'fabricate-rule-row',
+      'fabricate-rule-row-head',
+      'fabricate-rule-row-disclosure',
+      'fabricate-rule-row-glyph',
+      'fabricate-rule-row-title',
+      'fabricate-rule-row-lead',
+      'fabricate-rule-row-chip',
+      'fabricate-rule-row-remove',
+      'fabricate-rule-row-body',
+      'fabricate-rule-row-legend',
+      'fabricate-rule-row-quote',
+      'fabricate-rule-row-line',
+      'fabricate-rule-row-icon',
+      'fabricate-rule-row-label',
+    ]),
+    composesClasses: true,
+    // Measured at this commit: 16 written, 30 family selectors, 27 owned; the other three are the
+    // field scale its body sets on `Field`, which is that primitive's caller-side rule.
+    writtenFloor: 14,
+    familyFloor: 28,
+    ownedFloor: 25,
     mirrored: Object.freeze([]),
   }),
 ]);

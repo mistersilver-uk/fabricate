@@ -5,6 +5,7 @@ import {
   resolveGatheringCompositionMode,
 } from '../../../src/systems/gatheringComposition.js';
 import { blindWaitingTaskId } from '../../../src/systems/gatheringEngineInternals.js';
+import { historyEvidenceFields } from '../../../src/systems/runHistoryEvidence.js';
 
 import { CRACKED_ALEMBIC_STAGE_IDS, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 import { LAB_HISTORY_DATA_STATES, historyDataRunSets } from './labHistoryEvidence.js';
@@ -113,6 +114,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
       'history-d100-all-miss',
       'history-gathering-check-failure',
       'history-just-resolved',
+      'history-just-resolved-rewards',
       'history-redacted',
       'history-missing-material',
       'history-gm-deleted-recipe',
@@ -1145,7 +1147,7 @@ function prototypeSpecial(context, state, id, containers) {
     replacePrototypeFocus(containers.gatheringRuns, run, false);
     return true;
   }
-  if (state === 'history-just-resolved') {
+  if (state === 'history-just-resolved' || state === 'history-just-resolved-rewards') {
     replacePrototypeFocus(containers.craftingRuns, prototypeCraft(context, 'cord', id), false);
     return true;
   }
@@ -1526,16 +1528,31 @@ function automaticCompletedCase(context, recipe, id) {
   });
 }
 
+const authoredGroupResults = (recipe, stepIndex) =>
+  (recipeSteps(recipe)[stepIndex]?.resultGroups ?? []).flatMap((group) => group?.results ?? []);
+
 function authoredResults(recipe, stepIndex) {
-  const authored = recipeSteps(recipe)[stepIndex];
-  return (authored?.resultGroups ?? []).flatMap((group) =>
-    (group?.results ?? []).map((result) => ({
+  return authoredGroupResults(recipe, stepIndex)
+    .filter((result) => (result?.kind ?? 'component') === 'component')
+    .map((result) => ({
       componentId: result.componentId,
       quantity: result.quantity ?? 1,
       name: result.name,
       img: result.img,
-    }))
-  );
+    }));
+}
+
+/** The credits a stage's authored currency results pay, as the reward step records them (1773). */
+function authoredRewards(recipe, stepIndex) {
+  const credits = authoredGroupResults(recipe, stepIndex)
+    .filter((result) => result?.kind === 'currency')
+    .map((result) => ({
+      ...result,
+      resultId: result.id,
+      amount: result.quantity,
+      unitName: result.unit,
+    }));
+  return historyEvidenceFields(credits.length > 0 ? { currencyCredits: credits } : {});
 }
 
 function requireGatheringTask(tasks, mode) {
@@ -1879,6 +1896,7 @@ function completeFixtureRun({ container, run, recipes, state, now }) {
       if (prototypeKey)
         recordPrototypeStage({ actorUuid: run.actorUuid }, prototypeKey, current, stepIndex, true);
       else current.resolutionSnapshot = { kind: 'none', mode: 'simple' };
+      Object.assign(current, authoredRewards(recipe, stepIndex));
       if (recipe?.craftingSystemId === LAB_SYSTEM_IDS.RUNEWORK) {
         current.lastCheckResult = {
           success: true,

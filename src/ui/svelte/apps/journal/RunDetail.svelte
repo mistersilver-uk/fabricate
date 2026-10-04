@@ -38,7 +38,7 @@
   import TimeRemainingBox from './TimeRemainingBox.svelte';
   import HistoricalRunDetail from './HistoricalRunDetail.svelte';
   import ThisRun from './ThisRun.svelte';
-  import { presentStage } from './historyPresentation.js';
+  import { presentReceiptFacts, presentStage } from './historyPresentation.js';
 
   let { run = null, journal = null, now = 0, services = null } = $props();
 
@@ -448,8 +448,8 @@
               quantity={quantityText(item.quantity, localize)}
             />
           {/each}
-          {#each effect.receipt?.currencies ?? [] as spend, index (index)}
-            <JournalFactRow label={spend.unit} value={String(spend.amount ?? '')} />
+          {#each presentReceiptFacts(effect.receipt, localize) as fact, index (index)}
+            <JournalFactRow label={fact.label} value={fact.value} />
           {/each}
         </div>
       {/each}

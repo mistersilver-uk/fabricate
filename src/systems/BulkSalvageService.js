@@ -208,7 +208,7 @@ function rowRollValue(checkResult, result) {
 /**
  * The tools that broke in one salvage, as `{ name, img }`, read from the run record because
  * `salvage()` returns tool evidence only there (the runless path has none, a stated limit). It
- * answers the question `CraftingEngine._resolveBrokenToolChatEntries` answers but is no mirror: it
+ * answers the question `craftChatEntries.brokenToolChatEntries` answers but is no mirror: it
  * resolves `componentId` only, does not dedupe, and is first-wins on a duplicated component id.
  * The index is consulted only when a record broke (issue 1202).
  */

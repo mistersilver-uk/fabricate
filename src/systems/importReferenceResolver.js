@@ -28,6 +28,9 @@ export const REFERENCE_KINDS = Object.freeze({
   EVENT_LINK: 'eventLink',
   COMPONENT_LINK: 'componentLink',
   RECIPE_ITEM: 'recipeItem',
+  // A `knowledge` result's taught recipe and a `currency` result's unit (issue 1773).
+  RECIPE_LINK: 'recipeLink',
+  CURRENCY_UNIT: 'currencyUnit',
   // The world-scope kinds (issue 1364) reuse the entity owner types; `worldToolBreakageDropped`,
   // whose subject is a setting, takes `unknown`; a generic `worldEntity` would be unsearchable.
   WORLD_ENTITY_COLLISION: 'worldEntityCollision',
@@ -345,11 +348,20 @@ function rewriteScopeSliceReferences(prepared, remappers, remapId) {
   }
 }
 
+/** Every result a recipe authors, top level and per step. */
+function recipeResults(recipe) {
+  const groups = [
+    ...arrayOf(recipe?.resultGroups),
+    ...arrayOf(recipe?.steps).flatMap((step) => arrayOf(step?.resultGroups)),
+  ];
+  return [...groups.flatMap((group) => arrayOf(group?.results)), ...arrayOf(recipe?.results)];
+}
+
 /**
  * Copy mode: regenerate every recipe id and remap each `recipeItemDefinitions[].recipeIds` entry
- * to it (issue 701), or every copied book renders empty; an id absent from the payload stays
- * verbatim and still reports. Only `recipeIds[]` positions move, and the component remap never
- * touches them.
+ * and each `knowledge` result's `recipeId` to it (issues 701, 1773), or every copied book renders
+ * empty and every taught recipe is lost; an id absent from the payload stays verbatim and still
+ * reports. The component remap never touches either.
  */
 export function rebindCopyRecipeIds(prepared, { generateId = localId } = {}) {
   if (!prepared || typeof prepared !== 'object') return prepared;
@@ -374,6 +386,11 @@ export function rebindCopyRecipeIds(prepared, { generateId = localId } = {}) {
   for (const def of arrayOf(system?.recipeItemDefinitions)) {
     if (def && Array.isArray(def.recipeIds)) {
       def.recipeIds = def.recipeIds.map((rid) => idMap.get(rid) ?? rid);
+    }
+  }
+  for (const result of arrayOf(recipes).flatMap(recipeResults)) {
+    if (result?.kind === 'knowledge' && idMap.has(result.recipeId)) {
+      result.recipeId = idMap.get(result.recipeId);
     }
   }
 
@@ -623,7 +640,10 @@ function collectBrokenInternalReferences(payload, out) {
     }
     for (const alt of arrayOf(ref.alternatives)) reportIngredientRef(alt, owner, ownerType);
   };
+  const recipeIds = idSet(payload.recipes);
+  const reportRewardRef = rewardReferenceReporter(payload, recipeIds, push);
   const reportResultRef = (result, owner, ownerType) => {
+    reportRewardRef(result, owner, ownerType);
     const references = new Set([result?.componentId, result?.systemItemId].filter(Boolean));
     for (const componentId of references) {
       if (!componentIds.has(componentId)) {
@@ -684,6 +704,11 @@ function collectBrokenInternalReferences(payload, out) {
     }
   }
 
+  reportRecipeItemLinks(payload, { recipeIds, recipeItemIds }, push);
+}
+
+/** Book-to-recipe links in both directions, reported where either end is absent. */
+function reportRecipeItemLinks(payload, { recipeIds, recipeItemIds }, push) {
   // Legacy reverse `recipeItemId`; absent once a world has book-side membership.
   for (const recipe of arrayOf(payload.recipes)) {
     if (recipe?.recipeItemId && !recipeItemIds.has(recipe.recipeItemId)) {
@@ -692,14 +717,26 @@ function collectBrokenInternalReferences(payload, out) {
   }
 
   // Book membership: each definition's recipeIds → recipes (issue 511 many-to-many).
-  const recipeIds = idSet(payload.recipes);
-  for (const def of arrayOf(system.recipeItemDefinitions)) {
+  for (const def of arrayOf(payload.system?.recipeItemDefinitions)) {
     for (const rid of arrayOf(def?.recipeIds)) {
       if (rid && !recipeIds.has(rid)) {
         push(REFERENCE_KINDS.RECIPE_ITEM, 'recipeItem', def, rid);
       }
     }
   }
+}
+
+/** Reports a `knowledge` result's absent taught recipe and a `currency` result's absent unit. */
+function rewardReferenceReporter(payload, recipeIds, push) {
+  const unitIds = idSet(payload.currencyConfig?.units);
+  return (result, owner, ownerType) => {
+    if (result?.kind === 'knowledge' && result.recipeId && !recipeIds.has(result.recipeId)) {
+      push(REFERENCE_KINDS.RECIPE_LINK, ownerType, owner, result.recipeId);
+    }
+    if (result?.kind === 'currency' && result.unit && !unitIds.has(result.unit)) {
+      push(REFERENCE_KINDS.CURRENCY_UNIT, ownerType, owner, result.unit);
+    }
+  };
 }
 
 function taskLinkIds(env) {

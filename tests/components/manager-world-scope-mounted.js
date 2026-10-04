@@ -1557,7 +1557,7 @@ export function registerWorldScopeCases() {
         await openChecksSection('triggers');
         const trigger = target.querySelector('[data-trigger="trg-1"]');
         assert.ok(Boolean(trigger), 'the authored trigger renders, so the gate has a subject');
-        target.querySelector('[data-trigger-disclosure="trg-1"]').click();
+        target.querySelector(':scope [data-trigger="trg-1"] [data-rule-row-disclosure]').click();
         await tick();
         flushSync();
         assert.ok(

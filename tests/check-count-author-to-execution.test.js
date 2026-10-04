@@ -264,7 +264,7 @@ test('a six-die pool that explodes tens and cancels ones botches as authored', a
   await act(() => choose(root, 'data-check-count-destination-option', 'pool'));
   // The Botch preset, offered once cancelling is on, from the Triggers section.
   await harness.setProps({ section: 'triggers' });
-  await act(() => root.querySelector('[data-add-trigger-preset="botch"]').click());
+  await act(() => root.querySelector('[data-rule-row-preset="botch"]').click());
 
   const reloaded = await saveAndReload(model);
   const { pool } = reloaded.simple.evaluation;

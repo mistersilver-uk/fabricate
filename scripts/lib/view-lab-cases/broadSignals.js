@@ -65,6 +65,17 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-crafting-odds-enumerable',
     'manager-checks-count-botch-odds',
   ]),
+  // The rule row (issue 1782): an opened trigger, a counting check's presets, an attached drop modifier.
+  'src/ui/svelte/components/RuleRow.svelte': Object.freeze([
+    'manager-checks-crafting-tier-step',
+    'manager-checks-v3-count-triggers',
+    'manager-gathering-task-drop-condition-modifier-attached',
+  ]),
+  // Its sentence: an opened trigger's lead and quotation, and a counting check's net successes.
+  'src/ui/svelte/components/RuleSentence.svelte': Object.freeze([
+    'manager-checks-crafting-tier-step',
+    'manager-checks-v3-count-triggers',
+  ]),
   // The bare leaf's one remaining caller: an opened gathering drop row's chance track.
   'src/ui/svelte/components/FillBar.svelte': Object.freeze(['player-gathering-drop-open']),
   'src/ui/svelte/components/StageNav.svelte': Object.freeze([

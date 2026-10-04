@@ -104,6 +104,8 @@ const harness = createMountedComponentHarness({
     // The shared status card: a trigger's break-tools effect is its own bordered card now
     // (issue 1096). Manifest only.
     'src/ui/svelte/components/ToggleCard.svelte',
+    'src/ui/svelte/components/RuleSentence.svelte',
+    'src/ui/svelte/components/RuleRow.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
     // THE SHARED ONE-OF-N PICKER and its compiled graph (issue 1510), rendered by this editor's
     // Preview-against control and by the trigger editor's five. Manifest only.

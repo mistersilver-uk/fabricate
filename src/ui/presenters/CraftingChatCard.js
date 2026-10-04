@@ -30,6 +30,7 @@ import {
   statesCountEvidence,
 } from './countEvidenceRows.js';
 import { esc } from './htmlEscape.js';
+import { RESULT_KIND_GLYPHS } from './resultKindGlyphs.js';
 
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
 
@@ -137,6 +138,41 @@ export function rolledAmountText(rolled, quantity, localize = (key) => key) {
   return String(localize(key)).replace('{formula}', formula).replace('{total}', String(total));
 }
 
+/** The sentence a knowledge grant reads, by its recorded outcome (issue 1773). */
+const KNOWLEDGE_GRANT_KEYS = Object.freeze({
+  granted: 'FABRICATE.Chat.RecipeLearned',
+  alreadyKnown: 'FABRICATE.Chat.RecipeAlreadyKnown',
+});
+
+/**
+ * One currency credit or knowledge grant as a full-width result row (issue 1773): the kind's glyph
+ * in place of an image, then a stack of the credit's label and amount or the grant's sentence, the
+ * roll, and the reason it was given, so a recipe name is never ellipsized away at chat width.
+ */
+function renderReward(entry, localize) {
+  const currency = entry.kind === 'currency';
+  const amount = `${entry.amount} ${entry.unitName || entry.unit}`;
+  const text = currency
+    ? [entry.label, amount].filter(Boolean).join(' — ')
+    : String(localize(KNOWLEDGE_GRANT_KEYS[entry.outcome] ?? KNOWLEDGE_GRANT_KEYS.granted)).replace(
+        '{recipe}',
+        entry.recipeName || entry.recipeId
+      );
+  const note = currency ? rolledAmountText(entry.rolled, entry.amount, localize) : '';
+  return [
+    `<li class="fabricate-craft-chat__item fabricate-craft-chat__item--reward" data-reward-kind="${currency ? 'currency' : 'knowledge'}">`,
+    `<i class="fabricate-craft-chat__icon ${RESULT_KIND_GLYPHS[entry.kind]}" aria-hidden="true"></i>`,
+    `<span class="fabricate-craft-chat__label"><span>${esc(text)}</span>`,
+    note
+      ? `<span class="fabricate-craft-chat__roll fabricate-craft-chat__item-roll">${esc(note)}</span>`
+      : '',
+    entry.reason
+      ? `<span class="fabricate-craft-chat__reward-reason">${esc(entry.reason)}</span>`
+      : '',
+    '</span></li>',
+  ].join('');
+}
+
 /**
  * Render one image-backed entry (created result, consumed ingredient, or tool)
  * as a list item. `quantity` is rendered as a `N×` prefix when present and > 1.
@@ -146,7 +182,9 @@ export function rolledAmountText(rolled, quantity, localize = (key) => key) {
  * ellipsed away at chat width; `__item-roll` names the per-row instance so a rule may reach it
  * without reaching the card-level total row. An entry without one renders byte-identically.
  */
-export function renderItem({ name, img, quantity, rolled }, localize = (key) => key) {
+export function renderItem(entry, localize = (key) => key) {
+  if (Object.hasOwn(RESULT_KIND_GLYPHS, entry?.kind)) return renderReward(entry, localize);
+  const { name, img, quantity, rolled } = entry;
   const label = Number(quantity) > 1 ? `${Number(quantity)}× ${esc(name)}` : esc(name);
   const note = rolledAmountText(rolled, quantity, localize);
   return [
@@ -529,6 +567,7 @@ export function renderComplications({
  * @param {string}  [model.subjectName] - The recipe (crafting) or source component (salvage).
  * @param {Array<{name:string,img:string,quantity:number,rolled?:{formula:string,total:number}}>}
  *   [model.results] - A `rolled` entry states its roll; `quantity` 0 is an empty award (issue 1645).
+ *   An entry whose `kind` is `currency` or `knowledge` is a credit or grant record (issue 1773).
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed]
  * @param {Array<{name:string,img:string}>}                 [model.tools]
  * @param {number}  [model.rollValue] - The rolled check total; rendered only when finite

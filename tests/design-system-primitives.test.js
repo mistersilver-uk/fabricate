@@ -139,6 +139,9 @@ const EXPECTED_OVERRIDE_KEYS = [
   // open step row, where `aria-expanded="true"` over a visible body is the only state in which the
   // control is more than a chevron. It sorts here rather than beside the entry it arrived with.
   'src/ui/svelte/components/RowDisclosure.svelte',
+  // Issue 1782: the rule row and its sentence, on an opened trigger, presets and a drop modifier.
+  'src/ui/svelte/components/RuleRow.svelte',
+  'src/ui/svelte/components/RuleSentence.svelte',
   // THE searchable picker. This list is compared against `Object.keys(...).sort()`, so the entry
   // sits here rather than four lines up because issue 1500 moved the file from
   // `apps/manager/SearchablePopover.svelte` into `components/` — which changes nothing about the
@@ -244,13 +247,15 @@ test('the inputs every property below quantifies over are alive', () => {
   // 74 as of issue 1516: `PickerRow` on its second importer, the result card.
   // 75 as of issue 1521, whose `InlineRenameField` replaced the party and realm name fields; 74
   // once the inspector action button became the button primitive at full width.
-  // 76 as of issue 1782: `Meter` and `BandedBar`, each on three and two importers.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 76, 'the shipped primitive set changed size');
+  // 76 as of issue 1782: `Meter` and `BandedBar`, each on three and two importers; 77 with
+  // `RuleRow` on its two.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 77, 'the shipped primitive set changed size');
   // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
   // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;
   // 17 when `ChoiceGroup` joined at one caller (issue 1516).
-  // 18 as of issue 1782: `StageBars`, whose one importer is `RunProgress`.
-  assert.equal(NOT_A_PRIMITIVE.length, 18, 'the recorded non-member set changed size');
+  // 18 as of issue 1782: `StageBars`, whose one importer is `RunProgress`; 19 with `RuleSentence`,
+  // whose one importer is `RuleRow`.
+  assert.equal(NOT_A_PRIMITIVE.length, 19, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
