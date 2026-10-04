@@ -136,6 +136,9 @@ function readParams() {
     knowledgeError: params.get('knowledgeError') === '1',
     // Build a world with NO Tools at all, for the world Tools Catalogue's empty state.
     noTools: params.get('noTools') === '1',
+    // Withhold the world essence scope from the manager, so an essence editor renders unscoped,
+    // with the On craft primer the rules screen drops.
+    noEssenceScope: params.get('noEssenceScope') === '1',
     // Seed NO world component records of the lab's own, so the world's tag vocabulary is empty and
     // — with `clearSystem` beside it — its component catalogue is too (issue 1540).
     noAuthoredWorldComponents: params.get('noAuthoredWorldComponents') === '1',
@@ -671,6 +674,7 @@ async function mountManagerApp(content, params) {
         }
       : {}),
   });
+  if (params.noEssenceScope) game.fabricate.getEssenceScopeStore = () => null;
   const props = app._prepareSvelteProps();
   const services = props.services;
   if (params.downtimeProvider) {

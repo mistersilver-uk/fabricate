@@ -667,22 +667,34 @@ test('the controls nested inside a callout and a notice own their own pointer ta
   }
 });
 
-// Issue 881 folded three explainers into one card, and issue 1521 folded that card onto the
-// callout's `items`: each item glyph shares the leading glyph's box and, at every tone, its ink.
+// Each item glyph shares the leading glyph's box and, at every tone, its ink (issue 1521).
 test('the callout items reuse the leading glyph, and no explainer re-derivation survives', () => {
+  const calloutValue = (selector, property) => {
+    const block = blockIn(calloutStyles, selector);
+    return declaration(block.slice(block.indexOf('{') + 1, block.lastIndexOf('}')), property);
+  };
   const glyphBlock = blockIn(calloutStyles, '.manager-callout > i,\n  .manager-callout-item > i');
   assert.ok(
     glyphBlock.includes('width: 13px;') && glyphBlock.includes('color: var(--fab-text-subtle);'),
     "an item glyph is the leading glyph's 13px box in the same neutral ink"
   );
   for (const tone of ['info', 'accent', 'warning', 'success', 'danger']) {
-    const toneBlock = blockIn(
-      calloutStyles,
+    const toneSelector =
       `.manager-callout.is-${tone} > i,\n  .manager-callout.is-${tone} .manager-callout-item > i,\n` +
-        `  .manager-callout.is-${tone} .manager-callout-title`
+      `  .manager-callout.is-${tone} .manager-callout-title`;
+    assert.equal(
+      calloutValue(toneSelector, 'color'),
+      `var(--fab-${tone}-text)`,
+      `${tone} inks the item glyphs in its own family`
     );
-    assert.match(toneBlock, /color: var\(--fab-\w+-text\);/, `${tone} inks the item glyphs too`);
   }
+  assert.equal(calloutValue('.manager-callout-item-lead', 'color'), 'var(--fab-text)');
+  assert.equal(calloutValue('.manager-callout-item-lead', 'font-weight'), '600');
+  assert.equal(
+    calloutValue('.manager-callout-items', 'margin-top'),
+    'var(--fab-space-2)',
+    'the list sits one step under the body'
+  );
 
   for (const dead of [
     'manager-tool-how-it-works',

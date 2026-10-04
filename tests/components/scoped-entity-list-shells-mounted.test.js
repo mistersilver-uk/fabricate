@@ -367,6 +367,11 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
       // THE CARD'S SECOND LINE IS THE LANE'S NOTE, AND THE COUNT IS ITS FALLBACK.
       for (const cell of cells) {
         assert.match(cell.textContent, /Falls back to /);
+        assert.ok(cell.matches('.manager-icon-fact-row.is-tiled.is-rule'), 'a rule-density tile');
+        assert.ok(
+          Boolean(cell.querySelector(':scope > i.fa-sliders')),
+          'the sliders glyph stands in when the lane names none'
+        );
       }
       const bare = await catalogueHarness.mount({
         ...props,

@@ -1,10 +1,9 @@
 /** `Callout`'s `items` mounted (issue 1521): the folded explainer's glyph-led points. */
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import { importedModules } from '../helpers/moduleAst.js';
+import { importedModules, lazilyImportedModules } from '../helpers/moduleAst.js';
 import { sourceAstEntriesUnder } from '../helpers/parsedSource.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { rendersComponent } from '../helpers/svelteStructureContract.js';
@@ -36,6 +35,7 @@ describe('Callout items', () => {
     assert.equal(note.tagName, 'DIV', 'items alone make the root structured');
     assert.equal(note.getAttribute('role'), 'note');
     assert.equal(note.getAttribute('data-x'), 'true');
+    assert.equal(note.querySelector('.manager-callout-text').textContent, 'Body');
 
     const rows = [
       ...note.querySelectorAll(':scope .manager-callout-items > .manager-callout-item'),
@@ -66,6 +66,20 @@ describe('Callout items', () => {
     );
   });
 
+  it('draws no body line, glyph or lead that the caller did not pass', async () => {
+    const root = await harness.mount({
+      title: 'Title',
+      items: [{ text: 'Bare point.' }],
+      'data-x': true,
+    });
+    const note = root.querySelector('[data-x]');
+    assert.ok(!note.querySelector('.manager-callout-text'), 'no text draws no body line');
+    const row = note.querySelector('.manager-callout-item');
+    assert.ok(!row.querySelector(':scope > i'), 'no icon draws no glyph box');
+    assert.ok(!row.querySelector('.manager-callout-item-lead'), 'no lead draws no lead');
+    assert.equal(row.querySelector('.manager-callout-item-text').textContent, 'Bare point.');
+  });
+
   it('keeps the plain paragraph when there are no items', async () => {
     const root = await harness.mount({ text: 'Body', 'data-x': true });
     const note = root.querySelector('[data-x]');
@@ -75,14 +89,12 @@ describe('Callout items', () => {
 
   it('retires the explainer card: no file, import or render of it remains', () => {
     const retired = 'ExplainerCard';
-    assert.equal(
-      existsSync(resolve(repoRoot, `src/ui/svelte/apps/manager/${retired}.svelte`)),
-      false
-    );
+    const namesIt = (specifier) => specifier.endsWith(`/${retired}.svelte`);
     const users = [...sourceAstEntriesUnder('src'), ...sourceAstEntriesUnder('scripts')]
       .filter(
-        ([, ast]) =>
-          importedModules(ast).some((specifier) => specifier.endsWith(`/${retired}.svelte`)) ||
+        ([path, ast]) =>
+          namesIt(path) ||
+          [...importedModules(ast), ...lazilyImportedModules(ast)].some(namesIt) ||
           (ast.fragment !== undefined && rendersComponent(ast, retired))
       )
       .map(([path]) => path);

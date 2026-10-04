@@ -257,5 +257,10 @@ for (const { path, root, compiled, props } of MOUNTED) {
         assert.equal(node.getAttribute('data-x'), rendered);
       });
     }
+
+    it("appends a caller's class to its root", async () => {
+      const target = await harness.mount({ ...props, class: 'x', 'data-x': true });
+      assert.ok(target.querySelector('[data-x]').matches(`${root}.x`));
+    });
   });
 }

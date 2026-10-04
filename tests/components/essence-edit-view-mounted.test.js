@@ -275,7 +275,6 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     harness.remount();
   });
 
-  // Issue 1521 folded the explainer card onto `Callout`'s `items`.
   it('draws the create draft primer as a callout note with three glyph-led points', async () => {
     const root = await harness.mount(props());
     openTab(root, 'oncraft');
@@ -284,6 +283,8 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     assert.ok(Boolean(primer), 'the create draft keeps its primer');
     assert.equal(primer.getAttribute('data-essence-on-craft-explainer'), 'true');
     assert.ok(primer.matches('div.manager-callout[role="note"]'), 'and it is the callout note');
+    assert.equal(primer.dataset.calloutTone, 'neutral', 'a standing note takes the neutral tone');
+    assert.ok(primer.querySelector(':scope > i').classList.contains('fa-circle-question'));
     assert.match(primer.querySelector('.manager-callout-title').textContent, /What an essence/);
     const points = [...primer.querySelectorAll('.manager-callout-item')];
     assert.equal(points.length, 3, 'one point per thing an essence carries');
@@ -726,6 +727,10 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
 
     const callout = root.querySelector('[data-scoped-shared-definition]');
     assert.ok(callout, 'the callout is the first thing the rules tab says');
+    assert.ok(
+      !root.querySelector('[data-essence-on-craft-explainer]'),
+      'and the create primer is not, because each rules card explains itself'
+    );
     assert.ok(
       callout.textContent.includes('Aether'),
       'it names the essence rather than "the shared definition"'

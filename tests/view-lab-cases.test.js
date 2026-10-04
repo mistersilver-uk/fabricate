@@ -713,14 +713,31 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
 const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) => caseId);
-// One measured control is not a verb: the `rule` fact row's subtitle ink (issue 1521).
-const RULE_SUBTITLE_INK = Object.freeze({
-  caseId: 'world-essence-catalogue',
-  selector: '[data-scoped-list-inherit-note="effectSource"]',
-  styles: 'color: var(--fab-text-muted)',
+// The measured controls that are not verbs: the `rule` fact row's subtitle ink, and the On craft
+// primer's item list offset and lead (issue 1521).
+const PRIMER = '[data-essence-on-craft-explainer]';
+const NON_VERB_CONTROLS = Object.freeze({
+  'world-essence-catalogue': [
+    {
+      selector: '[data-scoped-list-inherit-note="effectSource"]',
+      styles: 'color: var(--fab-text-muted)',
+    },
+  ],
+  'manager-essence-edit-unscoped-on-craft': [
+    { selector: `${PRIMER} .manager-callout-items`, styles: 'margin-top: var(--fab-space-2)' },
+    {
+      selector: `${PRIMER} .manager-callout-item:first-child .manager-callout-item-lead`,
+      styles: 'color: var(--fab-text); font-weight: 600',
+    },
+  ],
 });
-const isVerbControl = (control) => control.selector !== RULE_SUBTITLE_INK.selector;
-const CONTROL_LAYOUT_CASE_IDS = Object.keys(CONTROL_LAYOUT_CASES);
+const NON_VERB_SELECTORS = new Set(
+  Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))
+);
+const isVerbControl = (control) => !NON_VERB_SELECTORS.has(control.selector);
+const CONTROL_LAYOUT_CASE_IDS = [
+  ...new Set([...Object.keys(CONTROL_LAYOUT_CASES), ...Object.keys(NON_VERB_CONTROLS)]),
+];
 const LAYOUT_CASE_IDS = [
   ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
   ...RESPONSIVE_LAYOUT_CASE_IDS,
@@ -849,14 +866,14 @@ test('the inspector-rail cases measure every verb on the manager rung, one prima
   }
 });
 
-test('the essence catalogue case measures the rule subtitle in the muted ink', () => {
-  const { caseId, ...control } = RULE_SUBTITLE_INK;
-  const controls = getCaseById(caseId).expectLayout.controls;
-  assert.deepEqual(
-    controls.filter((candidate) => !isVerbControl(candidate)),
-    [control],
-    `${caseId} reads the world-default card's subtitle ink`
-  );
+test('the subtitle ink and the primer items are measured by the cases that draw them', () => {
+  for (const [caseId, expected] of Object.entries(NON_VERB_CONTROLS)) {
+    assert.deepEqual(
+      getCaseById(caseId).expectLayout.controls.filter((candidate) => !isVerbControl(candidate)),
+      expected,
+      `${caseId} measures its non-verb controls`
+    );
+  }
 });
 
 // The side-rail routes' own scrollers below the 1120px rung (issue 1976): the two editors whose

@@ -20,8 +20,7 @@ const SHARED_PRIMITIVES = [
   // that mounts a tree containing that screen.
   'src/ui/svelte/components/Modal.svelte',
   // The manager's ONE icon fact row (issue 881), a side-panel primitive the scoped-entity preview,
-  // the world catalogue shell and the inspectors pull into several mounted trees. Its sibling
-  // explainer card left at issue 1521, folded onto `Callout`'s `items`.
+  // the world catalogue shell and the inspectors pull into several mounted trees.
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   // The manager's ONE chip (issue 883). This is the sharpest case yet.
   'src/ui/svelte/components/Chip.svelte',

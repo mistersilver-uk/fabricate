@@ -262,6 +262,39 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-essence-edit-unscoped-on-craft',
+    label: 'Manager — Essence edit On craft, unscoped',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // With no world scope the editor is the unscoped one, whose On craft tab opens on the primer.
+    query: { noEssenceScope: '1' },
+    steps: [
+      { selector: '#manager-nav-essence-rules' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '[data-essence-tab="oncraft"]' },
+    ],
+    expectView: 'essence-edit',
+    expectSelector: '[data-essence-on-craft-explainer]',
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-essence-on-craft-explainer] .manager-callout-items',
+          styles: 'margin-top: var(--fab-space-2)',
+        },
+        {
+          selector:
+            '[data-essence-on-craft-explainer] .manager-callout-item:first-child .manager-callout-item-lead',
+          styles: 'color: var(--fab-text); font-weight: 600',
+        },
+      ],
+    },
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceOnCraftTab\.svelte$/,
+      // `Callout.svelte` is a broad signal, so its route here is its BROAD_SIGNAL_CASE_OVERRIDES entry.
+    ],
+  }),
+  managerCase({
     id: 'manager-essence-edit-validation',
     label: 'Manager — Essence edit Validation',
     reaches: 'beyond',

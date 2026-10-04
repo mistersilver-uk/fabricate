@@ -11,8 +11,9 @@
   meant to make the hazard stand out. At `accent` the ink is `--fab-accent-text`, not `--fab-accent`,
   which measures 4.48:1 in `ironblood-forge` and fails AA. `title`, `text`, `icon`, an `actions`
   snippet drawn inside the strip so a note and the control answering it are one object, and an
-  extra `class` are the rest. `items` (`[{ icon, lead, text }]`) lists glyph-led points under the
-  body, each glyph inked as the leading one; an item's `text` renders only when non-empty.
+  extra `class` are the rest; `text` may be omitted when `items` carry the body. `items`
+  (`[{ icon, lead, text }]`) lists glyph-led points under the body, each glyph inked as the leading
+  one; every field of an item is optional and renders only when non-empty.
 
   Rest spread:
   - `{...rest}` lands on the root, written after `class`, and carries a caller's `data-*` hook.
@@ -70,15 +71,15 @@
   <i class={resolvedIcon} aria-hidden="true"></i>
   <span class="manager-callout-body">
     {#if title}<span class="manager-callout-title">{title}</span>{/if}
-    <span class="manager-callout-text">{text}</span>
+    {#if text}<span class="manager-callout-text">{text}</span>{/if}
     {#if points.length > 0}
       <!-- Spans with list roles: the body is a `<span>`, which cannot hold a `<ul>`. -->
       <span class="manager-callout-items" role="list">
         {#each points as point, index (index)}
           <span class="manager-callout-item" role="listitem">
-            <i class={point.icon} aria-hidden="true"></i>
+            {#if point.icon}<i class={point.icon} aria-hidden="true"></i>{/if}
             <span
-              ><span class="manager-callout-item-lead">{point.lead}</span>
+              >{#if point.lead}<span class="manager-callout-item-lead">{point.lead}</span>{/if}
               {#if point.text}<span class="manager-callout-item-text">{point.text}</span>{/if}</span
             >
           </span>

@@ -137,11 +137,4 @@ describe('ScopedEntityPreview fact groups (mounted)', () => {
       'the descendant form is the one to write'
     );
   });
-
-  it('renders no explainer, the prop no caller passed having gone (issue 1521)', async () => {
-    const explainer = { title: 'How this works', items: [{ icon: 'fas fa-cube', lead: 'Lead' }] };
-    const root = await harness.mount({ kicker: 'PLAYER PREVIEW', explainer });
-    assert.ok(!root.textContent.includes('How this works'), 'the old prop draws nothing');
-    assert.equal(root.querySelector('aside').childElementCount, 1, 'only the kicker renders');
-  });
 });

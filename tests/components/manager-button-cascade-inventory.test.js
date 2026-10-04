@@ -106,9 +106,6 @@ const CONVERTED_BATCHES = Object.freeze([
         file: 'src/ui/svelte/components/EditorValidationSurface.svelte',
         sites: 1,
       }),
-      // REMOVED at issue 1521, recorded rather than performed silently: `ExplainerCard.svelte`
-      // was booked for its one docs-link `Button`, and the card folded onto `Callout`'s `items`,
-      // which renders no link — no caller had ever passed one.
     ]),
   }),
   Object.freeze({
@@ -1095,7 +1092,6 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
     119,
-    // 119, not 120, since issue 1521: the explainer card's one converted site left the product.
     'the conversion is 119 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
@@ -1103,7 +1099,7 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
     47,
     // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), and one for the
     // salvage DC card's move into `CheckOverrideField` (issue 2005); the site total above is
-    // unchanged by those, because nothing converted. One fewer with the explainer card (1521).
+    // unchanged by those, because nothing converted.
     'across 47 components'
   );
 

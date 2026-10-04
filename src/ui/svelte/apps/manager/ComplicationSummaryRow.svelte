@@ -20,7 +20,7 @@
   - `{...rest}` lands on the root after `class`, and carries the caller's `data-*` hook.
 
   Invariants:
-  - ONE SCAFFOLD, not a copy per variant: there are six call sites, and three `{#if}` branches each
+  - ONE SCAFFOLD, not a copy per variant: there are five call sites, and three `{#if}` branches each
     restating the shell is intra-file duplication SonarCloud's detector reads in `.svelte`.
   - THE ROW IS A `<div>` and `RowDisclosure` is the sole trigger, with the delete control as its
     SIBLING: a whole-row `<button>` would nest buttons, which `createElement` accepts and no mounted

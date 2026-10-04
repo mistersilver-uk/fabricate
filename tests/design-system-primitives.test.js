@@ -79,6 +79,8 @@ const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/comp
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
  */
 const EXPECTED_OVERRIDE_KEYS = [
+  // Issue 1521: the fact row, on the frames that draw its `rule` density.
+  'src/ui/svelte/apps/manager/IconFactRow.svelte',
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
@@ -218,7 +220,6 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * RE-KEY between the two primitive directories, which holds the length (issue 1710).
  */
 const PRIMITIVES_WITH_NO_FRAME = [
-  'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/TintPicker.svelte',
@@ -374,6 +375,16 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'src/ui/svelte/components/EditorTabs.svelte',
       'manager-world-downtime-narrow-settings',
       'the frame that draws the strip wrapped, with its last tab`s description at the card`s end',
+    ],
+    [
+      'src/ui/svelte/components/Callout.svelte',
+      'manager-essence-edit-unscoped-on-craft',
+      'the one frame that draws the `items` form, the essence On craft primer',
+    ],
+    [
+      'src/ui/svelte/apps/manager/IconFactRow.svelte',
+      'world-essence-catalogue',
+      'a frame that draws the `rule` density as catalogue cards',
     ],
   ];
   for (const [file, caseId, because] of expectations) {
