@@ -454,8 +454,8 @@ An alternative is claimable if its component or source item still exists, its re
 
 #### Forfeited
 
-A pending award choice that settles because no alternative remains claimable.
-The settled choice records the forfeit and remains in history.
+A pending award choice that settles with no picks, because no alternative remains claimable or because a clean-up would otherwise drop its run.
+The settled choice records the forfeit and remains in history until the next clean-up.
 
 [Notes](docs/domain/terms.md#forfeited)
 
