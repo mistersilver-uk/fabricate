@@ -325,14 +325,6 @@ test('rejects a geometry selector too thin to measure anything', async () => {
   );
 });
 
-test('rejects row geometry declared without a container', async () => {
-  const { containerSelector: _container, ...uncontained } = ROWS;
-  await assert.rejects(
-    assertViewLabLayout(rowsFrame(), uncontained, 'uncontained'),
-    /uncontained: a layout expectation needs a containerSelector/
-  );
-});
-
 // A wrapped row's lines: each line's boxes share its first box's band, each below the line before.
 const wrappedRow = (boxes) => ({ querySelector: (selector) => boxes[selector] ?? null });
 const WRAPPED = Object.freeze({
@@ -380,6 +372,19 @@ test('rejects a control off its stated line, and a row missing one', async () =>
     assertViewLabLayout(wrappedFrame([missing]), WRAPPED, 'missing'),
     /.row #1 has no visible .amount/
   );
+});
+
+test('rejects one-line and wrapped row geometry declared without a container', async () => {
+  for (const [layout, page] of [
+    [ROWS, rowsFrame()],
+    [WRAPPED, wrappedFrame([twoLines()])],
+  ]) {
+    const { containerSelector: _container, ...uncontained } = layout;
+    await assert.rejects(
+      assertViewLabLayout(page, uncontained, 'uncontained'),
+      /uncontained: a layout expectation needs a containerSelector/
+    );
+  }
 });
 
 // A control's computed style, each declared value resolved in the control's own context (issue
