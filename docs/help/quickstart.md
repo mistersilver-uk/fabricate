@@ -194,6 +194,6 @@ The Crafting tab provides recipe browsing, actor and source selection, craft but
 ## See Also
 
 - [Crafting Systems]({% link crafting-systems/index.md %}) covers resolution modes, features, and system configuration
-- [Recipes]({% link crafting/recipes/index.md %}) covers ingredient sets, result groups, recipe authoring, and player crafting
+- [Recipes]({% link crafting/recipes/index.md %}) covers ingredient sets, result sets, recipe authoring, and player crafting
 - [API Reference]({% link api/index.md %}) is the full developer documentation
 - [Troubleshooting]({% link help/troubleshooting.md %}) has solutions for common setup issues
