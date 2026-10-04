@@ -6,27 +6,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { applyDocumentUpdate } from './helpers/companionRewardWorld.js';
+import { rewardableCrafter as rewardable } from './helpers/companionRewardWorld.js';
 import { createPersistedCraftingHistory } from './helpers/journal-fixtures.js';
-
-const LEARNED_KEY = 'fabricate.learnedRecipes';
-
-/** Give the fixture's crafter a `_source` its currency and learned-recipe writes land on. */
-function rewardable(actor) {
-  const getFlag = actor.getFlag.bind(actor);
-  actor._source = { system: { currency: { gp: 1, sp: 0 } }, flags: {} };
-  Object.defineProperty(actor, 'system', { get: () => actor._source.system, configurable: true });
-  actor.getFlag = (namespace, key) =>
-    key === LEARNED_KEY
-      ? actor._source.flags.fabricate?.fabricate?.learnedRecipes
-      : getFlag(namespace, key);
-  actor.update = async (payload) => {
-    applyDocumentUpdate(actor._source, payload);
-    return actor;
-  };
-  actor.updateSource = () => {};
-  return actor;
-}
 
 const rewards = (recipeId) => [
   { id: 'coin', kind: 'currency', unit: 'gp', quantity: 2, label: 'Fee', reason: 'For the work' },

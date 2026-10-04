@@ -3135,14 +3135,15 @@ Result = {
 The authoring surface for all of it — the chooser as a segmented control in the group header, the award strategy, the range cell per alternative and the currency reward's naming body — is specified by the `design-system` capability, under the requirements "A result-side choice group states who chooses and how many it awards" and "One requirement row serves both sides of a recipe".
 This section states only what is persisted.
 
-8. `alternatives` PRESENT makes this result a choice group, and every member including the one the group was converted from is an entry in that array.
+8. `alternatives` PRESENT makes this result a choice group, and every alternative, including the one the group was converted from, is an entry in that array.
    The carrier's own `kind`, `componentId`, `unit`, `recipeId`, `quantity` and `quantityFormula` are not read while `alternatives` is set, so a group is never also a result in its own right.
    `alternatives` holds two or more entries; a group reduced to one is a plain result again.
-   Alternatives do not nest: a member MUST NOT carry `alternatives` of its own.
+   Alternatives do not nest: an alternative MUST NOT carry `alternatives` of its own.
 9. `chooser` defaults to `"playerChooses"` and is read only on a group.
-   `"rolled"` requires a non-empty `selectionFormula`, and `"playerChooses"` ignores `selectionFormula` and every member's `selectionRange`.
+   `"rolled"` requires a non-empty `selectionFormula`, and `"playerChooses"` ignores `selectionFormula` and every alternative's `selectionRange`.
+   `selectionFormula` is not written under `"playerChooses"`.
 10. `awardStrategy` defaults to `"anyOne"` and is read only on a group.
-    `"upTo"` requires exactly one of `awardCount` or a non-empty `awardCountFormula`; `"anyOne"` reads neither.
+    `"upTo"` requires exactly one of `awardCount` or a non-empty `awardCountFormula`; `"anyOne"` reads neither, and neither is written there.
     `awardCount` must be positive.
     `awardCountFormula` is the same roll expression a `quantityFormula` is, validated the same way.
 11. `withReplacement` is read only where `awardStrategy` is `"upTo"` AND `chooser` is `"rolled"`, and defaults to `false`.
@@ -3150,8 +3151,11 @@ This section states only what is persisted.
     `true` makes `awardCount` EXACT and permits the same alternative more than once; `false` awards distinct alternatives, and a count above the number of alternatives exhausts the bundle rather than erroring.
 12. No `awardStrategy` constrains `chooser`: every combination of the two is authorable.
     A repeated draw is not a third strategy — it is `"upTo"` under `"rolled"` with `withReplacement` true — so there is no combination left to forbid.
-13. `selectionRange` is read only on a member of a group whose `chooser` is `"rolled"`, and `from` and `to` are inclusive.
-    The ranges of a group's members are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest member and a roll above the highest selects the highest, so no authored group can produce nothing.
+13. `selectionRange` is read only on an alternative of a group whose `chooser` is `"rolled"`, and `from` and `to` are inclusive.
+    The ranges of a group's alternatives are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest alternative and a roll above the highest selects the highest, so no authored group can produce nothing.
+    A roll selects the alternative with the highest `from` at or below it, and a roll below every `from` selects the lowest.
+    Ranges MUST NOT overlap and `from` MUST NOT exceed `to`.
+    Without repeats, each later roll is read against the alternatives not yet awarded.
     Where a roll awards more than one alternative, the `selectionFormula` is rolled once per award rather than once for the group.
 14. A choice group is NOT valid inside a `progressive` result group.
     Progressive awards every ordered entry whose difficulty the roll affords and normalizes a result's quantity to 1, so neither a chooser nor an award strategy has anything to mean there.
@@ -3162,7 +3166,7 @@ This section states only what is persisted.
 16. `Result.toJSON()` omits every key above whose value is the one the constructor rebuilds from absence, under the issue-1135 omission policy the `Ingredient` section states.
     `id`, `componentId` where the kind is a component, and `quantity` are never omitted.
     Absence is the pre-change on-disk state for all of them, so no reader gains a case it did not already have.
-17. The addition is LOSSLESS FORWARD and LOSSY BACKWARD: a payload written by an older build carries none of these keys and reads identically, while a downgrade drops a group's alternatives and settings rather than degrading them, and the release's upgrade note says so, because an older build cannot.
+17. The addition is LOSSLESS FORWARD and LOSSY BACKWARD: a payload written by an older build carries none of these keys and reads identically, while a downgrade either drops a group's settings or, where the older build requires a `componentId`, fails the recipe's validation until the result is removed, and the release's upgrade note says so, because an older build cannot.
 
 ## Versioned Run Lifecycle
 
@@ -3191,6 +3195,7 @@ RunLifecycle = {
     }>,
     outcome?: object | null,
   },
+  awardChoiceJournal?: object, // the `executionJournal` shape, holding the latest award-choice settle
 }
 ```
 
@@ -3216,6 +3221,17 @@ It does not delay terminal history until effects finish.
 8. Intent, effect plans, receipts and outcomes retain existing secret and blind-run redaction.
 Authority request deduplication and safe prepare-token metadata live in the GM-owned authority ledger; the run record retains effect evidence.
 9. Stage browsing is transient UI state and never changes the persisted executable stage index.
+10. A terminal run accepts one kind of mutation, settling a pending award choice, once per choice.
+Each settle advances `runRevision` and journals into `awardChoiceJournal`, which holds the latest settle and never replaces `executionJournal`.
+Each settle's receipts are appended to the step that held its choice, so a later settle replacing the journal loses none of them.
+A clean-up that forfeits an owed choice (Crafting Runs Flag requirement 5) also advances `runRevision`, without a journal entry.
+An active run's settle journals there too, so the stage's committed journal, its `award-results` receipt and its committed replay are untouched.
+The settle runs under a grant issued for `chooseAward`, a grant issued for another operation is refused, and a new request for a settled choice awards nothing.
+Its effects are `award-choice` (kind `awardChoice`, planned `{ choiceId, picks }`, every pick's amount resolved before the first write), `settle-choice` (kind `settleAwardChoice`) and `post-chat` (kind `postCraftChat`).
+A fresh settle is refused before its plan exists when a pick is unclaimable or fails the craft-time pre-flight, and every pick's amount and reward plan is resolved then, so `award-choice` only writes.
+A resumed settle runs the plan it persisted and is not judged again.
+The two journals exclude each other: neither a settle nor a stage plans while the other's plan is unfinished, each refusing `EXECUTION_IN_PROGRESS`, and the world-time sweep skips a run whose settle is planned.
+Reload reconstruction reads `awardChoiceJournal` as it reads `executionJournal`, so an award choice interrupted mid-effect is recovery-required.
 
 ### Authority Ledger and Recovery Boundary
 
@@ -3471,6 +3487,21 @@ CraftingRunStepState = {
     outcome: "granted" | "alreadyKnown", recipeName?: string,
   }>,
 
+  // What a result-side choice group awarded, and the pick a group whose chooser is the player
+  // still owes (issue 1773); absent on a step written before it and on one whose set held no group.
+  // `choiceId` is the carrier's `Result.id`, `count` the resolved N rather than the authored count.
+  groupAwards?: Array<{
+    choiceId: string, chooser: "playerChooses" | "rolled", awardStrategy: "anyOne" | "upTo",
+    count: number, countRoll?: { formula: string, total: number },
+    selections: Array<{ alternativeId: string, roll?: { formula: string, total: number } }>,
+  }>,
+  pendingAwardChoices?: Array<{
+    choiceId: string, resultGroupId: string | null, resultRowId?: string,
+    awardStrategy: "anyOne" | "upTo", count: number, countRoll?: { formula: string, total: number },
+    alternatives: Array<object>, // the alternatives as snapshotted at award time, without ranges
+    picks?: string[], settledAt?: number, outcome?: "awarded" | "forfeited",
+  }>,
+
   failureReason?: string,
 }
 ```
@@ -3514,12 +3545,24 @@ CraftingRunStepState = {
    An ABSENT map — a run armed before the field existed — reads as all-enabled.
    A collapsed multi-step chain has no such snapshot at all, because it consumes nothing when its single gate is armed and executes every step live at maturity; it therefore evaluates enabled-ness at maturity, consistent with its already-live essence resolution.
 9. `currencyCredits` and `knowledgeGrants` are each absent on a step written before issue 1773, and an older build ignores them.
-   They are written by the versioned `award-rewards` effect, which follows `award-results` and is planned only when the routed set holds a currency or knowledge result, and by the unversioned award paths right after their items.
+   They are written by the versioned `award-rewards` effect, which follows `award-results` and is planned only when the routed set holds a currency, knowledge or choice-group result, and by the unversioned award paths right after their items.
    A credit is written through the world strategy's own writer.
    Under `actorProperty` the credit and the marker `{ runId, effectId: 'award-rewards', resultId, index }` ride one `actor.update`; an `actorInventory` credit is proven by the balance delta and a `macro` credit by nothing, and neither writes a marker.
    `runId` is the run's id on every path that holds a run, and `index` is the credit's position in the step's reward plan.
    A craft refuses a reward its world cannot honour before anything is consumed, at the run's start and again when a later stage starts: an unconfigured unit, currency off, a credit the writer would refuse without writing (a synthetic-token crafter, `creditNotConfigured`, `currencySourceMissing`, `balanceUnreadable`), a taught recipe outside the system, and `knowledgeNotObservable`.
    An interrupted reward step is recovery-required and never replayed; on the unversioned paths the credits and grants it confirmed stay in `currencyCredits` and `knowledgeGrants`, never as `createdResults` rows.
+10. `groupAwards` and `pendingAwardChoices` are each absent on a step written before issue 1773, and an older build ignores them, so an unsettled choice is stranded there.
+   `award-results` writes them into its receipt, and the step persists them when it finalizes; `award-rewards` is planned whenever the routed set holds a choice group, because a group's draw is rolled after the plan is persisted.
+   A rolled group's draws award through each alternative's own kind, so a drawn credit or grant names the carrier as `resultId` and the alternative as `alternativeId`.
+   An N of 0 records an empty `groupAwards` entry and leaves no pending choice.
+   A pending choice records the carrier's linked `resultRowId`, so an Item its settle awards carries the same `resultRowId` a stage draw does.
+   A pending choice is settled exactly once, writing `picks`, `settledAt` and `outcome` onto its entry and appending the award's receipts and a `groupAwards` entry to the same step.
+   For a settled choice whose chooser is the player, that entry's `selections` lists the picks in pick order, none carrying a `roll`, and its `count` is the resolved N; a forfeited choice's entry lists none.
+   A settled entry stays in `pendingAwardChoices` as the record of its choice.
+   A choice with no claimable alternative settles `forfeited`; claimability is judged at settle time, and an alternative whose component or Item is gone, whose credit the world writer would refuse, or whose taught recipe is gone, outside the system, unobservable or already known is not claimable.
+   While an unsettled choice has a claimable alternative, a later stage's start and execute refuse with the blocker `awardChoicePending`, and the world-time sweep skips the run by that same predicate.
+   A run holding an unsettled choice survives the history limit, and a prune that would drop it forfeits the choice instead (Crafting Runs Flag, requirement 5).
+   A versioned step carries no `historySettlement`, so nothing reads an owed step's awards as complete before the settle.
 
 #### Optional historical evidence
 
@@ -3567,10 +3610,14 @@ Requirements:
 2. `history` contains only terminal runs (`succeeded`, `failed`, `cancelled`).
 3. When a run reaches a terminal status, it must be removed from `active` and prepended to `history`.
 4. History should be newest-first and capped by a configured or default limit.
+   A terminal run holding an unsettled award choice is never evicted by the cap, whatever its age, and the cap counts only the other runs.
 5. Deleting a recipe or crafting system should clean-up its associated crafting runs, both historical and in-progress.
+   Where that clean-up would drop a run still owing an award choice, it settles the choice `forfeited` instead and keeps the run until the next clean-up, which drops it as any other.
+   The forfeit is recorded against the run's recorded recipe id and system.
 6. Run-flag writes must be document-coherent.
    A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
    A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
+   The same cap applies to that union and keeps such a run.
    This holds across concurrent writers, sessions/clients, and the primary-GM world-time resume path.
    The identical guarantee applies to the salvage runs flag (`flags.fabricate.salvageRuns`), which shares this persistence mechanism.
 

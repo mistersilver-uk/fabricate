@@ -461,6 +461,26 @@ function buildStageOperations(fabricate) {
   };
 }
 
+/** The award-choice leg: settle a pending reward pick under its own `chooseAward` grant, on an
+ *  active or terminal run (issue 1773). */
+function buildAwardChoiceOperations(fabricate) {
+  return {
+    chooseAward: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
+      const settle = fabricate.craftingEngine?.settleAwardChoice;
+      if (typeof settle !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return settle.call(fabricate.craftingEngine, {
+        actor,
+        runId: run.id,
+        expectedRevision,
+        executionGrant,
+        requestId,
+        choiceId: payload.choiceId,
+        picks: payload.picks,
+      });
+    },
+  };
+}
+
 /** The run-manager mutations, each taken inside the authority claim. */
 function buildRunMutationOperations(fabricate, managerMutation) {
   return {
@@ -540,6 +560,7 @@ function createCraftingJournalOperations(fabricate, getService) {
     ...buildRunStartOperations(fabricate),
     ...buildCheckOperations(fabricate, authorizeRollHandoff),
     ...buildStageOperations(fabricate),
+    ...buildAwardChoiceOperations(fabricate),
     ...buildRunMutationOperations(fabricate, managerMutation),
     authorizeRollHandoff,
   };
