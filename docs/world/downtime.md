@@ -20,7 +20,13 @@ Use the **Tracking**, **Activities**, **Factions**, and **Settings** tabs to exp
 Each tab describes a possible Fabricate Premium workflow and shows a compact example board.
 The **Subscribe on Patreon & download Fabricate Premium** button opens Fabricate's Patreon page in a new browser tab.
 
+Each tab carries a padlock after its name, marking it as a Fabricate Premium feature.
+The padlock does not stop you opening the tab.
+Hover over a tab or focus it with the keyboard to see a short description of it above the tab.
+Press Escape to hide the description.
+
 The preview remains usable when the Manager window is narrow or its navigation rail is collapsed.
+When the window is narrow, the tabs wrap onto more than one row and keep their names.
 
 ## Installed companion extensions
 
