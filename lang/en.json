@@ -1482,6 +1482,8 @@
         "CheckChanged": "This roll's details changed while you were deciding. Check them and roll again.",
         "Reason": {
           "ActiveRun": "This character already has a run of this kind in progress. Finish or cancel it first.",
+          "AwardChoicePending": "Choose this run's reward before you hide it.",
+          "AwardChoiceSettled": "This reward has already been chosen.",
           "ActorNotFound": "That character could not be found. Reopen Fabricate and choose the character again.",
           "AdditionalDiceRefused": "The additional dice could not be bought, so nothing was spent or rolled.",
           "CheckEvaluatorUnavailable": "The check for this run could not be evaluated. Ask your GM to review the activity's check settings.",
@@ -1588,6 +1590,7 @@
           "SourcesUnavailable": "The actors this run draws components from can no longer be found, so what it still needs cannot be judged. Ask your GM to restore them, or cancel the run.",
           "ChoiceRequired": "Make this stage's choices before it can begin: an option for each requirement that offers one, and an allocation for each essence it needs.",
           "RouteRequired": "Choose this stage's route before it can begin.",
+          "AwardChoicePending": "Choose the reward an earlier stage left you before this stage can begin.",
           "StageNotStarted": "Begin this stage before its check can be rolled.",
           "Completion": {
             "Label": "When ready",

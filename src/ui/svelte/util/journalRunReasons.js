@@ -61,6 +61,8 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   'ingredient-set-not-found': 'FABRICATE.App.Journal.Reason.IngredientSetNotFound',
   // ── Run state ─────────────────────────────────────────────────────────────
   'active-run': 'FABRICATE.App.Journal.Reason.ActiveRun',
+  'award-choice-pending': 'FABRICATE.App.Journal.Reason.AwardChoicePending',
+  'award-choice-settled': 'FABRICATE.App.Journal.Reason.AwardChoiceSettled',
   'actor-not-found': 'FABRICATE.App.Journal.Reason.ActorNotFound',
   'run-not-found': 'FABRICATE.App.Journal.Actions.NoRun',
   'stale-run': 'FABRICATE.App.Journal.Reason.StaleRun',
@@ -91,6 +93,7 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   sourcesUnavailable: 'FABRICATE.App.Journal.Actions.SourcesUnavailable',
   choiceRequired: 'FABRICATE.App.Journal.Actions.ChoiceRequired',
   routeRequired: 'FABRICATE.App.Journal.Actions.RouteRequired',
+  awardChoicePending: 'FABRICATE.App.Journal.Actions.AwardChoicePending',
   stageNotStarted: 'FABRICATE.App.Journal.Actions.StageNotStarted',
   notOwner: 'FABRICATE.App.Journal.Actions.NeedsOwner',
 });

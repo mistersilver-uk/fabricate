@@ -6,6 +6,12 @@ import {
   withSpentAdditionalDice,
 } from './journalPreparedCheck.js';
 import { cardOffer, executedCheckFor, withEntitledFacts } from './journalRollFacts.js';
+import {
+  authorizeAwardChoice,
+  awardChoiceDismissalRefusal,
+  validAwardChoicePayload,
+} from './journalRunAwardChoice.js';
+import { serializedOperationResult, terminalRun } from './journalRunReply.js';
 import { decisionAdditionalDice, preparedDecisionPolicy } from './preparedDecisionPolicy.js';
 import { applyGuardedRunMutation } from './runLifecycleState.js';
 
@@ -31,6 +37,7 @@ const MUTATING_ACTIONS = new Set([
   'setCompletionMode',
   'setSelection',
   'cancel',
+  'chooseAward',
 ]);
 
 function failure(reason, extra = {}) {
@@ -51,6 +58,7 @@ function validRequest(request) {
   if (!validText(request?.actorUuid) || !validText(request?.runType)) return false;
   if (!MUTATING_ACTIONS.has(request?.action) && request?.action !== 'releaseCheck') return false;
   if (request.action !== 'start' && !validText(request?.runId)) return false;
+  if (request.action === 'chooseAward' && !validAwardChoicePayload(request.payload)) return false;
   return Number.isInteger(request?.expectedRevision) && request.expectedRevision >= 0;
 }
 
@@ -89,12 +97,6 @@ export function normalizeJournalRunDismissals(value) {
     .sort((left, right) => Number(right[1]) - Number(left[1]))
     .slice(0, DISMISSAL_LIMIT);
   return Object.fromEntries(entries);
-}
-
-function terminalRun(run) {
-  return ['succeeded', 'complete', 'completed', 'cancelled', 'failed', 'archived'].includes(
-    String(run?.status ?? '').toLowerCase()
-  );
 }
 
 function operationUnavailable() {
@@ -562,57 +564,6 @@ export function createGatheringJournalRunOperations({
   };
 }
 
-function serializedOperationResult(result, { secret = false, runId = '' } = {}) {
-  const source = result && typeof result === 'object' ? result : failure('operation-unavailable');
-  const run = source.run && typeof source.run === 'object' ? source.run : {};
-  const base = {
-    success: source.success === true,
-    runId: source.runId ?? run.id ?? runId,
-    status: source.status ?? run.status ?? null,
-    runRevision: source.runRevision ?? run.runRevision ?? null,
-  };
-  if (secret) {
-    return {
-      ...base,
-      secret: true,
-      reason: source.success === true ? null : 'operation-failed',
-    };
-  }
-  const results = Array.isArray(source.results) ? source.results : [];
-  return {
-    ...base,
-    reason: source.reason ?? null,
-    message: source.message ?? null,
-    disposition: source.disposition ?? null,
-    waiting: source.waiting === true,
-    terminal: source.terminal === true || terminalRun(run),
-    authorityUnavailable: source.authorityUnavailable === true,
-    automaticBlocked: source.automaticBlocked === true,
-    blocker: source.blocker ?? null,
-    accepted: source.accepted === true,
-    cancelled: source.cancelled === true,
-    refunded: source.refunded === true,
-    partialRefund: source.partialRefund === true,
-    restoredCount: Number.isFinite(source.restoredCount) ? source.restoredCount : 0,
-    consumed: source.consumed === true,
-    ...(Object.hasOwn(source, 'requiresExecution') && {
-      requiresExecution: source.requiresExecution === true,
-    }),
-    ...(Object.hasOwn(source, 'canExecuteImmediately') && {
-      canExecuteImmediately: source.canExecuteImmediately === true,
-    }),
-    // Gathering refuses in its own vocabulary (`state` and the coded `blockedReasons`), where
-    // crafting uses `reason` and `message`; dropping them left a refusal no surface could word
-    // (issue 1759).
-    ...(Object.hasOwn(source, 'state') && { state: source.state ?? null }),
-    ...(Object.hasOwn(source, 'blockedReasons') && {
-      blockedReasons: Array.isArray(source.blockedReasons) ? source.blockedReasons : [],
-    }),
-    createdResultUuids:
-      source.createdResultUuids ?? results.map((item) => item?.uuid).filter(validText),
-  };
-}
-
 /**
  * Server-attested commands revalidate identity, ownership, revision and expected stage under a claim.
  * Player checks use one-use tokens, local prompts and GM resolution; adapters own disclosure.
@@ -692,11 +643,14 @@ export function createJournalRunCommandService({
     ) {
       return failure('stale-stage');
     }
-    const authorized = await operation.authorize?.({
+    // A settle spends nothing, so the owner-or-GM check above is its whole authorization.
+    const authorize = request.action === 'chooseAward' ? authorizeAwardChoice : operation.authorize;
+    const authorized = await authorize?.({
       actor,
       run,
       payload: request.payload ?? {},
       sender,
+      request,
     });
     if (authorized === false) return failure('source-owner-required');
     if (authorized?.success === false) return authorized;
@@ -941,7 +895,8 @@ export function createJournalRunCommandService({
     const request = {
       kind: JOURNAL_RUN_SOCKET_KIND.REQUEST,
       ...command,
-      requestId: randomId(),
+      // A resumed settle re-sends its persisted request id, so its plan matches (issue 1773).
+      requestId: validText(command.requestId) ? command.requestId : randomId(),
       sessionId,
       senderId: undefined,
       payload: command.payload && typeof command.payload === 'object' ? command.payload : {},
@@ -999,6 +954,8 @@ export function createJournalRunCommandService({
     const run = actor ? await operation.getRun?.({ actor, runId, includeHistory: true }) : null;
     if (!run) return failure('run-not-found');
     if (!terminalRun(run)) return failure('active-run');
+    const owed = awardChoiceDismissalRefusal(run);
+    if (owed) return owed;
     const key = journalRunDismissalKey({ actorUuid, runType, runId });
     const next = normalizeJournalRunDismissals({ ...getDismissals(), [key]: now() });
     await setDismissals(next);
