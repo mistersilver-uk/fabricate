@@ -110,6 +110,25 @@ export function makeWorldActor(id, { system = {}, hooks = {} } = {}) {
   return actor;
 }
 
+const LEARNED_KEY = 'fabricate.learnedRecipes';
+
+/** Give a history fixture's crafter a `_source` its currency and learned-recipe writes land on. */
+export function rewardableCrafter(actor) {
+  const getFlag = actor.getFlag.bind(actor);
+  actor._source = { system: { currency: { gp: 1, sp: 0 } }, flags: {} };
+  Object.defineProperty(actor, 'system', { get: () => actor._source.system, configurable: true });
+  actor.getFlag = (namespace, key) =>
+    key === LEARNED_KEY
+      ? actor._source.flags.fabricate?.fabricate?.learnedRecipes
+      : getFlag(namespace, key);
+  actor.update = async (payload) => {
+    applyDocumentUpdate(actor._source, payload);
+    return actor;
+  };
+  actor.updateSource = () => {};
+  return actor;
+}
+
 /** Give an existing item to an actor, as though it had been created earlier. */
 export function giveItem(actor, data) {
   const item = makeItem(actor, data, `held${actor.items.length + 1}`);

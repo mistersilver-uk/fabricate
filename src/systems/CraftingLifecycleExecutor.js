@@ -11,14 +11,35 @@ export class CraftingLifecycleExecutionError extends Error {
   }
 }
 
+/** A stage executes on an active run and journals into `executionJournal`. */
+const STAGE_LANE = Object.freeze({
+  operation: 'execute',
+  journal: 'executionJournal',
+  terminalAdmitted: false,
+});
+
+/** A pending award choice settles on an active or terminal run, never replacing the stage's
+ *  committed journal (issue 1773). */
+const AWARD_CHOICE_LANE = Object.freeze({
+  operation: 'chooseAward',
+  journal: 'awardChoiceJournal',
+  terminalAdmitted: true,
+});
+
 /**
- * Orders caller-supplied crafting effects around the persisted versioned-stage journal.
+ * Orders caller-supplied crafting effects around a persisted versioned-run journal.
  * Invocation forbids retry: a lost acknowledgement requires recovery, never replay or rollback.
  */
 export class CraftingLifecycleExecutor {
   constructor({ runManager, consumeExecutionGrant }) {
     this.runManager = runManager;
     this.consumeExecutionGrant = consumeExecutionGrant;
+    this._lane = STAGE_LANE;
+  }
+
+  /** Settle a pending award choice: the `chooseAward` grant, journalled in `awardChoiceJournal`. */
+  settleAwardChoice(request) {
+    return this.execute({ ...request, selectionPlan: null, lane: AWARD_CHOICE_LANE });
   }
 
   async execute({
@@ -29,7 +50,9 @@ export class CraftingLifecycleExecutor {
     executionGrant,
     selectionPlan = null,
     operation,
+    lane = STAGE_LANE,
   }) {
+    this._lane = lane;
     const trusted = await this._consumeGrant({
       actor,
       runId,
@@ -38,16 +61,13 @@ export class CraftingLifecycleExecutor {
       executionGrant,
     });
     const persisted = this._currentRunAnyStatus(actor, runId);
-    const committed = persisted.executionJournal
-      ? getCommittedExecutionOutcome(persisted.executionJournal, requestId)
-      : null;
+    const journal = persisted[lane.journal];
+    const committed = journal ? getCommittedExecutionOutcome(journal, requestId) : null;
     if (committed) return { run: persisted, outcome: committed, receipts: {} };
-    const existingJournal = persisted.executionJournal
-      ? observeExecutionJournal(persisted.executionJournal)
-      : null;
+    const existingJournal = journal ? observeExecutionJournal(journal) : null;
     const resuming = existingJournal?.status === 'planned';
-    const run = resuming ? persisted : this._currentRun(actor, runId);
-    this._assertExecutable(run, expectedRevision, { resuming });
+    const run = resuming || lane.terminalAdmitted ? persisted : this._currentRun(actor, runId);
+    this._assertExecutable(run, expectedRevision, { resuming: resuming || lane.terminalAdmitted });
 
     const resolvedOperation =
       typeof operation === 'function' ? await operation({ actor, run, trusted }) : operation;
@@ -95,7 +115,7 @@ export class CraftingLifecycleExecutor {
     await executable.hydrate?.({ receipts: { ...receipts }, resumed: resuming });
 
     for (const effect of executable.effects) {
-      const persisted = observeExecutionJournal(current.executionJournal).effects.find(
+      const persisted = observeExecutionJournal(current[lane.journal]).effects.find(
         (entry) => entry.effectId === effect.effectId
       );
       if (persisted?.phase === 'applied') continue;
@@ -140,7 +160,7 @@ export class CraftingLifecycleExecutor {
       throw executionError('Versioned crafting authority is unavailable', 'AUTHORITY_UNAVAILABLE');
     }
     const trusted = await this.consumeExecutionGrant(executionGrant, {
-      operation: 'execute',
+      operation: this._lane.operation,
       actor,
       runId,
       expectedRevision,
@@ -178,7 +198,10 @@ export class CraftingLifecycleExecutor {
       );
     }
     if (run.pauseState) throw executionError('The crafting run is paused', 'RUN_PAUSED');
-    if (run.executionJournal?.status === 'recoveryRequired') {
+    if (
+      run.executionJournal?.status === 'recoveryRequired' ||
+      run[this._lane.journal]?.status === 'recoveryRequired'
+    ) {
       throw executionError('The crafting run requires recovery', 'RECOVERY_REQUIRED');
     }
     if (Number(expectedRevision) !== Number(run.runRevision)) {
@@ -192,6 +215,7 @@ export class CraftingLifecycleExecutor {
   _transition(actor, run, transition) {
     return this.runManager.updateExecutionJournal(actor, run.id, transition, {
       expectedRevision: run.runRevision,
+      journal: this._lane.journal,
     });
   }
 
@@ -201,7 +225,7 @@ export class CraftingLifecycleExecutor {
    * than becoming permanently unclearable (issue 1648, F1).
    */
   async _effectFailure(actor, run, effectId, error) {
-    const applied = observeExecutionJournal(run.executionJournal).effects.some(
+    const applied = observeExecutionJournal(run[this._lane.journal]).effects.some(
       (entry) => entry.phase === 'applied'
     );
     if (!applied && isDefiniteRefusal(error)) {

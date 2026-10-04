@@ -4,8 +4,10 @@
  * resolved once there, and applied by the reward step after them, so neither writes an Item.
  */
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { isChoiceGroup } from '../models/Result.js';
 import { cloneJson } from '../utils/scalars.js';
 
+import { groupEvidenceFields } from './choiceGroupAward.js';
 import { GRANTED_BY_MAX_LENGTH } from './companionContract.js';
 import { createCurrencyCreditKind } from './companionCurrencyEffect.js';
 import { grantRecipeKnowledgeEntry } from './companionKnowledgeGrant.js';
@@ -57,18 +59,23 @@ export function grantedByFor(recipe) {
 
 const worldUnits = (recipe, seams) => getCurrencyRequirementConfig(recipe, seams)?.units ?? [];
 
+/** Who a reward entry names: the result, or a choice group's carrier and the member it awards. */
+const rewardIdentity = (result, carrier) =>
+  carrier ? { resultId: carrier.id, alternativeId: result.id } : { resultId: result.id };
+
 /**
  * One reward's plan entry, its amount resolved here and nowhere later, plus the live `Roll` a card
- * carries; the entry is what the award receipt persists.
+ * carries; the entry is what the award receipt persists. `carrier` is the choice group `result`
+ * was drawn from, if any.
  */
-export async function planReward(result, actor, recipe, { Roll, seams = {} } = {}) {
+export async function planReward(result, actor, recipe, { Roll, seams = {}, carrier = null } = {}) {
   if (result.kind === 'knowledge') {
     const taught = seams.resolveRecipe?.(result.recipeId) ?? null;
     const recipeName = typeof taught?.name === 'string' ? taught.name : null;
     return {
       entry: {
         kind: 'knowledge',
-        resultId: result.id,
+        ...rewardIdentity(result, carrier),
         recipeId: result.recipeId,
         ...(recipeName && { recipeName }),
       },
@@ -79,7 +86,8 @@ export async function planReward(result, actor, recipe, { Roll, seams = {} } = {
   const unitName = currencyUnitDisplayName(
     findCurrencyUnit(worldUnits(recipe, seams), result.unit)
   );
-  const record = currencyCreditRecord({ ...result, resultId: result.id, amount, rolled, unitName });
+  const identity = rewardIdentity(result, carrier);
+  const record = currencyCreditRecord({ ...result, ...identity, amount, rolled, unitName });
   // A total too large to be a safe integer is refused, as a non-finite one is.
   if (!record) throw new RangeError(`Fabricate | The currency reward amount ${amount} is invalid`);
   return { entry: { kind: 'currency', ...record }, roll };
@@ -107,15 +115,19 @@ async function creditOnce(entry, { actor, recipe, seams, marker }) {
 /**
  * Apply a reward plan once, in order: a zero credit writes nothing and is recorded empty, and an
  * already-known recipe writes nothing and is recorded `alreadyKnown`. A write that is not `applied`
- * throws carrying every receipt before it, and nothing is ever probed or replayed.
+ * throws carrying every receipt before it, and nothing is ever probed or replayed. `effectId` names
+ * the effect the credit marker records.
  */
-export async function applyRewardPlan(plan, { actor, recipe, runId = null, seams = {} }) {
+export async function applyRewardPlan(
+  plan,
+  { actor, recipe, runId = null, seams = {}, effectId = AWARD_REWARDS_EFFECT_ID }
+) {
   const currencyCredits = [];
   const knowledgeGrants = [];
   const receipts = () => [...currencyCredits, ...knowledgeGrants];
   for (const [index, entry] of list(plan).entries()) {
     if (entry?.kind === 'currency') {
-      const marker = { runId, effectId: AWARD_REWARDS_EFFECT_ID, resultId: entry.resultId, index };
+      const marker = { runId, effectId, resultId: entry.resultId, index };
       const answer =
         entry.amount > 0 ? await creditOnce(entry, { actor, recipe, seams, marker }) : null;
       if (answer && answer.status !== 'applied') throw rewardFailure(answer, receipts());
@@ -144,9 +156,22 @@ function attach(items, key, value) {
   return items;
 }
 
-/** The plan and live rolls `_createResultItems` resolved; never persisted from here. */
-export const attachRewardPlan = (items, plan, rolls) =>
-  attach(attach(items, 'rewardPlan', plan), 'rewardRolls', rolls);
+/** The group awards and pending choices worth a key, as persisted: an empty list is not written. */
+function groupHistory(source = {}) {
+  const { groupAwards, pendingAwardChoices } = groupEvidenceFields(source);
+  return {
+    ...(list(groupAwards).length > 0 && { groupAwards }),
+    ...(list(pendingAwardChoices).length > 0 && { pendingAwardChoices }),
+  };
+}
+
+/** The plan, live rolls and group records `_createResultItems` resolved; never persisted from here. */
+export const attachRewardPlan = (items, plan, rolls, groups = {}) =>
+  attach(
+    attach(attach(items, 'rewardPlan', plan), 'rewardRolls', rolls),
+    'groupRecords',
+    groupHistory(groups)
+  );
 
 /** What the reward step applied, for the chat card and the step record. */
 export const attachRewardAwards = (items, awards) => attach(items, 'rewardAwards', awards);
@@ -165,8 +190,11 @@ export async function settleRewardPlan(items, context) {
   }
 }
 
-/** The step record's credit and grant fields, absent when nothing was rewarded. */
-export const rewardHistory = (items) => historyEvidenceFields({ ...items?.rewardAwards });
+/** The step record's group, credit and grant fields, absent when nothing was rewarded. */
+export const rewardHistory = (items) => ({
+  ...groupHistory(items?.groupRecords),
+  ...historyEvidenceFields({ ...items?.rewardAwards }),
+});
 
 /** The step record's award fields: the Item receipts, then any credits and grants. */
 export function awardHistory(items) {
@@ -200,11 +228,12 @@ export const versionedResultPlan = (groups) =>
     }))
   );
 
-/** The ids of every reward result in the routed groups, in award order. */
+/** The ids of every reward result and choice group in the routed groups, in award order: a group
+ *  is planned whatever it draws, because its draw is rolled after the plan is persisted. */
 export const rewardResultIds = (groups) =>
   list(groups).flatMap((group) =>
     list(group?.results)
-      .filter(isRewardResult)
+      .filter((result) => isRewardResult(result) || isChoiceGroup(result))
       .map((result) => result.id ?? null)
   );
 
@@ -217,11 +246,13 @@ function awardResultsEffect(state, groups, createItems) {
     apply: async () => {
       const { items, resolutionMeta } = await createItems();
       Object.assign(state, { resultItems: items, resolutionMeta, rewardPlan: items.rewardPlan });
+      Object.assign(state, cloneJson(items.groupRecords));
       state.resultRecords = awardReceipts(items);
       return {
         results: state.resultRecords,
         resolutionMeta: cloneJson(resolutionMeta) ?? null,
         ...(list(items.rewardPlan).length > 0 && { rewardPlan: cloneJson(items.rewardPlan) }),
+        ...cloneJson(items.groupRecords),
       };
     },
   };
@@ -250,10 +281,12 @@ export function versionedAwardEffects(state, { groups, createItems, actor, recip
   return effects;
 }
 
-/** Restore the reward plan and what the reward step applied from the applied receipts. */
+/** Restore the reward plan, the group records and what the reward step applied from the applied
+ *  receipts. */
 export function hydrateRewardState(state, receipts) {
   const plan = receipts['award-results']?.rewardPlan;
   if (Array.isArray(plan)) state.rewardPlan = structuredClone(plan);
+  Object.assign(state, cloneJson(groupHistory(receipts['award-results'])));
   const applied = receipts[AWARD_REWARDS_EFFECT_ID];
   if (!applied) return;
   Object.assign(state, historyEvidenceFields(applied));
@@ -262,9 +295,11 @@ export function hydrateRewardState(state, receipts) {
   }
 }
 
-/** The finalize payload's award fields: the receipts, then whatever the reward step applied. */
+/** The finalize payload's award fields: the receipts, the group records, then whatever the reward
+ *  step applied. */
 export const stageAwardHistory = (state) => ({
   createdResults: state.resultRecords,
+  ...groupHistory(state),
   ...historyEvidenceFields({
     currencyCredits: state.currencyCredits,
     knowledgeGrants: state.knowledgeGrants,
@@ -301,20 +336,33 @@ function knowledgeRefusals(result, { recipe, seams }) {
     : ['Knowledge reward cannot be granted (knowledgeNotObservable)'];
 }
 
+/** Every result a routed set holds, a choice group standing for each of its members. */
+const awardableResults = (groups) =>
+  list(groups)
+    .flatMap((group) => list(group?.results))
+    .flatMap((result) => (isChoiceGroup(result) ? result.alternatives : [result]));
+
+const progressiveGroupRefusals = (groups) =>
+  list(groups)
+    .flatMap((group) => list(group?.results).filter(isChoiceGroup))
+    .map(() => 'A progressive result cannot be a choice group');
+
 /**
  * The pre-flight `validateCraft` runs over every result group of every step, failure-role sets
- * included, before anything is consumed: a reward under progressive, and every currency or
- * knowledge result its world cannot honour for `actor`.
+ * included, before anything is consumed: a reward or a choice group under progressive, and every
+ * currency or knowledge result, a group member included, its world cannot honour for `actor`.
  */
 export function rewardRefusals(seams) {
-  return (groups, { actor, recipe, progressive = false }) =>
-    list(groups)
-      .flatMap((group) => list(group?.results).filter(isRewardResult))
+  return (groups, { actor, recipe, progressive = false }) => [
+    ...(progressive ? progressiveGroupRefusals(groups) : []),
+    ...awardableResults(groups)
+      .filter(isRewardResult)
       .flatMap((result) => {
         if (progressive) return ['A progressive result must award a component'];
         const context = { actor, recipe, seams };
         return result.kind === 'currency'
           ? currencyRefusals(result, context)
           : knowledgeRefusals(result, context);
-      });
+      }),
+  ];
 }
