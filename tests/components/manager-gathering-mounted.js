@@ -625,7 +625,7 @@ export function registerGatheringCases() {
       "Adjust this drop's chance based on the gathering environment's biomes."
     );
     assert.equal(
-      biome.querySelector('.manager-character-modifier-icon i').getAttribute('class'),
+      biome.querySelector('.fabricate-rule-row-icon i').getAttribute('class'),
       'fas fa-tree',
       'a biome modifier takes its vocabulary icon'
     );
@@ -2709,7 +2709,7 @@ export function registerGatheringCases() {
       await settleSaveAttempt();
       rows()
         .find((row) => row.textContent.includes('First Light'))
-        .querySelector('.manager-character-modifier-row-reference-delete')
+        .querySelector('[data-rule-row-remove]')
         .click();
       await settleSaveAttempt();
 

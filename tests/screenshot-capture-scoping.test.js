@@ -1948,7 +1948,7 @@ test('the Phase D0 tier-step walk drives hooks the trigger component still emits
   // dirties the Checks draft and the next navigation raises a discard prompt mid-phase.
   assert.ok(HARNESS.includes('[data-add-trigger]'), 'the walk must add a trigger');
   assert.ok(
-    HARNESS.includes('[data-trigger] [data-remove-trigger]'),
+    HARNESS.includes('[data-trigger] [data-rule-row-remove]'),
     'the walk must remove the trigger it authored',
   );
 });

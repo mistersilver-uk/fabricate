@@ -192,19 +192,19 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 16 library entries with no shipped implementation (issue 1505). Re-derived from the array
+ * The 14 library entries with no shipped implementation (issue 1505). Re-derived from the array
  * rather than carried forward: `SortableList` left it at issue 1512, `Well` at issue 2008,
- * `PickerRow` at issue 1516, `RequirementChooser` at issue 1518, and the three instruments and the
- * validation pair at issue 1782 — `ValidationSummary` by naming its shipped component and
- * `ValidationList` by being merged into it — when each specified primitive shipped, and
- * `ChoiceGroup` and `Menu` at issue 1516, when each specified entry gained its manifest row; the
+ * `PickerRow` at issue 1516, `RequirementChooser` at issue 1518, and the three instruments, the
+ * validation pair and the rule pair at issue 1782 — `ValidationSummary` by naming its shipped
+ * component and `ValidationList` by being merged into it — when each specified primitive shipped,
+ * and `ChoiceGroup` and `Menu` at issue 1516, when each specified entry gained its manifest row; the
  * count this docblock states is the array's own length.
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BrowseCard',
   'DataTable', 'InfoStrip', 'LogList',
   'NavSidebar', 'PageHeader', 'Rail',
-  'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
+  'Search', 'SetPicker',
   'TierTrack', 'ViewToggle', 'XrefList',
 ];
 
@@ -455,6 +455,7 @@ const RE_ROOTED_ROWS = [
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  'src/ui/svelte/components/RuleRow.svelte',
   'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
@@ -609,7 +610,14 @@ test('every entry recorded as specified-but-unbuilt is declared a target', () =>
  * member rows only and the target ratchet fails only on additions, so a non-member such as
  * `StageBars` left at `target` would pass both.
  */
-const BUILT_BY_1782 = ['Meter', 'BandedBar', 'StageBars', 'ValidationSummary'];
+const BUILT_BY_1782 = [
+  'Meter',
+  'BandedBar',
+  'StageBars',
+  'ValidationSummary',
+  'RuleRow',
+  'RuleSentence',
+];
 
 /** Names issue 1782 merged away, which must be no entry and must be on the ruled-out register. */
 const DELETED_BY_1782 = ['ValidationList'];

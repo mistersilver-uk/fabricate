@@ -1387,7 +1387,7 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   if (!(await checksSave.isEnabled())) {
     throw new Error('Authoring a tier-step trigger left the Checks draft undirtied');
   }
-  await triggerCard.locator('[data-trigger] [data-remove-trigger]').first().click();
+  await triggerCard.locator('[data-trigger] [data-rule-row-remove]').first().click();
   await triggerCard.locator('[data-triggers-empty]').waitFor({ state: 'visible', timeout: 5000 });
   if (await checksSave.isEnabled())
     throw new Error('Tier-step trigger round trip left the Checks draft dirty');

@@ -21,6 +21,9 @@
       "StageBars": {
         "Unnamed": "Stage {index} of {count}"
       },
+      "RuleSentence": {
+        "Missing": "This rule is not finished."
+      },
       "DiceTiles": {
         "Generated": "rolled by an explosion",
         "More": "+{count} more",
@@ -6759,15 +6762,25 @@
             "OpUnder": "under",
             "OpOver": "over",
             "SummaryGroupTotal": "Group total",
+            "SummaryGroupTotalInSentence": "group total",
             "SummaryAnyDie": "Any die",
+            "SummaryAnyDieInSentence": "any die",
             "SummaryAllDice": "All dice",
+            "SummaryAllDiceInSentence": "all dice",
             "SummaryLowestDie": "Lowest die",
+            "SummaryLowestDieInSentence": "lowest die",
             "SummaryHighestDie": "Highest die",
+            "SummaryHighestDieInSentence": "highest die",
             "SummaryDiceGroup": "{aggregate} of {die} is {comparison} {value}",
+            "SummaryDiceGroupInSentence": "{aggregate} of {die} is {comparison} {value}",
             "SummaryRollTotal": "Roll total is {comparison} {value}",
+            "SummaryRollTotalInSentence": "roll total is {comparison} {value}",
             "SummaryProgressiveValue": "Rolled value is {comparison} {value}",
+            "SummaryProgressiveValueInSentence": "rolled value is {comparison} {value}",
             "SummaryOutcomeTier": "Outcome tier is {tiers}",
+            "SummaryOutcomeTierInSentence": "outcome tier is {tiers}",
             "SummaryOutcomeTierNone": "No outcome tier chosen",
+            "SummaryOutcomeTierNoneInSentence": "no outcome tier chosen",
             "SummaryForceSuccess": "the check is an automatic success",
             "SummaryForceFailure": "the check is an automatic failure",
             "SummaryAwardAll": "every result is awarded",
@@ -6779,7 +6792,7 @@
             "SummaryBreakTools": "the required tools break",
             "SummaryNoEffect": "nothing changes",
             "SummaryJoin": ", and ",
-            "SummarySentence": "When {condition}, {effect}.",
+            "SummarySentence": "When {condition}, {clauses}.",
             "ChipStepUp": "Step up {steps}",
             "ChipStepDown": "Step down {steps}",
             "ChipStepTarget": "Becomes {tier}",
@@ -7187,7 +7200,8 @@
               "PresetBotch": "Botch (net below zero) → {effect}",
               "EffectLowestTier": "lowest tier",
               "TypeNetSuccesses": "Net successes",
-              "SummaryNetSuccesses": "Net successes is {comparison} {value}"
+              "SummaryNetSuccesses": "Net successes is {comparison} {value}",
+              "SummaryNetSuccessesInSentence": "net successes is {comparison} {value}"
             },
             "Difficulty": {
               "Lead": "How many successes the roll must reach, and where that number comes from.",

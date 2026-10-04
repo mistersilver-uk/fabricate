@@ -55,7 +55,7 @@ async function authorBotch(type) {
     section: 'triggers',
     onChange: (patch) => emitted.push(patch),
   });
-  const botch = root.querySelector('[data-add-trigger-preset="botch"]');
+  const botch = root.querySelector('[data-rule-row-preset="botch"]');
   assert.ok(Boolean(botch), 'a cancelling routed count check offers Botch');
   botch.click();
   return emitted.at(-1).checkBreakage.triggers.at(-1);

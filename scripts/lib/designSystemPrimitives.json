@@ -286,7 +286,7 @@
       "status": "target",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "The gathering modifier panel issue 1707 wrote once (two callers, phase 1): `src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte` renders it for a task's drop and `src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte` for a gathering event, parameterised by `subject`. It was authored twice in `CraftingSystemManagerRoot.svelte` and the de-duplication is what put it over the two-caller bar, so it arrived on the unadjudicated register and is adjudicated here rather than left there. The two callers are sibling leaves of one inspector rail, and independent is worth stating rather than assuming: each passes a different subject, a different modifier collection and a different set of `data-*` hooks, so a change made for one is a change the other has to survive. `library: null` is the adjudication, not an omission. `library.html:1486` specifies `<RuleRow>` and `<RuleSentence>` as the condition editor behind \"triggers, gates and modifiers\", and this panel attaches world-library condition and character modifiers to a gathering drop or event — a domain composition of the shared card, field, select, icon-button and picker primitives rather than a generic entry the library names. It is a recorded shared composition with its existing geometry, on the same reading as `environment/CompositionList.svelte` and `recipe/RecipeResultsSection.svelte`. Scoped `manager-only`: it authors a world's gathering rules, which only the GM manager does. Targeted: `manager-gathering-event-editor-normal` draws the event half and `manager-gathering-task-drop-modifiers-normal` the drop half, and both claim it by `sourceMatches`."
+      "why": "The gathering modifier panel issue 1707 wrote once (two callers, phase 1): `src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte` renders it for a task's drop and `src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte` for a gathering event, parameterised by `subject`. It was authored twice in `CraftingSystemManagerRoot.svelte` and the de-duplication is what put it over the two-caller bar, so it arrived on the unadjudicated register and is adjudicated here rather than left there. The two callers are sibling leaves of one inspector rail, and independent is worth stating rather than assuming: each passes a different subject, a different modifier collection and a different set of `data-*` hooks, so a change made for one is a change the other has to survive. `library: null` is the adjudication, not an omission. Since issue 1782 each attached condition modifier is a `<RuleRow>` (`components/RuleRow.svelte`) laid on one line, and the panel around those rows attaches world-library condition and character modifiers to a gathering drop or event — a domain composition of the shared card, rule row, field, select, icon-button and picker primitives rather than a generic entry the library names. It is a recorded shared composition with its existing geometry, on the same reading as `environment/CompositionList.svelte` and `recipe/RecipeResultsSection.svelte`. Scoped `manager-only`: it authors a world's gathering rules, which only the GM manager does. Targeted: `manager-gathering-event-editor-normal` draws the event half and `manager-gathering-task-drop-modifiers-normal` the drop half, and both claim it by `sourceMatches`."
     },
     {
       "path": "src/ui/svelte/components/ActionMenu.svelte",
@@ -607,6 +607,14 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "Issue 1782 builds the specified banded bar over `FillBar`: each row's whole fill is a semantic tone or a ramp key from `util/dropRateTier.js`, never interpolated. One row is a `meter` (`apps/gathering/ChanceBar.svelte`, whose event scale reads the risk ramp descending); several rows are a histogram with hidden tracks (`apps/manager/checks/CheckOddsPanel.svelte`). Scoped `shared`: the player gathering tab and the manager Checks Studio both draw it. Its broad-signal override names one frame of each form."
+    },
+    {
+      "path": "src/ui/svelte/components/RuleRow.svelte",
+      "library": "<RuleRow>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1782 builds the specified condition → effect rule row: a head stating the rule, a field chain the caller's `schema` draws step by step, a `RuleSentence` restating it, and presets offered while the rule is unauthored. Two importers: `apps/manager/checks/CheckTriggers.svelte`, whose triggers are collapsible rows and whose common-trigger presets are the unauthored one, and `apps/manager/environment/GatheringModifierEditor.svelte`, whose attached condition modifiers lie on one line. Scoped `shared`: its family is rooted at `fabricate-rule-row`, the class it writes, so it paints wherever it is mounted. Its broad-signal override names an opened trigger, a counting check's presets and an attached drop modifier."
     }
   ],
   "notAPrimitive": [
@@ -771,6 +779,15 @@
         "src/ui/svelte/components/RunProgress.svelte"
       ],
       "why": "Issue 1782 builds the specified stage instrument over `FillBar`: a named `group` of stage-named `progressbar`s, one bar per stage. ONE importer, `src/ui/svelte/components/RunProgress.svelte`, which the journal's run card and run detail render, so it is below the two-importer membership bar on the `RunActionBar` precedent. Its library specimen reads `shipped`, and its broad-signal override names the run detail's stage track and a run card's."
+    },
+    {
+      "path": "src/ui/svelte/components/RuleSentence.svelte",
+      "library": "<RuleSentence>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/components/RuleRow.svelte"
+      ],
+      "why": "Issue 1782 builds the specified rule sentence: a translator-owned frame whose clauses are joined by a translator-owned join, every fragment from its own key and none re-cased, and the `missingClauseKey` sentence in place of a rule with a missing clause. ONE importer, `src/ui/svelte/components/RuleRow.svelte`, which draws it as a rule's lead and its closing quotation, so it is below the two-importer membership bar on the `RunActionBar` precedent. Its library specimen reads `shipped`, and its broad-signal override names an opened trigger's sentence and a counting check's."
     }
   ],
   "ruledOut": [

@@ -111,12 +111,14 @@ function mountChecks(props, section = '') {
  * @returns {HTMLElement} The trigger's card.
  */
 function openTrigger(target, id) {
-  const disclosure = target.querySelector(`[data-trigger-disclosure="${id}"]`);
+  const disclosure = target.querySelector(
+    `:scope [data-trigger="${id}"] [data-rule-row-disclosure]`
+  );
   assert.ok(Boolean(disclosure), `the head of trigger ${id} renders`);
   disclosure.click();
   flushSync();
   assert.ok(
-    Boolean(target.querySelector(`[data-trigger-body="${id}"]`)),
+    Boolean(target.querySelector(`:scope [data-trigger="${id}"] [data-rule-row-body]`)),
     `the head of trigger ${id} opens its body`
   );
   return target.querySelector(`[data-trigger="${id}"]`);
