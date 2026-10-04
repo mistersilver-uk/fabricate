@@ -190,17 +190,18 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 23 library entries with no shipped implementation (issue 1505). Re-derived from the array
+ * The 20 library entries with no shipped implementation (issue 1505). Re-derived from the array
  * rather than carried forward: `SortableList` left it at issue 1512, `Well` at issue 2008,
- * `PickerRow` at issue 1516 and `RequirementChooser` at issue 1518, when each specified primitive
- * shipped, and the count this docblock states is the array's own length.
+ * `PickerRow` at issue 1516, `RequirementChooser` at issue 1518 and the three instruments at issue
+ * 1782, when each specified primitive shipped, and the count this docblock states is the array's
+ * own length.
  */
 const SPECIFIED_ONLY = [
-  'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
+  'AppRail', 'AppTitleBar', 'BrowseCard', 'ChoiceGroup',
   'DataTable', 'InfoStrip', 'LogList', 'Menu',
-  'Meter', 'NavSidebar', 'PageHeader', 'Rail',
+  'NavSidebar', 'PageHeader', 'Rail',
   'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
-  'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
+  'TierTrack', 'ValidationList', 'ValidationSummary',
   'ViewToggle', 'XrefList',
 ];
 
@@ -576,6 +577,24 @@ test('every entry recorded as specified-but-unbuilt is declared a target', () =>
       'shipped',
       `${name} is recorded as specified-but-unbuilt and its specimen declares it shipped. ` +
         'Nothing implements it, so there is nothing for the specimen to match.'
+    );
+  }
+});
+
+/**
+ * Names issue 1782 built, which must read `shipped` in the library. The status clause above reads
+ * member rows only and the target ratchet fails only on additions, so a non-member such as
+ * `StageBars` left at `target` would pass both.
+ */
+const BUILT_BY_1782 = ['Meter', 'BandedBar', 'StageBars'];
+
+test('every name issue 1782 built reads shipped in the library', () => {
+  for (const name of BUILT_BY_1782) {
+    assert.equal(
+      PER_NAME_STATUS.get(name),
+      'shipped',
+      `${name} ships as a component and its specimen still declares ` +
+        JSON.stringify(PER_NAME_STATUS.get(name))
     );
   }
 });

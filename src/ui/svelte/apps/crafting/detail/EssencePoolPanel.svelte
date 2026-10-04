@@ -10,11 +10,8 @@
   An overshoot is a sentence beneath the carrier list, one per essence: a meter's ratio is
   capped at its need and its fill clamps at full, so neither states the surplus.
 
-  The meter is built HERE rather than reusing the gathering ChanceBar: that is a 0–1
-  percentage meter which hard-codes `aria-valuemax="100"`, prints a percentage and
-  has one flat fill, whereas a `2 / 4` ratio needs `aria-valuemax = need`, a
-  caller-supplied readout and a met/partial/short tone. Importing it would also drag
-  a gathering util into the crafting harnesses and invert the app layering.
+  Each requirement is the shared `Meter`, not a banded chance bar: a `2 / 4` ratio needs
+  `aria-valuemax = need`, a caller-supplied reading and a met/partial/short tone.
 
   A carrier's stepper maxes at `ownedUnits` — the units left AFTER the set's
   non-essence plan has claimed — never the raw stack quantity, so the player cannot
@@ -29,7 +26,7 @@
   import Stepper from '../../../components/Stepper.svelte';
   import EssenceContribution from './EssenceContribution.svelte';
   import Kicker from '../../../components/Kicker.svelte';
-  import FillBar from '../../../components/FillBar.svelte';
+  import Meter from '../../../components/Meter.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import { essenceOvershoots } from './essenceOvershoot.js';
 
@@ -75,14 +72,7 @@
     return delivered > 0 ? 'partial' : 'short';
   }
 
-  function meterPercent(requirement) {
-    const need = Number(requirement?.need ?? 0);
-    if (need <= 0) return 100;
-    return Math.min(100, Math.round((Number(requirement?.delivered ?? 0) / need) * 100));
-  }
-
-  // The bar's tone for a requirement whose essence declares no colour. A scoped block cannot
-  // reach a child component's element, so the state arrives as `FillBar`'s own prop.
+  // The bar's tone for a requirement whose essence declares no colour.
   function meterTone(requirement) {
     const state = meterState(requirement);
     if (state === 'met') return 'success';
@@ -139,29 +129,16 @@
               >{requirement.delivered ?? 0}/{requirement.need ?? 0}</span
             >
           </div>
-          <!-- THE SHARED `FillBar` (issue 1514), inside the wrapper that keeps the ARIA. The
-               primitive is a LEAF by contract — no caption, no readout, no `role`, no `aria-*`
-               — so the `progressbar` role and all three `aria-value*` attributes stay on this
-               caller's own element, which is the only thing that element still does. -->
-          <div
-            class="essence-pool-bar"
-            role="progressbar"
-            aria-valuemin="0"
-            aria-valuemax={requirement.need ?? 0}
-            aria-valuenow={requirement.delivered ?? 0}
-            aria-label={localize('FABRICATE.App.Crafting.Pool.Meter', {
-              name: requirement.name,
+          <Meter
+            value={requirement.delivered ?? 0}
+            max={requirement.need ?? 0}
+            segments={[{ tone: meterTone(requirement), color: meterColor(requirement) }]}
+            label={localize('FABRICATE.App.Crafting.Pool.MeterLabel', { name: requirement.name })}
+            valueText={localize('FABRICATE.App.Crafting.Pool.MeterValue', {
               delivered: requirement.delivered ?? 0,
               need: requirement.need ?? 0,
             })}
-          >
-            <FillBar
-              density="compact"
-              value={meterPercent(requirement)}
-              tone={meterTone(requirement)}
-              color={meterColor(requirement)}
-            />
-          </div>
+          />
         </div>
       {/each}
     </div>
@@ -347,32 +324,6 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: var(--fab-text);
-  }
-
-  /* LAYOUT AND ARIA ONLY (issue 1514). The track, its corner, its ground and its fill are
-     `FillBar`'s now; this element survives to carry the `progressbar` role and the three
-     `aria-value*` attributes the primitive deliberately does not emit, and to give the bar a
-     block box to fill. The five fill-state rules that lived here — the base tint, the
-     met/partial/short trio and the `has-tint` triple — became the `tone` and `color` props
-     `meterTone` and `meterColor` derive, because a scoped block cannot reach inside a child
-     component to paint its fill.
-
-     TWO PUBLISHED FRAME MOVES, measured rather than predicted. The track gains a 1px
-     `var(--fab-border)` hairline it never drew, and its ground changes from
-     `var(--fab-surface-active)` to the primitive's own `var(--fab-surface-raised)`, a lower-alpha
-     wash of the same ink.
-     Neither moves the BOX: measured in the View Lab at 183.14x6.00 before and 183.14x6.00
-     after, because this leaf is border-box and Foundry core's own `@layer reset` makes every
-     element border-box anyway, so the 1px edge eats into the 6px rather than adding to it.
-
-     ONE THING IS LOST AND IT IS RECORDED RATHER THAN WORKED AROUND: the fill had a
-     `transition: width 0.2s ease` with a `prefers-reduced-motion` escape, and `FillBar` has
-     neither, so the bar now moves instantly as units are stepped. Reaching into the primitive
-     with a `:global()` rule from here would be this file re-styling a component it does not
-     own, which is the whole reason the fill states above moved to props. A `transition` the
-     primitive owns is what would close it. */
-  .essence-pool-bar {
-    display: flex;
   }
 
   /* LAYOUT ONLY. This sub-label kept its own 10px rung when the section title above it

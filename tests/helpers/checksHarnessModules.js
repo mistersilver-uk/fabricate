@@ -4,6 +4,8 @@
 import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
 
 export const CHECKS_TREE_RAW_MODULES = Object.freeze([
+  // The ramp `BandedBar` reads its fills from (issue 1782).
+  'src/ui/svelte/util/dropRateTier.js',
   ...FOUNDRY_BRIDGE_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/foundryIconVocabulary.js',
@@ -188,6 +190,8 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // modifier row's eligibility control was a checkbox plus an inert pill, and it is now ONE
   // `aria-pressed` toggle button that the card renders itself.
   'src/ui/svelte/components/FillBar.svelte',
+  // The odds histogram's rows (issue 1782).
+  'src/ui/svelte/components/BandedBar.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
   // The product's ONE ordered list (issue 1512), which the difficulty-tier card renders, and the

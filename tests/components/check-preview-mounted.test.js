@@ -677,10 +677,13 @@ describe('the odds histogram', () => {
   it('renders every bar through the shipped FillBar rather than a sixth hand-rolled one', async () => {
     const root = await mountChecks();
     await choosePreviewActor(root, 'sera');
-    const bars = [...root.querySelectorAll('[data-checks-odds-bar]')];
+    const bars = [...root.querySelectorAll('[data-banded-bar-track]')];
     assert.ok(bars.length > 0, 'there are bars');
     for (const bar of bars) {
       assert.ok(bar.classList.contains('fab-fill-bar'), 'each bar IS the shared primitive');
+      // A histogram's tracks are hidden; its names and percentages are not (issue 1782).
+      assert.equal(bar.getAttribute('aria-hidden'), 'true', 'the track is decorative');
+      assert.ok(!bar.closest('[role="meter"]'), 'several rows are not a meter');
       const fill = bar.querySelector('.fab-fill-bar-fill');
       assert.ok(Boolean(fill), 'with the primitive’s own fill element');
       assert.ok(
@@ -792,8 +795,8 @@ describe('the modifier context reaches the derivations that DESCRIBE the roll', 
     const percents = async (props) => {
       const root = await mountChecks(props);
       await choosePreviewActor(root, 'sera');
-      return [...root.querySelectorAll('[data-checks-odds-percent]')].map(
-        (cell) => `${cell.getAttribute('data-checks-odds-percent')}:${cell.textContent.trim()}`
+      return [...root.querySelectorAll('[data-banded-bar-percent]')].map(
+        (cell) => `${cell.getAttribute('data-banded-bar-percent')}:${cell.textContent.trim()}`
       );
     };
     const without = await percents();
@@ -856,9 +859,9 @@ describe('the progressive PREVIEW SANDBOX', () => {
     // `1d20 + @prof` for Sera is `1d20 + 3`.
     const root = await mountProgressive({ difficulties: [6, 9, 14, 40] });
     await choosePreviewActor(root, 'sera');
-    const rows = [...root.querySelectorAll('[data-checks-odds-row]')].map((row) => [
-      row.getAttribute('data-checks-odds-row'),
-      row.querySelector('[data-checks-odds-percent]').textContent.trim(),
+    const rows = [...root.querySelectorAll('[data-banded-bar-row]')].map((row) => [
+      row.getAttribute('data-banded-bar-row'),
+      row.querySelector('[data-banded-bar-percent]').textContent.trim(),
     ]);
     assert.deepEqual(rows, [
       ['award-0', '10%'],
@@ -866,7 +869,7 @@ describe('the progressive PREVIEW SANDBOX', () => {
       ['award-2', '45%'],
     ]);
     assert.equal(
-      root.querySelector('[data-checks-odds-row="award-0"] .manager-checks-odds-label').textContent
+      root.querySelector('[data-banded-bar-row="award-0"] .fab-banded-bar-name').textContent
         .trim(),
       '0 of 4',
       'an award of nothing is a real outcome and IS listed, out of the authored four'
@@ -952,8 +955,8 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
     assert.equal(odds(root).dataset.checksOddsState, 'enumerated');
     assert.equal(odds(root).dataset.checksOddsDirection, 'under');
     assert.deepEqual(
-      [...root.querySelectorAll('[data-checks-odds-percent]')].map((cell) => [
-        cell.dataset.checksOddsPercent,
+      [...root.querySelectorAll('[data-banded-bar-percent]')].map((cell) => [
+        cell.dataset.bandedBarPercent,
         cell.textContent.trim(),
       ]),
       [
@@ -1108,7 +1111,7 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
       'the prototype’s exact heading, never "all 0 faces"'
     );
     // P(d20 <= 10 + d4) = 50 / 80.
-    assert.equal(root.querySelector('[data-checks-odds-percent="success"]').textContent.trim(), '62.5%');
+    assert.equal(root.querySelector('[data-banded-bar-percent="success"]').textContent.trim(), '62.5%');
   });
 
   it('never publishes a result rolled before its inputs changed', async () => {
@@ -1706,7 +1709,7 @@ describe('the source contract these hooks are pinned by', () => {
       resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte'),
       'utf8'
     );
-    assert.match(odds, /FillBar from '\.\.\/\.\.\/\.\.\/components\/FillBar\.svelte'/);
+    assert.match(odds, /BandedBar from '\.\.\/\.\.\/\.\.\/components\/BandedBar\.svelte'/);
     const preview = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte'),
       'utf8'

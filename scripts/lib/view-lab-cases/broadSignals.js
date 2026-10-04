@@ -48,6 +48,24 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/RunProgress.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
   ]),
+  // The instruments over the fill leaf (issue 1782): the run detail's stage track and a run card's.
+  'src/ui/svelte/components/StageBars.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-past-stage',
+    'fabricate-journal-lifecycle-waiting-auto-eligible',
+  ]),
+  // The crafting essence pool's requirement meters and the journal's shared essence stage.
+  'src/ui/svelte/components/Meter.svelte': Object.freeze([
+    'player-crafting-essence-pool',
+    'fabricate-journal-lifecycle-essence-shared',
+  ]),
+  // One chance bar of each scale, and the Checks Studio's odds histogram.
+  'src/ui/svelte/components/BandedBar.svelte': Object.freeze([
+    'player-gathering-task-ready',
+    'player-gathering-events',
+    'manager-checks-crafting-odds-enumerable',
+  ]),
+  // The bare leaf's one remaining caller: an opened gathering drop row's chance track.
+  'src/ui/svelte/components/FillBar.svelte': Object.freeze(['player-gathering-drop-open']),
   'src/ui/svelte/components/StageNav.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-future-stage',
