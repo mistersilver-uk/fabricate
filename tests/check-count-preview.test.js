@@ -399,7 +399,7 @@ describe('the count readout', () => {
     assert.equal(readout.breakdown, '4 qualified − 2 cancelled = 2 net');
     assert.equal(readout.targetLine, 'needs 2 · margin +0', 'a zero margin is signed');
     assert.equal(readout.card.title, 'Success');
-    assert.equal(readout.card.detail, 'The recipe’s result group is produced');
+    assert.equal(readout.card.detail, 'The recipe’s result set is produced');
     assert.equal(readout.hasFormula, true);
   });
 
@@ -479,7 +479,7 @@ describe('the count readout', () => {
     assert.equal(readout.count.botch, true, 'the net is below zero');
     assert.equal(readout.card.tone, 'success');
     assert.equal(readout.card.title, 'Success');
-    assert.equal(readout.card.detail, 'The recipe’s result group is produced');
+    assert.equal(readout.card.detail, 'The recipe’s result set is produced');
     assert.equal(readout.targetLine, 'needs 2 · margin −8', 'the normal line, naming no botch');
     assert.equal(readout.marginKind, 'margin');
   });

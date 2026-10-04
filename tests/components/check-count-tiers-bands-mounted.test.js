@@ -246,7 +246,7 @@ describe('the simple editor authors a counting check (issue 2006)', () => {
     });
     const outcome = (kind) =>
       state.root.querySelector(`[data-simple-outcome="${kind}"]`).textContent.replaceAll(/\s+/g, ' ');
-    assert.match(outcome('success'), /Reaches 2 successes — the component's result group is produced in full\./);
+    assert.match(outcome('success'), /Reaches 2 successes — the component's result set is produced in full\./);
     assert.match(outcome('failure'), /Fewer than 2 — nothing is produced; the failure policy decides the cost\./);
     assert.doesNotMatch(outcome('success') + outcome('failure'), /\bDC\b/);
     await state.act(() => chooseSelectOption(state.root, '[data-simple-band-record]', 't-hard'));

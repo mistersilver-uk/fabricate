@@ -1378,7 +1378,7 @@ The vocabulary is stated because the model and the interface differ, and the dif
 `DOMAIN.md` names the parent on the ingredient side an **Ingredient Set** and the OR-alternative bundle inside it an **Ingredient Group**, so on that side `group` is the CHILD level.
 The result-side parent carries the model identifier `ResultGroup`, which reuses `group` at the PARENT level and is the source of the confusion.
 The interface therefore says **result set** for the parent, matching its ingredient-side twin, and reserves **choice group** for the OR-alternative bundle on either side.
-User-facing strings already use both terms today; unifying them is recorded as a migration.
+User-facing strings in `lang/en.json` say result set as of issue 1516; engine-authored validation messages and default set names still say result group, recorded as a migration.
 The persisted identifier is out of scope for this capability and does not change.
 Both hold the SAME TWO ELEMENTS — picker rows and choice groups — and the authoring surface MUST render them as the same shape so the two sides of a recipe read as one model.
 There is no separate result row: what differs between the two sets is the ROLE the set carries, which restricts the kinds a row may offer, and nothing else about the row changes.

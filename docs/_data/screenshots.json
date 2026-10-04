@@ -62,7 +62,7 @@
     },
     {
       "case": "manager-component-edit-salvage",
-      "alt": "The salvage section of the component editor, showing the result groups a component breaks down into, the check outcome each group is awarded for, and the DC override set for this component.",
+      "alt": "The salvage section of the component editor, showing the result sets a component breaks down into, the check outcome each set is awarded for, and the DC override set for this component.",
       "sha256": "eb870b5b6d4e0e40154fa1470897576cca4ab8e69b9d7929648c3d7c8712b347"
     },
     {
@@ -127,7 +127,7 @@
     },
     {
       "case": "coverage-mode-routed-ingredients-results",
-      "alt": "The results tab of the recipe editor for a recipe routed by ingredients, showing one result group for each route.",
+      "alt": "The results tab of the recipe editor for a recipe routed by ingredients, showing one result set for each route.",
       "sha256": "b9953a07c7121b28e12bb7d3e203d340a670a73ab6595637825bca616a002e74"
     },
     {

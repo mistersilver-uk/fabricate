@@ -126,7 +126,7 @@ describe('ChecksValidationTab (mounted)', () => {
     ]);
     assert.deepEqual(words('unnamedOutcome'), [
       'An outcome tier has no name',
-      'An unnamed tier cannot be routed to a result group. Name every tier.',
+      'An unnamed tier cannot be routed to a result set. Name every tier.',
     ]);
     assert.deepEqual(words('noSuccessOutcome'), [
       'No tier counts as a success',

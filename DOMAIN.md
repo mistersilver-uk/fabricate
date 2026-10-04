@@ -604,6 +604,7 @@ A single produced item output that references a component.
 #### Result Group
 
 A named collection of results.
+The interface calls it a **result set**, matching **Ingredient Set**; `ResultGroup` is the persisted identifier.
 
 [Notes](docs/domain/terms.md#result-group)
 
