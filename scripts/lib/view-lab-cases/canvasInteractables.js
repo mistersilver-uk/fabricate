@@ -227,7 +227,7 @@ export const CASES = Object.freeze([
     query: { noInteractables: '1' },
     steps: [],
     expectSelector:
-      '.fabricate-interactables-manager-body .fab-im-list-section .manager-empty[data-interactable-manager-empty]',
+      '.fabricate-interactables-manager-body .fab-im-list-section .manager-empty:not(.is-note):not(.is-filtered)[data-interactable-manager-empty]',
     kinds: ['canvas', 'interactables'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/interactables\//,
