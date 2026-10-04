@@ -34,9 +34,9 @@ Changing salvage resolution mode is non-destructive for recipes and runs (it del
 A switch into `simple` that drops a component's surplus success groups SHALL emit a `ui.notifications.warn` naming the affected component(s).
 The confirmation/warn copy is salvage-accurate — it discloses the group deletion and is not the recipe-deletion warning.
 
-In `simple` salvage mode the component salvage editor is capped at one success result group: the Add group affordance is removed and a required visible hint ("Simple mode uses a single result group") is shown, matching the recipe editor's `data-recipe-result-simple` single-group treatment.
+In `simple` salvage mode the component salvage editor is capped at one success result group: the Add result set affordance is removed and a required visible hint ("Simple mode uses a single result set") is shown, matching the recipe editor's `data-recipe-result-simple` single-group treatment.
 The cap counts success groups (`role !== 'failure'`) and does not filter, blank, or destroy a legacy reserved failure group's stored data.
-Routed keeps its multi-group list and Add group; progressive is unchanged.
+Routed keeps its multi-group list and Add result set; progressive is unchanged.
 
 ### Feature Toggles
 
@@ -165,7 +165,7 @@ A summed roll-over against a fixed DC:
 Every other evaluation:
 
 - states the benefit-positive margin note whenever the line shows a margin, unless a trigger-forced outcome takes the note slot
-- lists one row, "Result group produced" or "Failure policy applies", plus a tool-breakage row when the result breaks tools
+- lists one row, "Result set produced" or "Failure policy applies", plus a tool-breakage row when the result breaks tools
 
 A progressive check spends its rolled value down the sandbox order through `resolveProgressiveAward` and reads "{awarded} of {of} awarded".
 

@@ -496,21 +496,21 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
       const root = await browser.mount({ recipes: [recipe], resolutionMode: mode });
       const io = root.querySelector('[data-recipe-io]');
       assert.match(io.textContent, /2 in/, `${mode} still reports the ingredient count`);
-      assert.match(io.textContent, /3 groups/, `${mode} reports result GROUPS`);
+      assert.match(io.textContent, /3 sets/, `${mode} reports result SETS`);
       assert.equal(io.textContent.includes('out'), false, `${mode} must not invent an outputs count`);
       assert.ok(io.querySelector('.manager-recipe-io-routed'), `${mode} shows the routing glyph`);
       browser.remount();
     }
   });
 
-  it('says "1 group", never "1 groups"', async () => {
+  it('says "1 set", never "1 sets"', async () => {
     const root = await browser.mount({
       recipes: [makeRecipe({ resultGroupCount: 1 })],
       resolutionMode: 'routedByCheck'
     });
     const io = root.querySelector('[data-recipe-io]').textContent;
-    assert.match(io, /1 group\b/);
-    assert.equal(/1 groups/.test(io), false);
+    assert.match(io, /1 set\b/);
+    assert.equal(/1 sets/.test(io), false);
   });
 
   it('shows the projected check DC in the mono face', async () => {

@@ -752,7 +752,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     );
     const hint = target.querySelector('[data-salvage-simple-hint]');
     assert.ok(hint, 'the required visible hint is present (not a tooltip)');
-    assert.match(hint.textContent, /single result group/i);
+    assert.match(hint.textContent, /single result set/i);
     harness.remount();
   });
 

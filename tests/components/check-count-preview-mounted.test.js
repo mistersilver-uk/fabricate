@@ -215,9 +215,9 @@ describe('count odds and the simulator readout', () => {
       breakdown: '4 qualified − 2 cancelled = 2 net · Idrin',
       total: '2',
       line: ['needs 2 · margin +0', 'margin'],
-      card: ['success', 'Success', 'The recipe’s result group is produced'],
+      card: ['success', 'Success', 'The recipe’s result set is produced'],
       note: MARGIN_NOTES.count,
-      rows: [['result-group', 'Result group produced', 'Success']],
+      rows: [['result-group', 'Result set produced', 'Success']],
     });
     // The shared tiles sit under the medallion row (issue 2006).
     assert.ok(Boolean(readout.querySelector('.manager-checks-simulator-head + .fabricate-dice-tiles')));
@@ -422,8 +422,8 @@ describe('the count readout per outcome (issue 2080)', () => {
     const readout = await rolled(await mountRouted(ROUTED_COUNT));
     assert.deepEqual([readout.line, readout.card, readout.rows], [
       ['needs 2 · margin +1', 'margin'],
-      ['success', 'Fine', 'The recipe’s result group is produced'],
-      [['result-group', 'Result group produced', 'Fine']],
+      ['success', 'Fine', 'The recipe’s result set is produced'],
+      [['result-group', 'Result set produced', 'Fine']],
     ]);
   });
 
@@ -465,7 +465,7 @@ describe('the count readout per outcome (issue 2080)', () => {
     assert.deepEqual([readout.total, readout.line, readout.card, readout.note], [
       '−3',
       ['needs 1 · margin −4', 'margin'],
-      ['success', 'Success', 'The recipe’s result group is produced'],
+      ['success', 'Success', 'The recipe’s result set is produced'],
       ['forced', 'Trigger fired — automatic success.'],
     ]);
   });

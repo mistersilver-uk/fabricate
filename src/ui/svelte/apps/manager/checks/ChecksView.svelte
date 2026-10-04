@@ -657,7 +657,7 @@
     if (routeIsRouted)
       return text(
         'FABRICATE.Admin.Manager.Checks.Sections.OutcomesLeadRouted',
-        'What each result of the roll produces. A record binds its result groups to the tiers set here.'
+        'What each result of the roll produces. A record binds its result sets to the tiers set here.'
       );
     if (activeMode === 'progressive')
       return text(

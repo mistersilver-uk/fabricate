@@ -444,6 +444,7 @@ Spec reference: openspec/specs/data-models/spec.md
 ## Result Group
 
 In routed and alchemy flows, it is the routing target.
+The interface names it a **result set** throughout `lang/en.json`; engine-authored validation messages and the persisted default name `Result Group N` still say result group.
 
 Canonical mapping: Plain object `{ id, name, results[] }`
 

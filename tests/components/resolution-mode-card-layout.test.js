@@ -23,7 +23,7 @@ const FIXTURE = `
               <span class="manager-resolution-option-icon" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
               <span class="manager-resolution-option-body">
                 <span class="manager-resolution-option-name">Simple</span>
-                <span class="manager-resolution-option-desc">One ingredient set and one result group, with an optional pass/fail check.</span>
+                <span class="manager-resolution-option-desc">One ingredient set and one result set, with an optional pass/fail check.</span>
               </span>
             </label>
             <label class="manager-resolution-option is-active">
@@ -31,7 +31,7 @@ const FIXTURE = `
               <span class="manager-resolution-option-icon" aria-hidden="true"><i class="fa-solid fa-layer-group"></i></span>
               <span class="manager-resolution-option-body">
                 <span class="manager-resolution-option-name">Routed by ingredients</span>
-                <span class="manager-resolution-option-desc">Multiple ingredient sets and result groups; the chosen ingredient set selects which result group is produced. The crafting check is optional.</span>
+                <span class="manager-resolution-option-desc">Multiple ingredient sets and result sets; the chosen ingredient set selects which result set is produced. The crafting check is optional.</span>
               </span>
             </label>
           </div>

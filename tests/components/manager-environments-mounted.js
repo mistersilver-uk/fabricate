@@ -3986,7 +3986,7 @@ export function registerEnvironmentsCases() {
         step.textContent.trim()
       ),
       [
-        'Define gathering tasks with their checks, timing, result groups, and failure outcomes.',
+        'Define gathering tasks with their checks, timing, result sets, and failure outcomes.',
         'Prepare event options that can be reused across your locations.',
         'Create environments after the gathering task and event libraries are ready to attach.',
       ]

@@ -110,7 +110,7 @@ Errors are shown in two places:
 When a failed save has an error tied to a field, the editor jumps to and focuses the first invalid one.
 Summary entries that point at a field are clickable and jump back to it.
 
-Some errors point at a whole list rather than a single field, such as the result groups, a specific group's name, a group's results, or an individual result row.
+Some errors point at a whole list rather than a single field, such as the result sets, a specific result set's name, a result set's results, or an individual result row.
 
 Disabled tasks skip the progressive completeness checks, so a placeholder task can be saved while a GM is still authoring it.
 Enabled tasks must be fully configured:
