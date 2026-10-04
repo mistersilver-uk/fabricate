@@ -2445,8 +2445,17 @@ test('every case declaring an expectView targets the manager', () => {
     );
   }
   // Every manager case must declare one: it is the only guard against capturing the wrong screen.
+  // A SPECIMEN (issue 1782) mounts a fixture in place of the manager root, so it has no route to
+  // name; its `expectSelector` is that guard instead, and it declares no route it does not render.
   for (const viewCase of VIEW_LAB_CASES) {
     if (viewCase.app !== 'fabricate-crafting-system-manager') continue;
+    if (viewCase.query?.specimen) {
+      assert.ok(
+        !viewCase.expectView && typeof viewCase.expectSelector === 'string',
+        `specimen case "${viewCase.id}" must guard its frame with expectSelector, not a route`
+      );
+      continue;
+    }
     assert.ok(
       viewCase.expectView,
       `manager case "${viewCase.id}" must declare expectView, or a mis-click captures silently`
