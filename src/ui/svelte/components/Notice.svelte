@@ -36,7 +36,7 @@
   take `--fab-accent-text` because the accent itself measures 4.48:1 in `ironblood-forge`, under AA;
   `font-variant-numeric: tabular-nums` on the detail; `icon`, load-bearing because two shipped states
   resolve to the same tone; the rest spread, whose hooks carry no behaviour; and the body's 12rem
-  basis, which wraps the action beneath it in a narrow host (issue 1773).
+  basis capped at its text, which wraps the action beneath it in a narrow host (issue 1773).
 -->
 <script>
   let {
@@ -159,9 +159,17 @@
     color: var(--fab-text-secondary);
   }
 
+  /* The basis wraps the action once the body would fall under 12rem, or under its own text when
+     that is shorter, so a short title in a shrink-wrapped notice keeps its one row; the action's
+     auto margin keeps it at the trailing edge the growing body used to push it to. */
   .fab-notice-body {
     flex: 1 1 12rem;
     min-width: 0;
+    max-width: max-content;
+  }
+
+  .fab-notice-body + .fab-notice-button {
+    margin-left: auto;
   }
 
   .fab-notice-title {
