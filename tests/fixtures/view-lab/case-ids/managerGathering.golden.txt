@@ -34,6 +34,8 @@ manager-environment-edit-task-row-open-narrow
 manager-environment-edit-event-row-open-narrow
 manager-environment-edit-scene-linked
 manager-environment-edit-scene-unlinked-narrow
+manager-environment-edit-available-row-open-narrow
+manager-environment-edit-events-ranked
 manager-gathering-events-normal
 manager-gathering-event-editor-normal
 manager-gathering-task-drop-modifiers-normal

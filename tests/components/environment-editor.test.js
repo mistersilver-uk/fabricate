@@ -71,7 +71,7 @@ describe('environment editor localization', () => {
       ['Composition', 'Automatic'],
       ['Composition', 'IncludedByMatch'],
       ['Inspector', 'TaskEnvironmentMatching'],
-      ['Inspector', 'Overrides'],
+      ['Inspector', 'DropRateAdjustments'],
       ['Validation', 'Readiness'],
       ['Evidence', 'Biome'],
       ['Tabs', 'Tasks'],
@@ -108,10 +108,11 @@ describe('environment editor localization', () => {
       ['Composition.ForceAdd', 'Force add'],
       ['Composition.LibraryDisabledNote', 'Enable in library first'],
       ['Composition.ForceIncluded', 'Force included'],
-      ['Composition.OverrideOn', 'On'],
-      ['Composition.OverrideOff', 'Off'],
-      ['Composition.OverrideOnTitle', 'Drop rate adjustment on'],
-      ['Composition.OverrideOffTitle', 'Drop rate adjustment off'],
+      // The spec's default-vs-override chip, which must not read like the row's On/Off switch.
+      ['Composition.OverrideOn', 'Adjusted'],
+      ['Composition.OverrideOff', 'Default'],
+      ['Composition.OverrideOnTitle', 'Drop rates adjusted in this environment'],
+      ['Composition.OverrideOffTitle', 'Default drop rates'],
       ['Composition.WeightPercentage', 'Selection share'],
       ['Composition.ColEvent', 'Event'],
       ['Composition.QuickRemove', 'Remove'],
@@ -141,7 +142,12 @@ describe('environment editor localization', () => {
       ['Inspector.BaseChanceModifier', 'Base chance modifier'],
       ['Inspector.BaseRate', 'Base'],
       ['Inspector.EffectiveRate', 'Effective'],
-      ['Inspector.ClearAdjustment', 'Clear'],
+      ['Inspector.ClearAdjustmentNamed', 'Clear {name}'],
+      ['Inspector.DropRateAdjustmentNamed', '{name}: Drop-rate adjustment (-100% to +100%)'],
+      ['Inspector.DropRateAdjustments', 'Drop-rate adjustments'],
+      ['Inspector.ApplyDropRateAdjustments', 'Apply drop-rate adjustments'],
+      ['Overview.OpenSceneNamed', 'Open scene: {name}'],
+      ['Overview.SceneNotFound', 'Scene not found'],
       [
         'Tasks.ManualIntro',
         'Only tasks you add are available to players, whether or not they match this environment.',
@@ -905,7 +911,7 @@ describe('environment composition editor structure', () => {
     OVERRIDE_BODY,
     {
       passesProps: [['IconButton', 'ariaLabel']],
-      spells: ['Inspector.ClearAdjustment'],
+      spells: ['ClearAdjustmentNamed'],
     }
   );
 

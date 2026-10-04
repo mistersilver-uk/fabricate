@@ -78,9 +78,15 @@
     );
   }
 
-  // The chevron opens a row and selects it, so the read-only rail follows the row being edited.
+  // The chevron opens a row and selects it, and selecting another row closes the open one, so the
+  // read-only rail and an open body always describe the same record.
   function openRow(id) {
     if (id) onSelect(kind, id);
+  }
+
+  function selectRow(id) {
+    if (expandedId !== id) expandedId = '';
+    onSelect(kind, id);
   }
 
   function toggleRow(id) {
@@ -338,7 +344,8 @@
     data-action="select"
     data-keyboard-focus="true"
     aria-pressed={selectedId === entry.id}
-    onclick={() => onSelect(kind, entry.id)}
+    title={recordName(entry)}
+    onclick={() => selectRow(entry.id)}
   >
     <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
     <span class="manager-environment-comp-copy">
@@ -348,8 +355,11 @@
   </button>
 {/snippet}
 
+<!-- Only the open row mounts its editor; a closed row keeps just the body its disclosure names. -->
 {#snippet overrideBody(entry)}
-  <CompositionOverrideBody {kind} {environment} {entry} text={localizeOr} {onUpdateEnvironment} />
+  {#if expandedId === entry.id}
+    <CompositionOverrideBody {kind} {environment} {entry} {onUpdateEnvironment} />
+  {/if}
 {/snippet}
 
 <!-- The rows outside the ordered list open the same body through the same disclosure, so an
@@ -357,6 +367,7 @@
 {#snippet rowLead(entry)}
   <RowDisclosure
     side="leading"
+    class="manager-environment-comp-disclosure"
     expanded={expandedId === entry.id}
     controls={bodyId(entry)}
     ariaLabel={recordName(entry)}
@@ -401,9 +412,9 @@
       class:has-rank-controls={showEventRankControls}
       aria-hidden="true"
     >
-      <!-- The lead track is the list's own cluster (issue 1512): the grip, the gap and the ordinal
-           badge the list draws before the record's cells, declared in the sheet from the same
-           tokens. Without it every label sits one cluster left of the column it names. -->
+      <!-- The lead track is the list's own cluster (issue 1512): the grip, the ordinal badge and
+           the row disclosure, with the line's gaps, declared in the sheet from the same tokens.
+           Without it every label sits one cluster left of the column it names. -->
       <span></span>
       <span>{recordColumnLabel}</span>
       {#if showBlindWeights}<span
@@ -721,20 +732,9 @@
                   />
                 {:else}
                   {#if entry.compositionState === 'notMatching'}
-                    <!-- THE `warning` REPAIR (issue 1118). This spelt its modifier
-                         `is-warning`, and the sheet declares `.fabricate-button.is-warning-action`
-                         while declaring `.fabricate-button.is-warning` NOWHERE — so Force add
-                         shipped with no warning treatment at all, and the amber treatment
-                         shipped with no call site. `role="warning"` emits the class that
-                         exists, which is why the role-to-class relation in the primitive is a
-                         NAMED MAPPING rather than a template over the role name.
-
-                         The typo survived review because the control never rendered: its
-                         guard demanded `mode === 'manual'` inside a section gated on
-                         `mode !== 'manual'`. Issue 1315 settled where a force add belongs —
-                         automatic mode, the one mode with a filter for it to override — so
-                         the guard now tests composition state alone and takes its mode from
-                         the enclosing section. This is the `warning` role's live consumer. -->
+                    <!-- The `warning` role's live consumer (issue 1118): it emits the
+                         `is-warning-action` class the sheet declares. Force add is automatic
+                         mode's (issue 1315), so the guard takes its mode from this section. -->
                     <Button
                       role="warning"
                       class="manager-environment-force-include"

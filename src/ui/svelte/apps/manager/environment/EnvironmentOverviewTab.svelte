@@ -215,7 +215,7 @@
                 data-scene-locked-image
                 title={text(
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImageTooltip',
-                  "This image comes from the linked scene and can't be edited. Unlink the scene on the Linked scene card to choose a custom image."
+                  "This image comes from the linked scene and can't be edited. Unlink the scene on the Linked scene card below to choose a custom image."
                 )}
                 aria-label={text(
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImage',

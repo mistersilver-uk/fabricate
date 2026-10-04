@@ -15,8 +15,13 @@
   );
   const sceneUuid = $derived(String(environment?.sceneUuid || ''));
   const scene = linkedScene(() => sceneUuid);
-  // The address never renders: an unresolved scene reads as the card's own title.
-  const item = $derived(sceneUuid ? { name: scene.name || title, img: scene.thumb } : null);
+  // The address never renders: a pending scene reads as the card's title, a deleted one as missing.
+  const name = $derived(
+    scene.missing
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneNotFound', 'Scene not found')
+      : scene.name || title
+  );
+  const item = $derived(sceneUuid ? { name, img: scene.thumb } : null);
 
   function handleSceneDrop(data) {
     const { uuid, type } = resolveDropData(data);
@@ -31,6 +36,7 @@
     {item}
     documentType="Scene"
     kind="scene"
+    state={scene.missing ? 'missing' : 'linked'}
     emptyIcon={sceneUuid ? 'fas fa-map' : 'fas fa-map-location-dot'}
     title={text(
       'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneDropHint',

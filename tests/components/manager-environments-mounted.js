@@ -2292,6 +2292,9 @@ export function registerEnvironmentsCases() {
           compositionMode: 'automatic',
           taskDropRateAdjustments: { 'task-forage': { 'drop-herb': 15, 'drop-root': -10 } },
           taskDropRateAdjustmentsEnabled: {},
+          // A sibling event's overrides, which every event write must carry through.
+          eventDropRateAdjustments: { 'event-other': 9 },
+          eventDropRateAdjustmentsEnabled: { 'event-other': false },
         },
         composition: {
           compositionMode: 'automatic',
@@ -2494,7 +2497,7 @@ export function registerEnvironmentsCases() {
       target.querySelector('[data-evidence-field="danger"]').textContent.includes('Any danger'),
       'task evidence table should keep the danger row as unconstrained'
     );
-    // Issue 1522: the overrides left the rail and open in place in the task's own row.
+    // Issue 1522: the task row opens its overrides in place.
     assert.ok(!target.querySelector('[data-record-inspector-section="overrides"]'));
     target.querySelector('[data-sortable-disclosure="task-forage"]').click();
     flushSync();
@@ -2565,8 +2568,8 @@ export function registerEnvironmentsCases() {
       '.manager-environment-drop-adjustment-clear'
     );
     assert.ok(taskClearButton, 'task drop override should render an icon-only clear button');
-    assert.equal(taskClearButton.getAttribute('aria-label'), 'Clear');
-    assert.equal(taskClearButton.getAttribute('title'), 'Clear');
+    assert.equal(taskClearButton.getAttribute('aria-label'), 'Clear Moon Herb');
+    assert.equal(taskClearButton.getAttribute('title'), 'Clear Moon Herb');
     assert.equal(
       taskClearButton.textContent.trim(),
       '',
@@ -2592,7 +2595,7 @@ export function registerEnvironmentsCases() {
     assert.equal(taskAdjustmentInput.value, '+15');
     assert.equal(
       taskAdjustmentInput.getAttribute('aria-label'),
-      'Drop-rate adjustment (-100% to +100%)'
+      'Moon Herb: Drop-rate adjustment (-100% to +100%)'
     );
     const percentShell = taskAdjustmentRow.querySelector('[data-drop-rate-adjustment-percent]');
     assert.ok(percentShell, 'task drop override should render the percent suffix shell');
@@ -2723,8 +2726,15 @@ export function registerEnvironmentsCases() {
     );
     assert.ok(eventOverrides, 'the event row opens its overrides in place');
     assert.ok(
-      eventOverrides.textContent.includes('Environment overrides'),
+      eventOverrides.textContent.includes('Drop-rate adjustments'),
       'event overrides card should keep its title'
+    );
+    assert.equal(
+      eventOverrides
+        .querySelector('[data-event-drop-rate-adjustments-toggle]')
+        .getAttribute('aria-label'),
+      'Apply drop-rate adjustments',
+      'the switch is named for what it applies, not its state'
     );
     assert.ok(
       eventOverrides.textContent.includes('Base chance modifier'),
@@ -2792,13 +2802,13 @@ export function registerEnvironmentsCases() {
     eventAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
     assert.deepEqual(
       updateCalls.at(-1),
-      { eventDropRateAdjustments: { 'event-thorns': -5 } },
+      { eventDropRateAdjustments: { 'event-other': 9, 'event-thorns': -5 } },
       'event percent input should update the stored event adjustment'
     );
     eventOverrides.querySelector('[data-event-drop-rate-adjustments-toggle]').click();
     assert.deepEqual(
       updateCalls.at(-1),
-      { eventDropRateAdjustmentsEnabled: { 'event-thorns': false } },
+      { eventDropRateAdjustmentsEnabled: { 'event-other': false, 'event-thorns': false } },
       'turning the event toggle off should preserve stored values and only disable application'
     );
   });
@@ -4128,15 +4138,19 @@ export function registerEnvironmentsCases() {
     assert.ok(!rail.querySelector(RAIL_EDITING), `${tab}: the rail hosts no editing input`);
     const before = updates.length;
     for (const element of [rail, ...rail.querySelectorAll('*')]) {
-      element.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }));
+      const over = new Event('dragover', { bubbles: true, cancelable: true });
+      element.dispatchEvent(over);
+      // Read before the drop, whose handler would clear the class again.
+      assert.ok(
+        !over.defaultPrevented &&
+          !rail.classList.contains('is-drop-active') &&
+          !rail.querySelector('.is-drop-active'),
+        `${tab}: ${element.tagName} takes a dragover, so a drop target sits on the rail`
+      );
       dispatchDrop(element, { type: 'Scene', uuid: 'Scene.dropped' });
     }
     flushSync();
     assert.equal(updates.length, before, `${tab}: a Scene dropped on the rail writes nothing`);
-    assert.ok(
-      !rail.classList.contains('is-drop-active') && !rail.querySelector('.is-drop-active'),
-      `${tab}: no rail element takes a drop`
-    );
   }
 
   it('keeps every rail pane read-only, while the same records edit in their rows', async () => {
@@ -4175,6 +4189,48 @@ export function registerEnvironmentsCases() {
     assertRailReadOnly(updates, 'events');
   });
 
+  it('keeps the rail read-only with no linked scene and with no record selected', async () => {
+    const updates = [];
+    mountEditor(overridesEditorProps(updates, { sceneUuid: '' }));
+    assert.ok(Boolean(target.querySelector(':scope aside [data-environment-summary-scene-empty]')));
+    assertRailReadOnly(updates, 'overview, unlinked');
+    unmount(mounted);
+    mounted = null;
+    const props = overridesEditorProps(updates);
+    mountEditor({ ...props, composition: { ...props.composition, tasks: [] } });
+    await openEditorTab('tasks');
+    assert.ok(
+      !target.querySelector(':scope aside [data-record-inspector]'),
+      'no record is selected'
+    );
+    assertRailReadOnly(updates, 'tasks, nothing selected');
+  });
+
+  it('marks a linked scene that no longer resolves as missing, on the card and the rail', async () => {
+    const previous = globalThis.fromUuid;
+    Object.assign(globalThis, { fromUuid: async () => null });
+    try {
+      mountEditor(overridesEditorProps([]));
+      for (let index = 0; index < 4; index += 1) await tick();
+      flushSync();
+      const zone = target.querySelector(
+        ':scope [data-overview-section="scene"] [data-item-drop-zone]'
+      );
+      assert.equal(zone.dataset.itemDropState, 'missing', 'the card paints the link as missing');
+      assert.ok(zone.textContent.includes('Scene not found'), 'and says so');
+      const route = target.querySelector(':scope aside [data-rail-route-out]');
+      assert.equal(route.textContent.trim(), 'Scene not found', 'the rail says the same');
+      assert.equal(route.getAttribute('aria-label'), 'Open scene: Scene not found');
+      assert.ok(!route.textContent.includes('Scene.cavern'), 'and never prints the address');
+      assert.ok(
+        Boolean(route.querySelector('.fa-up-right-from-square')),
+        'it reads as a route out'
+      );
+    } finally {
+      Object.assign(globalThis, { fromUuid: previous });
+    }
+  });
+
   it('commits on blur with the row still open and focus still in its body, in any section', async () => {
     for (const id of ['task-vein', 'task-cut']) {
       const updates = [];
@@ -4185,11 +4241,16 @@ export function registerEnvironmentsCases() {
         target,
         props: {
           ...props,
-          // The store's round trip: each write comes back as a new draft.
+          // The store's round trip: each write comes back as a new draft AND a rebuilt composition,
+          // so every record arrives under a new identity.
           onUpdateEnvironment: (patch) => {
             updates.push(patch);
             props.environmentDraft = { ...props.environmentDraft, ...patch };
-            editor.$set({ environmentDraft: props.environmentDraft });
+            props.composition = structuredClone(props.composition);
+            editor.$set({
+              environmentDraft: props.environmentDraft,
+              composition: props.composition,
+            });
           },
         },
       });

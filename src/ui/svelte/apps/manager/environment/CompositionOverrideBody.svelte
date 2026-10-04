@@ -2,7 +2,8 @@
   One composition row's per-environment overrides, opened in place in that row whatever its section
   (issue 1522): the node count, the drop-rate switch and the drop-rate adjustments. Every writer
   patches the environment through `onUpdateEnvironment` and never the reusable source record, and
-  the inspector rail beside the list only reads them. `text(key, fallback)` is the host's localizer.
+  the inspector rail beside the list only reads them. `text(key, fallback, data)` is the host's
+  localizer.
 -->
 <script>
   import {
@@ -13,13 +14,14 @@
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import { recordNodePool } from './recordNodePool.js';
 
   let {
     kind = 'task',
     environment = null,
     entry = null,
-    text = (_key, fallback) => fallback,
+    text = localizeOr,
     onUpdateEnvironment = () => {},
   } = $props();
 
@@ -65,10 +67,11 @@
     return Math.max(-100, Math.min(100, Math.trunc(number)));
   }
 
-  // Seeds an unstored pool from the library config, as the runtime's own first write would.
+  // Seeds an unstored pool from the library config, as the runtime's own first write would. A node
+  // count is whole: the Stepper commits whatever is typed, so `2.5` writes 2.
   function setNodeCount(value) {
     const taskId = String(entry?.id || '').trim();
-    const current = Math.max(0, Math.min(pool.max, Number(value)));
+    const current = Math.max(0, Math.min(pool.max, Math.trunc(Number(value))));
     if (!taskId || !pool.hasNodes || !Number.isFinite(current) || current === pool.current) return;
     const next = environmentMap('nodeRuntime');
     const base =
@@ -153,6 +156,13 @@
     write(adjustment);
   }
 
+  // Clear disables itself once it writes 0, so focus moves to its row's input, not the document.
+  function onClear(write, event) {
+    const row = event.currentTarget.closest('[data-drop-rate-adjustment]');
+    write(0);
+    row?.querySelector('[data-drop-rate-adjustment-input]')?.focus();
+  }
+
   function rowLabel(row) {
     return String(
       row?.name ||
@@ -174,12 +184,19 @@
       text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.AvailableNodes', 'Available nodes')
     )
   );
-  const clearLabel = $derived(
-    text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment', 'Clear')
-  );
 </script>
 
 {#snippet adjustmentRow(row, write)}
+  {@const inputLabel = text(
+    'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustmentNamed',
+    '{name}: Drop-rate adjustment (-100% to +100%)',
+    { name: row.label }
+  )}
+  {@const clearLabel = text(
+    'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustmentNamed',
+    'Clear {name}',
+    { name: row.label }
+  )}
   <div
     class={`manager-environment-drop-adjustment-row is-task-drop ${enabled ? '' : 'is-disabled'} ${adjustmentValueClass(row.adjustment)}`}
     data-drop-rate-adjustment={row.id}
@@ -206,7 +223,7 @@
             inputmode="numeric"
             pattern="[+\-]?[0-9]*"
             value={adjustmentDisplayValue(row.adjustment)}
-            aria-label={rangeLabel}
+            aria-label={inputLabel}
             title={rangeLabel}
             disabled={!enabled}
             data-drop-rate-adjustment-input
@@ -231,7 +248,7 @@
         ariaLabel={clearLabel}
         title={clearLabel}
         disabled={!enabled || row.adjustment === 0}
-        onclick={() => write(0)}
+        onclick={(event) => onClear(write, event)}
       >
         <i class="fas fa-rotate-left" aria-hidden="true"></i>
       </IconButton>
@@ -265,16 +282,19 @@
             )}
           </p>
         {:else}
-          <Stepper
-            value={pool.current}
-            min={0}
-            max={pool.max}
-            ariaLabel={nodeLabels.ariaLabel}
-            decrementLabel={nodeLabels.decrementLabel}
-            incrementLabel={nodeLabels.incrementLabel}
-            inputProps={{ 'data-node-count-input': entry.id }}
-            onChange={setNodeCount}
-          />
+          <div class="manager-environment-node-count-field">
+            <Stepper
+              value={pool.current}
+              min={0}
+              max={pool.max}
+              ariaLabel={nodeLabels.ariaLabel}
+              decrementLabel={nodeLabels.decrementLabel}
+              incrementLabel={nodeLabels.incrementLabel}
+              inputProps={{ 'data-node-count-input': entry.id }}
+              onChange={setNodeCount}
+            />
+            <span class="manager-muted" data-node-count-max>/ {pool.max}</span>
+          </div>
         {/if}
       </section>
     {/if}
@@ -284,8 +304,8 @@
         <div class="manager-environment-overrides-copy">
           <h5 class="manager-environment-drop-adjustment-heading">
             {text(
-              'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Overrides',
-              'Environment overrides'
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustments',
+              'Drop-rate adjustments'
             )}
           </h5>
           <p class="manager-muted">
@@ -312,6 +332,10 @@
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOff',
                   'Off'
                 )}
+            ariaLabel={text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustments',
+              'Apply drop-rate adjustments'
+            )}
             class="manager-environment-override-toggle"
             data-task-drop-rate-adjustments-toggle={kind === 'event' ? undefined : ''}
             data-event-drop-rate-adjustments-toggle={kind === 'event' ? '' : undefined}

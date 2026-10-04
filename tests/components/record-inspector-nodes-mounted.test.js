@@ -1,14 +1,16 @@
 /**
- * The available-node Stepper, mounted (issue 1522). It moved from the inspector rail into a
- * composition row's `CompositionOverrideBody`; the rail's read-only count is pinned by
- * `record-inspector-node-max.test.js`.
+ * The available-node Stepper in a composition row's `CompositionOverrideBody`, mounted (issue 1522);
+ * the rail's read-only count is pinned by `record-inspector-node-max.test.js`.
  */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const BODY = 'src/ui/svelte/apps/manager/environment/CompositionOverrideBody.svelte';
 
@@ -17,6 +19,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-override-body-nodes-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/gatheringImageDefaults.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/apps/manager/environment/recordNodePool.js',
@@ -78,6 +81,11 @@ describe('CompositionOverrideBody available-node Stepper', () => {
     assert.equal(input.value, '2');
     assert.equal(input.getAttribute('min'), '0');
     assert.equal(input.getAttribute('max'), '5');
+    assert.equal(
+      nodeSection(root).querySelector('[data-node-count-max]').textContent.trim(),
+      '/ 5',
+      'the capacity reads beside the Stepper'
+    );
   });
 
   it('writes the whole nodeRuntime map, keeping a sibling pool, through the input and adjuncts', async () => {
@@ -101,6 +109,19 @@ describe('CompositionOverrideBody available-node Stepper', () => {
     typeInto(nodeInput(root), '3');
     assert.deepEqual(patches, [
       { nodeRuntime: { ...SIBLING_POOL, 'mine-ore': { enabled: true, max: 5, current: 3 } } },
+    ]);
+  });
+
+  // The write is skipped only when it would not change the displayed count, so stepping an unstored
+  // pool from its config's 7 up to its max of 10 writes 10.
+  it('writes an unstored pool set to its max', async () => {
+    const { root, patches } = await render({
+      entry: taskEntry({ record: { name: 'Vein', nodes: { enabled: true, max: 10, current: 7 } } }),
+    });
+    assert.equal(nodeInput(root).value, '7');
+    typeInto(nodeInput(root), '10');
+    assert.deepEqual(patches, [
+      { nodeRuntime: { ...SIBLING_POOL, 'mine-ore': { enabled: true, max: 10, current: 10 } } },
     ]);
   });
 

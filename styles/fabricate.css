@@ -15397,6 +15397,24 @@
   white-space: nowrap;
 }
 
+/* The rail's route out (issue 1522): its name truncates inside it and the trailing open glyph stays whole. */
+.fabricate-manager .manager-environment-scene-name.is-route {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-environment-scene-name.is-route > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-environment-scene-name.is-route > i {
+  flex: 0 0 auto;
+}
+
 .fabricate-manager .manager-environment-runtime-grid .manager-fact,
 .fabricate-manager .manager-environment-inspector-facts .manager-fact {
   min-width: 0;
@@ -15555,12 +15573,13 @@
   gap: var(--fab-space-chip);
 }
 
+/* A row outside the ordered list leads with the strip's own track and ends its chevron there, so the chevron and every column sit where an ordered row's do. */
 .fabricate-manager .manager-environment-comp-row {
   display: grid;
-  grid-template-columns: 24px var(--fab-env-comp-grid);
+  grid-template-columns: var(--fab-env-comp-lead) var(--fab-env-comp-grid);
   align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2) var(--fab-space-2);
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-16);
@@ -15569,6 +15588,14 @@
 /* A ranked strip gains the grip's width at the lead and a 24px track under the list's trailing rocker. */
 .fabricate-manager .manager-environment-comp-head.has-rank-controls {
   grid-template-columns: var(--fab-env-comp-lead-ranked) var(--fab-env-comp-grid) 24px;
+}
+
+.fabricate-manager .manager-environment-comp:has(.has-rank-controls) .manager-environment-comp-row {
+  grid-template-columns: var(--fab-env-comp-lead-ranked) var(--fab-env-comp-grid);
+}
+
+.fabricate-manager .manager-environment-comp-disclosure {
+  justify-self: end;
 }
 
 /* The record's own cells, on the same template the strip reads, so a label sits over the column it names. The list owns everything outside them. */
@@ -15609,11 +15636,17 @@
   align-items: flex-start;
 }
 
+.fabricate-manager .manager-environment-node-count-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
 .fabricate-manager .manager-environment-override-body .manager-environment-drop-adjustment-heading {
   margin: 0;
 }
 
-/* A row is wider than the rail these cards came from, so they tile rather than stack. */
+/* The row is wide enough to tile the adjustment cards. */
 .fabricate-manager .manager-environment-override-body .manager-environment-drop-adjustment-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));

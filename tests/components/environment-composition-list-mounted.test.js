@@ -190,6 +190,7 @@ const adjustment = (row) =>
 const clearButton = (row) =>
   `[data-drop-rate-adjustment="${row}"] .manager-environment-drop-adjustment-clear`;
 const EVENT_INPUT = '[data-drop-rate-adjustment-input]';
+const BODIES = '.manager-environment-comp-body, .fabricate-sortable-list-body';
 const EVENT_CLEAR = '.manager-environment-drop-adjustment-clear';
 
 /** A writer step: type into, blur, key or click the control `selector` names inside the body. */
@@ -200,10 +201,12 @@ const typed =
     element.value = value;
     element.dispatchEvent(new Event(type, { bubbles: true }));
   };
-const keyed = (selector, key) => (body) =>
-  body
-    .querySelector(selector)
-    .dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+/** Returns the key event, so a row can assert the input took it from Foundry's keybindings. */
+const keyed = (selector, key) => (body) => {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+  body.querySelector(selector).dispatchEvent(event);
+  return event;
+};
 const clicked = (selector) => (body) => body.querySelector(selector).click();
 
 const taskAdjusted = (id, own) => ({
@@ -216,6 +219,14 @@ const WRITERS = [
     'nodeRuntime, seeded from the config',
     'task',
     typed((id) => `[data-node-count-input="${id}"]`, '2'),
+    (id) => ({
+      nodeRuntime: { ...SIBLINGS.nodeRuntime, [id]: { enabled: true, max: 5, current: 2 } },
+    }),
+  ],
+  [
+    'nodeRuntime, a typed fraction kept whole',
+    'task',
+    typed((id) => `[data-node-count-input="${id}"]`, '2.5'),
     (id) => ({
       nodeRuntime: { ...SIBLINGS.nodeRuntime, [id]: { enabled: true, max: 5, current: 2 } },
     }),
@@ -888,11 +899,95 @@ describe('CompositionList mounted layout', () => {
             1,
             'one row is open at a time'
           );
+          let shown = 0;
+          for (const body of target.querySelectorAll(BODIES)) {
+            if (!body.hidden) {
+              shown += 1;
+              continue;
+            }
+            assert.ok(body.inert, `${body.id} is closed, hidden and inert`);
+            assert.ok(
+              !body.querySelector('[data-composition-override-body]'),
+              `${body.id} mounts no editor while closed`
+            );
+          }
+          assert.equal(shown, 1, `${id}: one body shows`);
         }
         unmount(mounted);
         mounted = null;
         target.remove();
       }
+    });
+
+    it('closes the open row when another row is selected, and keeps it when its own is', async () => {
+      const selected = [];
+      await renderComposition({
+        mode: 'automatic',
+        onSelect: (_kind, id) => {
+          selected.push(id);
+        },
+      });
+      const expanded = () => target.querySelectorAll('.fab-row-disclosure[aria-expanded="true"]');
+      const select = (id) => {
+        target.querySelector(`[data-record-id="${id}"] [data-action="select"]`).click();
+        flushSync();
+      };
+      for (const open of ['included', 'excluded-matching']) {
+        openRow(open);
+        select(open);
+        assert.equal(expanded().length, 1, `selecting ${open} keeps its own row open`);
+        select('nonmatching');
+        assert.equal(selected.at(-1), 'nonmatching');
+        assert.equal(expanded().length, 0, `selecting another row closes ${open}`);
+      }
+    });
+
+    it('clears a drop row back to its input, and names each row`s controls by the row', async () => {
+      await renderComposition({
+        mode: 'automatic',
+        records: [overrideRecord('task', 'kept', 'explicitlyIncluded', true)],
+        environment: environmentFor('task', 'kept', true, STORED),
+      });
+      const body = openRow('kept');
+      const input = body.querySelector(adjustment('drop-a'));
+      const clear = body.querySelector(clearButton('drop-a'));
+      assert.equal(
+        input.getAttribute('aria-label'),
+        'drop-a: Drop-rate adjustment (-100% to +100%)'
+      );
+      assert.equal(clear.getAttribute('aria-label'), 'Clear drop-a');
+      clear.focus();
+      clear.click();
+      flushSync();
+      assert.ok(document.activeElement === input, 'focus lands on the cleared row`s input');
+      const toggle = body.querySelector('[data-task-drop-rate-adjustments-toggle]');
+      assert.equal(toggle.getAttribute('aria-label'), 'Apply drop-rate adjustments');
+    });
+
+    it('holds ArrowUp at +100, inside the row', async () => {
+      const patches = [];
+      const capped = overrideRecord('task', 'kept', 'explicitlyIncluded', true);
+      capped.dropRateAdjustmentRows[0].adjustment = 100;
+      await renderComposition({
+        mode: 'automatic',
+        records: [capped],
+        environment: environmentFor('task', 'kept', true, { ...STORED, 'drop-a': 100 }),
+        onUpdateEnvironment: (patch) => {
+          patches.push(patch);
+        },
+      });
+      const body = openRow('kept');
+      let leaked = false;
+      const foundry = () => {
+        leaked = true;
+      };
+      document.addEventListener('keydown', foundry);
+      const event = keyed(adjustment('drop-a'), 'ArrowUp')(body);
+      document.removeEventListener('keydown', foundry);
+      flushSync();
+      assert.ok(event.defaultPrevented && !leaked, 'the key never reaches Foundry');
+      assert.deepEqual(patches, [taskAdjusted('kept', { ...STORED, 'drop-a': 100 })]);
+      assert.equal(body.querySelector(adjustment('drop-a')).value, '+100');
     });
 
     for (const [name, kind, act, expected, enabled = true, stored = STORED] of WRITERS) {
@@ -914,9 +1009,12 @@ describe('CompositionList mounted layout', () => {
               patches.push(patch);
             },
           });
-          act(openRow(id), id);
+          const event = act(openRow(id), id);
           flushSync();
-          assert.deepEqual(patches.at(-1), expected(id), `${state}: ${name}`);
+          assert.deepEqual(patches, [expected(id)], `${state}: ${name}, in one patch`);
+          if (event instanceof KeyboardEvent) {
+            assert.ok(event.defaultPrevented, `${state}: ${name} keeps the key from Foundry`);
+          }
           unmount(mounted);
           mounted = null;
           target.remove();

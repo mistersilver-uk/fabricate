@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize, viewScene } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import Chip from '../../../components/Chip.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { countReadiness, evaluateEnvironmentReadiness } from './environmentReadiness.js';
@@ -30,7 +31,11 @@
   const sceneUuid = $derived(String(environment?.sceneUuid || ''));
   // Read-only (issue 1522): the link is authored on the Overview tab's Linked scene card.
   const scene = linkedScene(() => sceneUuid);
-  const sceneLabel = $derived(scene.name || sceneUuid);
+  const sceneLabel = $derived(
+    scene.missing
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneNotFound', 'Scene not found')
+      : scene.name || sceneUuid
+  );
 </script>
 
 <InspectorCard data-environment-summary-inspector="">
@@ -78,11 +83,17 @@
       {/if}
       <button
         type="button"
-        class="manager-environment-scene-name"
+        class="manager-environment-scene-name is-route"
         data-rail-route-out
         onclick={() => viewScene(sceneUuid)}
         title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.OpenScene', 'Open scene')}
-        >{sceneLabel}</button
+        aria-label={localizeOr(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.OpenSceneNamed',
+          'Open scene: {name}',
+          { name: sceneLabel }
+        )}
+        ><span>{sceneLabel}</span>
+        <i class="fas fa-up-right-from-square" aria-hidden="true"></i></button
       >
     </div>
   {:else}

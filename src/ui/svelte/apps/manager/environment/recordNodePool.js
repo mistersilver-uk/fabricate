@@ -1,8 +1,9 @@
 /**
- * A task's per-environment resource-node pool, merged as `GatheringNodeService._mergeNodeConfigState`
- * merges it: the library config owns the capacity, and the environment's runtime entry contributes
- * only the live count, clamped to that capacity. Events have no nodes. Read by the rail's read-only
- * count and by a composition row's node Stepper, so the two cannot disagree (issue 1522).
+ * A task's per-environment resource-node pool. A stored pool is merged as
+ * `GatheringNodeService._mergeNodeConfigState` merges it: the library config owns the capacity and
+ * the stored entry only the live count, clamped to it. An unstored pool reads the config's
+ * `current`. Events have no nodes. Read by the rail's read-only count and by a composition row's
+ * node Stepper, so the two cannot disagree (issue 1522).
  */
 export function recordNodePool(kind, entry, environment) {
   const config = kind === 'task' ? entry?.record?.nodes || null : null;
