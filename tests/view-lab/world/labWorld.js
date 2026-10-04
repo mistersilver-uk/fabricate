@@ -211,6 +211,13 @@ const routedCheck = (evaluation) => ({
   evaluation,
 });
 
+/** Herbalism's progressive check without its formula: a system blocker (issue 1522). */
+function blockHerbalism(content) {
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
+  const check = system.craftingCheck;
+  system.craftingCheck = { ...check, progressive: { ...check.progressive, rollFormula: '' } };
+}
+
 function seedCheckOverride(content, state) {
   const spec = CHECK_OVERRIDE_STATES[state];
   if (!spec) return;
@@ -493,6 +500,7 @@ export async function buildLabWorld({
   checkPreviewState = null,
   resultRowState = null,
   learnableBook = false,
+  systemBlocked = false,
 } = {}) {
   const content = buildLabContent({ journalCaseState });
   if (
@@ -505,6 +513,7 @@ export async function buildLabWorld({
   seedResultRowState(content, resultRowState);
   seedRuneworkCheckMode(content, runeworkCheckMode);
   seedCheckOverride(content, checkOverride);
+  if (systemBlocked) blockHerbalism(content);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.

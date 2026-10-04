@@ -114,9 +114,8 @@
     {@render modeCallout?.()}
   </div>
 
-  {#if collapsed}
-    <!-- The heading block's note says why there is nothing to author here. -->
-  {:else if isMultiStep}
+  <!-- A collapsed chain authors nothing here; the heading block's note says why. -->
+  {#if isMultiStep && !collapsed}
     {#if steps.length === 0}
       <p class="manager-muted">
         {text(
@@ -142,7 +141,7 @@
         {/snippet}
       </RecipeStepAccordion>
     {/if}
-  {:else}
+  {:else if !collapsed}
     <RecipeIngredientsSection
       {ingredientSets}
       {canAddSet}

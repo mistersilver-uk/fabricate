@@ -567,7 +567,7 @@ export const CASES = Object.freeze([
     // The three complication components are claimed by the four complication and stage-strip cases below (issue 1286).
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
-  // Issue 1522: the refused save's blocking notice, first in the tab panel.
+  // Issue 1522: the refused save's blocking notice, a row of the entry column above the scroller.
   managerCase({
     id: 'manager-component-edit-save-failed',
     label: 'Manager — Component edit save failed',
@@ -582,8 +582,8 @@ export const CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     expectSelector:
-      '.fabricate-manager [data-component-edit-panel] > [data-notice-position][role="alert"]',
-    expectCenterHit: '[data-component-edit-panel] > [data-notice-position]',
+      '.fabricate-manager #manager-component-edit-form > [data-notice-position] > [role="alert"]',
+    expectCenterHit: '#manager-component-edit-form > [data-notice-position] > [role="alert"]',
     kinds: ['manager', 'components'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),

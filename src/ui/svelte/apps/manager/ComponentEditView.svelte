@@ -1213,10 +1213,8 @@
     class="manager-component-edit-view manager-component-entry-column"
     onsubmit={handleSave}
   >
-    <!--
-      THE TWO-TAB STRIP lives INSIDE the form: the header's Save submits this element by id, so a
-      form mounted only on the rules tab would stop being submittable on the Validation tab.
-    -->
+    <!-- The tab strip lives inside the form: the header's Save submits it by id, so a form mounted
+         only on the rules tab would stop being submittable on the Validation tab. -->
     <EditorTabs
       {tabs}
       {activeTab}
@@ -1229,10 +1227,23 @@
       badgeDataAttr="data-component-edit-tab-badge"
     />
 
-    <!--
-      THE SCROLLING PANEL (M26): the strip stays put and the tab body scrolls under it, carrying the
-      inset. It is also the tab panel the strip's `aria-controls` names.
-    -->
+    <!-- The page notice position: a row of the column above the scroller, so it stays in view. -->
+    {#if saveFailed}
+      <div class="manager-component-entry-notices" data-notice-position="page">
+        <Notice
+          blocking
+          tone="danger"
+          title={text('FABRICATE.Admin.Manager.Component.SaveFailed', 'Save failed')}
+          detail={text(
+            'FABRICATE.Admin.Manager.Component.SaveFailedDetail',
+            'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+          )}
+        />
+      </div>
+    {/if}
+
+    <!-- The scrolling panel (M26): the tab body scrolls under the strip, carrying the inset, and is
+         the tab panel the strip's `aria-controls` names. -->
     <div
       class="manager-component-entry-panel"
       data-component-edit-panel={activeTab}
@@ -1242,17 +1253,6 @@
       tabindex="-1"
       data-keyboard-focus="true"
     >
-      {#if saveFailed}
-        <Notice
-          blocking
-          tone="danger"
-          data-notice-position="page"
-          title={text(
-            'FABRICATE.Admin.Manager.Component.SaveFailed',
-            'Save failed. Try again or refresh the manager.'
-          )}
-        />
-      {/if}
       {#if activeTab === 'rules'}
         <!-- The rules tab's heading block; see `ComponentIdentityStrip` for its two smoke hooks. -->
         <ComponentIdentityStrip

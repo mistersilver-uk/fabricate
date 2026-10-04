@@ -13736,6 +13736,11 @@
   gap: var(--fab-space-4);
 }
 
+/* The page notice position, first in the panel, keeps the tab stack's own gap to the card below (issue 1522). */
+.fabricate-manager .manager-tool-editor-notices {
+  margin-bottom: var(--fab-space-4);
+}
+
 .fabricate-manager .manager-tool-editor-card,
 .fabricate-manager .manager-tool-repair {
   display: flex;
@@ -15269,6 +15274,14 @@
   padding-right: var(--fab-space-3);
 }
 
+/* The notice position above that scroller keeps its inline-end inset, gutter included, so a notice lines up with the cards below it (issue 1522). */
+.fabricate-manager .manager-editor-notice-position {
+  flex: none;
+  overflow: hidden;
+  scrollbar-gutter: stable;
+  padding-right: var(--fab-space-3);
+}
+
 /* Recipe editor header identity block (issue 643): medallion + name + the "<category> · <mode>" subline. */
 .fabricate-manager .manager-recipe-edit-heading {
   display: flex;
@@ -15474,23 +15487,6 @@
 
 .fabricate-manager .manager-system-overview-blocker {
   border-left-color: var(--fab-danger);
-}
-
-.fabricate-manager .manager-system-edit-blocker {
-  align-items: center;
-  border-left-color: var(--fab-danger);
-}
-
-.fabricate-manager .manager-system-edit-blocker-copy {
-  display: flex;
-  flex: 1 1 auto;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-}
-
-.fabricate-manager .manager-system-edit-blocker-link {
-  flex: 0 0 auto;
 }
 
 /* Composition table */
@@ -19051,6 +19047,12 @@
 .fabricate-manager .manager-component-entry-column > .manager-editor-tabs .manager-editor-tab-button {
   font-size: 12px;
   font-weight: 600;
+}
+
+/* The page notice position, a row of the column above the scroller, inset as the scroller insets its cards (issue 1522). */
+.fabricate-manager .manager-component-entry-notices {
+  flex: none;
+  padding: var(--fab-space-4) var(--fab-space-3) 0;
 }
 
 /* THE SCROLLER. `padding-bottom: 40px` is the reference's own value and is a documented literal exemption from the spacing scale (`ui-integration`: one-off fixed dimensions in the 34-42px range), because it is breathing room under the last card rather than a rhythm step (issue 1371). */

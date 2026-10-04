@@ -26,7 +26,7 @@
     resolutionModeOptions.find((entry) => entry.value === mode) || resolutionModeOptions[0]
   );
   const kicker = $derived(
-    text('FABRICATE.Admin.Manager.Recipe.ModeCallout.Kicker', 'Resolution mode')
+    text('FABRICATE.Admin.Manager.Recipe.ModeCallout.Kicker', 'System resolution mode')
   );
 </script>
 

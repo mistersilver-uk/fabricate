@@ -144,6 +144,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',
+    // The failed-save notice at the editor's notice position (issue 1522).
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/ToolEditView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -2261,10 +2263,13 @@ describe('Tool Studio editor (mounted)', () => {
     assert.match(blockers, /Repair group 3 is incomplete/);
     assert.match(blockers, /Some Tool settings are incomplete/);
     assert.doesNotMatch(blockers, /componentId|repairRequirements|unexpected internal/);
-    assert.equal(
-      root.querySelector('[data-tool-save-error]').textContent,
-      'The Tool could not be saved. Try again.'
+    // The failed save is the editor's blocking notice at its notice position (issue 1522).
+    const saveFailed = root.querySelector(
+      ':scope [data-notice-position="page"] > [data-tool-save-error]'
     );
+    assert.equal(saveFailed?.getAttribute('role'), 'alert');
+    assert.equal(saveFailed.querySelector('.fab-notice-title').textContent, 'Save failed');
+    assert.doesNotMatch(saveFailed.textContent, /database adapter/);
     assert.equal(
       root.querySelector('[data-tool-editor-save]').getAttribute('title'),
       'Resolve validation issues before saving.'

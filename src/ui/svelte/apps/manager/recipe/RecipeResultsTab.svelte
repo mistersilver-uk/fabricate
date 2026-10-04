@@ -156,8 +156,8 @@
     />
 
     <!-- The strip sits directly above the list it describes, as an info strip precedes its cards:
-         it states an INVARIANT — the award mechanic holds whatever the toggle says — where the card
-         above states a CONDITIONAL. NEUTRAL, because the info tint is reserved for live state. -->
+         it states an invariant — the award mechanic holds whatever the toggle says — where the card
+         above states a conditional. Neutral, because the info tint is reserved for live state. -->
     <Callout
       tone="neutral"
       icon="fas fa-dice-d20"

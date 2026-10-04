@@ -544,12 +544,9 @@
     in the View Lab, every click on a visible, enabled tab button was intercepted by the form. The
     wrapper keeps the grid at two children whatever this head grows to carry.
   -->
-  <!--
-    THE ROW ACTION'S LIVE REGION (issue 1517): a row action unmounts the validation panel in the
-    update that was meant to announce, so the `aria-live` element is ALWAYS in the DOM, outside the
-    `{#if activeTab}` chain, with its own `{#if}` inside it. As `.visually-hidden` is
-    `position: absolute` it takes no grid track, and its `data-` hook joins no pinned class family.
-  -->
+  <!-- The row action's live region (issue 1517): a row action unmounts the validation panel in
+       the update meant to announce, so this stays in the DOM outside the tab chain with its own
+       `{#if}`, out of flow (no grid track) and hooked by `data-` (no pinned class family). -->
   <div class="visually-hidden" role="status" aria-live="polite" data-essence-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
   </div>
@@ -570,13 +567,19 @@
         blocking
         tone="danger"
         data-notice-position="page"
-        title={text(
-          'FABRICATE.Admin.Manager.Essence.SaveFailed',
-          'Save failed. Check for duplicate or blank names and try again.'
-        )}
+        title={text('FABRICATE.Admin.Manager.Essence.SaveFailed', 'Save failed')}
+        detail={rulesMode
+          ? text(
+              'FABRICATE.Admin.Manager.Essence.SaveFailedDetail',
+              'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Essence.SaveFailedNameDetail',
+              'Nothing was saved. Another essence in this system may already have this name; rename it and try again.'
+            )}
       />
     {/if}
-    <!-- BOUND: the ROUTE-ONLY validation row's focus destination (issue 1517). -->
+    <!-- Bound: the route-only validation row's focus destination (issue 1517). -->
     <div
       class="manager-essence-tab-panel"
       id={`essence-panel-${activeTab}`}

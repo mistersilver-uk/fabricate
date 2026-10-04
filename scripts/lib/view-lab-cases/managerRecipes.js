@@ -637,6 +637,29 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
     ],
   }),
+  // Issue 1522: the refused save's blocking notice, at the editor's notice position.
+  managerCase({
+    id: 'manager-recipe-item-save-failed',
+    label: 'Manager — Recipe item save failed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism', saveFails: '1' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-enabled]' },
+      { selector: '[data-recipe-item-save]' },
+    ],
+    expectView: 'recipe-item-edit',
+    expectSelector:
+      '[data-recipe-item-editor] [data-notice-position] > [data-recipe-item-save-error]',
+    expectCenterHit: '[data-notice-position] > [data-recipe-item-save-error]',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(BooksScrollsView|RecipeItemEditor)\.svelte$/,
+    ],
+  }),
   managerCase({
     id: 'manager-recipe-item-contents',
     label: 'Manager — Recipe item contents',

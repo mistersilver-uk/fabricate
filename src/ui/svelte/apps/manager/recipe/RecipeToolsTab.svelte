@@ -92,9 +92,8 @@
     {@render modeCallout?.()}
   </div>
 
-  {#if collapsed}
-    <!-- The heading block's note says why there is nothing to author here. -->
-  {:else if isMultiStep && steps.length > 0}
+  <!-- A collapsed chain authors nothing here; the heading block's note says why. -->
+  {#if isMultiStep && steps.length > 0 && !collapsed}
     <!-- The recipe-level tools are GLOBAL — required for every step (§D2). -->
     <div class="manager-recipe-tools-global" data-recipe-tools-global>
       <div class="manager-recipe-tools-global-head">
@@ -165,7 +164,7 @@
         {/each}
       {/snippet}
     </RecipeStepAccordion>
-  {:else}
+  {:else if !collapsed}
     <RecipeToolsSection
       {toolIds}
       {toolsLibrary}

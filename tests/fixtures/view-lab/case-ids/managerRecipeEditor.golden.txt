@@ -36,6 +36,8 @@ manager-recipe-edit-results-rolled-narrow
 manager-recipe-edit-results-suggestions
 manager-multistep-disable-confirm
 manager-recipe-edit-collapsed
+manager-recipe-edit-ingredients-collapsed
+manager-recipe-edit-results-collapsed
 manager-recipe-edit-results-progressive
 manager-recipe-edit-results-alchemy
 manager-recipe-edit-access-rail

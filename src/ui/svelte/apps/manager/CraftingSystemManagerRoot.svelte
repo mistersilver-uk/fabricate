@@ -4927,7 +4927,6 @@
     {recipeItemDraft}
     {recipeItemEditDirty}
     {recipeItemEditSaving}
-    {recipeItemSaveFailed}
     {canSaveRecipeItemEdit}
     {deleteRecipeItemFromEdit}
     {saveRecipeItemDraft}
@@ -5781,6 +5780,7 @@
         characterPrerequisites={selectedCharacterPrerequisites}
         visibilityMode={craftingVisibilityMode}
         activeTab={recipeItemActiveTab}
+        saveFailed={recipeItemSaveFailed}
         onSelectTab={(tab) => (recipeItemActiveTab = tab)}
         onPatch={(patch) => patchRecipeItemDraft(patch)}
         onLinkItem={(uuid) => linkRecipeItemSource(uuid)}

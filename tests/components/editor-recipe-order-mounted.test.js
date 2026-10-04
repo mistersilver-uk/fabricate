@@ -1,7 +1,7 @@
 /**
  * The EDITOR recipe's gap rule and action pair, mounted (issue 1522): between the tab bar and the
- * first card sit only the notices and then the tab's heading block, and every editor header puts
- * Back before Save with Save last.
+ * first card sit only the notices and then the tab's heading block, on every tab of every editor,
+ * and every editor header puts Back before Save with Save last.
  */
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -34,7 +34,7 @@ let target;
 let store;
 
 const queries = createManagerQueries(() => target);
-const { craftingParent, craftingSubitem, navButton, worldNavItem } = queries;
+const { craftingParent, craftingSubitem, gatheringSubitem, navButton, worldNavItem } = queries;
 const { mountManager, openRecipeEditor } = createManagerMounts({
   queries,
   component: () => Component,
@@ -70,13 +70,28 @@ function mountDirect(component, props) {
   return target;
 }
 
-/** Every `apps/manager` component importing the strip, directly or through a `*EditorTabs` wrapper. */
+const TAB_STRIP = /\/\w*EditorTabs\.svelte$/;
+
+/** A module's static imports and re-exports, read off its program body. */
+const moduleSources = (program) =>
+  program.body.filter((node) => node.source).map((node) => node.source.value);
+
+/** Every source under `root` importing or re-exporting the strip or a `*EditorTabs` wrapper. */
+function stripImporters(root) {
+  return sourceAstEntriesUnder(root)
+    .filter(([path]) => !path.endsWith('EditorTabs.svelte'))
+    .filter(([path, ast]) =>
+      (path.endsWith('.svelte') ? importedModules(ast) : moduleSources(ast)).some((name) =>
+        TAB_STRIP.test(name)
+      )
+    )
+    .map(([path]) => path);
+}
+
+/** Every `apps/manager` component importing the strip, less the stated exemptions. */
 function derivedEditorSet() {
-  return sourceAstEntriesUnder(MANAGER)
-    .filter(([path]) => path.endsWith('.svelte') && !path.endsWith('EditorTabs.svelte'))
-    .filter(([, ast]) => importedModules(ast).some((name) => /\/\w*EditorTabs\.svelte$/.test(name)))
-    .map(([path]) => path)
-    .filter((path) => !Object.hasOwn(EXEMPT, path))
+  return stripImporters(MANAGER)
+    .filter((path) => path.endsWith('.svelte') && !Object.hasOwn(EXEMPT, path))
     .sort((left, right) => left.localeCompare(right));
 }
 
@@ -126,12 +141,23 @@ async function openEssenceEditor(storeOptions = {}) {
   );
 }
 
+async function openRecipeItemEditor(storeOptions = {}) {
+  mountManager([], {
+    experimentalFeaturesEnabled: true,
+    recipeItemDefinitions: booksScrollsFixtures,
+    ...storeOptions,
+  });
+  await press(craftingParent(), 'the Crafting parent');
+  await press(craftingSubitem('Books & Scrolls'), 'Books & Scrolls');
+  await press(target.querySelector('[data-books-scrolls-edit="ri1"]'), 'the ri1 edit action');
+}
+
 async function openChecks() {
   mountManager([], { alchemyConfig: { checkMode: 'simple' } });
   await press(navButton('Checks'), 'Checks');
 }
 
-async function openToolEditor() {
+async function openToolEditor(storeOptions = {}) {
   mountManager([], {
     gatheringLibraryTools: [
       {
@@ -145,6 +171,7 @@ async function openToolEditor() {
       },
     ],
     toolDraftValidation: { valid: true, errors: [] },
+    ...storeOptions,
   });
   await press(navButton('Gathering'), 'Gathering');
   await press(navButton('Tool Rules'), 'Tool Rules');
@@ -162,12 +189,14 @@ async function pressHeaderSave() {
   );
 }
 
-// One row per editor: how a GM reaches it, the first card of the tab it opens on, and, where the
-// store double can reach one, a run raising the editor's notice and the hook that notice carries.
+// One row per editor: how a GM reaches it, the cards its tabs open on (a tab's first card is the
+// first match in its panel outside the heading block and the notices), and, where the store double
+// can reach one, a run raising the editor's notice, that notice's hook and its position.
+const VALIDATION = '[data-editor-validation-surface]';
 const EDITORS = {
   [`${MANAGER}/RecipeEditView.svelte`]: {
     open: () => openRecipeEditor([]),
-    firstCard: '[data-recipe-tab="overview"] [data-recipe-section="identity"]',
+    cards: `[data-recipe-section], ${VALIDATION}`,
     raise: async () => {
       await openRecipeEditor([], { updateRecipeResult: false });
       setInputValue(
@@ -178,22 +207,24 @@ const EDITORS = {
       await pressHeaderSave();
     },
     notice: '[role="alert"]',
+    position: 'page',
   },
   [`${MANAGER}/RecipeItemEditor.svelte`]: {
-    open: async () => {
-      mountManager([], {
-        experimentalFeaturesEnabled: true,
-        recipeItemDefinitions: booksScrollsFixtures,
-      });
-      await press(craftingParent(), 'the Crafting parent');
-      await press(craftingSubitem('Books & Scrolls'), 'Books & Scrolls');
-      await press(target.querySelector('[data-books-scrolls-edit="ri1"]'), 'the ri1 edit action');
+    open: () => openRecipeItemEditor(),
+    cards:
+      '.manager-recipe-item-field, .manager-recipe-item-contents-head, ' +
+      `[data-recipe-item-limits-card], ${VALIDATION}`,
+    raise: async () => {
+      await openRecipeItemEditor({ saveRecipeItemResult: false });
+      await press(target.querySelector('[data-recipe-item-enabled]'), 'the enabled toggle');
+      await pressHeaderSave();
     },
-    firstCard: '[data-recipe-item-tab="overview"] .manager-recipe-item-field',
+    notice: '[data-recipe-item-save-error][role="alert"]',
+    position: 'page',
   },
   [`${MANAGER}/ComponentEditView.svelte`]: {
     open: () => openComponentEditor(),
-    firstCard: '[data-component-edit-section="category"]',
+    cards: `.manager-component-rules-card, ${VALIDATION}`,
     raise: async () => {
       await openComponentEditor({ updateComponentResult: false });
       await press(
@@ -203,10 +234,11 @@ const EDITORS = {
       await pressHeaderSave();
     },
     notice: '[role="alert"]',
+    position: 'page',
   },
   [`${MANAGER}/EssenceEditView.svelte`]: {
     open: () => openEssenceEditor(),
-    firstCard: '#essence-panel-identity .manager-edit-card',
+    cards: `.manager-edit-card, .fabricate-card, .fabricate-toggle-card, ${VALIDATION}`,
     raise: async () => {
       await openEssenceEditor({ updateEssenceResult: false });
       setInputValue(target.querySelector('#manager-essence-edit-name'), 'Rain');
@@ -214,21 +246,23 @@ const EDITORS = {
       await pressHeaderSave();
     },
     notice: '[role="alert"]',
+    position: 'page',
   },
   // The store double's crafting check has no roll formula, so The roll's non-blocking notice is
   // raised on every run of this route.
   [`${MANAGER}/checks/ChecksView.svelte`]: {
     open: openChecks,
-    firstCard: '[data-checks-panel] .fabricate-card',
+    cards: '[data-checks-panel] .fabricate-card, [data-check-triggers]',
     raise: openChecks,
     notice: '[data-checks-section-notice]',
+    position: 'stack',
   },
   [`${MANAGER}/SystemEditView.svelte`]: {
     open: async () => {
       mountManager();
       await press(navButton('System Overview'), 'System Overview');
     },
-    firstCard: '#system-panel-settings .manager-edit-card',
+    cards: '.manager-edit-card, [data-system-overview]',
     raise: async () => {
       mountManager([], {
         systemValidation: {
@@ -239,24 +273,34 @@ const EDITORS = {
       });
       await press(navButton('System Overview'), 'System Overview');
     },
-    notice: '[data-system-edit-blocker]',
+    notice: '[data-system-edit-blocker][role="status"]',
+    position: 'stack',
   },
   [`${MANAGER}/ToolEditView.svelte`]: {
-    open: openToolEditor,
-    firstCard: '[data-tool-system-scope]',
+    open: () => openToolEditor(),
+    cards: `[data-tool-system-scope], [data-tool-rule-card], ${VALIDATION}`,
+    // A refused save routes to Validation, whose panel states the failure at its head.
+    raise: async () => {
+      await openToolEditor({ saveToolDraftResult: false, toolDraftSaveError: 'save' });
+      setInputValue(target.querySelector('[data-tool-label]'), 'Changed');
+      await settle();
+      await press(target.querySelector('[data-tool-editor-save]'), 'the Tool Save');
+    },
+    notice: '[data-tool-save-error][role="alert"]',
+    position: 'page',
   },
   [`${MANAGER}/scoped/WorldComponentEntryPage.svelte`]: {
     open: () =>
       openScopedEntry('component', { id: 'vial', name: 'Glass Vial' }, 'component-catalogue'),
-    firstCard: '[data-scoped-entry-identity-card]',
+    cards: `.fabricate-card, ${VALIDATION}`,
   },
   [`${MANAGER}/scoped/WorldEssenceEntryPage.svelte`]: {
     open: () => openScopedEntry('essence', { id: 'water', name: 'Water' }, 'essence-catalogue'),
-    firstCard: '[data-scoped-entry-identity="water"]',
+    cards: `[data-scoped-entry-identity], ${VALIDATION}`,
   },
   [`${MANAGER}/scoped/WorldToolEntryPage.svelte`]: {
     open: () => openScopedEntry('tool', { id: 'pick', name: 'Mining Pick' }, 'tool-catalogue'),
-    firstCard: '[data-world-tool-entry-card]',
+    cards: `.manager-world-tool-entry-card, [data-world-tool-entry-card], ${VALIDATION}`,
   },
 };
 
@@ -274,13 +318,12 @@ function describeElement(element) {
 }
 
 /**
- * Every maximal element between the tab bar nearest above the first card and that card. Order and
- * containment are read off the hand walk's preorder: happy-dom proxies a `<form>`, so its
- * descendants' `parentElement`, `contains` and `compareDocumentPosition` misread it.
+ * Every maximal element between the tab bar nearest above the first card and that card, less any
+ * that renders nothing. Order and containment are read off the hand walk's preorder: happy-dom
+ * proxies a `<form>`, so its descendants' `parentElement`, `contains` and
+ * `compareDocumentPosition` misread it.
  */
-function gapOf(host, firstCardSelector) {
-  const firstCard = host.querySelector(firstCardSelector);
-  assert.ok(Boolean(firstCard), `the first card ${firstCardSelector} did not render`);
+function gapOf(host, firstCard) {
   const ordered = elementsUnder(host);
   const position = new Map(ordered.map((element, index) => [element, index]));
   const last = new Map(
@@ -300,40 +343,104 @@ function gapOf(host, firstCardSelector) {
   const parentOf = new Map(
     ordered.flatMap((element) => [...element.children].map((child) => [child, element]))
   );
-  return ordered.filter((element) => between(element) && !between(parentOf.get(element)));
+  return ordered.filter(
+    (element) =>
+      between(element) &&
+      !between(parentOf.get(element)) &&
+      (element.children.length > 0 || element.textContent.trim() !== '')
+  );
 }
 
+/** A notice carrying its position, or a position wrapping nothing but notices. */
 const isNotice = (element) =>
-  element.hasAttribute('data-notice-position') || element.classList.contains('fab-notice');
+  element.matches('.fab-notice[data-notice-position]') ||
+  (element.matches('[data-notice-position]') &&
+    element.children.length > 0 &&
+    [...element.children].every((child) => child.matches('.fab-notice')));
+
+const isHeading = (element) => element.hasAttribute('data-tab-heading');
+
+const CALLOUT = '.manager-callout, .manager-checks-mode-callout, .manager-environment-comp-callout';
+const NOTICE_LIKE = '.fab-notice, [data-notice-position], [role="alert"], [role="status"]';
 
 /** The gap rule, element by element, naming what it found when it fails. */
-function assertGapRule(host, firstCardSelector) {
-  const maximal = gapOf(host, firstCardSelector);
+function assertGapRule(host, firstCard) {
+  const card = typeof firstCard === 'string' ? host.querySelector(firstCard) : firstCard;
+  assert.ok(Boolean(card), `the first card ${firstCard} did not render`);
+  const maximal = gapOf(host, card);
   const found = `found\n  ${maximal.map(describeElement).join('\n  ')}`;
-  const headings = maximal.filter((element) => element.hasAttribute('data-tab-heading'));
+  const headings = maximal.filter(isHeading);
+  const positions = maximal.filter(isNotice).map((notice) => notice.dataset.noticePosition);
   assert.ok(
-    maximal.every((element) => isNotice(element) || element.hasAttribute('data-tab-heading')),
+    maximal.every((element) => isNotice(element) || isHeading(element)),
     `only notices and the heading block sit above the first card; ${found}`
   );
   assert.ok(headings.length <= 1, `one heading block at most; ${found}`);
-  assert.ok(
-    headings.every((heading) => heading.querySelectorAll('.manager-callout').length <= 1),
-    `the heading block holds one callout at most; ${found}`
-  );
+  for (const heading of headings) {
+    assert.ok(
+      heading.querySelectorAll(CALLOUT).length <= 1,
+      `the heading block holds one callout at most; ${found}`
+    );
+    assert.ok(!heading.querySelector(NOTICE_LIKE), `no notice inside the heading block; ${found}`);
+  }
   assert.ok(
     headings.length === 0 || maximal.findLastIndex(isNotice) < maximal.indexOf(headings[0]),
     `the notices precede the heading block; ${found}`
   );
+  assert.ok(
+    !positions.includes('stack') || positions.lastIndexOf('page') < positions.indexOf('stack'),
+    `the page notice precedes the stacking region; ${found}`
+  );
   return maximal;
 }
 
-/** The raised notice, asserted to sit at its editor's notice position. */
-function assertNoticeAtPosition(host, firstCardSelector, notice) {
-  const positioned = assertGapRule(host, firstCardSelector).filter(isNotice);
-  assert.ok(
-    positioned.some((element) => element.matches(notice) || element.querySelector(notice)),
-    `${notice} renders at the notice position`
+/** The selected tab of the last tab bar whose selection names a rendered panel, and that panel. */
+function activeTab(host) {
+  const panelOf = (tab) => host.querySelector(`[role="tabpanel"][aria-labelledby="${tab.id}"]`);
+  const active = elementsUnder(host)
+    .filter((element) => element.getAttribute('role') === 'tablist')
+    .map((tabs) => ({ tabs, tab: tabs.querySelector('[role="tab"][aria-selected="true"]') }))
+    .findLast(({ tab }) => tab && panelOf(tab));
+  assert.ok(Boolean(active), 'no selected tab names a rendered panel');
+  return { ...active, panel: panelOf(active.tab) };
+}
+
+/** The first of `cards` in the active panel, outside its heading block and its notices. */
+function firstCardOf(host, cards) {
+  const { tab, panel } = activeTab(host);
+  const shielded = new Set(
+    elementsUnder(panel).flatMap((element) =>
+      isHeading(element) || element.matches('[data-notice-position]')
+        ? [element, ...elementsUnder(element)]
+        : []
+    )
   );
+  const card = elementsUnder(panel).find(
+    (element) => element.matches(cards) && !shielded.has(element)
+  );
+  assert.ok(Boolean(card), `${tab.id} renders none of ${cards}`);
+  return card;
+}
+
+/** Open every tab of the editor's strip in turn, asserting the gap rule on each. */
+async function assertGapRuleOnEveryTab(host, cards) {
+  const count = activeTab(host).tabs.querySelectorAll('[role="tab"]').length;
+  assert.ok(count >= 2, 'the editor offers more than one tab');
+  for (let index = 0; index < count; index += 1) {
+    const tab = activeTab(host).tabs.querySelectorAll('[role="tab"]')[index];
+    await press(tab, `tab ${index}`);
+    assert.equal(activeTab(host).tab.id, tab.id, `${tab.id} opens its panel`);
+    assertGapRule(host, firstCardOf(host, cards));
+  }
+}
+
+/** The raised notice, asserted to sit at its editor's notice position, in the named one. */
+function assertNoticeAtPosition(host, cards, notice, where) {
+  const raised = assertGapRule(host, firstCardOf(host, cards))
+    .filter(isNotice)
+    .find((element) => element.matches(notice) || element.querySelector(notice));
+  assert.ok(Boolean(raised), `${notice} renders at the notice position`);
+  assert.equal(raised.dataset.noticePosition, where, `${notice} takes the ${where} position`);
 }
 
 const RECIPE = Object.freeze({
@@ -344,6 +451,7 @@ const RECIPE = Object.freeze({
 });
 
 const RECIPE_TABS = Object.freeze(['overview', 'ingredients', 'results', 'tools']);
+const RECIPE_CARDS = EDITORS[`${MANAGER}/RecipeEditView.svelte`].cards;
 
 /** Mount the recipe editor on its own, with every tab the strip can offer. */
 function mountRecipeEditor(RecipeEditView, props = {}) {
@@ -398,22 +506,46 @@ describe('the EDITOR recipe (issue 1522)', () => {
     );
   });
 
+  it('exempts only importers of the strip, and no module re-exports it', () => {
+    const importers = stripImporters(MANAGER);
+    for (const path of Object.keys(EXEMPT)) {
+      assert.ok(importers.includes(path), `${path} no longer imports the strip; drop it`);
+    }
+    assert.deepEqual(
+      stripImporters('src/ui/svelte').filter((path) => !path.endsWith('.svelte')),
+      [],
+      'a module re-exporting the strip hides its importers from the derivation'
+    );
+  });
+
+  it('still fails the environment editor, so P2 has to retire its exemption', async () => {
+    mountManager();
+    await press(navButton('Gathering'), 'Gathering');
+    await press(gatheringSubitem('Environments'), 'Environments');
+    await press(target.querySelector('[aria-label="Edit Quiet Cavern"]'), 'the cavern editor');
+    await press(target.querySelector('#environment-tab-tasks'), 'the Tasks tab');
+    assert.throws(
+      () => assertGapRule(target, firstCardOf(target, '.manager-environment-comp')),
+      /only notices and the heading block/
+    );
+  });
+
   for (const [file, editor] of Object.entries(EDITORS)) {
-    it(`${file}: only notices and the heading block sit above the first card`, async () => {
+    it(`${file}: only notices and the heading block sit above every tab's first card`, async () => {
       await editor.open();
-      assertGapRule(target, editor.firstCard);
+      await assertGapRuleOnEveryTab(target, editor.cards);
     });
 
     if (editor.raise) {
-      it(`${file}: and its notice renders at the notice position`, async () => {
+      it(`${file}: and its notice renders at its notice position`, async () => {
         await editor.raise();
-        assertNoticeAtPosition(target, editor.firstCard, editor.notice);
+        assertNoticeAtPosition(target, editor.cards, editor.notice, editor.position);
       });
     }
   }
 
-  it('the essence editor`s world rules tab heads its cards with the shared definition', async () => {
-    mountManager();
+  async function openEssenceRules(storeOptions = {}) {
+    mountManager([], storeOptions);
     store.viewState.update((state) => ({
       ...state,
       worldScope: { ...state.worldScope, essence: worldScopeLeg([{ id: 'water', name: 'Water' }]) },
@@ -424,14 +556,33 @@ describe('the EDITOR recipe (issue 1522)', () => {
       target.querySelector(':scope [data-essence-id="water"] [data-essence-edit="water"]'),
       'the water edit action'
     );
+  }
+
+  it('the essence editor`s world rules tabs head their cards with the shared definition', async () => {
+    await openEssenceRules();
     const [heading] = assertGapRule(target, '[data-recipe-section="enabled"]');
     assert.ok(heading?.hasAttribute('data-scoped-shared-definition'), 'the heading is the record');
+    await assertGapRuleOnEveryTab(target, EDITORS[`${MANAGER}/EssenceEditView.svelte`].cards);
+  });
+
+  it('the essence save-failed notice offers name advice only where the name is editable', async () => {
+    const detail = () =>
+      target.querySelector(':scope [role="alert"] .fab-notice-detail')?.textContent;
+    await EDITORS[`${MANAGER}/EssenceEditView.svelte`].raise();
+    assert.match(detail(), /already have this name/, 'the three-tab editor refuses duplicates');
+    unmount(mounted);
+    target.remove();
+    await openEssenceRules({ updateEssenceResult: false });
+    await press(target.querySelector('[data-recipe-field="essence-enabled"]'), 'Enabled');
+    await pressHeaderSave();
+    assert.ok(Boolean(detail()), 'the rules screen raises its notice');
+    assert.doesNotMatch(detail(), /name/, 'the rules screen edits no name');
   });
 
   it('the recipe save-failed notice stays at the notice position on another tab', async () => {
     await EDITORS[`${MANAGER}/RecipeEditView.svelte`].raise();
     await press(target.querySelector('[data-recipe-tab-button="ingredients"]'), 'Ingredients');
-    assertNoticeAtPosition(target, recipeFirstCard('ingredients'), '[role="alert"]');
+    assertNoticeAtPosition(target, RECIPE_CARDS, '[role="alert"]', 'page');
   });
 
   it('the mode callout heads exactly the tabs the mode shapes, in their heading blocks', () => {
@@ -446,6 +597,7 @@ describe('the EDITOR recipe (issue 1522)', () => {
     }
     for (const tab of ['access', 'books-scrolls', 'validation']) {
       openRecipeTab(tab);
+      assertGapRule(target, firstCardOf(target, RECIPE_CARDS));
       assert.ok(!target.querySelector('[data-recipe-mode-callout]'), `${tab} carries no callout`);
     }
   });

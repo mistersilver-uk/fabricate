@@ -559,10 +559,10 @@
         data-keyboard-focus="true"
       >
         {#if activeTab === 'definition'}
-          <!-- TWO COLUMNS, AND THE RIGHT ONE IS THE PLAYER PREVIEW (`essEntry.png`). -->
+          <!-- Two columns, and the right one is the player preview (`essEntry.png`). -->
           <div class="manager-scoped-entry-body">
             <div class="manager-scoped-entry-main">
-              <!-- THE SCOPE BANNER, the tab's heading block: one record shared by every system. A
+              <!-- The scope banner, the tab's heading block: one record shared by every system. A
                    heading rather than a `Callout`, because it introduces a region. -->
               <div
                 class="manager-scoped-entry-kicker is-world"

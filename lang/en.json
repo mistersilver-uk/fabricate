@@ -3356,7 +3356,7 @@
             "OffHint": "Players who can see this recipe can craft it."
           },
           "ModeCallout": {
-            "Kicker": "Resolution mode",
+            "Kicker": "System resolution mode",
             "Settings": "System settings",
             "SettingsHint": "Resolution mode is set for the whole crafting system, not per recipe."
           },
@@ -3390,7 +3390,8 @@
           "DiscardDirtyContent": "The current recipe has unsaved changes. Save them and continue, or discard them?",
           "DiscardDirtyConfirm": "Discard changes",
           "DiscardDirtyCancel": "Keep editing",
-          "SaveFailed": "Save failed. Check for duplicate or blank names and try again.",
+          "SaveFailed": "Save failed",
+          "SaveFailedDetail": "Nothing was saved. Try again, or refresh the manager if it keeps failing.",
           "EmptySetup": {
             "Kicker": "Recipe setup",
             "Title": "Set up recipes",
@@ -3708,7 +3709,8 @@
           "Saving": "Saving...",
           "Dirty": "Unsaved",
           "DiscardDirtyContent": "The current component has unsaved changes. Save them and continue, or discard them?",
-          "SaveFailed": "Save failed. Try again or refresh the manager.",
+          "SaveFailed": "Save failed",
+          "SaveFailedDetail": "Nothing was saved. Try again, or refresh the manager if it keeps failing.",
           "Identity": {
             "Title": "Identity",
             "NameLabel": "Name",
@@ -4111,7 +4113,9 @@
           "SaveNamed": "Save {name}",
           "Save": "Save essence",
           "Saving": "Saving...",
-          "SaveFailed": "Save failed. Check for duplicate or blank names and try again.",
+          "SaveFailed": "Save failed",
+          "SaveFailedDetail": "Nothing was saved. Try again, or refresh the manager if it keeps failing.",
+          "SaveFailedNameDetail": "Nothing was saved. Another essence in this system may already have this name; rename it and try again.",
           "CancelEdit": "Cancel editing",
           "DiscardDirtyTitle": "Discard unsaved essence changes?",
           "DiscardDirtyContent": "The current essence has unsaved changes. Save them and continue, or discard them?",
@@ -6150,6 +6154,8 @@
             "StatusIncomplete": "Incomplete",
             "ResolveValidation": "Resolve validation issues before saving.",
             "SaveFailed": "The Tool could not be saved. Try again.",
+            "SaveFailedTitle": "Save failed",
+            "SaveFailedDetail": "Nothing was saved. Try again, or refresh the manager if it keeps failing.",
             "DeleteFailed": "The Tool could not be deleted. Try again.",
             "ToggleFailed": "The Tool status could not be changed. Try again.",
             "ValidationErrorSource": "Link an Item or managed Component.",
@@ -8161,7 +8167,8 @@
             "UnlimitedUses": "Unlimited uses"
           },
           "Save": "Save recipe item",
-          "SaveFailed": "Save failed. Try again.",
+          "SaveFailed": "Save failed",
+          "SaveFailedDetail": "Nothing was saved. Try again, or refresh the manager if it keeps failing.",
           "SelectItem": "Select a recipe item",
           "Tabs": {
             "Label": "Recipe item editor sections",

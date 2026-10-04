@@ -1,6 +1,7 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import Button from '../../components/Button.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ToolBehaviorPreview from './tools/ToolBehaviorPreview.svelte';
   import ToolBreakageTab from './tools/ToolBreakageTab.svelte';
@@ -309,6 +310,21 @@
       data-keyboard-focus="true"
       bind:this={tabPanel}
     >
+      <!-- The page notice position, first in the panel so a failed save shows on every tab. -->
+      {#if saveError && saveError !== 'invalid'}
+        <div class="manager-tool-editor-notices" data-notice-position="page">
+          <Notice
+            blocking
+            tone="danger"
+            data-tool-save-error
+            title={text('FABRICATE.Admin.Manager.Tools.Editor.SaveFailedTitle', 'Save failed')}
+            detail={text(
+              'FABRICATE.Admin.Manager.Tools.Editor.SaveFailedDetail',
+              'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+            )}
+          />
+        </div>
+      {/if}
       {#if activeTab === 'requirements'}
         <ToolRequirementsTab
           {tool}
@@ -328,7 +344,6 @@
           {tool}
           {authority}
           {validation}
-          {saveError}
           {focusValidationNonce}
           {worldRecordExists}
           {onEditWorldTool}

@@ -92,7 +92,7 @@
     // `component.difficulty` is consumed by recipes, salvage, gathering AND system validation, so
     // a progressive result row deep-links to the component editor rather than stepping it here.
     onOpenComponent = () => {},
-    // The SYSTEM's resolution mode. Never per-recipe: the mode callout reports it on the tabs it
+    // The system's resolution mode. Never per-recipe: the mode callout reports it on the tabs it
     // shapes and routes to Crafting Settings, which is the only place it can change.
     resolutionMode = 'simple',
     // The system's craftingEffect matrix row, gating the Access and Books & Scrolls tabs (issue
@@ -442,17 +442,20 @@
         }}
       />
 
-      <!-- The blocking notice's page position, so a failed save shows on whichever tab is open. -->
+      <!-- The blocking notice's page position, outside the scroller so a failed save stays in view
+           on every tab, inset as the panel insets its cards. -->
       {#if saveFailed}
-        <Notice
-          blocking
-          tone="danger"
-          data-notice-position="page"
-          title={text(
-            'FABRICATE.Admin.Manager.Recipe.SaveFailed',
-            'Save failed. Check for duplicate or blank names and try again.'
-          )}
-        />
+        <div class="manager-editor-notice-position" data-notice-position="page">
+          <Notice
+            blocking
+            tone="danger"
+            title={text('FABRICATE.Admin.Manager.Recipe.SaveFailed', 'Save failed')}
+            detail={text(
+              'FABRICATE.Admin.Manager.Recipe.SaveFailedDetail',
+              'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+            )}
+          />
+        </div>
       {/if}
 
       <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus

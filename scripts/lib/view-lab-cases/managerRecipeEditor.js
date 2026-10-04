@@ -57,7 +57,7 @@ export const CASES = Object.freeze([
       CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
-  // Issue 1522: the refused save's blocking notice, in the page position above the tab panel.
+  // Issue 1522: the refused save's blocking notice, in the page position above the scrolling panel.
   managerCase({
     id: 'manager-recipe-edit-save-failed',
     label: 'Manager — Recipe edit save failed',
@@ -73,8 +73,8 @@ export const CASES = Object.freeze([
     ],
     expectView: 'recipe-edit',
     expectSelector:
-      '.fabricate-manager [data-recipe-editor] > [data-notice-position][role="alert"]',
-    expectCenterHit: '[data-recipe-editor] > [data-notice-position]',
+      '.fabricate-manager [data-recipe-editor] > [data-notice-position] > [role="alert"]',
+    expectCenterHit: '[data-recipe-editor] > [data-notice-position] > [role="alert"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/],
   }),
@@ -1001,6 +1001,31 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
+  // Issue 1522: on the tabs a collapsed chain empties, its note is lede text in the heading block.
+  ...[
+    ['manager-recipe-edit-ingredients-collapsed', 'ingredients', 'data-recipe-collapsed-note'],
+    ['manager-recipe-edit-results-collapsed', 'results', 'data-recipe-collapsed-results-note'],
+  ].map(([id, tab, note]) =>
+    managerCase({
+      id,
+      label: `Manager — Recipe edit ${tab} collapsed`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-jewelry' },
+      steps: [
+        'Crafting',
+        { selector: '[data-recipe-edit="jw-r-circlet"]' },
+        { selector: `#recipe-tab-${tab}` },
+      ],
+      expectView: 'recipe-edit',
+      expectSelector: `[data-recipe-tab="${tab}"] [data-tab-heading] [${note}]`,
+      kinds: ['manager', 'recipes'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      ],
+    })
+  ),
   managerCase({
     id: 'manager-recipe-edit-results-progressive',
     label: 'Manager — Recipe edit results progressive',

@@ -18,6 +18,7 @@
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
   import Button from '../../components/Button.svelte';
+  import Notice from '../../components/Notice.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import SystemEditorTabs from './system/SystemEditorTabs.svelte';
@@ -26,9 +27,8 @@
   let {
     selectedSystem = null,
     // True when the system carries a `blocks:'system'` validation issue. Drives a
-    // GM-only full-width callout above the identity card on the Settings tab. The
-    // whole crafting manager admin is GM-scoped, so this is GM-only by
-    // construction.
+    // warning notice above the identity card on the Settings tab. The whole crafting
+    // manager admin is GM-scoped, so this is GM-only by construction.
     systemBlocked = false,
     // The `evaluateSystemValidation` report driving the Validation tab's
     // kind-grouped issue list and the tab's open-issue badge.
@@ -296,44 +296,31 @@
             aria-label={text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings')}
           >
             <form class="manager-system-edit-form" onsubmit={handleSubmit}>
+              <!-- A non-blocking warning, so it takes the stacking region (issue 1522). -->
               {#if systemBlocked}
-                <div
-                  class="manager-environment-comp-callout manager-system-edit-blocker"
-                  role="note"
+                <Notice
+                  tone="warning"
                   data-system-edit-blocker
-                  data-notice-position="page"
-                >
-                  <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                  <div class="manager-system-edit-blocker-copy">
-                    <strong
-                      >{text(
-                        'FABRICATE.Admin.Manager.SystemEdit.BlockerTitle',
-                        'This system has a blocker'
-                      )}</strong
-                    >
-                    <span
-                      >{text(
-                        'FABRICATE.Admin.Manager.SystemEdit.BlockerBody',
-                        "Players cannot see or use any of this system's recipes until the blocker is resolved. Open the system overview to review and fix it."
-                      )}</span
-                    >
-                  </div>
-                  <!-- Ghost (issue 1118, row 8): `ui-visual-style/spec.md`'s quiet NAVIGATIONAL
-                       verb — "Back, Open, View" — and this control is literally an Open. It
-                       sits inside a blocker that already carries the alarm, so at the base
-                       weight it competed with the copy explaining it. -->
-                  <Button
-                    role="ghost"
-                    class="manager-system-edit-blocker-link"
-                    data-system-edit-blocker-link
-                    onclick={() => {
+                  data-notice-position="stack"
+                  title={text(
+                    'FABRICATE.Admin.Manager.SystemEdit.BlockerTitle',
+                    'This system has a blocker'
+                  )}
+                  detail={text(
+                    'FABRICATE.Admin.Manager.SystemEdit.BlockerBody',
+                    "Players cannot see or use any of this system's recipes until the blocker is resolved. Open the system overview to review and fix it."
+                  )}
+                  action={{
+                    label: text(
+                      'FABRICATE.Admin.Manager.SystemEdit.BlockerLink',
+                      'Open system overview'
+                    ),
+                    onClick: () => {
                       activeTab = 'validation';
                       onShowSystemOverview();
-                    }}
-                  >
-                    {text('FABRICATE.Admin.Manager.SystemEdit.BlockerLink', 'Open system overview')}
-                  </Button>
-                </div>
+                    },
+                  }}
+                />
               {/if}
               <section class="manager-edit-card">
                 <div class="manager-edit-card-heading">

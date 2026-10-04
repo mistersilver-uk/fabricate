@@ -7,6 +7,7 @@ manager-rail-expanded
 manager-rail-collapsed
 manager-selected-stacked
 manager-system-edit-normal
+manager-system-edit-blocked
 manager-system-edit-validation
 manager-system-edit-narrow
 manager-system-edit-dirty

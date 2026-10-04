@@ -26,6 +26,7 @@ manager-books-scrolls-item
 manager-books-scrolls-cap-filter-list
 manager-crafting-settings
 manager-recipe-item-overview
+manager-recipe-item-save-failed
 manager-recipe-item-contents
 manager-recipe-item-contents-picker
 manager-recipe-item-validation

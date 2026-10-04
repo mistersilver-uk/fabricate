@@ -648,8 +648,8 @@
     {/if}
   </div>
 
-  <!-- FULL-BLEED below the grid rather than a grid cell: it REPLACES the picker cell, and the
-       sentence would wrap to five lines in a 220px column. Warning-toned, because the rule DID hand
+  <!-- Full-bleed below the grid rather than a grid cell: it replaces the picker cell, and the
+       sentence would wrap to five lines in a 220px column. Warning-toned, because the rule did hand
        the pick to this recipe and the system rolls no check for it to reach; under every other
        rule the tab renders nothing rather than a callout on every recipe. -->
   {#if showModifierInert}

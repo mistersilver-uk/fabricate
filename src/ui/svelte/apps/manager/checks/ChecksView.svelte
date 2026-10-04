@@ -1160,7 +1160,7 @@
   data-checks-editor
   bind:this={checksRoot}
 >
-  <!-- THE ROW ACTION'S LIVE REGION: a row action routes to another activity and unmounts the
+  <!-- The row action's live region: a row action routes to another activity and unmounts the
        validation panel, so the `aria-live` element stays outside that branch with its own `{#if}`;
        being `position: absolute`, it is a safe third child of this two-row grid. -->
   <div class="visually-hidden" role="status" aria-live="polite" data-checks-issue-announcement>
@@ -1209,23 +1209,23 @@
       {/if}
 
       <!-- The heading block, in plain block flow so the head's margin collapses through it. The
-           mode stays a callout: it documents the mode, where a notice reports THIS check's state. -->
-      <div data-tab-heading>
-        {#if paneHead && !routeIsOff}
+           mode stays a callout: it documents the mode, where a notice reports this check's state. -->
+      {#if paneHead && !routeIsOff}
+        <div data-tab-heading>
           <header class="manager-checks-pane-head" data-checks-pane-head={activeSection}>
             <h2 class="manager-checks-pane-title">{paneHead.title}</h2>
             <p class="manager-checks-pane-lead">{paneHead.lead}</p>
           </header>
-        {/if}
-        {#if activity !== 'validation' && !routeIsOff && activeSection === 'roll'}
-          <CheckModeCallout
-            {activity}
-            mode={calloutMode}
-            {alchemyCheckMode}
-            outcomeCount={outcomeCount ?? 0}
-          />
-        {/if}
-      </div>
+          {#if activeSection === 'roll'}
+            <CheckModeCallout
+              {activity}
+              mode={calloutMode}
+              {alchemyCheckMode}
+              outcomeCount={outcomeCount ?? 0}
+            />
+          {/if}
+        </div>
+      {/if}
 
       {#if activity === 'validation'}
         <ChecksValidationTab
