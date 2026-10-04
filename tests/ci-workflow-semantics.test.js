@@ -66,7 +66,7 @@ function contextFor(action, draft = false) {
 function jobsFor(workflow, action, draft = false) {
   const context = contextFor(action, draft);
   return Object.entries(workflow.jobs)
-    .filter(([, job]) => !job.if || evaluate(job.if, context))
+    .filter(([, job]) => !job.if || gateValue(job.if, context))
     .map(([name]) => name)
     .sort();
 }
@@ -84,6 +84,7 @@ test('CI runs full gates for source events in either draft state and isolates me
     'check-screenshots',
     'lint',
     'lint-commits',
+    'unit-test-shards',
     'unit-tests',
     'validate-bindings',
   ];
@@ -114,7 +115,7 @@ test('a red unit-tests job re-prints its failing tests at the END of the job log
   // bounded tail the log APIs serve (issue 1654).
   assert.match(
     workflow,
-    /npm test 2>&1 \| tee "\$RUNNER_TEMP\/unit-tests\.tap"/,
+    /npm run test:shard 2>&1 \| tee "\$RUNNER_TEMP\/unit-tests\.tap"/,
     'the unit-tests run must tee its output, or the failure re-print below has nothing to read'
   );
   assert.match(
@@ -140,6 +141,36 @@ test('a red unit-tests job re-prints its failing tests at the END of the job log
     true,
     'the TAP must be written outside the checkout'
   );
+});
+
+test('the required unit-tests check is green only when every shard of the suite passed', () => {
+  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const jobs = parseJobs(ci);
+  const shards = jobs['unit-test-shards'];
+  const gate = jobs['unit-tests'];
+
+  // Each shard runs its quarter: `test:shard` reads the shard from the job's env.
+  assert.equal(jobEnv(ci, 'unit-test-shards').UNIT_TEST_SHARD, '${{ matrix.shard }}/4');
+  assert.match(ci, /\n {8}shard: \[1, 2, 3, 4\]\n/, 'the matrix must run all four shards');
+  assert.match(ci, /\n {6}fail-fast: false\n/, 'one red shard must not cancel the others');
+  assert.ok(Number(shards['timeout-minutes']) <= 10, 'a shard is a quarter of the suite');
+
+  // The gate is the check the ruleset requires. It runs after a failed or cancelled shard (always),
+  // and passes only on the shards' success, so neither can read as green.
+  assert.deepEqual(needsOf(gate), ['unit-test-shards']);
+  assert.match(unwrap(gate.if), /^always\(\) && /);
+  const check = gate.steps.find((step) => step.env.SHARDS);
+  assert.equal(check?.env.SHARDS, '${{ needs.unit-test-shards.result }}');
+  for (const [result, status] of [['success', 0], ['failure', 1], ['cancelled', 1], ['skipped', 1]]) {
+    const run = spawnSync('bash', ['-e'], { input: check.run, env: { PATH: process.env.PATH, SHARDS: result } });
+    assert.equal(run.status, status, `the gate exits ${run.status} when the shards ended ${result}`);
+  }
+
+  // The gate is skipped exactly when the shards are, on a metadata edit.
+  for (const action of ['edited', 'synchronize']) {
+    const context = contextFor(action);
+    assert.equal(gateValue(gate.if, context), gateValue(shards.if, context), action);
+  }
 });
 
 // The screenshot gate's sequencing contract (issue 1133).
@@ -985,7 +1016,7 @@ test('the ratchet jobs check out and name their base, and a release test run opt
   const ci = readFileSync(path.join(WORKFLOWS, 'ci.yml'), 'utf8');
   const jobs = parseJobs(ci);
   const before = 'b'.repeat(40);
-  for (const name of ['unit-tests', 'lint']) {
+  for (const name of ['unit-test-shards', 'lint']) {
     const { steps } = jobs[name];
     const checkout = steps.find((step) => step.uses.startsWith('actions/checkout@'));
     assert.equal(checkout?.with['fetch-depth'], '2', `${name} must check out the merge ref's parents`);

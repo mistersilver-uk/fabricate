@@ -230,4 +230,12 @@ test('the npm scripts cover the repository, and are short enough to read', () =>
       'single `*` and the nested suites stop running silently.'
   );
   assert.equal(scripts['lint:all'], undefined, '`lint:all` was `eslint .`, which `lint` covers.');
+  // CI's shards run `test:shard`. It must be `test` and nothing else, or a flag added to one script
+  // runs locally and silently not in CI; and node honours `--test-shard` only BEFORE the glob.
+  assert.equal(
+    scripts['test:shard'],
+    scripts.test.replace(' "tests/', ' --test-shard=$UNIT_TEST_SHARD "tests/'),
+    '`test:shard` must be the `test` script with `--test-shard` inserted before its glob'
+  );
+  assert.notEqual(scripts['test:shard'], scripts.test, 'the shard flag was not inserted');
 });
