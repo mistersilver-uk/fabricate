@@ -118,6 +118,17 @@ describe('1477 ActionMenu announces a MENU, never a listbox', () => {
     assert.equal(menu.getAttribute('aria-label'), 'More actions');
     assert.equal(menu.getAttribute('tabindex'), '-1');
     assert.equal(menu.getAttribute('data-keyboard-focus'), 'true');
+    // Without a heading the panel itself is the menu, its items its only children.
+    assert.ok(menu.classList.contains('fabricate-action-menu-panel'), 'the menu is the panel');
+    assert.ok(
+      [...menu.children].every((child) => child.getAttribute('role') === 'menuitem'),
+      'and holds its items directly'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-action-menu').children.length,
+      1,
+      'the root keeps the trigger alone, the panel being portaled'
+    );
 
     assert.equal(menuItems(target).length, 4);
     for (const item of menuItems(target)) {
@@ -339,6 +350,55 @@ describe('1516 ActionMenu trigger snippet, heading and item tone', () => {
     );
     assert.ok(!menu.hasAttribute('aria-label'), 'the heading replaces the label');
     assert.equal(menuItems(doc).length, 4);
+    hostHarness.remount();
+  });
+
+  it('a headed menu keeps the keyboard contract', async () => {
+    const target = await hostHarness.mount({ ...props(), heading: 'Accept instead' });
+    const doc = target.ownerDocument;
+    keydown(hostTrigger(target), 'ArrowDown');
+    await flushRender();
+    assert.ok(doc.activeElement === enabledItems(doc)[0], 'ArrowDown opens onto the first item');
+    keydown(doc.activeElement, 'ArrowDown');
+    assert.ok(doc.activeElement === enabledItems(doc)[1], 'ArrowDown steps through the list');
+    keydown(doc.activeElement, 'End');
+    assert.ok(doc.activeElement === enabledItems(doc).at(-1), 'End jumps to the last item');
+    keydown(doc.activeElement, 'Tab');
+    await flushRender();
+    assert.ok(!panel(doc), 'Tab closes the menu');
+    assert.ok(doc.activeElement === hostTrigger(target), 'and returns focus to the trigger');
+    hostHarness.remount();
+  });
+
+  it('a click anywhere in the panel stops at it, heading and padding included', async () => {
+    for (const heading of ['Accept instead', '']) {
+      const target = await hostHarness.mount({ ...props(), heading });
+      hostTrigger(target).click();
+      await flushRender();
+      const doc = target.ownerDocument;
+      const panelRoot = doc.querySelector('.fabricate-action-menu-panel');
+      const escaped = [];
+      const listen = () => escaped.push(heading);
+      doc.body.addEventListener('click', listen);
+      for (const node of [panelRoot, panelRoot.querySelector('.manager-action-menu-heading')]) {
+        node?.dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
+      }
+      doc.body.removeEventListener('click', listen);
+      assert.deepEqual(escaped, [], `no click escapes the panel (heading "${heading}")`);
+      hostHarness.remount();
+    }
+  });
+
+  it('choosing an item returns focus to the caller’s own trigger', async () => {
+    const chosen = [];
+    const target = await hostHarness.mount(props(chosen));
+    hostTrigger(target).click();
+    await flushRender();
+    const doc = target.ownerDocument;
+    enabledItems(doc)[1].click();
+    await flushRender();
+    assert.deepEqual(chosen, ['middle']);
+    assert.ok(doc.activeElement === hostTrigger(target), 'focus comes back to the caller’s button');
     hostHarness.remount();
   });
 

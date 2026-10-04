@@ -14,7 +14,7 @@
   | `triggerClass` / `triggerIcon` / `triggerTitle` / `triggerProps` | strings / attribute object | `''` / `{}` | The trigger's extra class, glyph, native tooltip and hooks. The trigger is `<IconButton>`, so the primitive that owns the icon-only-button meaning keeps owning it. |
   | `panelLabel` / `menuClass` | string / class string | `ariaLabel` / `''` | The panel's accessible name, and an extra class on the portaled panel, which escapes this component's root, so a caller's popover-scoped hook has to ride the panel itself. |
   | `heading` | pre-localized string | `''` | A `<Kicker>` atop the panel and outside its `role="menu"`, which it names through `aria-labelledby` in place of `panelLabel`. |
-  | `trigger` | snippet `{ attributes, open }` | `undefined` | Replaces the `<IconButton>`. The caller spreads `attributes` — `aria-haspopup`, `aria-expanded`, the click and key handlers, and an attachment handing this component the element — LAST onto its own button, which it names, titles and disables itself; `ariaLabel` and the `trigger*` props then reach nothing. |
+  | `trigger` | snippet `{ attributes, open }` | `undefined` | Replaces the `<IconButton>`. The caller spreads `attributes` — `aria-haspopup`, `aria-expanded`, the click and key handlers, and an attachment handing this component the element — last onto its own button, which it names, titles and disables itself; `triggerClass`, `triggerIcon`, `triggerTitle` and `triggerProps` then reach nothing, and `ariaLabel` still names a menu without a heading when no `panelLabel` is passed. |
   | `open` | bindable boolean | `false` | For a surface that must close the menu from outside itself. |
 
   Callbacks:
@@ -242,15 +242,18 @@
   {/snippet}
 
   {#if open && heading}
-    <!-- A headed panel holds the heading beside the menu, which it names from outside. -->
+    <!-- A headed panel holds the heading beside the menu, which it names from outside. Clicks stop
+         at the panel root in both forms, so one on the heading or the padding never escapes it. -->
     <div
       bind:this={panelRoot}
       class={`fabricate-action-menu-panel manager-action-menu-panel ${menuClass}`}
+      role="presentation"
       use:anchoredPopover={{
         component: 'ActionMenu',
         trigger: triggerButton,
         layout: menuLayout,
       }}
+      onclick={stop}
     >
       <div class="manager-action-menu-heading" id={headingId}>
         <Kicker as="span">{heading}</Kicker>
@@ -261,7 +264,6 @@
         tabindex="-1"
         data-keyboard-focus="true"
         aria-labelledby={headingId}
-        onclick={stop}
         onkeydown={onPanelKeydown}
       >
         {@render menuItems()}
