@@ -18,6 +18,9 @@
         "Expand": "Show details for {name}",
         "Collapse": "Hide details for {name}"
       },
+      "StageBars": {
+        "Unnamed": "Stage {index} of {count}"
+      },
       "DiceTiles": {
         "Generated": "rolled by an explosion",
         "More": "+{count} more",
@@ -841,6 +844,7 @@
       "ActorBar": {
         "Trigger": "Select a character",
         "Stamina": "Stamina",
+        "StaminaValue": "{current} of {max}",
         "SearchPlaceholder": "Search characters…",
         "SearchLabel": "Search characters",
         "NoActorsTitle": "No selectable characters",
@@ -1008,7 +1012,8 @@
           "YourSelection": "Your selection",
           "Owned": "You own {count}.",
           "Contribution": "{amount} {name}",
-          "Meter": "{name} has {delivered} of {need} delivered.",
+          "MeterLabel": "{name} delivered",
+          "MeterValue": "{delivered} of {need}",
           "Overshoot": "{essence}: {amount} more than required",
           "Allocate": "Units of {name} to spend",
           "AllocateLess": "Spend one less {name}",
