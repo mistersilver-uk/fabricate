@@ -1,7 +1,7 @@
 /**
  * The non-component result kinds (issue 1773). A `currency` result is a recipe-keyed credit and a
- * `knowledge` result a recipe-knowledge grant: each is PLANNED where items are awarded, its amount
- * resolved once there, and APPLIED by the reward step after them, so neither writes an Item.
+ * `knowledge` result a recipe-knowledge grant: each is planned where items are awarded, its amount
+ * resolved once there, and applied by the reward step after them, so neither writes an Item.
  */
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { cloneJson } from '../utils/scalars.js';
@@ -180,7 +180,7 @@ export function rewardChatParts(items) {
   };
 }
 
-/** `award-results`' planned list: one entry per routed result, of every kind, as it always was. */
+/** `award-results`' planned list: one entry per routed result, of every kind. */
 export const versionedResultPlan = (groups) =>
   list(groups).flatMap((group) =>
     list(group?.results).map((result) => ({
