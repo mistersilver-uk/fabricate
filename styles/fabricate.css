@@ -15225,7 +15225,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* A tab's description is a SIBLING of the tablist (a tablist owns only tabs), placed against the caller's nearest positioned ancestor: above it and end-aligned, so it cannot overhang that box (issue 1779). */
+/* A tab's description is a sibling of the tablist (a tablist owns only tabs), placed against the caller's nearest positioned ancestor; the strip writes its tab's start-aligned, clamped position inline, and this above-and-end-aligned box is the fallback when nothing can be measured (issue 1779). */
 .fabricate-tabs ~ .fabricate-tabs-tooltip {
   position: absolute;
   z-index: 2;
@@ -15249,10 +15249,11 @@
 .fabricate-tabs ~ .fabricate-tabs-tooltip.is-described {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
   translate: 0 0;
 }
 
-/* The premium padlock tracks CURRENCY, not lockedness, and colours itself, so it does not follow the label's hover. */
+/* The premium padlock tracks currency, not lockedness, and colours itself, so it does not follow the label's hover. */
 .fabricate-tabs .manager-editor-tab-lock {
   color: var(--fab-text-subtle);
   font-size: 7px;

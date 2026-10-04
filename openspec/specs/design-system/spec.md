@@ -992,7 +992,9 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 The tab-strip primitive's roving tab stop is the selected tab, or the first rendered tab when the selected id names no rendered tab, while `aria-selected` stays bound to the selected id.
 A tab entry MAY override its accessible name, and an overriding name MUST contain the tab's visible label.
 A tab entry MAY carry a description that the strip renders as a `role="tooltip"` element beside the tablist rather than inside it — a tablist owns only tabs — referenced by the tab's `aria-describedby`.
+A description is placed above its tab, start-aligned to it, clamped inside the positioned ancestor, and falls back to that ancestor's top end when its tab cannot be measured.
 The strip shows the hovered tab's description, else the focused tab's, and Escape hides it until that tab is next hovered or focused, without moving focus or selection.
+A description stays shown while the pointer is over it, and Escape hides a description shown by hover even when focus is outside the strip, without closing the window that holds it.
 A pointer activation focuses the tab it selects.
 A tier-gated tab stays focusable and selectable, carrying neither `disabled` nor `aria-disabled`.
 The strip does not move focus when the focused tab is removed; the caller that removed it owns the recovery.
@@ -1009,6 +1011,12 @@ Apart from that fallback, an entry naming none of these renders exactly what it 
 - **WHEN** the focused, selected tab re-renders `tierGated`
 - **THEN** it keeps `tabindex="0"` and `aria-selected="true"`
 - **AND** it carries neither `disabled` nor `aria-disabled`
+
+#### Scenario: Escape hides a hover-shown description with focus outside the strip
+
+- **WHEN** a description is shown by hover and focus is outside the strip
+- **THEN** Escape hides it
+- **AND** the window stays open
 
 ### Requirement: An ordered row opens in place to its editing body
 

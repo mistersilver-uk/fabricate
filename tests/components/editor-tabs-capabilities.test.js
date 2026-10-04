@@ -64,6 +64,19 @@ const shown = (root) =>
 const fire = (node, type) => node.dispatchEvent(new globalThis.Event(type, { bubbles: false }));
 const press = (node, key) =>
   node.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key, bubbles: true }));
+const tooltip = (root, id) => root.querySelector(`#editor-tooltip-${id}`);
+// The strip keeps a left description for 150ms so the pointer can cross onto it.
+const afterGrace = () => new Promise((done) => setTimeout(done, 200));
+async function leave(node) {
+  fire(node, 'mouseleave');
+  await afterGrace();
+  await settle();
+}
+const define = (node, values) => {
+  for (const [name, value] of Object.entries(values)) {
+    Object.defineProperty(node, name, { value, configurable: true });
+  }
+};
 
 describe('the tab stop falls back to the first tab', () => {
   it('gives the first tab the stop and selects none when activeTab names no rendered tab', async () => {
@@ -157,8 +170,7 @@ describe('a tab entry may carry a description', () => {
     await settle();
     assert.deepEqual(shown(root), ['editor-tooltip-outputs'], 'hover wins over focus');
 
-    fire(button(root, 'outputs'), 'mouseleave');
-    await settle();
+    await leave(button(root, 'outputs'));
     assert.deepEqual(
       shown(root),
       ['editor-tooltip-overview'],
@@ -193,13 +205,135 @@ describe('a tab entry may carry a description', () => {
     assert.equal(inputs.getAttribute('aria-selected'), 'true');
 
     fire(button(root, 'outputs'), 'mouseenter');
-    fire(button(root, 'outputs'), 'mouseleave');
-    await settle();
+    await leave(button(root, 'outputs'));
     assert.deepEqual(shown(root), [], 'another tab`s hover does not re-arm it');
 
     fire(inputs, 'mouseenter');
     await settle();
     assert.deepEqual(shown(root), ['editor-tooltip-inputs'], 'its own next hover re-arms it');
+  });
+
+  it('re-shows a dismissed description when its tab is next focused', async () => {
+    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'inputs' });
+    const inputs = button(root, 'inputs');
+    fire(inputs, 'focus');
+    await settle();
+    press(inputs, 'Escape');
+    await settle();
+    assert.deepEqual(shown(root), []);
+    fire(inputs, 'blur');
+    fire(inputs, 'focus');
+    await settle();
+    assert.deepEqual(shown(root), ['editor-tooltip-inputs']);
+  });
+
+  it('dismisses the hovered description, not the focused one, and leaves the focused one armed', async () => {
+    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    const overview = button(root, 'overview');
+    fire(overview, 'focus');
+    fire(button(root, 'outputs'), 'mouseenter');
+    await settle();
+    press(overview, 'Escape');
+    await settle();
+    assert.deepEqual(shown(root), [], 'Escape hides the hovered description');
+    await leave(button(root, 'outputs'));
+    assert.deepEqual(shown(root), ['editor-tooltip-overview']);
+  });
+
+  it('describes only the entries that carry a description in a mixed strip', async () => {
+    const root = await harness.mount({ tabs: [DESCRIBED[0], TABS[1]], activeTab: 'overview' });
+    assert.ok(!button(root, 'inputs').hasAttribute('aria-describedby'));
+    const described = [...root.querySelectorAll('[aria-describedby]')];
+    assert.equal(described.length, 1);
+    for (const node of described) {
+      const id = node.getAttribute('aria-describedby');
+      assert.ok(Boolean(root.querySelector(`#${id}`)), `${id} resolves`);
+    }
+  });
+
+  it('describes an entry that names only a description key', async () => {
+    globalThis.game.i18n.localize = (key) => (key === 'x.Tip' ? 'About the overview' : key);
+    const root = await harness.mount({
+      tabs: [{ ...TABS[0], tooltipKey: 'x.Tip' }],
+      activeTab: 'overview',
+    });
+    assert.equal(tooltip(root, 'overview')?.textContent, 'About the overview');
+  });
+
+  it('keeps a description shown while the pointer crosses onto it, and hides it after', async () => {
+    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    const outputs = button(root, 'outputs');
+    fire(outputs, 'mouseenter');
+    await settle();
+    fire(outputs, 'mouseleave');
+    await settle();
+    assert.deepEqual(shown(root), ['editor-tooltip-outputs'], 'leaving the tab keeps it a moment');
+    fire(tooltip(root, 'outputs'), 'mouseenter');
+    await afterGrace();
+    await settle();
+    assert.deepEqual(shown(root), ['editor-tooltip-outputs'], 'the pointer on it keeps it');
+    await leave(tooltip(root, 'outputs'));
+    assert.deepEqual(shown(root), [], 'leaving it hides it');
+  });
+
+  it('hides a hover-shown description on Escape with focus outside the strip, and keeps the window open', async () => {
+    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    const reached = [];
+    const onPage = (event) => {
+      reached.push(event.key);
+    };
+    globalThis.document.addEventListener('keydown', onPage);
+    try {
+      fire(button(root, 'outputs'), 'mouseenter');
+      await settle();
+      press(globalThis.document.body, 'Escape');
+      await settle();
+      assert.deepEqual(shown(root), [], 'Escape hides it');
+      assert.deepEqual(reached, [], 'the page`s keybindings never see that Escape');
+      press(globalThis.document.body, 'Escape');
+      assert.deepEqual(reached, ['Escape'], 'with nothing shown, Escape passes through');
+    } finally {
+      globalThis.document.removeEventListener('keydown', onPage);
+    }
+  });
+
+  it('places the shown description above its tab, start-aligned and clamped inside the ancestor', async () => {
+    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    const anchor = globalThis.document.createElement('div');
+    define(anchor, { clientWidth: 600, clientHeight: 80 });
+    define(button(root, 'inputs'), { offsetParent: anchor, offsetLeft: 120, offsetTop: 40 });
+    define(button(root, 'outputs'), { offsetParent: anchor, offsetLeft: 500, offsetTop: 40 });
+    for (const id of ['inputs', 'outputs']) {
+      define(tooltip(root, id), { offsetParent: anchor, offsetWidth: 200 });
+    }
+    fire(button(root, 'inputs'), 'mouseenter');
+    await settle();
+    assert.equal(
+      tooltip(root, 'inputs').getAttribute('style'),
+      'left: 120px; right: auto; bottom: 47px;'
+    );
+    fire(button(root, 'outputs'), 'mouseenter');
+    await settle();
+    assert.equal(
+      tooltip(root, 'outputs').getAttribute('style'),
+      'left: 400px; right: auto; bottom: 47px;',
+      'clamped so its end meets the ancestor`s'
+    );
+    assert.ok(!tooltip(root, 'inputs').hasAttribute('style'), 'only the shown one is placed');
+  });
+
+  it('leaves the sheet`s fallback when the tab and its description share no measured ancestor', async () => {
+    const root = await harness.mount({ tabs: DESCRIBED, activeTab: 'overview' });
+    fire(button(root, 'overview'), 'mouseenter');
+    await settle();
+    assert.ok(!tooltip(root, 'overview').hasAttribute('style'), 'nothing measured');
+    const anchor = globalThis.document.createElement('div');
+    define(anchor, { clientWidth: 600, clientHeight: 80 });
+    define(tooltip(root, 'inputs'), { offsetParent: anchor, offsetWidth: 200 });
+    define(button(root, 'inputs'), { offsetParent: root, offsetLeft: 120, offsetTop: 40 });
+    fire(button(root, 'inputs'), 'mouseenter');
+    await settle();
+    assert.ok(!tooltip(root, 'inputs').hasAttribute('style'), 'a different ancestor');
   });
 
   it('focuses the tab a pointer click selects', async () => {
@@ -293,12 +427,30 @@ describe('the sheet draws the description, and the danger tint stays scoped', ()
       declared('.fabricate-tabs ~ .fabricate-tabs-tooltip.is-described', 'visibility'),
       ['visible']
     );
+    assert.deepEqual(declared('.fabricate-tabs ~ .fabricate-tabs-tooltip', 'position'), [
+      'absolute',
+    ]);
+    assert.deepEqual(
+      declared('.fabricate-tabs ~ .fabricate-tabs-tooltip.is-described', 'pointer-events'),
+      ['auto'],
+      'a shown description takes the pointer, so it can be hovered'
+    );
     assert.deepEqual(
       rules
         .flatMap((rule) => rule.selectors)
         .filter((selector) => selector.includes('.fabricate-tabs .fabricate-tabs-tooltip')),
       [],
       'the description is a sibling of the tablist, so a descendant rule matches nothing'
+    );
+  });
+
+  it('colours the current tab`s padlock in the accent', () => {
+    assert.deepEqual(
+      declared(
+        '.fabricate-tabs .manager-editor-tab-button.is-active .manager-editor-tab-lock',
+        'color'
+      ),
+      ['var(--fab-accent)']
     );
   });
 

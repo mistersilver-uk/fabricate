@@ -125,6 +125,11 @@ describe('the Downtime tab strip keeps its ARIA contract', () => {
     for (const tab of TABS) {
       const tip = root.querySelector(`[data-downtime-tooltip="${tab.id}"]`);
       assert.ok(tip?.textContent.trim(), `${tab.id} carries a non-empty description`);
+      assert.equal(
+        root.querySelector(`[data-downtime-tab="${tab.id}"] span`).textContent,
+        tab.label,
+        `${tab.id} falls back to its untranslated label`
+      );
     }
   });
 
@@ -209,6 +214,8 @@ describe('the Downtime tab strip keeps its ARIA contract', () => {
     assert.deepEqual(shown(), ['factions'], 'hover describes exactly its own tab');
 
     factions.dispatchEvent(new globalThis.MouseEvent('mouseleave'));
+    // The strip keeps a left description for 150ms so the pointer can cross onto it.
+    await new Promise((done) => setTimeout(done, 200));
     await settle();
     assert.deepEqual(shown(), [], 'mouseleave clears it');
   });

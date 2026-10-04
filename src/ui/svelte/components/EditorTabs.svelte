@@ -7,7 +7,7 @@
   | --- | --- | --- | --- |
   | `tabs` / `activeTab` / `onSelect(tabId)` | `{ id, icon, labelKey, label }[]` / string / function | `[]` / `''` / no-op | The tabs in render order, where `labelKey` is looked up and `label` is the English fallback, and a tab with no `icon` draws no glyph; the current tab; and the selection callback. The strip holds no selection state. |
   | tab `ariaLabelKey` / `ariaLabel` | key / English fallback | absent | The tab's accessible name, which MUST contain its visible label; absent writes no `aria-label`. |
-  | tab `tooltipKey` / `tooltip` | key / English fallback | absent | The tab's description: a `role="tooltip"` sibling AFTER the tablist, named by the tab's `aria-describedby` and placed against the caller's nearest positioned ancestor. |
+  | tab `tooltipKey` / `tooltip` | key / English fallback | absent | The tab's description: a `role="tooltip"` sibling after the tablist, named by the tab's `aria-describedby` and placed above its tab, start-aligned to it, clamped inside the caller's nearest positioned ancestor. |
   | tab `tierGated` | boolean | `false` | Draws the premium padlock after the label; the tab stays focusable and selectable. |
   | `badges` | per tab id: one mark, or an array of them | `{}` | A mark is a plain value, or `{ vehicle, label, tone, name, class, suppressZero }`. `tone` ∈ neutral/success/positive/warning/danger and applies to the CHIP; `name` is the accessible name, REQUIRED by any mark that renders no readable text; `class` is one modifier class appended to `badgeClass` on the chip only; `suppressZero` defaults true. A tab may carry more than one mark, because a section can be both authored and unready at once. |
   | `ariaLabelKey` / `ariaLabel` | strings | `''` | The strip's own accessible name. |
@@ -42,6 +42,8 @@
   - The tab stop is `activeTab`, or the first tab when it names none; `aria-selected` stays bound to
     `activeTab`. The hovered tab's description shows, else the focused tab's, and Escape hides it
     until that tab is next hovered or focused — pinned by `tests/components/editor-tabs-capabilities.test.js`.
+    A description stays shown while the pointer is over it, and a hover-shown one takes Escape even
+    with focus outside the strip, stopping it at the window so the host stays open.
 -->
 <script>
   import { localize } from '../util/foundryBridge.js';
@@ -94,6 +96,27 @@
   });
 
   const VEHICLES = new Set(['count', 'issue', 'dot']);
+  const HOVER_GRACE_MS = 150;
+  const TOOLTIP_GAP_PX = 7;
+
+  const buttonNodes = {};
+  const tooltipNodes = {};
+  let tablistNode = null;
+  let hoverClear = null;
+  let tooltipPlacement = $state({ id: null, style: undefined });
+
+  $effect(() => {
+    const id = shownTooltipId;
+    tooltipPlacement = { id, style: id === null ? undefined : placement(id) };
+  });
+  $effect(() => () => clearTimeout(hoverClear));
+
+  // Capturing at the document runs ahead of Foundry's window-level keybindings.
+  $effect(() => {
+    const host = tablistNode?.ownerDocument;
+    host?.addEventListener('keydown', onDocumentKeydown, true);
+    return () => host?.removeEventListener('keydown', onDocumentKeydown, true);
+  });
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -109,14 +132,43 @@
   }
 
   function track(kind, tabId) {
-    if (kind === 'hover') hoveredTabId = tabId;
-    else focusedTabId = tabId;
+    if (kind === 'hover') {
+      clearTimeout(hoverClear);
+      hoveredTabId = tabId;
+    } else focusedTabId = tabId;
     if (dismissedTabId === tabId) dismissedTabId = null;
   }
 
+  // A pointer leaving a tab or its description keeps it shown for the grace, so it can cross the gap.
   function untrack(kind, tabId) {
-    if (kind === 'hover' && hoveredTabId === tabId) hoveredTabId = null;
-    if (kind === 'focus' && focusedTabId === tabId) focusedTabId = null;
+    if (kind === 'focus') {
+      if (focusedTabId === tabId) focusedTabId = null;
+      return;
+    }
+    clearTimeout(hoverClear);
+    hoverClear = setTimeout(() => {
+      if (hoveredTabId === tabId) hoveredTabId = null;
+    }, HOVER_GRACE_MS);
+  }
+
+  // Unmeasurable (no shared positioned ancestor) leaves the sheet's end-aligned fallback in force.
+  function placement(tabId) {
+    const tabButton = buttonNodes[tabId];
+    const tooltip = tooltipNodes[tabId];
+    const anchor = tooltip?.offsetParent;
+    if (!anchor || tabButton?.offsetParent !== anchor || !anchor.clientWidth) return undefined;
+    const left = Math.max(
+      0,
+      Math.min(tabButton.offsetLeft, anchor.clientWidth - tooltip.offsetWidth)
+    );
+    const bottom = anchor.clientHeight - tabButton.offsetTop + TOOLTIP_GAP_PX;
+    return `left: ${left}px; right: auto; bottom: ${bottom}px;`;
+  }
+
+  function onDocumentKeydown(event) {
+    if (event.key !== 'Escape' || focusedTabId !== null || shownTooltipId === null) return;
+    dismissedTabId = shownTooltipId;
+    event.stopPropagation();
   }
 
   function normalizeMark(tab, mark) {
@@ -224,6 +276,7 @@
 </script>
 
 <div
+  bind:this={tablistNode}
   class={`fabricate-tabs ${containerClass}`}
   role="tablist"
   aria-label={text(ariaLabelKey, ariaLabel)}
@@ -241,6 +294,7 @@
       aria-describedby={isDescribed(tab) ? `${tooltipStem}-${tab.id}` : undefined}
       tabindex={tabStop === tab.id ? 0 : -1}
       data-keyboard-focus="true"
+      bind:this={buttonNodes[tab.id]}
       {...buttonAttributes(tab)}
       onclick={(event) => activate(event, tab.id)}
       onkeydown={(event) => onKeydown(event, index)}
@@ -279,7 +333,11 @@
     id={`${tooltipStem}-${tab.id}`}
     class="fabricate-tabs-tooltip"
     class:is-described={shownTooltipId === tab.id}
+    style={tooltipPlacement.id === tab.id ? tooltipPlacement.style : undefined}
     role="tooltip"
+    bind:this={tooltipNodes[tab.id]}
+    onmouseenter={() => track('hover', tab.id)}
+    onmouseleave={() => untrack('hover', tab.id)}
     {...tooltipAttributes(tab)}>{text(tab.tooltipKey, tab.tooltip)}</span
   >{/each}
 
