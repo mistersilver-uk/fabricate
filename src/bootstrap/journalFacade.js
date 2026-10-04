@@ -160,7 +160,7 @@ export const journalFacade = {
         getJournalActionAvailability: () => this.getJournalRunAuthorityAvailability(),
         // The settle's own claimability, so a tile is disabled exactly when a pick would refuse.
         getAwardChoiceClaimability: ({ run, actor }) =>
-          this.craftingEngine?._awardChoices?.().unclaimable(run, actor) ?? (() => null),
+          this.craftingEngine?.awardChoiceClaimability?.(run, actor) ?? (() => null),
       });
     }
     return this._runJournalBuilder;

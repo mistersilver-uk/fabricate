@@ -198,7 +198,7 @@ test('1773 V&A 12: a grant issued for execute is refused for the award choice', 
 });
 
 test('1773 V&A 12: a crash between the award and the settle never awards twice', async () => {
-  const { gp, record, retried, cards } = await craftWithGroup(pickGroup(), {
+  const { gp, record, fresh, retried, cards } = await craftWithGroup(pickGroup(), {
     act: async ({ execute, settle, manager, system, cards: posted }) => {
       await execute();
       posted.length = 0;
@@ -209,12 +209,15 @@ test('1773 V&A 12: a crash between the award and the settle never awards twice',
       );
       await assert.rejects(settle(['coin']), /stopped at settle-choice/);
       release();
-      await assert.rejects(settle(['coin'], 'choose-fresh'), { code: 'PLAN_MISMATCH' });
+      // A second settle while the plan is open is refused, changing nothing, rather than thrown.
+      const fresh = await settle(['coin'], 'choose-fresh');
       // The resume runs its persisted plan: a coin unclaimable now is not judged again.
       system.requirements.currency.enabled = false;
-      return { retried: await settle(['coin']) };
+      return { fresh, retried: await settle(['coin']) };
     },
   });
+  assert.equal(fresh.success, false);
+  assert.match(fresh.message, /still in progress/);
   assert.equal(retried.success, true, retried.message);
   assert.equal(gp, 4, 'the coin was credited once across all three requests');
   const [step] = record.steps;
@@ -395,13 +398,15 @@ test('1773: the settle lane refuses while a stage is mid-plan, and writes nothin
       await assert.rejects(execute(), /stopped at post-chat/);
       release();
       assert.equal(run().executionJournal.status, 'planned', 'the terminal stage is still planned');
-      const answer = await settle(['coin']).catch((error) => ({ code: error.code }));
+      const answer = await settle(['coin']);
       assert.equal(run().awardChoiceJournal, undefined, 'no award choice was planned');
       await execute();
       return { refused: answer, settled: await settle(['coin']) };
     },
   });
-  assert.equal(refused.code, 'EXECUTION_IN_PROGRESS');
+  // Refused before any plan, so it answers rather than throwing a grant-consumed recovery.
+  assert.equal(refused.success, false);
+  assert.match(refused.message, /execution in progress/);
   assert.equal(settled.success, true, 'the resumed stage frees the lane');
   assert.equal(gp, 4, 'credited once, by the second settle');
   assert.equal(record.awardChoiceJournal.status, 'committed');

@@ -11,7 +11,7 @@ import {
   awardChoiceDismissalRefusal,
   validAwardChoicePayload,
 } from './journalRunAwardChoice.js';
-import { serializedOperationResult, terminalRun } from './journalRunReply.js';
+import { serializedOperationResult, terminalRun, validText } from './journalRunReply.js';
 import { decisionAdditionalDice, preparedDecisionPolicy } from './preparedDecisionPolicy.js';
 import { applyGuardedRunMutation } from './runLifecycleState.js';
 
@@ -47,10 +47,6 @@ function failure(reason, extra = {}) {
 function currentRevision(run) {
   const value = Number(run?.runRevision);
   return Number.isInteger(value) && value >= 0 ? value : 0;
-}
-
-function validText(value) {
-  return typeof value === 'string' && value.trim() !== '';
 }
 
 function validRequest(request) {
@@ -97,6 +93,15 @@ export function normalizeJournalRunDismissals(value) {
     .sort((left, right) => Number(right[1]) - Number(left[1]))
     .slice(0, DISMISSAL_LIMIT);
   return Object.fromEntries(entries);
+}
+
+/**
+ * Only a settle keeps the request id its caller names, so an API caller can replay it from the
+ * ledger; any other command mints its own, as a check's follow-up sends must (issue 1773).
+ */
+function requestIdFor(command, randomId) {
+  const kept = command.action === 'chooseAward' && validText(command.requestId);
+  return kept ? command.requestId : randomId();
 }
 
 /** A settle spends nothing, so the sender's owner-or-GM check is its whole authorization. */
@@ -893,7 +898,7 @@ export function createJournalRunCommandService({
     const request = {
       kind: JOURNAL_RUN_SOCKET_KIND.REQUEST,
       ...command,
-      requestId: validText(command.requestId) ? command.requestId : randomId(),
+      requestId: requestIdFor(command, randomId),
       sessionId,
       senderId: undefined,
       payload: command.payload && typeof command.payload === 'object' ? command.payload : {},

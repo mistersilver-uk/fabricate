@@ -163,12 +163,43 @@ test('1773 PR4: with no GM connected the settle is refused active-gm-missing and
   assert.deepEqual(sent, []);
 });
 
-test('1773 PR4 hand-off 7: a resumed settle re-sends its persisted request id', async () => {
+test('1773 PR4: a settle keeps the request id its caller names, so a replay answers from the ledger', async () => {
   const { commands, sent } = service();
-  await commands.executeJournalRunCommand(choose({ requestId: 'persisted-settle' }));
+  await commands.executeJournalRunCommand(choose({ requestId: 'caller-settle' }));
   await commands.executeJournalRunCommand(choose());
-  assert.equal(sent[0], 'persisted-settle');
-  assert.match(sent[1], /^random-/, 'a fresh settle mints its own');
+  assert.equal(sent[0], 'caller-settle');
+  assert.match(sent[1], /^random-/, 'a settle naming none mints its own');
+});
+
+test('1773 PR4: any other command mints its own request ids, so a check follow-up never replays', async () => {
+  const sent = [];
+  const commands = createJournalRunCommandService({
+    authority: {
+      availability: () => ({ available: true, reason: null }),
+      // The first send answers a required check, as the ledger records it; the follow-up settles.
+      run: async (request) => {
+        sent.push(request.requestId);
+        return sent.length === 1
+          ? { success: true, checkRequired: true, prepareToken: 'token', promptDescriptor: {} }
+          : { success: true };
+      },
+      consumeExecutionGrant: () => null,
+    },
+    currentUser: () => USERS.get('gm'),
+    activeGM: () => USERS.get('gm'),
+    getUser: (id) => USERS.get(id) ?? null,
+    resolveUuid: async () => null,
+    emit: () => {},
+    randomId: () => `random-${sent.length}`,
+  });
+  const reply = await commands.executeJournalRunCommand(
+    choose({ action: 'execute', payload: {}, requestId: 'caller-execute' }),
+    { interactive: false }
+  );
+  assert.equal(reply.success, true);
+  assert.equal(sent.length, 2, 'the check was answered by a second send');
+  assert.ok(!sent.includes('caller-execute'), "the caller's id is never reused");
+  assert.notEqual(sent[0], sent[1], 'the follow-up is a request of its own');
 });
 
 test('1773 PR4: a run owing a pick cannot be dismissed until it is settled or needs recovery', async () => {

@@ -1,14 +1,14 @@
 /**
  * Issue 1773 PR4: the Journal projection of a run that owes an award choice, built from the real
- * engine's persisted run. It lists the run under Active and counts it there until it is settled,
- * and projects the face's choices and the `chooseAward` action. It holds a later stage on
- * `awardChoicePending` and refuses dismissal. A settle that stopped is projected as recovery or
- * as a resume of its own request.
+ * engine's persisted run through `journalFacade`'s own builder. It lists the run under Active and
+ * counts it there until it is settled, and projects the face's choices and the `chooseAward`
+ * action for an entitled owner only. It holds a later stage on `awardChoicePending` and refuses
+ * dismissal, and a settle that stopped is projected as recovery.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
+import { journalFacade } from '../src/bootstrap/journalFacade.js';
 
 import {
   coin,
@@ -19,21 +19,23 @@ import {
   pickGroup,
 } from './helpers/choiceGroupWorld.js';
 
-/** The listing as `journalFacade` wires it: the engine's own claimability, for `viewer`. */
-function listing(world, { viewer = world.gm, authority = null } = {}) {
-  const builder = new RunJournalBuilder({
+/**
+ * The listing `journalFacade` builds, wiring the engine's own claimability, for `viewer`, with the
+ * recipe visibility `recipeVisibility` reads (none, so only a GM is entitled, by default).
+ */
+function listing(world, { viewer = world.gm, authority = null, recipeVisibility = null } = {}) {
+  const facade = Object.assign(Object.create(journalFacade), {
     craftingRunManager: world.manager(),
     recipeManager: world.engine.recipeManager,
-    getSystem: () => world.system,
-    getResultItem: () => null,
-    getComponent: () => null,
-    nowWorldTime: () => Number(game.time?.worldTime ?? 0),
-    getJournalActionAvailability: () => authority ?? { available: true, reason: null },
-    getAwardChoiceClaimability: ({ run, actor }) =>
-      world.engine._awardChoices().unclaimable(run, actor),
+    recipeVisibilityService: recipeVisibility,
+    craftingSystemManager: { getSystem: () => world.system },
+    craftingEngine: world.engine,
+    getWorldTime: () => Number(game.time?.worldTime ?? 0),
+    getDismissedJournalRunKeys: () => new Set(),
+    getJournalRunAuthorityAvailability: () => authority ?? { available: true, reason: null },
   });
   world.manager().invalidateCache(world.actor.id);
-  return builder.buildListing({ actor: world.actor, viewer });
+  return facade._getRunJournalBuilder().buildListing({ actor: world.actor, viewer });
 }
 
 const owedRun = (built) => built.activeRuns.find((run) => run.awardChoicePending === true);
@@ -79,7 +81,7 @@ test('1773 PR4: a closed run owing a pick is listed and counted under Active, wi
   assert.equal(step.createdResultsRecorded, true);
   assert.equal(step.pendingAwardChoices.length, 1, 'the step projects its pending choice');
   assert.equal(settled.activeRuns.length, 0, 'once settled the run leaves Active');
-  assert.equal(settled.history[0].awardChoicePending, undefined);
+  assert.equal(settled.history[0].awardChoicePending, false, 'a run owing nothing says so');
   assert.deepEqual(settled.history[0].steps[0].groupAwards.at(-1).selections, [
     { alternativeId: 'coin' },
     { alternativeId: 'lore' },
@@ -173,31 +175,41 @@ test('1773 PR4 hand-off 4: an interrupted settle surfaces as recovery and may be
   );
 });
 
-test('1773 PR4 hand-off 7: a settle stopped before it applied anything resumes under its request', async () => {
-  const { built, resumed, gp } = await craftWithGroup(pickGroup(), {
+test('1773 PR4: an owner not entitled to the run is shown no reward and may not settle it', async () => {
+  const { hidden, shown } = await craftWithGroup(pickGroup(), {
     act: async (world) => {
       await world.execute();
-      const release = interrupt(
-        world.manager,
-        (transition) => transition.type === 'effectApplying'
-      );
-      await assert.rejects(world.settle(['coin', 'lore'], 'first-settle'));
-      release();
-      const projected = listing(world);
-      const { resume } = owedRun(projected).awardChoices[0];
+      const visible = { evaluateRecipeAccess: () => ({ visible: true }) };
       return {
-        built: projected,
-        resumed: await world.settle(resume.picks, resume.requestId),
+        hidden: listing(world, { viewer: world.viewer }),
+        shown: listing(world, { viewer: world.viewer, recipeVisibility: visible }),
       };
     },
   });
-  const choice = owedRun(built).awardChoices[0];
-  assert.deepEqual(choice.resume, {
-    requestId: 'first-settle',
-    choiceId: 'pick',
-    picks: ['coin', 'lore'],
+  const run = owedRun(hidden);
+  assert.ok(run, 'the owed run is still listed under Active');
+  assert.deepEqual(run.awardChoices, [], "a hidden recipe's rewards are never named");
+  assert.equal(run.awardChoiceBlocker, 'notEntitled');
+  assert.equal(run.actions.chooseAward, false);
+  const entitled = owedRun(shown);
+  assert.equal(entitled.awardChoices.length, 1, 'an entitled owner is shown the choice');
+  assert.equal(entitled.awardChoiceBlocker, null);
+  assert.equal(entitled.actions.chooseAward, true);
+});
+
+test('1773 PR4: an unclaimable alternative and the stage hold come through the facade wiring', async () => {
+  const group = pickGroup({ alternatives: [gem({ componentId: 'retired' }), coin()] });
+  const { built } = await craftWithGroup(group, {
+    stageCount: 2,
+    act: async (world) => {
+      await world.execute();
+      return { built: listing(world) };
+    },
   });
-  assert.equal(owedRun(built).actions.chooseAward, true, 'the resume may be sent');
-  assert.equal(resumed.success, true, resumed.message);
-  assert.equal(gp, 4);
+  const run = owedRun(built);
+  assert.deepEqual(
+    run.awardChoices[0].alternatives.map((entry) => entry.unclaimable),
+    ['componentMissing', null]
+  );
+  assert.equal(run.actions.disabledReason, 'awardChoicePending', 'the coin still holds the stage');
 });

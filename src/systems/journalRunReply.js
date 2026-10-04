@@ -10,7 +10,7 @@ export function terminalRun(run) {
   );
 }
 
-const validText = (value) => typeof value === 'string' && value.trim() !== '';
+export const validText = (value) => typeof value === 'string' && value.trim() !== '';
 
 export function serializedOperationResult(result, { secret = false, runId = '' } = {}) {
   const source =

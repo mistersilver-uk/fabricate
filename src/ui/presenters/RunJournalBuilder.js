@@ -749,14 +749,16 @@ export class RunJournalBuilder {
       entitled: viewer?.isGM === true || access?.visible === true,
       authority,
       describe: { system, currencyUnits, taughtName, localize },
-      unclaimable: this._awardChoiceClaimability({ run, actor }),
+      claimability: () => this._awardChoiceClaimability({ run, actor }),
     });
     return { ...model, ...fields };
   }
 
   /** The current stage's readiness, held while an earlier stage owes a claimable pick. */
   _awardHeld(run, actor, availability) {
-    return awardHeldAvailability(availability, run, this._awardChoiceClaimability({ run, actor }));
+    return awardHeldAvailability(availability, run, () =>
+      this._awardChoiceClaimability({ run, actor })
+    );
   }
 
   /**

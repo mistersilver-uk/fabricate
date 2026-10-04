@@ -1,11 +1,11 @@
 /**
  * `chooseAward` at the journal-run edge (issue 1773): its payload, its authorization and the
- * dismissal it blocks. A resumed settle re-sends its own `requestId`, under which alone it resumes.
+ * dismissal it blocks. A replayed settle carries its own `requestId`, which the ledger answers.
  */
-import { holdsUnsettledAwardChoice, isUnsettledChoice } from './choiceGroupAward.js';
+import { arrayOrEmpty as list } from '../utils/scalars.js';
 
-const list = (value) => (Array.isArray(value) ? value : []);
-const validText = (value) => typeof value === 'string' && value.trim() !== '';
+import { holdsUnsettledAwardChoice, isUnsettledChoice } from './choiceGroupAward.js';
+import { validText } from './journalRunReply.js';
 
 export const validAwardChoicePayload = (payload) =>
   validText(payload?.choiceId) && Array.isArray(payload.picks) && payload.picks.every(validText);

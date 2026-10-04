@@ -2824,6 +2824,11 @@ export class CraftingEngine {
     return this._awardChoices().settle(request);
   }
 
+  /** Why `actor` cannot claim each alternative `run` owes now, or `null`: the settle's own rule. */
+  awardChoiceClaimability(run, actor) {
+    return this._awardChoices().unclaimable(run, actor);
+  }
+
   _awardChoices() {
     return new AwardChoiceSettler({
       runManager: this._craftingRunManager(),
@@ -2917,10 +2922,8 @@ export class CraftingEngine {
       };
       return ctx;
     }
-    const validation = validateCraft(recipe, craftingActor, ctx.resolutionService, {
-      ...this._refusals(),
-      refusePlayerChoices: true,
-    });
+    const refusals = { ...this._refusals(), refusePlayerChoices: true };
+    const validation = validateCraft(recipe, craftingActor, ctx.resolutionService, refusals);
     if (!validation.valid) {
       ctx.refusal = {
         success: false,
