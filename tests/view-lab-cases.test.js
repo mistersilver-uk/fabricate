@@ -751,6 +751,7 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     }
     if (ROW_GEOMETRY_LAYOUT_CASE_IDS.includes(viewCase.id)) {
       assert.equal(viewCase.expectLayout.gridSelector, undefined, 'row geometry needs no grid');
+      assert.equal(typeof viewCase.expectLayout.containerSelector, 'string', 'but a container');
       assert.equal(typeof viewCase.expectLayout.oneLineRows, 'string');
       continue;
     }
