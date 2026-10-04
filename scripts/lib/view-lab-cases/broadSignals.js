@@ -69,7 +69,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/RuleRow.svelte': Object.freeze([
     'manager-checks-crafting-tier-step',
     'manager-checks-v3-count-triggers',
-    'manager-gathering-task-drop-modifiers-normal',
+    'manager-gathering-task-drop-condition-modifier-attached',
   ]),
   // Its sentence: an opened trigger's lead and quotation, and a counting check's net successes.
   'src/ui/svelte/components/RuleSentence.svelte': Object.freeze([

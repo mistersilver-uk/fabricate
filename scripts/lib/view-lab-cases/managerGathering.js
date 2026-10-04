@@ -787,6 +787,35 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
+  managerCase({
+    id: 'manager-gathering-task-drop-condition-modifier-attached',
+    label: 'Manager — Gathering task drop with an attached condition modifier',
+    // Beyond the smoke: it attaches a biome modifier, so a condition modifier's one-line rule row
+    // is on screen, which the empty card above never draws (issue 1782).
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-drop-id="hb-slowbloom-drop"]' },
+      { selector: '[data-gathering-drop-condition-modifier-picker="biome"] button' },
+      { selector: '[data-gathering-drop-condition-modifiers="biome"]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager .manager-inspector [data-gathering-drop-condition-modifiers="biome"] [data-gathering-drop-modifier-id]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+    ],
+  }),
   taskOverrideCase({
     id: 'manager-gathering-task-editor-check-fixed-over',
     label: 'higher is better, fixed DC',
