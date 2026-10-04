@@ -38,8 +38,9 @@
     its button names through `aria-describedby`.
   - `pip` is caller-formatted, so a face that states an amount rather than a held-against-needed
     pair supplies its own text and this component draws nothing extra for it.
-  - An award tile is a native `disabled` button when its alternative is; its `reading` and the
-    slot's `status`, a visible `role="status"` sentence, are named through `aria-describedby`.
+  - An award tile is a native `disabled` button when its alternative is; its `reading`, a whole
+    sentence, and the slot's `status`, a visible `role="status"` sentence, are named through
+    `aria-describedby`. Award and choice alternatives share one Well snippet.
   - Pinned by `tests/components/requirement-chooser-mounted.test.js`.
 -->
 <script>
@@ -78,7 +79,6 @@
   // first of them owns the panel.
   const opened = $derived(items.find(isOpen) ?? null);
   const alternatives = $derived(Array.isArray(opened?.alternatives) ? opened.alternatives : []);
-  const shortfalls = $derived(alternatives.filter((entry) => entry.short && entry.reading));
   const hasPanel = $derived(Boolean(opened) && (alternatives.length > 0 || Boolean(panel)));
 
   function tileState(slot) {
@@ -98,10 +98,16 @@
     return `${uid}-status-${slot.slotId}`;
   }
 
-  function awardDescribedBy(slot, alternative) {
+  function alternativeState(alternative, award) {
+    if (award) return alternative.disabled ? 'disabled' : 'open';
+    return alternative.short ? 'short' : 'met';
+  }
+
+  // An award tile names its reading and the slot's status; a choice tile only its shortfall.
+  function describedIds(slot, alternative, award, reasons) {
     const ids = [
-      alternative.reading ? shortfallId(alternative) : '',
-      slot.status ? statusId(slot) : '',
+      reasons.includes(alternative) ? shortfallId(alternative) : '',
+      award && slot.status ? statusId(slot) : '',
     ];
     return ids.filter(Boolean).join(' ') || null;
   }
@@ -117,6 +123,63 @@
     return { update: apply };
   }
 </script>
+
+<!-- A slot's alternatives as tiles in a Well, each reading stated as a sentence beneath: an
+     award slot's disabled tiles and ceiling status, or a choice panel's shortfalls. -->
+{#snippet alternativesWell(slot, entries, award)}
+  {@const reasons = entries.filter((entry) => entry.reading && (award || entry.short))}
+  <Well label={award ? slot.name : alternativesLabel}>
+    <div class="fab-requirement-alternatives">
+      {#each entries as alternative (alternative.id)}
+        {@const { class: hookClass = '', ...hooks } = alternative.wrapperProps ?? {}}
+        <div
+          class={['fab-requirement-alternative', hookClass]}
+          class:is-short={!award && alternative.short === true}
+          class:is-disabled={award && alternative.disabled === true}
+          data-requirement-alternative={alternative.id}
+          data-alternative-state={alternativeState(alternative, award)}
+          use:describedBy={describedIds(slot, alternative, award, reasons)}
+          {...hooks}
+        >
+          <SlotTile
+            label={alternative.name}
+            ariaLabel={alternative.label}
+            art={alternative.art || ''}
+            icon={alternative.icon || 'fas fa-circle'}
+            tint={alternative.tint || ''}
+            state={!award && alternative.short ? 'short' : 'met'}
+            pip={alternative.pip || ''}
+            interactive={!award || !readOnly}
+            pressed={alternative.selected === true}
+            disabled={award && alternative.disabled === true}
+            onActivate={() => onChoose?.(slot, alternative)}
+          />
+        </div>
+      {/each}
+    </div>
+    {#each reasons as alternative (alternative.id)}
+      <p
+        class={award ? 'fab-requirement-reason' : 'fab-requirement-shortfall'}
+        id={shortfallId(alternative)}
+        data-requirement-reason={award ? alternative.id : undefined}
+        data-requirement-shortfall={award ? undefined : alternative.id}
+      >
+        {alternative.reading}
+      </p>
+    {/each}
+    {#if award}
+      <p
+        class="fab-requirement-status"
+        class:is-empty={!slot.status}
+        role="status"
+        id={statusId(slot)}
+        data-award-status
+      >
+        {slot.status ?? ''}
+      </p>
+    {/if}
+  </Well>
+{/snippet}
 
 {#snippet tile(slot)}
   <SlotTile
@@ -177,52 +240,7 @@
 
   {#each awardSlots as slot (slot.key)}
     <div class="fab-requirement-panel" data-requirement-panel={slot.slotId} data-slot-kind="award">
-      <Well label={slot.name}>
-        <div class="fab-requirement-alternatives">
-          {#each slot.alternatives ?? [] as alternative (alternative.id)}
-            {@const { class: hookClass = '', ...hooks } = alternative.wrapperProps ?? {}}
-            <div
-              class={['fab-requirement-alternative', hookClass]}
-              class:is-disabled={alternative.disabled === true}
-              data-requirement-alternative={alternative.id}
-              data-alternative-state={alternative.disabled ? 'disabled' : 'open'}
-              use:describedBy={awardDescribedBy(slot, alternative)}
-              {...hooks}
-            >
-              <SlotTile
-                label={alternative.name}
-                ariaLabel={alternative.label}
-                art={alternative.art || ''}
-                icon={alternative.icon || 'fas fa-circle'}
-                tint={alternative.tint || ''}
-                pip={alternative.pip || ''}
-                interactive={!readOnly}
-                pressed={alternative.selected === true}
-                disabled={alternative.disabled === true}
-                onActivate={() => onChoose?.(slot, alternative)}
-              />
-            </div>
-          {/each}
-        </div>
-        {#each (slot.alternatives ?? []).filter((entry) => entry.reading) as alternative (alternative.id)}
-          <p
-            class="fab-requirement-reason"
-            id={shortfallId(alternative)}
-            data-requirement-reason={alternative.id}
-          >
-            {alternative.name}: {alternative.reading}
-          </p>
-        {/each}
-        <p
-          class="fab-requirement-status"
-          class:is-empty={!slot.status}
-          role="status"
-          id={statusId(slot)}
-          data-award-status
-        >
-          {slot.status ?? ''}
-        </p>
-      </Well>
+      {@render alternativesWell(slot, slot.alternatives ?? [], true)}
     </div>
   {/each}
 
@@ -235,43 +253,7 @@
       data-requirement-panel={opened.slotId}
     >
       {#if alternatives.length > 0}
-        <Well label={alternativesLabel}>
-          <div class="fab-requirement-alternatives">
-            {#each alternatives as alternative (alternative.id)}
-              {@const { class: hookClass = '', ...hooks } = alternative.wrapperProps ?? {}}
-              <div
-                class={['fab-requirement-alternative', hookClass]}
-                class:is-short={alternative.short === true}
-                data-requirement-alternative={alternative.id}
-                data-alternative-state={alternative.short ? 'short' : 'met'}
-                use:describedBy={shortfalls.includes(alternative) ? shortfallId(alternative) : null}
-                {...hooks}
-              >
-                <SlotTile
-                  label={alternative.name}
-                  ariaLabel={alternative.label}
-                  art={alternative.art || ''}
-                  icon={alternative.icon || 'fas fa-circle'}
-                  tint={alternative.tint || ''}
-                  state={alternative.short ? 'short' : 'met'}
-                  pip={alternative.pip || ''}
-                  interactive
-                  pressed={alternative.selected === true}
-                  onActivate={() => onChoose?.(opened, alternative)}
-                />
-              </div>
-            {/each}
-          </div>
-          {#each shortfalls as alternative (alternative.id)}
-            <p
-              class="fab-requirement-shortfall"
-              id={shortfallId(alternative)}
-              data-requirement-shortfall={alternative.id}
-            >
-              {alternative.reading}
-            </p>
-          {/each}
-        </Well>
+        {@render alternativesWell(opened, alternatives, false)}
       {/if}
       {@render panel?.(opened)}
     </div>
@@ -365,9 +347,11 @@
     font-size: 10.5px;
   }
 
-  /* Kept in the tree while empty, because a live region must exist before what it announces. */
+  /* Kept in the tree while empty, because a live region must exist before what it announces;
+     core's `p:empty { min-height: 1rem }` would otherwise keep a line's height. */
   .fab-requirement-status.is-empty {
     height: 0;
+    min-height: 0;
     margin: 0;
     overflow: hidden;
   }

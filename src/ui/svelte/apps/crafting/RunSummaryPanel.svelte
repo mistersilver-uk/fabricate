@@ -4,9 +4,9 @@
   just-completed / in-flight craft run. It is a compact, self-contained summary of
   the latest outcome with a "craft next step" advance action (re-invokes
   store.craft for the same recipe — used to advance a progressive run or craft
-  another). A visible/keyboard Back affordance returns to the shopping list. An
-  outcome that left a reward to pick names it, and `onOpenRun(runId)` opens that
-  run in the Journal (issue 1773).
+  another). A visible/keyboard Back affordance returns to the shopping list. While
+  `awardPending`, the outcome's reward still to pick is named, and `onOpenRun(runId)`
+  opens that run in the Journal (issue 1773).
 -->
 <script>
   import Button from '../../components/Button.svelte';
@@ -20,6 +20,7 @@
   let {
     recipe = null,
     rollResult = null,
+    awardPending = false,
     canCraft = true,
     busy = false,
     onCraftNext = null,
@@ -60,7 +61,7 @@
 
   <RollResultBox result={rollResult} />
 
-  {#if rollResult?.awardChoicePending === true}
+  {#if awardPending}
     <Notice
       tone="info"
       title={localize('FABRICATE.App.Crafting.Run.AwardPending')}

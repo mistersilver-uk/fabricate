@@ -1084,8 +1084,8 @@
           "Advance": "Craft next step",
           "Dismiss": "Back to shopping list",
           "AwardPending": "A reward awaits your choice",
-          "AwardPendingDetail": "This craft left a reward for you to pick. Choose it in the Journal to claim it.",
-          "OpenJournal": "Choose it in the Journal",
+          "AwardPendingDetail": "Pick it there to claim it.",
+          "OpenJournal": "Open in Journal",
           "ResultProduced": "The result set is produced.",
           "NothingProduced": "Nothing is produced; the failure policy applies."
         },
@@ -1107,6 +1107,9 @@
           "AlwaysIncluded": "always included",
           "Empty": "No other owned characters to add.",
           "SearchCharacters": "Search characters…"
+        },
+        "Refusal": {
+          "PlayerChoiceUnversioned": "This recipe awards a reward the player chooses, which only a versioned crafting run can settle. Nothing was consumed."
         }
       },
       "Journal": {
@@ -1131,6 +1134,7 @@
           "unknown": "Outcome unknown",
           "awaitingChoice": "Needs your choice",
           "awaitingReward": "Choose your reward",
+          "rewardPending": "Reward pending",
           "readyToBegin": "Needs your go-ahead",
           "needsMaterials": "Needs materials",
           "needsEssences": "Needs essences",
@@ -1400,8 +1404,12 @@
           "RecoveryDetail": "Fabricate recorded {count} completed effects and stopped before it could confirm the rest.",
           "PausedInline": "Run paused — its countdown is frozen until you resume it.",
           "UnsupportedTitle": "This run is read-only",
-          "RewardTitle": "A reward is waiting for your choice",
-          "RewardDetail": "Pick it below to claim it. Nothing from it is yours until you do.",
+          "RewardTitle": "Choose your reward",
+          "RewardDetail": "Choose below to claim it. Nothing from it is yours until you do.",
+          "RewardNoneClaimableDetail": "None of its rewards can be claimed now.",
+          "RewardWaitingTitle": "A reward is waiting to be chosen",
+          "RewardOwnerDetail": "This character's owner or the GM chooses it.",
+          "RewardGmDetail": "Your GM can choose this reward for you.",
           "ChoiceTitle": "Waiting on your choice",
           "ChoiceDetail": "Nothing is counting down: this stage needs you to choose how to meet it before it can go on."
         },
@@ -1500,19 +1508,21 @@
           "ClaimOne": "Claim {name}",
           "ClaimMany": "Claim {count} rewards",
           "ClaimNone": "Choose a reward to claim",
-          "Forfeit": "Settle with nothing to claim",
-          "ForfeitDetail": "None of these rewards can be claimed now, so settling it awards nothing.",
-          "Resume": "Your last claim was interrupted. Claim it again to finish.",
+          "Forfeit": "Close without a reward",
+          "ForfeitDetail": "None of these rewards can be claimed by this character. Closing the choice awards nothing and moves the run to Finished.",
           "ReadOnly": "Only this character's owner or the GM can choose this reward.",
           "Claimed": "Reward claimed",
+          "ClosedEmpty": "Closed without a reward",
+          "UnlearnedRecipe": "A recipe you have not learned",
+          "RecipeAmount": "recipe",
           "Unclaimable": {
-            "alreadyKnown": "You already know this recipe",
-            "recipeMissing": "This recipe is no longer available",
-            "knowledgeNotObservable": "Learned recipes are not tracked here",
-            "componentMissing": "This item is no longer available",
-            "currencyDisabled": "Currency rewards are turned off",
-            "unitMissing": "This currency no longer exists",
-            "other": "This reward cannot be credited to this character"
+            "alreadyKnown": "You already know {name}.",
+            "recipeMissing": "This recipe is no longer available.",
+            "knowledgeNotObservable": "Learned recipes are not tracked here, so {name} cannot be taught.",
+            "componentMissing": "{name} is no longer available.",
+            "currencyDisabled": "Currency rewards are turned off.",
+            "unitMissing": "The currency of {name} no longer exists.",
+            "other": "{name} cannot be credited to this character."
           }
         },
         "Reason": {
@@ -1985,7 +1995,7 @@
       "RolledAmountEmpty": "Rolled {formula} = {total}, nothing produced",
       "RecipeLearned": "Learned the recipe {recipe}",
       "RecipeAlreadyKnown": "Already knew the recipe {recipe}",
-      "AwardChoicePending": "A reward awaits your choice"
+      "AwardChoicePending": "A reward is waiting to be chosen in the Journal"
     },
     "Check": {
       "Roll": {

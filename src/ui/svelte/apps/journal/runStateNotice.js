@@ -26,6 +26,20 @@ const NON_BLOCKING_REASONS = new Set([
   'awardChoicePending',
 ]);
 
+/**
+ * The reward notice's title and detail for this viewer: one who may not pick is told who does,
+ * and one who may is told to choose below, or that nothing there can be claimed now.
+ */
+function rewardNoticeKeys(run) {
+  const blocker = run?.awardChoiceBlocker;
+  if (blocker === 'notOwner') return ['RewardWaitingTitle', 'RewardOwnerDetail'];
+  if (blocker === 'notEntitled') return ['RewardWaitingTitle', 'RewardGmDetail'];
+  const claimable = (run?.awardChoices ?? []).some((choice) =>
+    (choice.alternatives ?? []).some((alternative) => !alternative.unclaimable)
+  );
+  return ['RewardTitle', claimable ? 'RewardDetail' : 'RewardNoneClaimableDetail'];
+}
+
 /** The blocker code, when execution is actually refused. `''` otherwise. */
 export function runBlockerCode(run) {
   const code = run?.actions?.disabledReason;
@@ -95,13 +109,14 @@ export function runStateNotice(run, localize) {
     };
   }
 
-  // A reward waiting for the player's pick, which the award face beneath asks for (issue 1773).
+  // A reward waiting for a pick, worded for whether this viewer can make it (issue 1773).
   if (run?.awardChoicePending === true) {
+    const [title, detail] = rewardNoticeKeys(run);
     return {
       tone: 'info',
       blocking: false,
-      title: text('RewardTitle'),
-      detail: text('RewardDetail'),
+      title: text(title),
+      detail: text(detail),
       hooks: { 'data-journal-award-pending': 'true', ...pausedHook },
       evidence: false,
       claim: null,

@@ -6,7 +6,9 @@
  */
 import { currencyUnitDisplayName, findCurrencyUnit } from '../../systems/currencyProfile.js';
 import { resolvedComponentsFor } from '../../systems/scopedEntityReads.js';
+import { isChoiceGroup } from '../../utils/choiceGroupShape.js';
 import {
+  arrayOrEmpty as list,
   untrimmedStringOrEmpty as stringOrEmpty,
   untrimmedStringOrNull as stringOrNull,
 } from '../../utils/scalars.js';
@@ -15,29 +17,40 @@ import { RESULT_KIND_GLYPHS } from './resultKindGlyphs.js';
 
 const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
 
-const list = (value) => (Array.isArray(value) ? value : []);
 const kindOf = (result) => result?.kind ?? 'component';
-// The model's `isChoiceGroup` test, read off the plain shape so the player app's mount closure
-// never reaches `src/models/` (issue 1773).
-const isChoiceGroup = (result) => Array.isArray(result?.alternatives);
 
 /** The authored amount: the expression when rolled, the number otherwise (issue 1645). */
 const authoredAmount = (result) => result?.quantityFormula || Number(result?.quantity || 1);
 
 const sortedJoin = (pairs) => pairs.sort((a, b) => a.localeCompare(b)).join(',');
 
+/** A choice group's settings: its chooser, strategy, count, selection roll and replacement. */
+function groupSettings(group) {
+  const count = group.awardCountFormula || group.awardCount || 1;
+  const settings = [group.chooser ?? 'playerChooses', group.awardStrategy ?? 'anyOne', count];
+  if (group.selectionFormula) settings.push(group.selectionFormula);
+  if (group.withReplacement === true) settings.push('withReplacement');
+  return settings.join(':');
+}
+
+/** A rolled group member's selection range, `''` for any other result. */
+const rangeSuffix = (result) => {
+  const range = result?.selectionRange;
+  return range ? `@${range.from}-${range.to}` : '';
+};
+
 /** One result's signature pair; a choice group signs its settings and its alternatives. */
 function signaturePair(result) {
   if (isChoiceGroup(result)) {
-    const count = result.awardCountFormula || result.awardCount || 1;
-    const settings = `${result.chooser ?? 'playerChooses'}:${result.awardStrategy ?? 'anyOne'}`;
-    return `group:${settings}:${count}(${sortedJoin(result.alternatives.map(signaturePair))})`;
+    return `group:${groupSettings(result)}(${sortedJoin(result.alternatives.map(signaturePair))})`;
   }
   const kind = kindOf(result);
   const quantity = Number(result?.quantity || 1);
-  if (kind === 'component') return `${stringOrEmpty(result?.componentId)}:${quantity}`;
+  if (kind === 'component') {
+    return `${stringOrEmpty(result?.componentId)}:${quantity}${rangeSuffix(result)}`;
+  }
   const subject = kind === 'currency' ? result?.unit : result?.recipeId;
-  return `${kind}:${stringOrEmpty(subject)}:${quantity}`;
+  return `${kind}:${stringOrEmpty(subject)}:${quantity}${rangeSuffix(result)}`;
 }
 
 /**

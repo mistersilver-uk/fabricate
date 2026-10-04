@@ -145,6 +145,17 @@ describe('CraftingView mounted behavior', () => {
     assert.ok(!target.querySelector('[data-crafting-award-pending]'));
   });
 
+  it('1773: once the reward is settled in the Journal the outcome stops naming it', async () => {
+    const store = fakeCraftingStore({
+      recipes: [recipe()],
+      lastRollResult: { 'recipe-1': { success: true, runId: 'run-7', awardChoicePending: true } },
+    });
+    const journal = { awardChoiceSettled: (runId) => runId === 'run-7' };
+    const target = await harness.mount({ services: services(store, { journal }) });
+    assert.ok(Boolean(target.querySelector('[data-crafting-run-summary]')), 'the outcome shows');
+    assert.ok(!target.querySelector('[data-crafting-award-pending]'), 'the settled pick is gone');
+  });
+
   // Issue 1648: a failed CHECK now records an outcome too.
   it('paints the run summary as a failure when the recorded outcome is a failed check', async () => {
     const built = recipe();

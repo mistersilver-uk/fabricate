@@ -3,6 +3,8 @@
  * its alternatives as tiles with caller-formatted pips, an unclaimable one disabled with its reason
  * and, under up to N, every unpicked tile disabled once the ceiling is picked.
  */
+import { arrayOrEmpty as list } from '../../utils/scalars.js';
+
 import { RESULT_KIND_GLYPHS } from './resultKindGlyphs.js';
 
 /** Whole literal keys, so the lang-key guard sees every reason a tile can state. */
@@ -16,11 +18,10 @@ const UNCLAIMABLE_KEYS = Object.freeze({
 });
 const UNCLAIMABLE_OTHER = 'FABRICATE.App.Journal.AwardChoice.Unclaimable.other';
 
-const list = (value) => (Array.isArray(value) ? value : []);
-
-/** The sentence an unclaimable alternative's tile states, for any blocker the settle can name. */
-export const unclaimableText = (reason, localize) =>
-  localize(UNCLAIMABLE_KEYS[reason] ?? UNCLAIMABLE_OTHER);
+/** The sentence an unclaimable alternative's tile states, naming it, for any blocker the settle
+ *  can name. */
+export const unclaimableText = (reason, name, localize) =>
+  localize(UNCLAIMABLE_KEYS[reason] ?? UNCLAIMABLE_OTHER, { name });
 
 /** A tile's pip: a component's amount or its expression, a credit's amount, a recipe none. */
 export function awardPip(alternative) {
@@ -82,13 +83,18 @@ export function awardSlot(choice, picks, localize) {
   const alternatives = list(choice.alternatives).map((alternative) => {
     const pip = awardPip(alternative);
     const selected = picks.includes(alternative.id);
+    // A recipe draws no pip, so its accessible name states the kind instead.
+    const amount =
+      alternative.kind === 'knowledge'
+        ? localize('FABRICATE.App.Journal.AwardChoice.RecipeAmount')
+        : pip;
     return {
       id: alternative.id,
       name: alternative.name,
-      label: pip
+      label: amount
         ? localize('FABRICATE.App.Journal.AwardChoice.TileLabel', {
             name: alternative.name,
-            amount: pip,
+            amount,
           })
         : alternative.name,
       art: alternative.img ?? '',
@@ -96,7 +102,9 @@ export function awardSlot(choice, picks, localize) {
       pip,
       selected,
       disabled: Boolean(alternative.unclaimable) || (atCeiling && !selected),
-      reading: alternative.unclaimable ? unclaimableText(alternative.unclaimable, localize) : '',
+      reading: alternative.unclaimable
+        ? unclaimableText(alternative.unclaimable, alternative.name, localize)
+        : '',
       wrapperProps: { 'data-award-alternative': alternative.id },
     };
   });

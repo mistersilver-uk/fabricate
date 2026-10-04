@@ -1819,7 +1819,6 @@ function owedChoice(extra = {}) {
     countRoll: null,
     ceiling: 2,
     alternatives: ALTERNATIVES.map((entry) => ({ unclaimable: null, ...entry })),
-    resume: null,
     ...extra,
   };
 }
@@ -1837,14 +1836,18 @@ function owedRun({ choices = [owedChoice()], blocker = null } = {}) {
   };
 }
 
-/** A journal whose settle answers as the reload would: `next` replaces the mounted run. */
-function settlingJournal(next) {
+/**
+ * A journal whose settle answers as the reload would: `next` replaces the mounted run, and a
+ * `refused` settle answers a refusal with the run unchanged.
+ */
+function settlingJournal(next, { refused = false } = {}) {
   const sent = [];
   return {
     sent,
     busyRunKey: '',
     async chooseAward(_run, request) {
       sent.push(request);
+      if (refused) return { success: false, reason: 'operation-failed' };
       await harness.setProps({ run: next });
       return { success: true };
     },
@@ -1929,10 +1932,75 @@ describe('RunDetail award face (issue 1773)', () => {
     confirm.click();
     await settleTurns();
     await settleTurns();
-    assert.deepEqual(journal.sent, [{ choiceId: 'pick', picks: ['coin'], requestId: null }]);
-    const heading = target.querySelector('[data-award-claimed]');
-    assert.ok(Boolean(heading), 'the claimed heading renders');
-    assert.ok(document.activeElement === heading, 'focus is on the claimed heading');
+    assert.deepEqual(journal.sent, [{ choiceId: 'pick', picks: ['coin'] }]);
+    const claimed = target.querySelector('[data-award-claimed]');
+    assert.ok(Boolean(claimed), 'the claimed notice renders');
+    assert.ok(document.activeElement === claimed, 'focus is on the claimed notice');
+    const notice = claimed.querySelector('[data-award-outcome="claimed"]');
+    assert.equal(notice.dataset.noticeTone, 'success', 'a state that just happened is a Notice');
+    assert.match(notice.textContent, /AwardChoice\.Claimed/);
+    assert.match(notice.textContent, /Gold 3 gp/, 'it names what was claimed');
+  });
+
+  it('a choice closed with nothing claimable reads as closed without a reward, never claimed', async () => {
+    const alternatives = ALTERNATIVES.map((entry) => ({ ...entry, unclaimable: 'unitMissing' }));
+    const journal = settlingJournal(owedRun({ choices: [] }));
+    const target = await harness.mount({
+      run: owedRun({ choices: [owedChoice({ alternatives })] }),
+      journal,
+    });
+    assert.match(confirmButton(target).textContent, /AwardChoice\.Forfeit/);
+    confirmButton(target).click();
+    await settleTurns();
+    await settleTurns();
+    assert.deepEqual(journal.sent, [{ choiceId: 'pick', picks: [] }]);
+    const notice = target.querySelector(
+      ':scope [data-award-claimed] [data-award-outcome="forfeited"]'
+    );
+    assert.match(notice.textContent, /AwardChoice\.ClosedEmpty/);
+    assert.doesNotMatch(notice.textContent, /AwardChoice\.Claimed/);
+  });
+
+  it('a held pick that becomes unclaimable stops counting, so the face never dead-ends', async () => {
+    const target = await harness.mount({ run: owedRun(), journal: settlingJournal(null) });
+    tile(target, 'gem').click();
+    await settleTurns();
+    tile(target, 'coin').click();
+    await settleTurns();
+    assert.equal(tile(target, 'ore').disabled, true, 'two picks hold the ceiling');
+    const coinGone = ALTERNATIVES.map((entry) => ({
+      ...entry,
+      unclaimable: entry.id === 'coin' ? 'unitMissing' : null,
+    }));
+    await harness.setProps({ run: owedRun({ choices: [owedChoice({ alternatives: coinGone })] }) });
+    await settleTurns();
+    assert.equal(tile(target, 'coin').getAttribute('aria-pressed'), 'false', 'the pick is dropped');
+    assert.equal(tile(target, 'ore').disabled, false, 'and no longer holds the ceiling');
+    const noneLeft = ALTERNATIVES.map((entry) => ({ ...entry, unclaimable: 'unitMissing' }));
+    await harness.setProps({ run: owedRun({ choices: [owedChoice({ alternatives: noneLeft })] }) });
+    await settleTurns();
+    assert.equal(confirmButton(target).disabled, false, 'closing without a reward stays open');
+  });
+
+  it("a refused confirm drops the choice's picks", async () => {
+    const journal = settlingJournal(null, { refused: true });
+    const target = await harness.mount({ run: owedRun(), journal });
+    tile(target, 'gem').click();
+    await settleTurns();
+    confirmButton(target).click();
+    await settleTurns();
+    await settleTurns();
+    assert.equal(journal.sent.length, 1);
+    assert.equal(tile(target, 'gem').getAttribute('aria-pressed'), 'false');
+    assert.equal(confirmButton(target).disabled, true, 'nothing is picked to send again');
+  });
+
+  it('a run awaiting recovery draws no tiles, whatever choices it still lists', async () => {
+    const target = await harness.mount({
+      run: { ...owedRun(), recoveryEvidence: { required: true, effects: [] } },
+      journal: settlingJournal(null),
+    });
+    assert.ok(!target.querySelector('[data-award-face]'), 'no face over an uncertain settle');
   });
 
   it('after a settle with another choice owed, focus moves to that choice', async () => {

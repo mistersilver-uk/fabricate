@@ -31,11 +31,12 @@
     hook is not layout. `align-items: flex-start` is declared explicitly, because the specimen declares no
     `align-items` and renders top-aligned only through its glyph's fixed box and top margin.
 
-  Five recorded deviations from the specimen's stated API: `action.description` (issue 2006), for
+  Six recorded deviations from the specimen's stated API: `action.description` (issue 2006), for
   an action whose effect its verb alone does not state; the `accent` tone, whose title and glyph
   take `--fab-accent-text` because the accent itself measures 4.48:1 in `ironblood-forge`, under AA;
   `font-variant-numeric: tabular-nums` on the detail; `icon`, load-bearing because two shipped states
-  resolve to the same tone; and the rest spread, whose hooks carry no behaviour.
+  resolve to the same tone; the rest spread, whose hooks carry no behaviour; and the body's 12rem
+  basis, which wraps the action beneath it in a narrow host (issue 1773).
 -->
 <script>
   let {
@@ -117,9 +118,9 @@
     box-sizing: border-box;
     display: flex;
     align-items: flex-start;
-    /* Wrapping carries the evidence band only: the glyph is `flex: none`, the body is
-       `flex: 1` (basis 0) and the controls are `flex: none`, so line breaking sees a row
-       that fits until it genuinely cannot (issue 1648). */
+    /* Wrapping carries the evidence band, and the action once the body would fall under its
+       12rem basis: the glyph and the controls are `flex: none`, so a wide notice keeps one
+       row while a narrow one drops its action beneath the body (issues 1648, 1773). */
     flex-wrap: wrap;
     gap: var(--fab-space-3);
     /* The specimen's gap is BETWEEN THE COLUMNS, so the band keeps the space-2 it
@@ -159,7 +160,7 @@
   }
 
   .fab-notice-body {
-    flex: 1;
+    flex: 1 1 12rem;
     min-width: 0;
   }
 

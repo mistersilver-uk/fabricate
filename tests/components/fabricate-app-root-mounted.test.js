@@ -48,8 +48,9 @@ const harness = createMountedComponentHarness({
     'src/gatheringImageDefaults.js',
     'src/ui/presenters/CraftingListingBuilder.js',
     'src/ui/presenters/resultOutputRows.js',
-    // Issue 1773: a reward row's glyph and its unit's display name.
+    // Issue 1773: a reward row's glyph and its unit's display name, and the choice-group shape.
     'src/ui/presenters/resultKindGlyphs.js',
+    'src/utils/choiceGroupShape.js',
     'src/systems/currencyProfile.js',
     'src/config/currencyPresets.js',
     // Issue 2005: the check card's roll-under or character-value target line.

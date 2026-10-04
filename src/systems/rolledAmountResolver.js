@@ -3,6 +3,7 @@ import {
   normalizeQuantityFormula,
   quantityFormulaErrors,
 } from '../models/Result.js';
+import { localizeWith } from '../utils/localizeWithFallback.js';
 import { diceEngine } from '../utils/rollFormulaRollability.js';
 
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
@@ -79,13 +80,22 @@ export function rolledAmountRefusals(resultGroups, Roll, rollData) {
     .map((formula) => `Result amount "${formula}" cannot be rolled for this character`);
 }
 
+/** The unversioned path's refusal of a group whose chooser is the player (issue 1773). */
+const playerChooserRefusal = () =>
+  localizeWith(
+    (key) => globalThis.game?.i18n?.localize?.(key),
+    'FABRICATE.App.Crafting.Refusal.PlayerChoiceUnversioned',
+    undefined,
+    'This recipe awards a reward the player chooses, which only a versioned crafting run can settle. Nothing was consumed.'
+  );
+
 /** A group whose chooser is the player is settled by the Journal's `chooseAward`, which only a
  *  versioned run has (issue 1773). */
 const playerChooserRefusals = (groups) =>
   groups
     .flatMap((group) => group?.results ?? [])
     .filter((result) => isChoiceGroup(result) && result.chooser !== 'rolled')
-    .map(() => 'A reward the player chooses is awarded only through the Journal');
+    .map(() => playerChooserRefusal());
 
 /**
  * Every refusal `groups` raise for `actor` before anything is consumed or awarded: a formula that

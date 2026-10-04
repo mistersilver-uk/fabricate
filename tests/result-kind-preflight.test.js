@@ -222,7 +222,10 @@ for (const [where, build] of Object.entries(PLAYER_CHOOSER_WORLDS)) {
       const world = build();
       const result = await world.craftWith(world.crafter, [world.sourceActor]);
       assert.equal(result.success, false);
-      assert.match(result.message, /the player chooses is awarded only through the Journal/);
+      assert.match(
+        result.message,
+        /only a versioned crafting run can settle\. Nothing was consumed\./
+      );
       assert.equal(wood(world), 5, 'the wood is all still there');
       assert.equal(world.crafter.updates.length, 0, 'nothing was credited or granted');
       assert.equal(

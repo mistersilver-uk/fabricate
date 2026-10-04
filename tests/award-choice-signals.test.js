@@ -71,7 +71,7 @@ test('1773 V&A 13: the award slot disables only past the ceiling under up to N, 
   assert.match(capped.status, /AwardChoice\.Ceiling\{"picked":2,"count":2\}/);
   assert.equal(
     capped.alternatives[2].reading,
-    'FABRICATE.App.Journal.AwardChoice.Unclaimable.alreadyKnown'
+    'FABRICATE.App.Journal.AwardChoice.Unclaimable.alreadyKnown{"name":"Tonic"}'
   );
   const open = awardSlot(choice({ awardStrategy: 'anyOne', ceiling: 1 }), ['gem'], localize);
   assert.deepEqual(
@@ -84,6 +84,11 @@ test('1773 V&A 13: the award slot disables only past the ceiling under up to N, 
     capped.alternatives.map((entry) => entry.pip),
     ['×2', '3 gp', ''],
     'a component its amount, a credit its unit, a recipe none'
+  );
+  assert.match(
+    capped.alternatives[2].label,
+    /TileLabel\{"name":"Tonic","amount":"FABRICATE\.App\.Journal\.AwardChoice\.RecipeAmount"\}/,
+    "a recipe's accessible name states that it is a recipe"
   );
 });
 
@@ -125,6 +130,34 @@ test('1773: a reward owed outranks every other attention and states its own noti
   );
 });
 
+const noticeFor = (extra) =>
+  runStateNotice({ awardChoicePending: true, awardChoices: [choice()], ...extra }, localize);
+
+test('1773: the reward notice and attention are worded for what this viewer can do', () => {
+  const read = (extra) => {
+    const notice = noticeFor(extra);
+    return [notice.title, notice.detail].map((key) => key.replace(/^.*\.Notice\./, ''));
+  };
+  assert.deepEqual(read({}), ['RewardTitle', 'RewardDetail']);
+  assert.deepEqual(read({ awardChoiceBlocker: 'notOwner' }), [
+    'RewardWaitingTitle',
+    'RewardOwnerDetail',
+  ]);
+  assert.deepEqual(read({ awardChoiceBlocker: 'notEntitled', awardChoices: [] }), [
+    'RewardWaitingTitle',
+    'RewardGmDetail',
+  ]);
+  const unclaimable = (entry) => ({ ...entry, unclaimable: 'unitMissing' });
+  const none = choice({ alternatives: choice().alternatives.map(unclaimable) });
+  assert.deepEqual(read({ awardChoices: [none] }), ['RewardTitle', 'RewardNoneClaimableDetail']);
+  const label = (extra) =>
+    runAttentionPresentation({ awardChoicePending: true, ...extra }).labelKey;
+  assert.match(label({}), /Status\.awaitingReward$/);
+  assert.match(label({ awardChoiceBlocker: 'notOwner' }), /Status\.rewardPending$/);
+  assert.match(label({ awardChoiceBlocker: 'notEntitled' }), /Status\.rewardPending$/);
+  assert.match(label({ awardChoiceBlocker: 'active-gm-missing' }), /Status\.awaitingReward$/);
+});
+
 test('1773: the closed guidance waits on the reward rather than calling the run closed', () => {
   const run = { status: 'succeeded', awardChoicePending: true, steps: [] };
   assert.match(
@@ -164,6 +197,34 @@ test('1773 V&A 16: a group signs its settings and alternatives, and never as an 
   assert.notEqual(sign(group()), sign(group({ awardStrategy: 'upTo', awardCount: 2 })));
   const swapped = group({ alternatives: group().alternatives.toReversed() });
   assert.equal(sign(group()), sign(swapped), 'alternative order does not sign');
+  const upTo = group({ awardStrategy: 'upTo', awardCount: 2 });
+  assert.notEqual(sign(upTo), sign(group({ awardStrategy: 'upTo', awardCount: 3 })), 'the count');
+  const rolled = (extra = {}) =>
+    group({
+      chooser: 'rolled',
+      selectionFormula: '1d6',
+      alternatives: [
+        { id: 'gem', componentId: 'gem', quantity: 2, selectionRange: { from: 1, to: 3 } },
+        { id: 'ore', componentId: 'ore', quantity: 1, selectionRange: { from: 4, to: 6 } },
+      ],
+      ...extra,
+    });
+  assert.notEqual(sign(rolled()), sign(rolled({ selectionFormula: '1d8' })), 'the selection roll');
+  assert.notEqual(
+    sign(rolled({ awardStrategy: 'upTo', awardCount: 2 })),
+    sign(rolled({ awardStrategy: 'upTo', awardCount: 2, withReplacement: true })),
+    'replacement'
+  );
+  const ladder = rolled().alternatives.map((member, index) => ({
+    ...member,
+    selectionRange: index === 0 ? { from: 1, to: 2 } : { from: 3, to: 6 },
+  }));
+  assert.notEqual(sign(rolled()), sign(rolled({ alternatives: ladder })), "each member's range");
+  assert.equal(
+    sign({ componentId: 'gem', quantity: 2 }),
+    'gem:2',
+    'a plain result signs exactly as before'
+  );
   assert.notEqual(
     sign(group()),
     sign(
