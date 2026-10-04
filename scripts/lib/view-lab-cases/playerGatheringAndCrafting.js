@@ -815,6 +815,47 @@ export const CASES = Object.freeze([
       /^src\/ui\/presenters\/(?:resultOutputRows|CraftingListingBuilder)\.js$/,
     ],
   }),
+  // Issue 1773: a group the player chooses from previews who chooses and how many over its
+  // alternatives, one Well beneath the plain result.
+  playerCase({
+    id: 'player-crafting-results-choice-group',
+    label: 'Player app — Crafting outputs with a reward the player chooses',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', resultRowState: 'reward-group' },
+    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' }],
+    position: { width: 1100, height: 860 },
+    expectTab: 'crafting',
+    expectSelector:
+      '[data-io-group="outputs"]:has([data-io-output="component"])' +
+      ':has([data-io-output="group"] .fab-well [data-io-output="currency"])' +
+      ':has([data-io-output="group"] [data-io-output="knowledge"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/presenters\/resultOutputRows\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
+    ],
+  }),
+  // Issue 1773: a craft that left a reward to pick names it and offers the run in the Journal.
+  playerCase({
+    id: 'player-crafting-outcome-award-pending',
+    label: 'Player app — a craft outcome owing a reward the player picks in the Journal',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'over-evidence', resultRowState: 'reward-group' },
+    steps: [...CRAFT_HORSESHOE],
+    expectTab: 'crafting',
+    expectSelector: '[data-crafting-run-summary] [data-crafting-award-pending]',
+    expectCenterHit: '[data-crafting-award-pending] button',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RunSummaryPanel\.svelte$/,
+      /^src\/systems\/journalRunReply\.js$/,
+    ],
+  }),
   // Issue 1773: a routed tier that pays a credit previews it as a reward, not as an Item.
   playerCase({
     id: 'player-crafting-routed-tier-reward',

@@ -91,6 +91,25 @@ function seedRewardCraftLearned(actors) {
   });
 }
 
+/** `reward-group` (issue 1773): Bend Horseshoe also leaves the player a pick of up to two — an
+ *  ingot, a guild bounty or the longsword's recipe — under a knowledge-visibility Smithing that
+ *  takes part in currency, so the craft clears the pre-flight and its outputs preview the group. */
+function seedRewardGroup(content) {
+  const { recipe, system } = recipeAndSystem(content, 'sm-r-horseshoe', 'reward-group');
+  system.requirements = { ...system.requirements, currency: { enabled: true } };
+  system.visibilityMode = 'knowledge';
+  recipe.resultGroups[0].results.push({
+    id: 'sm-r-horseshoe-reward',
+    awardStrategy: 'upTo',
+    awardCount: 2,
+    alternatives: [
+      { id: 'ingot', componentId: 'sm-iron-ingot', quantity: 2 },
+      { id: 'bounty', kind: 'currency', unit: 'gp', quantity: 12, label: 'Guild bounty' },
+      { id: 'lore', kind: 'knowledge', recipeId: 'sm-r-longsword', quantity: 1 },
+    ],
+  });
+}
+
 /** `reward-tiers`: the Runeblade's masterwork tier also pays a labelled commission. */
 function seedRewardTiers(content) {
   const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', 'reward-tiers');
@@ -133,6 +152,7 @@ const RESULT_ROW_STATES = Object.freeze({
   'reward-kinds': seedRewardKinds,
   'reward-craft': seedRewardCraft,
   'reward-missing': seedRewardMissing,
+  'reward-group': seedRewardGroup,
   'reward-tiers': seedRewardTiers,
 });
 
@@ -581,7 +601,8 @@ function stripAuthoredWorldComponents(content) {
  * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component,
  *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result, `reward-craft`
  *   for that award crafted, `reward-missing` for it also teaching a recipe its system no longer
- *   holds, or `reward-tiers` for a Runeblade tier paying a commission.
+ *   holds, `reward-group` for it leaving a pick of up to two (issue 1773), or `reward-tiers` for a
+ *   Runeblade tier paying a commission.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
@@ -624,7 +645,7 @@ export async function buildLabWorld({
   // A real Manager refresh resolves an empty selection to the first available crafting system.
   if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
-  if (resultRowState === 'reward-craft') seedRewardCraftLearned(actors);
+  if (['reward-craft', 'reward-group'].includes(resultRowState)) seedRewardCraftLearned(actors);
   seedCheckPreviewState(content, actors, checkPreviewState);
   if (learnableBook) seedLearnableBook(content, actors);
   const documents = buildDocumentIndex(content, actors);

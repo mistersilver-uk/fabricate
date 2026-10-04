@@ -10,6 +10,7 @@ import {
   PLAYER_VIEW_STATE,
 } from './caseConstants.js';
 import { playerCase, responsiveLayout } from './caseFactories.js';
+import { journalAwardChoiceCases } from './journalAwardChoiceCases.js';
 import { journalBlindRunCases } from './journalBlindRunCases.js';
 import { journalHistoryBatchCases, journalHistoryDataCases } from './journalHistoryCases.js';
 import { journalLifecycleCases } from './journalLifecycleCases.js';
@@ -540,4 +541,5 @@ export const CASES = Object.freeze([
   ...journalLifecycleCases(),
   ...journalHistoryBatchCases(),
   ...journalHistoryDataCases(),
+  ...journalAwardChoiceCases(),
 ]);

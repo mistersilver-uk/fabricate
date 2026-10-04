@@ -40,6 +40,8 @@ player-gathering-realm-locked
 player-gathering-stacked
 player-crafting-simple
 player-crafting-results-kinds
+player-crafting-results-choice-group
+player-crafting-outcome-award-pending
 player-crafting-routed-tier-reward
 player-crafting-authority-blocked
 player-crafting-category-filter-list
