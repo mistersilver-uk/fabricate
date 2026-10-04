@@ -58,7 +58,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     ...['RunActionBar', 'Button', 'SlotTile',
-      'SlotRow', 'ChoiceOptionList', 'EssencePool', 'RunProgress', 'StageNav',
+      'SlotRow', 'ChoiceOptionList', 'EssencePool', 'RunProgress', 'StageBars', 'StageNav',
       'StageCard', 'YieldScale', 'OutcomeLadder', 'ListRow'].map((name) => `src/ui/svelte/components/${name}.svelte`),
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',

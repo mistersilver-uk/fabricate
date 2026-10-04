@@ -1876,12 +1876,12 @@ test('the rolled readout layers its number and caption INSIDE the 38px medallion
 test('an odds row keeps its bar between a bounded label and a pinned percentage', async () => {
   const hash = oddsScoped.hashClass;
   const view = await renderWithCascade(
-    `<div class="fabricate-manager"><ul class="manager-checks-odds-list ${hash}">` +
-      `<li class="manager-checks-odds-row ${hash}" id="row">` +
-      `<span class="manager-checks-odds-label ${hash}" id="label">` +
+    `<div class="fabricate-manager"><ul class="fab-banded-bar is-histogram ${hash}">` +
+      `<li class="fab-banded-bar-band ${hash}" id="row">` +
+      `<span class="fab-banded-bar-name ${hash}" id="label">` +
       `An extremely long localized outcome tier name that must not squeeze the bar</span>` +
       `<span class="fab-fill-bar" id="bar" style="display:block;height:6px"></span>` +
-      `<span class="manager-checks-odds-percent ${hash}" id="percent">100%</span>` +
+      `<span class="fab-banded-bar-percent ${hash}" id="percent">100%</span>` +
       `</li></ul></div>`,
     [css, oddsScoped.css],
     { viewport: { width: 320, height: 300 } }

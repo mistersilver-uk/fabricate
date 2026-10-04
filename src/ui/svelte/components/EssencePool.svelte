@@ -1,8 +1,8 @@
 <!-- One physical carrier allocation supplies all essence requirements; history is read-only. -->
 <script>
   import { SvelteMap } from 'svelte/reactivity';
-  import FillBar from './FillBar.svelte';
   import Medallion from './Medallion.svelte';
+  import Meter from './Meter.svelte';
   import Stepper from './Stepper.svelte';
 
   let {
@@ -23,6 +23,8 @@
     hint = '',
     history = null,
   } = $props();
+
+  const nameIdPrefix = $props.id();
 
   function safeTint(tint) {
     const key = String(tint || '').replace(/^--fab-tag-/u, '');
@@ -149,7 +151,7 @@
     </div>
   {:else}
     <div class="fab-essence-thresholds">
-      {#each pools as threshold (threshold.essence)}
+      {#each pools as threshold, index (threshold.essence)}
         {@const got = totalFor(threshold)}
         {@const need = Math.max(0, Number(threshold.amount) || 0)}
         {@const isMet = got >= need}
@@ -157,28 +159,27 @@
         <div class="fab-essence-threshold" data-essence-threshold={threshold.essence}>
           <div class="fab-essence-threshold-heading">
             <Medallion icon={threshold.icon || 'fas fa-droplet'} {tint} size={26} glyph={12} />
-            <span class="fab-essence-name">{essenceLabel(threshold.essence)}</span>
+            <span class="fab-essence-name" id={`${nameIdPrefix}-${index}`}
+              >{essenceLabel(threshold.essence)}</span
+            >
             <span
               class:is-met={isMet}
               class="fab-essence-total"
               data-essence-total={threshold.essence}>{got} / {need}</span
             >
           </div>
-          <div
-            class="fab-essence-progress"
-            role="progressbar"
-            aria-label={essenceLabel(threshold.essence)}
-            aria-valuemin="0"
-            aria-valuemax={need}
-            aria-valuenow={Math.min(got, need)}
-          >
-            <FillBar
-              value={need > 0 ? (got / need) * 100 : 100}
-              density="compact"
-              tone={isMet ? 'success' : 'neutral'}
-              color={!isMet && tint ? `var(--fab-tag-${tint})` : ''}
-            />
-          </div>
+          <Meter
+            value={got}
+            max={need}
+            segments={[
+              {
+                tone: isMet ? 'success' : 'neutral',
+                color: !isMet && tint ? `var(--fab-tag-${tint})` : '',
+              },
+            ]}
+            valueText={`${got} / ${need}`}
+            labelId={`${nameIdPrefix}-${index}`}
+          />
         </div>
       {/each}
     </div>
@@ -291,10 +292,6 @@
 
   .fab-essence-total.is-met {
     color: var(--fab-success-text);
-  }
-
-  .fab-essence-progress {
-    display: flex;
   }
 
   .fab-essence-source {
