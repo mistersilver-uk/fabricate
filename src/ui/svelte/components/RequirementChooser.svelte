@@ -1,20 +1,22 @@
 <!--
   The player-side requirement chooser: one row of slot tiles, and beneath it the single open
   slot's panel — its alternatives as tiles in a `Well`, then whatever the caller draws for that slot.
+  An `award` slot is a reward pick (issue 1773): it draws no tile in the row and its panel is
+  always open.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `slots` | ordered slot records | `[]` | Each carries `key`, `slotId` (null opens nothing), `kind` `fixed` \| `choice` \| `essence`, `state` `met` \| `partial` \| `short`, `name`, `label` (the whole accessible sentence), `art` / `icon` / `tint`, `pip` (already formatted; empty draws none), `affordance`, `description`, `tileId` and optional `alternatives`. |
+  | `slots` | ordered slot records | `[]` | Each carries `key`, `slotId` (null opens nothing), `kind` `fixed` \| `choice` \| `essence` \| `award`, `state` `met` \| `partial` \| `short`, `name`, `label` (the whole accessible sentence), `art` / `icon` / `tint`, `pip` (already formatted; empty draws none), `affordance`, `description`, `tileId` and optional `alternatives`. An `award` slot has no `state`: its `name` is the kicker naming its alternatives and its `status` the ceiling sentence, empty below the ceiling. |
   | `openSlotId` | slot id | `null` | The one open slot. The caller owns it and this component never writes it, so two open choosers cannot be represented. |
-  | `readOnly` | boolean | `false` | Renders every slot as a labelled image and opens no panel. |
+  | `readOnly` | boolean | `false` | Renders every slot as a labelled image and opens no panel; an `award` panel stays drawn, its tiles as images. |
   | `panelId` | DOM id | `null` | The open panel's id, which the open tile names through `aria-controls`. |
   | `ariaLabel` / `alternativesLabel` | localized strings | `''` | The accessible name of the tile group, and the visible kicker that names the alternatives' `Well`. |
   | `class` | class string | `''` | An extra class on the root. |
 
   An alternative carries `id`, `name`, `label`, `art` / `icon` / `tint`, `pip`, `selected`, `short`,
-  `reading`, the shortfall stated in words, and `wrapperProps`, the caller's hooks spread on its wrapper
-  with any `class` appended to the wrapper's own.
+  `reading`, the shortfall stated in words, an optional `disabled`, and `wrapperProps`, the caller's
+  hooks spread on its wrapper with any `class` appended to the wrapper's own.
 
   Snippets:
   - `panel(slot)` — the caller's content for the open slot, such as an essence pool; it lands in
@@ -36,6 +38,8 @@
     its button names through `aria-describedby`.
   - `pip` is caller-formatted, so a face that states an amount rather than a held-against-needed
     pair supplies its own text and this component draws nothing extra for it.
+  - An award tile is a native `disabled` button when its alternative is; its `reading` and the
+    slot's `status`, a visible `role="status"` sentence, are named through `aria-describedby`.
   - Pinned by `tests/components/requirement-chooser-mounted.test.js`.
 -->
 <script>
@@ -58,10 +62,12 @@
 
   const uid = $props.id();
   const items = $derived(Array.isArray(slots) ? slots : []);
+  const rowSlots = $derived(items.filter((slot) => slot.kind !== 'award'));
+  const awardSlots = $derived(items.filter((slot) => slot.kind === 'award'));
   const classes = $derived(['fab-requirement-chooser', extraClass].filter(Boolean).join(' '));
 
   function selectable(slot) {
-    return !readOnly && slot.kind !== 'fixed' && Boolean(slot.slotId);
+    return !readOnly && !['fixed', 'award'].includes(slot.kind) && Boolean(slot.slotId);
   }
 
   function isOpen(slot) {
@@ -86,6 +92,18 @@
 
   function shortfallId(alternative) {
     return `${uid}-short-${alternative.id}`;
+  }
+
+  function statusId(slot) {
+    return `${uid}-status-${slot.slotId}`;
+  }
+
+  function awardDescribedBy(slot, alternative) {
+    const ids = [
+      alternative.reading ? shortfallId(alternative) : '',
+      slot.status ? statusId(slot) : '',
+    ];
+    return ids.filter(Boolean).join(' ') || null;
   }
 
   // The shared tile forwards no ARIA attribute, so the reading is tied to its button from here.
@@ -114,44 +132,93 @@
 {/snippet}
 
 <div class={classes} {...rest}>
-  <div class="fab-requirement-slots" role="group" aria-label={ariaLabel || undefined}>
-    {#each items as slot (slot.key)}
-      {#if selectable(slot)}
-        <button
-          type="button"
-          class="fab-requirement-slot is-{slot.state}"
-          class:is-open={isOpen(slot)}
-          id={slot.tileId ?? undefined}
-          data-requirement-slot={slot.key}
-          data-slot-kind={slot.kind}
-          data-slot-state={slot.state}
-          data-keyboard-focus="true"
-          aria-expanded={isOpen(slot)}
-          aria-controls={isOpen(slot) && hasPanel && panelId ? panelId : undefined}
-          aria-label={slot.label || undefined}
-          title={slot.description || undefined}
-          onclick={() => toggle(slot)}
-        >
-          {@render tile(slot)}
-          {#if slot.affordance}
-            <span class="fab-requirement-slot-affordance" aria-hidden="true">
-              <i class="fas fa-chevron-down"></i>{slot.affordance}
-            </span>
-          {/if}
-        </button>
-      {:else}
-        <div
-          class="fab-requirement-slot is-static is-{slot.state}"
-          data-requirement-slot={slot.key}
-          data-slot-kind={slot.kind}
-          data-slot-state={slot.state}
-          title={slot.description || undefined}
-        >
-          {@render tile(slot)}
+  {#if rowSlots.length > 0}<div
+      class="fab-requirement-slots"
+      role="group"
+      aria-label={ariaLabel || undefined}
+    >
+      {#each rowSlots as slot (slot.key)}
+        {#if selectable(slot)}
+          <button
+            type="button"
+            class="fab-requirement-slot is-{slot.state}"
+            class:is-open={isOpen(slot)}
+            id={slot.tileId ?? undefined}
+            data-requirement-slot={slot.key}
+            data-slot-kind={slot.kind}
+            data-slot-state={slot.state}
+            data-keyboard-focus="true"
+            aria-expanded={isOpen(slot)}
+            aria-controls={isOpen(slot) && hasPanel && panelId ? panelId : undefined}
+            aria-label={slot.label || undefined}
+            title={slot.description || undefined}
+            onclick={() => toggle(slot)}
+          >
+            {@render tile(slot)}
+            {#if slot.affordance}
+              <span class="fab-requirement-slot-affordance" aria-hidden="true">
+                <i class="fas fa-chevron-down"></i>{slot.affordance}
+              </span>
+            {/if}
+          </button>
+        {:else}
+          <div
+            class="fab-requirement-slot is-static is-{slot.state}"
+            data-requirement-slot={slot.key}
+            data-slot-kind={slot.kind}
+            data-slot-state={slot.state}
+            title={slot.description || undefined}
+          >
+            {@render tile(slot)}
+          </div>
+        {/if}
+      {/each}
+    </div>{/if}
+
+  {#each awardSlots as slot (slot.key)}
+    <div class="fab-requirement-panel" data-requirement-panel={slot.slotId} data-slot-kind="award">
+      <Well label={slot.name}>
+        <div class="fab-requirement-alternatives">
+          {#each slot.alternatives ?? [] as alternative (alternative.id)}
+            {@const { class: hookClass = '', ...hooks } = alternative.wrapperProps ?? {}}
+            <div
+              class={['fab-requirement-alternative', hookClass]}
+              class:is-disabled={alternative.disabled === true}
+              data-requirement-alternative={alternative.id}
+              data-alternative-state={alternative.disabled ? 'disabled' : 'open'}
+              use:describedBy={awardDescribedBy(slot, alternative)}
+              {...hooks}
+            >
+              <SlotTile
+                label={alternative.name}
+                ariaLabel={alternative.label}
+                art={alternative.art || ''}
+                icon={alternative.icon || 'fas fa-circle'}
+                tint={alternative.tint || ''}
+                pip={alternative.pip || ''}
+                interactive={!readOnly}
+                pressed={alternative.selected === true}
+                disabled={alternative.disabled === true}
+                onActivate={() => onChoose?.(slot, alternative)}
+              />
+            </div>
+          {/each}
         </div>
-      {/if}
-    {/each}
-  </div>
+        {#each (slot.alternatives ?? []).filter((entry) => entry.reading) as alternative (alternative.id)}
+          <p
+            class="fab-requirement-reason"
+            id={shortfallId(alternative)}
+            data-requirement-reason={alternative.id}
+          >
+            {alternative.name}: {alternative.reading}
+          </p>
+        {/each}
+        <p class="fab-requirement-status" role="status" id={statusId(slot)} data-award-status>
+          {slot.status ?? ''}
+        </p>
+      </Well>
+    </div>
+  {/each}
 
   {#if hasPanel}
     <div
@@ -279,5 +346,20 @@
     margin: var(--fab-space-2) 0 0;
     color: var(--fab-danger-text);
     font-size: 10.5px;
+  }
+
+  .fab-requirement-alternative.is-disabled {
+    opacity: 0.55;
+  }
+
+  .fab-requirement-reason,
+  .fab-requirement-status {
+    margin: var(--fab-space-2) 0 0;
+    color: var(--fab-text-muted);
+    font-size: 10.5px;
+  }
+
+  .fab-requirement-status:empty {
+    margin: 0;
   }
 </style>

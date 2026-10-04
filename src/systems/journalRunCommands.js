@@ -99,6 +99,11 @@ export function normalizeJournalRunDismissals(value) {
   return Object.fromEntries(entries);
 }
 
+/** A settle spends nothing, so the sender's owner-or-GM check is its whole authorization. */
+function commandAuthorizer(request, operation) {
+  return request.action === 'chooseAward' ? authorizeAwardChoice : operation.authorize;
+}
+
 function operationUnavailable() {
   return failure('unsupported-operation');
 }
@@ -643,15 +648,8 @@ export function createJournalRunCommandService({
     ) {
       return failure('stale-stage');
     }
-    // A settle spends nothing, so the owner-or-GM check above is its whole authorization.
-    const authorize = request.action === 'chooseAward' ? authorizeAwardChoice : operation.authorize;
-    const authorized = await authorize?.({
-      actor,
-      run,
-      payload: request.payload ?? {},
-      sender,
-      request,
-    });
+    const context = { actor, run, sender, request, payload: request.payload ?? {} };
+    const authorized = await commandAuthorizer(request, operation)?.(context);
     if (authorized === false) return failure('source-owner-required');
     if (authorized?.success === false) return authorized;
     return { success: true, sender, actor, operation, run, revision };
@@ -895,7 +893,6 @@ export function createJournalRunCommandService({
     const request = {
       kind: JOURNAL_RUN_SOCKET_KIND.REQUEST,
       ...command,
-      // A resumed settle re-sends its persisted request id, so its plan matches (issue 1773).
       requestId: validText(command.requestId) ? command.requestId : randomId(),
       sessionId,
       senderId: undefined,
@@ -953,9 +950,8 @@ export function createJournalRunCommandService({
     }
     const run = actor ? await operation.getRun?.({ actor, runId, includeHistory: true }) : null;
     if (!run) return failure('run-not-found');
-    if (!terminalRun(run)) return failure('active-run');
-    const owed = awardChoiceDismissalRefusal(run);
-    if (owed) return owed;
+    const refused = terminalRun(run) ? awardChoiceDismissalRefusal(run) : failure('active-run');
+    if (refused) return refused;
     const key = journalRunDismissalKey({ actorUuid, runType, runId });
     const next = normalizeJournalRunDismissals({ ...getDismissals(), [key]: now() });
     await setDismissals(next);

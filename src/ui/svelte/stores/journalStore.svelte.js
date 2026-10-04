@@ -259,6 +259,11 @@ export function createJournalStore({ services } = {}) {
     return runCommand(run, 'setCompletionMode', { completionMode });
   }
 
+  // A settle names the picks, and a resumed one re-sends the request its plan was made under.
+  async function chooseAward(run, { choiceId, picks, requestId = null } = {}) {
+    return runCommand(run, 'chooseAward', { choiceId, picks: [...(picks ?? [])] }, requestId);
+  }
+
   async function setSelection(run, selection) {
     return runCommand(run, 'setSelection', {
       stepIndex: run?.stepIndex,
@@ -266,7 +271,7 @@ export function createJournalStore({ services } = {}) {
     });
   }
 
-  async function runCommand(run, action, payload) {
+  async function runCommand(run, action, payload, requestId = null) {
     if (
       !run?.id ||
       busyRunKey ||
@@ -294,6 +299,7 @@ export function createJournalStore({ services } = {}) {
         expectedRevision: normalizeRevision(run.runRevision),
         action,
         payload: payload ?? {},
+        ...(requestId && { requestId }),
       });
       // A DISMISSED prompt is a refusal that carries `cancelled`, and nothing happened, so
       // there is nothing to re-read. A CANCEL command answers `{success: true, cancelled: true}`
@@ -328,6 +334,7 @@ export function createJournalStore({ services } = {}) {
         if (completed && !completed.recoveryEvidence?.required && !completed.redacted)
           commandResult = { runKey: request.runKey };
       }
+      return result;
     } catch (err) {
       console.error(`Fabricate | Error running Journal ${action} command:`, err);
       const message = safeCommandMessage(services?.craftErrorMessage?.());
@@ -560,6 +567,7 @@ export function createJournalStore({ services } = {}) {
     resume,
     setCompletionMode,
     setSelection,
+    chooseAward,
     advance: execute,
     cancel,
     dismiss,

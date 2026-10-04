@@ -56,6 +56,19 @@ import {
   taskCountNeed,
 } from './journalCheckText.js';
 import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
+import {
+  awardChoiceFields,
+  awardHeldAvailability,
+  inFlightAwardJournal,
+  stepAwardEvidence,
+} from './runAwardChoiceProjection.js';
+import {
+  ingredientNeed,
+  ingredientOptionName,
+  ingredientOverrideIndex,
+  selectedIngredientIndex,
+} from './runJournalIngredientOptions.js';
+import { taughtNameReader } from './resultOutputRows.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
@@ -268,6 +281,7 @@ export class RunJournalBuilder {
     resolveItemEssences = null,
     affordCurrency = null,
     affordCurrencySpends = null,
+    getAwardChoiceClaimability = null,
   } = {}) {
     this._craftingRunManager = craftingRunManager;
     this._salvageRunManager = salvageRunManager;
@@ -302,6 +316,7 @@ export class RunJournalBuilder {
     this._affordCurrency = typeof affordCurrency === 'function' ? affordCurrency : undefined;
     this._affordCurrencySpends =
       typeof affordCurrencySpends === 'function' ? affordCurrencySpends : null;
+    this._awardChoiceClaimability = getAwardChoiceClaimability ?? (() => () => null);
   }
 
   /**
@@ -365,7 +380,7 @@ export class RunJournalBuilder {
       snapshot,
       authority,
     });
-    const history = this._buildRunModels({
+    const closed = this._buildRunModels({
       actor,
       viewer: resolvedViewer,
       worldTime,
@@ -375,6 +390,9 @@ export class RunJournalBuilder {
       snapshot,
       authority,
     }).filter((run) => !dismissedRunKeys.has(run.key));
+    // A closed run still owing a pick is listed, and counted, under Active until it is settled.
+    activeRuns.push(...closed.filter((run) => run.awardChoicePending));
+    const history = closed.filter((run) => !run.awardChoicePending);
     return {
       selectedActorId: idOf(actor),
       selectedActorUuid: this._actorUuid(actor),
@@ -449,7 +467,7 @@ export class RunJournalBuilder {
       ? runs.filter((run) => accessByRun.get(run)?.visible === true && !run.isFizzle)
       : [];
     const crafting = runs.map((run, runIndex) =>
-      this._craftingRunModel({
+      this._withAwardChoices({
         run,
         actor,
         viewer,
@@ -620,7 +638,7 @@ export class RunJournalBuilder {
       derivedStatus,
       timeGate: activeStep?.timeGate,
       hasPlayerCheck,
-      selectionAvailability: currentStep?.selectionAvailability ?? null,
+      selectionAvailability: this._awardHeld(run, actor, currentStep?.selectionAvailability),
       stageStart: this._stageStartState({
         activeStep,
         recipeStep: recipeSteps[currentStepIndex],
@@ -710,6 +728,35 @@ export class RunJournalBuilder {
       canCancel: lifecycleProjection.actions.cancel,
       refundOnCancel: system?.features?.refundOnPlayerCancel !== false,
     };
+  }
+
+  /** `_craftingRunModel` with the run's award choices for this viewer (issue 1773). */
+  _withAwardChoices(args) {
+    const { run, actor, viewer, authority, recipe, access } = args;
+    const model = this._craftingRunModel(args);
+    if (!model || run.isFizzle === true) return model;
+    const { _recipeManager: recipeManager, _recipeVisibility: recipeVisibility, localize } = this;
+    const taughtName = taughtNameReader(
+      { recipeManager, recipeVisibility },
+      { isGM: viewer?.isGM === true, viewer, craftingActor: actor, knowledgeSources: [actor] }
+    );
+    const currencyUnits = () => recipeManager?._resolveNormalizedCurrencyUnits?.(recipe) ?? [];
+    const system = this._getSystem(stringOrNull(run.craftingSystemId));
+    const fields = awardChoiceFields({
+      run,
+      actions: model.actions,
+      owner: actor?.isOwner === true,
+      entitled: viewer?.isGM === true || access?.visible === true,
+      authority,
+      describe: { system, currencyUnits, taughtName, localize },
+      unclaimable: this._awardChoiceClaimability({ run, actor }),
+    });
+    return { ...model, ...fields };
+  }
+
+  /** The current stage's readiness, held while an earlier stage owes a claimable pick. */
+  _awardHeld(run, actor, availability) {
+    return awardHeldAvailability(availability, run, this._awardChoiceClaimability({ run, actor }));
   }
 
   /**
@@ -878,7 +925,7 @@ export class RunJournalBuilder {
       completedAt: historyEntitled ? recordedNumber(runStep?.completedAt) : null,
       presentationSnapshot: evidence.presentationSnapshot ?? null,
       resolutionSnapshot: evidence.resolutionSnapshot ?? null,
-      ...(historyEntitled && historyEvidenceFields(runStep)),
+      ...(historyEntitled && stepAwardEvidence(runStep)),
       essenceSpend: evidence.essenceSpend ?? null,
       currencySpends:
         evidence.currencySpends ??
@@ -2475,7 +2522,7 @@ export class RunJournalBuilder {
     const lifecycleContract = getRunLifecycleContract(run);
     const recoveryEvidence =
       this._recoveryEvidence(
-        run?.executionJournal,
+        inFlightAwardJournal(run) ?? run?.executionJournal,
         evidenceEntitled,
         stringOrNull(run?.craftingSystemId)
       ) ?? this._nativeRecoveryEvidence(run, evidenceEntitled);
@@ -2757,8 +2804,10 @@ export class RunJournalBuilder {
       entries = normalizeList(receipt.results);
     } else if (effect.kind === 'createGatheredResults') {
       entries = normalizeList(receipt);
-    } else if (effect.kind === 'awardRewards') {
-      entries = [receipt.currencyCredits, receipt.knowledgeGrants].flatMap(normalizeList);
+    } else if (['awardRewards', 'awardChoice'].includes(effect.kind)) {
+      entries = [receipt.createdResults, receipt.currencyCredits, receipt.knowledgeGrants].flatMap(
+        normalizeList
+      );
     }
     const spends = effect.kind === 'spendCurrency' ? normalizeList(receipt.settledSpends) : [];
     return this._receiptProjection(entries, systemId, { spends });
@@ -2813,57 +2862,6 @@ function normalizeName(value) {
   return String(value ?? '')
     .trim()
     .toLowerCase();
-}
-
-function ingredientOverrideIndex(group, optionOverrides) {
-  const groupId = stringOrNull(group?.id);
-  if (!Object.hasOwn(optionOverrides, groupId)) return;
-  const raw = optionOverrides[groupId]?.optionIndex;
-  if (typeof raw !== 'number' && typeof raw !== 'string') return null;
-  if (typeof raw === 'string' && !raw.trim()) {
-    return null;
-  }
-  const index = Number(raw);
-  return Number.isSafeInteger(index) && index >= 0 && index < normalizeList(group?.options).length
-    ? index
-    : null;
-}
-
-function selectedIngredientIndex(group, optionOverrides, selection) {
-  const options = normalizeList(group?.options);
-  const override = ingredientOverrideIndex(group, optionOverrides);
-  if (override !== undefined) return override;
-  const selected = normalizeList(selection?.selectedIngredients).find((ingredient) =>
-    options.includes(ingredient)
-  );
-  const selectedIndex = options.indexOf(selected);
-  return Math.max(selectedIndex, 0);
-}
-
-function ingredientNeed(option) {
-  const match = plainObjectOrNull(option?.match);
-  if (match?.type === 'essence' || match?.type === 'currency') {
-    return Math.max(0, numberOrNull(match.amount) ?? 0);
-  }
-  return Math.max(0, numberOrNull(option?.quantity) ?? 1);
-}
-
-function ingredientOptionName({ group, option, kind, match, definition, component }) {
-  if (kind === 'component') {
-    return stringOrEmpty(component?.name) || stringOrEmpty(match?.componentId);
-  }
-  if (kind === 'essence') {
-    const essenceName = stringOrEmpty(definition?.name) || stringOrEmpty(match?.essenceId);
-    return essenceName ? `${essenceName} essence` : '';
-  }
-  if (kind === 'currency') {
-    return `${ingredientNeed(option)} ${stringOrEmpty(match?.unit)}`.trim();
-  }
-  if (kind === 'tag') {
-    const tags = normalizeList(match?.tags).map(stringOrEmpty).filter(Boolean);
-    return tags.join(match?.tagMatch === 'all' ? ' & ' : ' | ') || stringOrEmpty(group?.name);
-  }
-  return stringOrEmpty(option?.name) || stringOrEmpty(group?.name);
 }
 
 /**

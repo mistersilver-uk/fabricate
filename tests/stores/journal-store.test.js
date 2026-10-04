@@ -135,7 +135,7 @@ const JOURNAL_STORE_SHAPE = {
     'selectedRunId', 'selectedRunKey', 'viewedStage', 'viewedStageIndex', 'worldTime',
   ],
   methods: [
-    'advance', 'beginStep', 'cancel', 'dismiss', 'execute', 'load', 'pause', 'resume',
+    'advance', 'beginStep', 'cancel', 'chooseAward', 'dismiss', 'execute', 'load', 'pause', 'resume',
     'retryCommandError', 'returnToCurrentStage', 'select', 'setActivePage', 'setActivePageSize',
     'setActiveSort', 'setActiveStatusFilter', 'setCompletionMode', 'setHistoryPage',
     'setHistoryPageSize', 'setHistorySort', 'setSearch', 'setSelection', 'tickWorldTime',
@@ -156,12 +156,28 @@ describe('journalStore', () => {
     compiler.cleanup();
   });
 
-  it('returns exactly the 57 public members the journal view reads, each still a getter', () => {
+  it('returns exactly the 58 public members the journal view reads, each still a getter', () => {
     const store = createJournalStore({ services: makeServices().services });
     const shape = expectedMemberKinds(JOURNAL_STORE_SHAPE);
 
     assert.deepEqual(Object.keys(store).sort(), Object.keys(shape));
     assert.deepEqual(storeMemberKinds(store), shape);
+  });
+
+  it('1773: chooseAward sends the picks as one chooseAward command, re-sending a resumed request id', async () => {
+    const owed = run({ lifecycleContract: 'current', actions: { chooseAward: true } });
+    const setup = makeServices({ listing: baseListing({ activeRuns: [owed], history: [] }) });
+    const store = await loadedStore(setup);
+    const settled = await store.chooseAward(owed, { choiceId: 'pick', picks: ['coin'] });
+    await store.chooseAward(owed, { choiceId: 'pick', picks: ['coin'], requestId: 'planned' });
+    assert.equal(settled.success, true, 'the reply answers the caller');
+    assert.deepEqual(
+      setup.calls.command.map(({ action, payload, requestId }) => ({ action, payload, requestId })),
+      [
+        { action: 'chooseAward', payload: { choiceId: 'pick', picks: ['coin'] }, requestId: undefined },
+        { action: 'chooseAward', payload: { choiceId: 'pick', picks: ['coin'] }, requestId: 'planned' },
+      ]
+    );
   });
 
   it('correlates a trusted completed command notice and clears it on reselect', async () => {

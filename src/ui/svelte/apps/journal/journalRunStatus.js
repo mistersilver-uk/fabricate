@@ -101,6 +101,14 @@ export function runStatusPresentation(status) {
 // The two are deliberately separate: one is fixed by choosing and the other by acquiring, and
 // telling a player to choose when nothing they can choose will help is the worse of the two
 // failures. `accent` is the neutral "your move" family; `warning` is the blocked one.
+// A reward an earlier stage left for the player to pick (issue 1773). It outranks every other
+// member: until it is settled the run can neither go on nor be dismissed.
+const REWARD_ATTENTION = Object.freeze({
+  kind: 'reward',
+  tone: 'accent',
+  icon: 'fa-gift',
+  labelKey: 'FABRICATE.App.Journal.Status.awaitingReward',
+});
 const CHOICE_ATTENTION = Object.freeze({
   kind: 'choice',
   tone: 'accent',
@@ -154,6 +162,7 @@ const ACQUISITION_ATTENTION = Object.freeze({
  * @returns {(RunStatusPresentation & {kind: string})|null}
  */
 export function runAttentionPresentation(run) {
+  if (run?.awardChoicePending === true) return REWARD_ATTENTION;
   if (run?.awaitingChoice === true) return CHOICE_ATTENTION;
   // Ranked under the two BLOCKED states: a stage that can be begun is asked for only once
   // nothing else is owed, which `beginStep` already answers — it is the projection's own

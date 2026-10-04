@@ -1,6 +1,8 @@
 /**
  * The `chooseAward` command's own rules at the journal-run edge (issue 1773): its payload shape,
  * the authorization that replaces the crafting source-owner check, and the dismissal it blocks.
+ * A resumed settle sends its persisted `requestId`, which the command service keeps, because the
+ * executor resumes a planned settle only under the request that planned it.
  */
 import { holdsUnsettledAwardChoice, isUnsettledChoice } from './choiceGroupAward.js';
 

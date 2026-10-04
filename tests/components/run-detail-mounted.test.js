@@ -54,6 +54,8 @@ const harness = createMountedComponentHarness({
     // Issue 1773: a reward row's glyph.
     'src/ui/presenters/resultKindGlyphs.js',
     'src/ui/svelte/apps/journal/runStateNotice.js',
+    // Issue 1773: the award face's rows.
+    'src/ui/presenters/awardChoiceRows.js',
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
     // The roll line signs an executed margin with the shared formatter (issue 2005).
     'src/utils/checkAdjustmentFormat.js',
@@ -94,6 +96,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
+    'src/ui/svelte/apps/journal/RunAwardChoice.svelte',
     'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte',
     'src/ui/svelte/apps/journal/ThisRun.svelte',
   ],
@@ -1797,5 +1800,179 @@ describe('RunDetail mounted behavior', () => {
       !target.querySelector('[data-journal-actions]'),
       'terminal run shows no actions panel'
     );
+  });
+});
+
+// Issue 1773 PR4: the award face, mounted through RunDetail on a closed run that owes a pick.
+const ALTERNATIVES = Object.freeze([
+  { id: 'gem', kind: 'component', name: 'Gem', quantity: 2, quantityFormula: null },
+  { id: 'coin', kind: 'currency', name: 'Gold', quantity: 3, amountText: '3 gp' },
+  { id: 'ore', kind: 'component', name: 'Ore', quantity: 1, quantityFormula: '1d4' },
+]);
+
+function owedChoice(extra = {}) {
+  return {
+    choiceId: 'pick',
+    stepIndex: 0,
+    awardStrategy: 'upTo',
+    count: 2,
+    countRoll: null,
+    ceiling: 2,
+    alternatives: ALTERNATIVES.map((entry) => ({ unclaimable: null, ...entry })),
+    resume: null,
+    ...extra,
+  };
+}
+
+function owedRun({ choices = [owedChoice()], blocker = null } = {}) {
+  return {
+    ...makeSucceededRun(),
+    key: '["Actor.a","crafting","owed"]',
+    id: 'owed',
+    lifecycleContract: 'current',
+    awardChoicePending: choices.length > 0,
+    awardChoiceBlocker: blocker,
+    awardChoices: choices,
+    actions: { chooseAward: blocker === null, dismiss: false },
+  };
+}
+
+/** A journal whose settle answers as the reload would: `next` replaces the mounted run. */
+function settlingJournal(next) {
+  const sent = [];
+  return {
+    sent,
+    busyRunKey: '',
+    async chooseAward(_run, request) {
+      sent.push(request);
+      await harness.setProps({ run: next });
+      return { success: true };
+    },
+  };
+}
+
+const tile = (target, id) => target.querySelector(`[data-award-alternative="${id}"] button`);
+const confirmButton = (target) => target.querySelector('[data-award-confirm]');
+
+async function settleTurns() {
+  for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
+  await new Promise((settle) => setTimeout(settle, 0));
+}
+
+describe('RunDetail award face (issue 1773)', () => {
+  before(() => harness.setup());
+  afterEach(() => harness.remount());
+  after(() => harness.teardown());
+
+  it('V&A 13: a disabled tile cannot be picked, and an unclaimable one states why', async () => {
+    const alternatives = [
+      { ...ALTERNATIVES[0], unclaimable: null },
+      { ...ALTERNATIVES[1], unclaimable: 'unitMissing' },
+    ];
+    const choices = [owedChoice({ alternatives })];
+    const target = await harness.mount({
+      run: owedRun({ choices }),
+      journal: settlingJournal(null),
+    });
+    const gold = tile(target, 'coin');
+    assert.equal(gold.disabled, true);
+    gold.click();
+    await settleTurns();
+    assert.equal(gold.getAttribute('aria-pressed'), 'false', 'a click adds no pick');
+    assert.equal(confirmButton(target).disabled, true, 'nothing is picked yet');
+    const reason = target.querySelector('[data-requirement-reason="coin"]');
+    assert.match(reason.textContent, /Unclaimable\.unitMissing/);
+    assert.ok(gold.getAttribute('aria-describedby').includes(reason.id), 'the tile names why');
+  });
+
+  it('V&A 13: up to N disables unpicked tiles at the ceiling, says why, and an unpick reopens them', async () => {
+    const target = await harness.mount({ run: owedRun(), journal: settlingJournal(null) });
+    tile(target, 'gem').click();
+    await settleTurns();
+    tile(target, 'coin').click();
+    await settleTurns();
+    assert.equal(tile(target, 'ore').disabled, true, 'a third pick is refused');
+    const status = target.querySelector('[data-award-status]');
+    assert.equal(status.getAttribute('role'), 'status');
+    assert.match(status.textContent, /AwardChoice\.Ceiling/);
+    for (const id of ['gem', 'coin', 'ore']) {
+      assert.ok(tile(target, id).getAttribute('aria-describedby').includes(status.id), id);
+    }
+    tile(target, 'gem').click();
+    await settleTurns();
+    assert.equal(tile(target, 'ore').disabled, false, 'unpicking one reopens the rest');
+  });
+
+  it('V&A 13: under any one of another press moves the pick and no tile is disabled', async () => {
+    const choices = [owedChoice({ awardStrategy: 'anyOne', ceiling: 1 })];
+    const target = await harness.mount({
+      run: owedRun({ choices }),
+      journal: settlingJournal(null),
+    });
+    tile(target, 'gem').click();
+    await settleTurns();
+    tile(target, 'coin').click();
+    await settleTurns();
+    assert.equal(tile(target, 'gem').getAttribute('aria-pressed'), 'false', 'the pick moved');
+    assert.equal(tile(target, 'coin').getAttribute('aria-pressed'), 'true');
+    assert.ok(['gem', 'coin', 'ore'].every((id) => !tile(target, id).disabled));
+  });
+
+  it('V&A 13: confirm sends one settle and moves focus to the claimed heading, never the document', async () => {
+    const journal = settlingJournal(owedRun({ choices: [] }));
+    const target = await harness.mount({ run: owedRun(), journal });
+    tile(target, 'coin').click();
+    await settleTurns();
+    const confirm = confirmButton(target);
+    assert.ok(confirm.classList.contains('is-primary'), "confirm is the stage's primary");
+    confirm.focus();
+    confirm.click();
+    await settleTurns();
+    await settleTurns();
+    assert.deepEqual(journal.sent, [{ choiceId: 'pick', picks: ['coin'], requestId: null }]);
+    const heading = target.querySelector('[data-award-claimed]');
+    assert.ok(Boolean(heading), 'the claimed heading renders');
+    assert.ok(document.activeElement === heading, 'focus is on the claimed heading');
+  });
+
+  it('after a settle with another choice owed, focus moves to that choice', async () => {
+    const second = owedChoice({ choiceId: 'second', stepIndex: 1 });
+    const journal = settlingJournal(owedRun({ choices: [second] }));
+    const target = await harness.mount({
+      run: owedRun({ choices: [owedChoice(), second] }),
+      journal,
+    });
+    const [, nextConfirm] = target.querySelectorAll('[data-award-confirm]');
+    assert.ok(!nextConfirm.classList.contains('is-primary'), 'one primary for the stage');
+    tile(target, 'gem').click();
+    await settleTurns();
+    confirmButton(target).click();
+    await settleTurns();
+    await settleTurns();
+    const focused = document.activeElement;
+    assert.ok(Boolean(focused?.closest?.('[data-award-choice-id="second"]')), 'focus moved on');
+  });
+
+  it('a viewer who is neither owner nor GM reads the tiles and has no confirm', async () => {
+    const target = await harness.mount({
+      run: owedRun({ blocker: 'notOwner' }),
+      journal: settlingJournal(null),
+    });
+    assert.ok(Boolean(target.querySelector('[data-award-alternative="gem"] [role="img"]')));
+    assert.ok(!tile(target, 'gem'), 'no pressable tile');
+    assert.ok(!confirmButton(target), 'no confirm');
+    assert.match(target.querySelector('[data-award-blocker]').textContent, /AwardChoice\.ReadOnly/);
+  });
+
+  it('with no GM connected the face states active-gm-missing and keeps the choice', async () => {
+    const target = await harness.mount({
+      run: owedRun({ blocker: 'active-gm-missing' }),
+      journal: settlingJournal(null),
+    });
+    tile(target, 'gem').click();
+    await settleTurns();
+    assert.equal(confirmButton(target).disabled, true);
+    const blocker = target.querySelector('[data-award-blocker="active-gm-missing"]');
+    assert.match(blocker.textContent, /Actions\.AuthorityUnavailable/);
   });
 });

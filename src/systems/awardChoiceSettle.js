@@ -222,11 +222,21 @@ export class AwardChoiceSettler {
     );
   }
 
-  _claimable(actor, recipe) {
+  /** Why `actor` cannot claim an alternative of `run`'s choices now, or `null`, for the Journal. */
+  unclaimable(run, actor) {
+    return this._unclaimable(actor, this._recipeOf(run));
+  }
+
+  _unclaimable(actor, recipe) {
     const resolveComponent = (componentId) => this.resolveComponent(recipe, componentId);
     const { seams, resolveItem } = this;
     const context = { actor, recipe, seams, resolveComponent, resolveItem };
-    return (member) => memberUnclaimableReason(member, context) === null;
+    return (member) => memberUnclaimableReason(member, context);
+  }
+
+  _claimable(actor, recipe) {
+    const reason = this._unclaimable(actor, recipe);
+    return (member) => reason(member) === null;
   }
 
   /**

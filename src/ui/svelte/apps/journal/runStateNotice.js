@@ -16,9 +16,15 @@ import { journalRefusalMessage, journalRunReasonMessage } from '../../util/journ
  * this code must not also raise the warning-toned blocker banner for it (issue 1648, M15).
  * `routeRequired` is the SAME unmade pick, reported in its own words because a route decision
  * and an option or allocation decision are not the same act (issue 1648, F5), so it is
- * non-blocking for the same reason.
+ * non-blocking for the same reason. `awardChoicePending` is the reward the run's own notice asks
+ * for (issue 1773), so it raises no second banner either.
  */
-const NON_BLOCKING_REASONS = new Set(['stageNotStarted', 'choiceRequired', 'routeRequired']);
+const NON_BLOCKING_REASONS = new Set([
+  'stageNotStarted',
+  'choiceRequired',
+  'routeRequired',
+  'awardChoicePending',
+]);
 
 /** The blocker code, when execution is actually refused. `''` otherwise. */
 export function runBlockerCode(run) {
@@ -86,6 +92,19 @@ export function runStateNotice(run, localize) {
       hooks: { 'data-journal-action-blocker': blocker, ...pausedHook },
       evidence: false,
       claim,
+    };
+  }
+
+  // A reward waiting for the player's pick, which the award face beneath asks for (issue 1773).
+  if (run?.awardChoicePending === true) {
+    return {
+      tone: 'info',
+      blocking: false,
+      title: text('RewardTitle'),
+      detail: text('RewardDetail'),
+      hooks: { 'data-journal-award-pending': 'true', ...pausedHook },
+      evidence: false,
+      claim: null,
     };
   }
 
