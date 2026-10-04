@@ -4,15 +4,15 @@
  * value. A pair is found by shape rather than by helper name, so `text`, `format`, `localize` and
  * `localizeOr` calls and the `[key, fallback]` / `{…Key, …Fallback}` tables all count.
  */
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { describe, it } from 'node:test';
 
-import { keyName } from './helpers/structureShapes.js';
 import { literalStrings, walkNodes } from './helpers/moduleAst.js';
 import { moduleAstOf, sourceAstEntriesUnder } from './helpers/parsedSource.js';
 import { repoRoot } from './helpers/sourceScan.js';
+import { keyName } from './helpers/structureShapes.js';
 
 const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 const KEY_PREFIX = 'FABRICATE.';
@@ -49,38 +49,54 @@ function resolveKey(key, prefixes) {
     .filter((full) => LEAVES.has(full));
 }
 
+/** `text(key, fallback)` in any helper's spelling: a key argument, then a static string. */
+function* callPairs(node) {
+  const args = node.arguments.map(staticString);
+  for (let index = 0; index + 1 < args.length; index += 1) {
+    if (args[index]?.startsWith(KEY_PREFIX) && args[index + 1] !== undefined) {
+      yield* resolveKey(args[index], []).map((key) => ({ key, fallback: args[index + 1] }));
+    }
+  }
+}
+
+function* arrayPairs(node, prefixes) {
+  const [key, fallback] = node.elements.slice(0, 2).map(staticString);
+  if (key === undefined || fallback === undefined) return;
+  yield* resolveKey(key, prefixes).map((full) => ({ key: full, fallback }));
+}
+
+/** `{ descKey, descFallback }` or `{ labelKey, fallback }`. */
+function* objectPairs(node) {
+  const values = new Map(node.properties.map((entry) => [keyName(entry), entry.value]));
+  for (const [name, value] of values) {
+    const key = staticString(value);
+    if (!/Key$|^key$/.test(name ?? '') || !key?.startsWith(KEY_PREFIX)) continue;
+    const stem = name.slice(0, -'Key'.length);
+    const fallback = staticString(values.get(`${stem}Fallback`) ?? values.get('fallback'));
+    if (fallback !== undefined) yield* resolveKey(key, []).map((full) => ({ key: full, fallback }));
+  }
+}
+
+const PAIRS_BY_TYPE = {
+  CallExpression: callPairs,
+  ArrayExpression: arrayPairs,
+  ObjectExpression: objectPairs,
+};
+
 function* fallbackPairs(ast) {
   const prefixes = [...new Set(literalStrings(ast).filter((s) => s.startsWith(KEY_PREFIX)))];
   for (const node of walkNodes(ast)) {
-    if (node.type === 'CallExpression') {
-      const args = node.arguments.map(staticString);
-      for (let index = 0; index + 1 < args.length; index += 1) {
-        if (args[index]?.startsWith(KEY_PREFIX) && args[index + 1] !== undefined) {
-          yield* resolveKey(args[index], []).map((key) => ({ key, fallback: args[index + 1] }));
-        }
-      }
-    } else if (node.type === 'ArrayExpression') {
-      const [key, fallback] = node.elements.slice(0, 2).map(staticString);
-      if (key === undefined || fallback === undefined) continue;
-      yield* resolveKey(key, prefixes).map((full) => ({ key: full, fallback }));
-    } else if (node.type === 'ObjectExpression') {
-      const values = new Map(node.properties.map((entry) => [keyName(entry), entry.value]));
-      for (const [name, value] of values) {
-        const key = staticString(value);
-        if (!/Key$|^key$/.test(name ?? '') || !key?.startsWith(KEY_PREFIX)) continue;
-        const stem = name.slice(0, -3);
-        const fallback = staticString(values.get(`${stem}Fallback`) ?? values.get('fallback'));
-        if (fallback !== undefined) {
-          yield* resolveKey(key, []).map((full) => ({ key: full, fallback }));
-        }
-      }
-    }
+    const pairs = PAIRS_BY_TYPE[node.type];
+    if (pairs) yield* pairs(node, prefixes);
   }
 }
 
 const CORPUS = [
   ...sourceAstEntriesUnder('src/ui'),
-  ['src/utils/recipeActivationMessages.js', moduleAstOf('src/utils/recipeActivationMessages.js').ast],
+  [
+    'src/utils/recipeActivationMessages.js',
+    moduleAstOf('src/utils/recipeActivationMessages.js').ast,
+  ],
 ];
 
 describe('result set wording (issue 1516)', () => {
