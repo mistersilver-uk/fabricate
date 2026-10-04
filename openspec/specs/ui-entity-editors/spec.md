@@ -347,6 +347,7 @@ A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of
 It is a single flat **"Accept instead"** list of the four real ingredient match types — Component, Tag, Essence, and Currency, in that order — each appended to that requirement as a new OR alternative for the row's own field to fill in.
 A requirement that already holds two or more alternatives renders that choice as four explicit dashed adders at the foot of its box instead, worded `alt component` / `alt tag` / `alt essence` / `alt currency`: inside a choice group every one of them appends an ALTERNATIVE, and `Add component` beside `Add cost` is two verbs for one act.
 The menu and the adders are drawn from one list, so they offer the same kinds in the same order, and no row inside the box draws the `or…` control.
+Choosing a kind turns a bare requirement into its box and so removes the trigger the menu would return focus to, so focus moves to the new alternative's name field, a tag alternative's being its `+ Tag`, rather than falling to the document, where Foundry's keybindings take the keys.
 Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
 
 The menu is a COMPACT PANEL OF KINDS rather than a picker of records, and its scale says so: a fixed 150px panel inset on its own frame, headed by an uppercase **"Accept instead"** eyebrow, over four entries that read from their own left edge.
