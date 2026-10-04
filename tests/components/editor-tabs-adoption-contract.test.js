@@ -118,8 +118,6 @@ function rawTablists() {
 const TABLIST_HOSTS = Object.freeze([
   // The player app's vertical nav rail: the library's `<AppRail>`, not a tab strip (issue 1779, E2).
   'src/ui/svelte/apps/FabricateAppRoot.svelte',
-  // Conversion pending: it needs the strip capabilities issue 1779 adds in its second change.
-  `${MANAGER_DIRECTORY}downtime/WorldDowntimeTabs.svelte`,
   // THE primitive. It is the one file that is supposed to write this.
   PRIMITIVE,
 ]);

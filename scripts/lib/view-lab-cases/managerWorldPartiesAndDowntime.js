@@ -728,4 +728,57 @@ export const CASES = Object.freeze([
       /^styles\/fabricate\.css$/,
     ],
   }),
+  // The wrapped strip's LAST tab, reached by a pointer, so the frame shows its description at the card's end (issue 1779).
+  managerCase({
+    id: 'manager-world-downtime-narrow-settings',
+    label: 'Manager — World Downtime narrow strip, Settings by pointer',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', longDowntimeLabels: '1' },
+    steps: [
+      { selector: '#manager-world-nav-downtime', press: 'Enter' },
+      { selector: '[data-downtime-tab="settings"]' },
+    ],
+    expectView: 'world-downtime',
+    expectSelector: '[data-downtime-panel="settings"]',
+    expectAttributes: [
+      { selector: '[data-downtime-tab="settings"]', name: 'aria-selected', value: 'true' },
+      {
+        selector: '[data-downtime-tab="settings"]',
+        name: 'aria-label',
+        value: 'Open campaign calendar, permissions and resolution settings',
+      },
+      {
+        selector: '[data-downtime-tab="settings"]',
+        name: 'aria-describedby',
+        value: 'world-downtime-tooltip-settings',
+      },
+      ...['tracking', 'activities', 'factions', 'settings'].map((id) => ({
+        selector: `[data-downtime-tab="${id}"]`,
+        name: 'aria-controls',
+        value: `world-downtime-panel-${id}`,
+      })),
+    ],
+    expectVisible:
+      '[data-downtime-tooltip="settings"]:has-text("Preview campaign calendar, permissions and resolution settings in Fabricate Premium")',
+    expectContained: [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+    ],
+    expectCenterHit: '[data-downtime-tab="settings"]',
+    expectNoHorizontalOverflow: [
+      '[data-world-downtime-host]',
+      '.manager-main',
+      '.manager-body',
+      '.fabricate-manager',
+    ],
+    expectOverflowY: '.downtime-preview-scroll',
+    position: { width: 960, height: 900 },
+    kinds: ['manager', 'world', 'downtime', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+    ],
+  }),
 ]);
