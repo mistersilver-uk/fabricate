@@ -28,6 +28,11 @@ const TABS = [
   { id: 'outcomes', icon: 'fas fa-list', labelKey: 'x.Outcomes', label: 'Outcomes' },
 ];
 
+/** The classes the strip authors on an element, in order, without Svelte's scoping class. */
+function authoredClasses(element) {
+  return [...element.classList].filter((name) => !name.startsWith('svelte-')).join(' ');
+}
+
 function tabButtons(root) {
   return [...root.querySelectorAll('[role="tab"]')];
 }
@@ -57,7 +62,7 @@ describe('EditorTabs emits the namespace root its rules are anchored on (issue 1
     const tablist = root.querySelector('[role="tablist"]');
     assert.ok(Boolean(tablist), 'the component must render a tablist at all');
     assert.equal(
-      tablist.className,
+      authoredClasses(tablist),
       'fabricate-tabs manager-editor-tabs',
       'the default render must carry the primitive`s own root and the family`s container class, ' +
         'in that order — the root FIRST, because every re-rooted rule in `styles/fabricate.css` ' +
@@ -73,7 +78,7 @@ describe('EditorTabs emits the namespace root its rules are anchored on (issue 1
       containerClass: 'manager-environment-tabs manager-checks-sections',
     });
     assert.equal(
-      root.querySelector('[role="tablist"]').className,
+      authoredClasses(root.querySelector('[role="tablist"]')),
       'fabricate-tabs manager-environment-tabs manager-checks-sections',
       'a caller`s container class replaces the family default and never the root'
     );
@@ -338,6 +343,23 @@ describe('EditorTabs takes no glyph from a caller (issue 1372)', () => {
       marksOn(buttonFor(root, 'outcomes')),
       [],
       'an empty mark is dropped rather than drawn as an empty box'
+    );
+  });
+
+  it('draws the premium padlock from `tierGated` alone, never as a mark (issue 1779)', async () => {
+    const root = await harness.mount({
+      tabs: [{ ...TABS[0], tierGated: true }, TABS[1]],
+      activeTab: 'roll',
+      badges: { outcomes: { vehicle: 'premium', label: 'PREMIUM' } },
+    });
+    assert.equal(buttonFor(root, 'roll').querySelectorAll('.manager-editor-tab-lock').length, 1);
+    assert.deepEqual(marksOn(buttonFor(root, 'roll')), [], 'the padlock is a tab state, not a mark');
+    const outcomes = buttonFor(root, 'outcomes');
+    assert.ok(!outcomes.querySelector('.manager-editor-tab-lock'), 'no vehicle draws the padlock');
+    assert.deepEqual(
+      marksOn(outcomes).map((mark) => [mark.chip, mark.text]),
+      [[true, 'PREMIUM']],
+      'an unknown vehicle stays the issue chip, so the family keeps its closed set'
     );
   });
 

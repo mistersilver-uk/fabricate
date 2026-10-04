@@ -5,8 +5,13 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { flushSync, tick } from 'svelte';
 
+import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from '../../src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
+import { useShippedLocalization } from '../helpers/manager/managerLocalization.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 /** Settle the component after a dispatched DOM event, the way the mounted suites do. */
 async function settle() {
@@ -20,14 +25,25 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-downtime-tabs-a11y-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
-  compiledModules: ['src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
+  compiledModules: [
+    'src/ui/svelte/components/Chip.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
+    'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
+  ],
   componentPath: 'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
 });
 
-before(() => harness.setup());
+let harnessLocalize;
+before(async () => {
+  await harness.setup();
+  harnessLocalize = globalThis.game.i18n.localize;
+});
 after(() => harness.teardown());
-afterEach(() => harness.remount());
+afterEach(() => {
+  globalThis.game.i18n.localize = harnessLocalize;
+  harness.remount();
+});
 
 const TABS = Object.freeze([
   {
@@ -97,6 +113,49 @@ describe('the Downtime tab strip keeps its ARIA contract', () => {
     }
   });
 
+  it('names the strip and every tab distinctly, and describes every tab', async () => {
+    const root = await harness.mount({ tabs: TABS, activeTabId: 'tracking', onSelect: () => {} });
+    const names = [
+      root.querySelector('[data-downtime-tablist]'),
+      ...root.querySelectorAll('[data-downtime-tab]'),
+    ].map((node) => node.getAttribute('aria-label') ?? '');
+    assert.equal(names.length, TABS.length + 1);
+    assert.ok(
+      names.every((name) => name.trim() !== ''),
+      `every name is non-empty: ${names}`
+    );
+    assert.equal(new Set(names).size, names.length, `every name is distinct: ${names}`);
+    for (const tab of TABS) {
+      const tip = root.querySelector(`[data-downtime-tooltip="${tab.id}"]`);
+      assert.ok(tip?.textContent.trim(), `${tab.id} carries a non-empty description`);
+      assert.equal(
+        root.querySelector(`[data-downtime-tab="${tab.id}"] span`).textContent,
+        tab.label,
+        `${tab.id} falls back to its untranslated label`
+      );
+    }
+  });
+
+  it('names each of Core`s tabs with a name that contains its visible label', async () => {
+    useShippedLocalization();
+    const root = await harness.mount({
+      tabs: WORLD_DOWNTIME_PREVIEW_PROVIDER.tabs,
+      activeTabId: 'tracking',
+      onSelect: () => {},
+    });
+    const buttons = [...root.querySelectorAll('[data-downtime-tab]')];
+    assert.equal(buttons.length, 4);
+    for (const button of buttons) {
+      const label = button.querySelector('span').textContent.trim().toLowerCase();
+      const name = button.getAttribute('aria-label').toLowerCase();
+      assert.ok(label && name.includes(label), `"${name}" contains the visible "${label}"`);
+      assert.equal(
+        button.querySelectorAll('.manager-editor-tab-lock[aria-hidden="true"]').length,
+        1
+      );
+    }
+  });
+
   it('gives the ACTIVE tab the only tab stop', async () => {
     const root = await harness.mount({ tabs: TABS, activeTabId: 'factions', onSelect: () => {} });
     assert.deepEqual(tabStops(root), ['-1', '-1', '0', '-1']);
@@ -158,6 +217,8 @@ describe('the Downtime tab strip keeps its ARIA contract', () => {
     assert.deepEqual(shown(), ['factions'], 'hover describes exactly its own tab');
 
     factions.dispatchEvent(new globalThis.MouseEvent('mouseleave'));
+    // The strip keeps a left description for 150ms so the pointer can cross onto it.
+    await new Promise((done) => setTimeout(done, 200));
     await settle();
     assert.deepEqual(shown(), [], 'mouseleave clears it');
   });
