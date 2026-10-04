@@ -17668,6 +17668,11 @@
   cursor: pointer;
 }
 
+/* A set picker's rows keep their height when its list overflows, so the list scrolls rather than squeezing every row to the base rule's 30px floor (issue 1782). */
+.fabricate-picker-popover .fabricate-set-picker-option {
+  flex-shrink: 0;
+}
+
 .fabricate-picker-popover .manager-travel-option:hover {
   background: var(--fab-surface-raised);
 }

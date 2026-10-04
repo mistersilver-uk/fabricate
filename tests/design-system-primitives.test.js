@@ -164,6 +164,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
   // — and neither representative frame draws it. Its override names the one frame that does.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
+  // Issue 1782: the set picker, in its session form and its staged form's four states.
+  'src/ui/svelte/components/SetPicker.svelte',
   // Issue 1505: the at-a-glance figure. It sorts HERE rather than after `StatusToggle` because this
   // list is compared against `Object.keys(...).sort()` and `'B'` < `'u'`.
   'src/ui/svelte/components/SlotRow.svelte',
@@ -248,8 +250,9 @@ test('the inputs every property below quantifies over are alive', () => {
   // 75 as of issue 1521, whose `InlineRenameField` replaced the party and realm name fields; 74
   // once the inspector action button became the button primitive at full width.
   // 76 as of issue 1782: `Meter` and `BandedBar`, each on three and two importers; 77 with
-  // `RuleRow` on its two; 76 once issue 1521 folded the explainer card onto the callout's `items`.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 76, 'the shipped primitive set changed size');
+  // `RuleRow` on its two; 76 once issue 1521 folded the explainer card onto the callout's `items`;
+  // 77 with `SetPicker` on its two.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 77, 'the shipped primitive set changed size');
   // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
   // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;
   // 17 when `ChoiceGroup` joined at one caller (issue 1516).

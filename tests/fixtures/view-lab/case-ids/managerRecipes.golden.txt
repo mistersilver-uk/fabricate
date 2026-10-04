@@ -30,6 +30,8 @@ manager-recipe-item-overview
 manager-recipe-item-save-failed
 manager-recipe-item-contents
 manager-recipe-item-contents-picker
+manager-recipe-item-contents-picker-staged
+manager-recipe-item-contents-overflow
 manager-recipe-item-validation
 manager-recipe-item-validation-blocked
 manager-recipe-item-preview-recipe-pager

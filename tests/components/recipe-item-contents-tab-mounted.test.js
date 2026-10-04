@@ -2,9 +2,11 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { scopedComponentCss } from '../helpers/scoped-component-css.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -12,33 +14,22 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-contents-',
   rawModules: [
-    ...FOUNDRY_BRIDGE_RAW_MODULES,
-    'src/ui/svelte/util/listReorderAnnouncement.js',
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     // The recipe thumbnails resolve through the shared pure image helper (issue 544).
     'src/ui/svelte/util/craftingImageDefaults.js',
-    // The Link-recipe menu is a `SearchablePopover` (issue 1458).
-    'src/ui/svelte/actions/dismissOnOutsideClick.js',
-    'src/ui/svelte/actions/portal.js',
-    'src/ui/svelte/actions/anchoredPopover.js',
-    'src/ui/svelte/util/overlayBounds.js',
-    'src/ui/svelte/util/iconPickerPopover.js',
-    'src/ui/svelte/util/listboxNavigation.js',
-    'src/ui/svelte/util/pickerOptionModel.js',
-    'src/ui/svelte/util/overlayHost.js',
   ],
   compiledModules: [
-    'src/ui/svelte/components/Medallion.svelte',
-    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness
-    // omits HANGS the suite (# cancelled) rather than failing it.
+    // `SetPicker` and the primitives it renders (issue 1782): its tokens are the one chip, its
+    // rows the shared Avatar, and its panel the searchable popover.
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/components/IconButton.svelte',
-    // `SearchablePopover` and the two primitives IT renders (issue 1458). The add menu is
-    // the shared picker now, so this tree reaches all three; an omission does not fail this
-    // suite, it cancels every test in it.
+    'src/ui/svelte/components/Avatar.svelte',
     'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
+    'src/ui/svelte/components/SetPicker.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
@@ -48,45 +39,57 @@ const LINKED = [
   { id: 'r1', name: 'Alloy Bronze', category: 'Smithing' },
   { id: 'r2', name: 'Refine Steel', category: 'Smithing' },
 ];
-const AVAILABLE = [
-  { id: 'r1', name: 'Alloy Bronze', category: 'Smithing' },
-  { id: 'r3', name: 'Veil Powder', category: 'Alchemy' },
-];
 
-// A library rather than a handful.
+// A library rather than a handful; the router hands the unlinked rest as `availableRecipes`.
 const LIBRARY = [
-  { id: 'r1', name: 'Alloy Bronze', category: 'Smithing' },
-  { id: 'r2', name: 'Refine Steel', category: 'Smithing' },
+  ...LINKED,
   { id: 'r3', name: 'Veil Powder', category: 'Alchemy' },
   { id: 'r4', name: 'Verdant Tonic', category: 'Alchemy' },
   { id: 'r5', name: 'Verdigris Salve', category: 'Alchemy' },
 ];
+const UNLINKED = LIBRARY.slice(2);
 
-function trigger(root) {
-  return root.querySelector('[data-recipe-item-link-recipe-toggle]');
-}
-
-function openPicker(root) {
-  trigger(root).click();
+async function settle() {
   flushSync();
-  return {
-    panel: () => root.querySelector('.manager-travel-popover'),
-    search: () => root.querySelector('.manager-travel-popover-search input'),
-    count: () => root.querySelector('[data-popover-filtered-count]'),
-    list: () => root.querySelector('.manager-travel-popover [role="listbox"]'),
-    options: () => root.querySelectorAll('[data-recipe-item-link-recipe-option]'),
-  };
+  await tick();
+  await new Promise((done) => setTimeout(done, 0));
+  flushSync();
 }
 
 /** A keydown from wherever focus is, which is how the primitive's dismissal is reached. */
 async function pressKey(key) {
   document.activeElement.dispatchEvent(
-    new window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+    new globalThis.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
   );
-  flushSync();
-  await tick();
-  await new Promise((done) => setTimeout(done, 0));
-  flushSync();
+  await settle();
+}
+
+/** A mounted tab with both callbacks recorded, in call order. */
+async function mountTab(props = {}) {
+  const calls = [];
+  const root = await harness.mount({
+    linkedRecipes: LINKED,
+    availableRecipes: UNLINKED,
+    onLinkRecipe: (id) => calls.push(['link', id]),
+    onRemoveRecipe: (id) => calls.push(['remove', id]),
+    ...props,
+  });
+  const panel = () => root.querySelector('.fabricate-set-picker-popover');
+  return {
+    root,
+    calls,
+    panel,
+    trigger: () => root.querySelector('[data-recipe-item-link-recipe-toggle]'),
+    option: (id) => root.querySelector(`[data-recipe-item-link-recipe-option="${id}"]`),
+    marked: () =>
+      [...(panel()?.querySelectorAll('[role="option"][aria-selected="true"]') ?? [])].map((row) =>
+        row.getAttribute('data-recipe-item-link-recipe-option')
+      ),
+    async click(element) {
+      element.click();
+      await settle();
+    },
+  };
 }
 
 before(() => harness.setup());
@@ -94,27 +97,30 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('RecipeItemContentsTab (mounted)', () => {
-  it('lists the linked recipes with name and category', async () => {
-    const root = await harness.mount({ linkedRecipes: LINKED, availableRecipes: AVAILABLE });
-    const rows = root.querySelectorAll('[data-recipe-item-recipe]');
-    assert.equal(rows.length, 2);
-    assert.equal(
-      rows[0].querySelector('.manager-recipe-item-recipe-name').textContent.trim(),
-      'Alloy Bronze'
+  it('draws the linked recipes as tokens and offers every recipe of the system in the panel', async () => {
+    const tab = await mountTab();
+    assert.deepEqual(
+      [...tab.root.querySelectorAll('[data-set-picker-token]')].map((token) =>
+        token.textContent.trim()
+      ),
+      ['Alloy Bronze', 'Refine Steel']
     );
+    await tab.click(tab.trigger());
+    assert.equal(tab.root.querySelectorAll('[data-recipe-item-link-recipe-option]').length, 5);
+    assert.deepEqual(tab.marked(), ['r1', 'r2'], 'the members are marked');
     assert.equal(
-      rows[0].querySelector('.manager-recipe-item-recipe-cat').textContent.trim(),
-      'Smithing'
+      tab.panel().querySelector('[data-popover-filtered-count]').textContent.trim(),
+      '5 of 5'
     );
   });
 
   it('shows an empty state with no linked recipes', async () => {
-    const root = await harness.mount({ linkedRecipes: [], availableRecipes: AVAILABLE });
-    assert.ok(root.querySelector('[data-recipe-item-contents-empty]'));
+    const tab = await mountTab({ linkedRecipes: [], availableRecipes: LIBRARY });
+    assert.ok(tab.root.querySelector('[data-recipe-item-contents-empty]'));
   });
 
   it('renders the blueprint (not the item-bag) for a recipe with a generic/empty image (issue 544)', async () => {
-    const root = await harness.mount({
+    const tab = await mountTab({
       linkedRecipes: [
         { id: 'bag', name: 'Forge Club', category: 'Smithing', img: 'icons/svg/item-bag.svg' },
         { id: 'empty', name: 'Forge Handaxe', category: 'Smithing', img: '' },
@@ -127,289 +133,144 @@ describe('RecipeItemContentsTab (mounted)', () => {
       ],
       availableRecipes: [],
     });
-    const src = (id) =>
-      root.querySelector(`[data-recipe-item-recipe="${id}"] img`).getAttribute('src');
-    assert.match(
-      src('bag'),
-      /blueprint-recipe-alchemical\.webp$/,
-      'a generic-bag recipe shows the blueprint'
-    );
-    assert.ok(!/item-bag\.svg$/.test(src('bag')), 'the bag SVG is not shown');
-    assert.match(
-      src('empty'),
-      /blueprint-recipe-alchemical\.webp$/,
-      'an empty-image recipe shows the blueprint'
-    );
-    assert.equal(
-      src('real'),
-      'icons/tools/smithing/anvil.webp',
-      'a real authored image passes through'
-    );
+    await tab.click(tab.trigger());
+    const src = (id) => tab.option(id).querySelector('img').getAttribute('src');
+    const blueprint = /blueprint-recipe-alchemical[.]webp$/u;
+    assert.match(src('bag'), blueprint, 'a generic bag shows the blueprint');
+    assert.match(src('empty'), blueprint, 'an empty image shows it too');
+    assert.equal(src('real'), 'icons/tools/smithing/anvil.webp', 'a real image passes through');
   });
 
-  it('fires onRemoveRecipe with the recipe id', async () => {
-    const calls = [];
-    const root = await harness.mount({
-      linkedRecipes: LINKED,
-      availableRecipes: AVAILABLE,
-      onRemoveRecipe: (id) => calls.push(id),
+  it('writes nothing while recipes are toggled', async () => {
+    const tab = await mountTab();
+    await tab.click(tab.trigger());
+    await tab.click(tab.option('r3'));
+    await tab.click(tab.option('r1'));
+    assert.deepEqual(tab.calls, []);
+    assert.deepEqual(tab.marked(), ['r2', 'r3'], 'the panel marks the staged set');
+  });
+
+  it('forwards only the changed recipes on Apply', async () => {
+    const tab = await mountTab();
+    await tab.click(tab.trigger());
+    const footer = () => tab.panel().querySelector('[data-set-picker-footer] [role="status"]');
+    assert.equal(footer().textContent.trim(), '2 selected');
+    await tab.click(tab.option('r3'));
+    await tab.click(tab.option('r5'));
+    await tab.click(tab.option('r1'));
+    assert.equal(footer().textContent.trim(), '2 to add · 1 to remove', 'the staged change shows');
+    await tab.click(tab.root.querySelector('[data-set-picker-apply]'));
+    assert.deepEqual(tab.calls, [
+      ['link', 'r3'],
+      ['link', 'r5'],
+      ['remove', 'r1'],
+    ]);
+    assert.ok(!tab.panel(), 'Apply closes the panel');
+  });
+
+  for (const [how, dismiss] of [
+    ['Escape', () => pressKey('Escape')],
+    [
+      'an outside press',
+      async () => {
+        document.body.dispatchEvent(new globalThis.MouseEvent('mousedown', { bubbles: true }));
+        await settle();
+      },
+    ],
+    ['the trigger', (tab) => tab.click(tab.trigger())],
+  ]) {
+    it(`discards the staged recipes when ${how} closes the panel`, async () => {
+      const tab = await mountTab();
+      await tab.click(tab.trigger());
+      await tab.click(tab.option('r3'));
+      await dismiss(tab);
+      assert.ok(!tab.panel(), `${how} closes it`);
+      assert.deepEqual(tab.calls, [], 'and writes nothing');
+      await tab.click(tab.trigger());
+      assert.deepEqual(tab.marked(), ['r1', 'r2'], 'reopening shows the committed set');
     });
-    root.querySelector('[data-recipe-item-remove-recipe="r2"]').click();
-    assert.deepEqual(calls, ['r2']);
-  });
+  }
 
-  it('opens the link picker offering only unlinked recipes and fires onLinkRecipe', async () => {
-    const calls = [];
-    const root = await harness.mount({
-      linkedRecipes: LINKED,
-      availableRecipes: AVAILABLE,
-      onLinkRecipe: (id) => calls.push(id),
-    });
-    root.querySelector('[data-recipe-item-link-recipe-toggle]').click();
-    flushSync();
-    const options = root.querySelectorAll('[data-recipe-item-link-recipe-option]');
-    // r1 is already linked, so only r3 is offered.
-    assert.equal(options.length, 1);
-    assert.equal(options[0].getAttribute('data-recipe-item-link-recipe-option'), 'r3');
-    options[0].click();
-    assert.deepEqual(calls, ['r3']);
-  });
-
-  // ── THE PICKER IS SEARCHABLE (issue 1513) ──────────────────────────────────────────────
-  // It passed `showSearch={false}` and announced `aria-haspopup="listbox"`, which is the shape
-  // of the four converted MENUS — a handful of fixed names. This panel offers every recipe in
-  // the world that is not already linked, so the field and the count come on and the truthful
-  // `dialog` default comes back with them.
-  it('renders a search field over the linkable library and states matched-of-total', async () => {
-    const root = await harness.mount({ linkedRecipes: [], availableRecipes: LIBRARY });
-    const picker = openPicker(root);
-
-    assert.ok(Boolean(picker.search()), 'the panel renders its search field');
-    assert.equal(picker.search().getAttribute('placeholder'), 'Search recipes…');
-    assert.equal(picker.search().getAttribute('aria-label'), 'Search recipes…');
-    assert.equal(picker.count().textContent.trim(), '5 of 5');
-
-    picker.search().value = 'Verd';
-    picker.search().dispatchEvent(new Event('input', { bubbles: true }));
-    flushSync();
-
-    assert.equal(picker.options().length, 2);
-    assert.equal(picker.count().textContent.trim(), '2 of 5');
-  });
-
-  // `triggerHasPopup` came off WITH `showSearch={false}`.
-  // from either end: with a query field in it the panel is a dialog that CONTAINS a listbox, and
-  // announcing a bare listbox promises a control the GM never gets. The source contract holds
-  // the rule; this holds the rendered attribute, which is the thing a screen reader reads.
-  it('announces the dialog it opens rather than a bare listbox', async () => {
-    const root = await harness.mount({ linkedRecipes: [], availableRecipes: LIBRARY });
-    assert.equal(
-      root.querySelector('[data-recipe-item-link-recipe-toggle]').getAttribute('aria-haspopup'),
-      'dialog'
-    );
-    // Single-select is UNCHANGED: `stayOpen` is the gate alone.
-    const picker = openPicker(root);
-    assert.equal(
-      picker.panel().querySelector('[role="listbox"]').hasAttribute('aria-multiselectable'),
-      false,
-      'linking is one choice at a time, so the list is not multi-selectable'
-    );
-  });
-
-  // ── THE PANEL SURVIVES A CHOICE (issue 1513) ───────────────────────────────────────────
-  // Linking a second recipe was: re-open the trigger, re-type the query, re-find the place in
-  // the library. `stayOpen` is that whole cost, and the query surviving with it is half of the
-  // point — a panel that reopened empty-handed would still be closing the loop on the GM.
-  it('stays open across choices, keeping the typed query and the rows it matched', async () => {
-    const calls = [];
-    const root = await harness.mount({
-      linkedRecipes: [],
-      availableRecipes: LIBRARY,
-      onLinkRecipe: (id) => calls.push(id),
-    });
-    const picker = openPicker(root);
-
-    picker.search().value = 'Verd';
-    picker.search().dispatchEvent(new Event('input', { bubbles: true }));
-    flushSync();
-    assert.equal(picker.options().length, 2);
-
-    picker.options()[0].click();
-    flushSync();
-
-    assert.deepEqual(calls, ['r4'], 'the first choice reaches the caller');
-    assert.ok(Boolean(picker.panel()), 'the panel is still open after a choice');
-    assert.equal(picker.search().value, 'Verd', 'the typed query survives the choice');
-    assert.equal(picker.options().length, 2, 'the matched rows survive the choice');
-
-    // THE SECOND LINK WITHOUT RE-OPENING.
-    picker.options()[1].click();
-    flushSync();
-    assert.deepEqual(calls, ['r4', 'r5']);
-  });
-
-  // ── THE CLOSED AFFORDANCE STAYS REACHABLE (issue 1513, review r1) ──────────────────
-  // `triggerAriaDisabled` rather than `disabled`, and `stayOpen` is what makes the difference
-  // reachable: the last linkable recipe is linked WITH THE PANEL OPEN, so a native `disabled`
-  // would put `disabled` and `aria-expanded="true"` on one button and then drop the keyboard
-  // user to `<body>` on Escape, because `focus()` on a disabled button is a silent no-op.
-  it('closes the link affordance without removing it from the keyboard', async () => {
-    const root = await harness.mount({ linkedRecipes: LINKED, availableRecipes: LINKED });
-    const button = trigger(root);
-    assert.equal(button.getAttribute('aria-disabled'), 'true');
-    assert.equal(button.disabled, false, 'it is not removed from the tab order');
-
-    button.click();
-    flushSync();
-    assert.ok(!root.querySelector('.manager-travel-popover'), 'and it still refuses to open');
-
-    button.focus();
-    assert.ok(document.activeElement === button, 'an aria-disabled trigger still takes focus');
-  });
-
-  // AND IT IS STILL PAINTED AS CLOSED.
-  it('paints the closed trigger through a selector that reads the ARIA flag it now carries', () => {
-    const { css } = scopedComponentCss(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte')
-    );
-    const flat = css.replaceAll(/\/\*[\s\S]*?\*\//gu, '').replaceAll(/\s+/gu, ' ');
-    const rules = [...flat.matchAll(/([^{}]+)\{([^{}]*)\}/gu)].map(([, selector, body]) => ({
-      selector: selector.trim(),
-      body,
-    }));
-
-    const closed = rules.filter((rule) =>
-      rule.selector.includes('manager-recipe-item-link-recipe-toggle')
-    );
-    assert.equal(
-      closed.length,
-      1,
-      `${closed.length} rules paint the link trigger, against the one this component writes. ` +
-        'Svelte PRUNES a scoped rule it cannot match, so a rule deleted and a rule pruned look ' +
-        'the same from here, and both leave the closed state unpainted'
-    );
-    assert.match(
-      closed[0].selector,
-      /\[aria-disabled='true'\]/u,
-      'the selector must read `aria-disabled`, because that is the flag this call site sets: it ' +
-        'passes `triggerAriaDisabled` so the button stays focusable, which means the native ' +
-        '`:disabled` this rule was written against never matches it again'
-    );
-    assert.match(
-      closed[0].body,
-      /opacity: 0\.5/u,
-      'and it still dims, or the state is announced and not drawn'
-    );
-    assert.match(closed[0].body, /cursor: not-allowed/u);
-  });
-
-  // THE STATE THE FIXTURE USED TO PIN AS AN ARTIFACT. The stay-open clause above asserts two rows
-  // survive a choice, which is true of the FIXTURE and false of production: the parent re-projects
-  // `linkedRecipes` after a link, so the option list shrinks under the open panel. Re-mounting the
-  // shrunk projection is what makes the assertion about the product.
-  it('re-projects the shrunk library under the open panel and keeps the query', async () => {
-    const calls = [];
-    const root = await harness.mount({
-      linkedRecipes: [],
-      availableRecipes: LIBRARY,
-      onLinkRecipe: (id) => calls.push(id),
-    });
-    const picker = openPicker(root);
-
-    picker.search().value = 'Verd';
-    picker.search().dispatchEvent(new Event('input', { bubbles: true }));
-    flushSync();
-    assert.equal(picker.options().length, 2);
-
-    picker.options()[0].click();
-    flushSync();
-    assert.deepEqual(calls, ['r4']);
-
-    // What the caller does with that id: r4 joins the linked list, so it leaves the linkable one.
+  it('keeps a recipe linked under the open panel when Apply lands', async () => {
+    const tab = await mountTab();
+    await tab.click(tab.trigger());
+    await tab.click(tab.option('r3'));
     await harness.setProps({
-      linkedRecipes: [LIBRARY[3]],
-      availableRecipes: LIBRARY,
+      linkedRecipes: [...LINKED, LIBRARY[3]],
+      availableRecipes: [LIBRARY[2], LIBRARY[4]],
     });
+    await settle();
+    await tab.click(tab.root.querySelector('[data-set-picker-apply]'));
+    assert.deepEqual(tab.calls, [['link', 'r3']], 'r4, linked meanwhile, is not unlinked');
+  });
 
-    assert.ok(Boolean(picker.panel()), 'the panel survives the re-projection');
-    assert.equal(picker.search().value, 'Verd', 'and so does the typed query');
-    assert.equal(picker.options().length, 1, 'the linked recipe left the option list');
+  it('offers and counts no id-less recipe, so Apply never forwards one', async () => {
+    const tab = await mountTab({
+      linkedRecipes: [...LINKED, null],
+      availableRecipes: [...UNLINKED, { name: 'Nameless', category: 'Alchemy' }],
+    });
+    assert.equal(tab.root.querySelectorAll('[data-set-picker-token]').length, 2);
+    await tab.click(tab.trigger());
+    assert.equal(tab.root.querySelectorAll('[role="option"]').length, 5);
+    await tab.click(tab.panel().querySelector('[data-set-picker-clear]'));
+    await tab.click(tab.root.querySelector('[data-set-picker-apply]'));
+    assert.deepEqual(tab.calls, [
+      ['remove', 'r1'],
+      ['remove', 'r2'],
+    ]);
+  });
+
+  it('keeps Clear reachable at zero members', async () => {
+    const tab = await mountTab({ linkedRecipes: [], availableRecipes: LIBRARY });
+    await tab.click(tab.trigger());
+    const clear = tab.root.querySelector('[data-set-picker-clear]');
+    assert.ok(Boolean(clear), 'Clear renders over an empty membership');
+    assert.equal(clear.disabled, false);
+    await tab.click(tab.option('r4'));
+    await tab.click(clear);
+    assert.deepEqual(tab.marked(), [], 'Clear empties the staged set');
+    assert.deepEqual(tab.calls, []);
+  });
+
+  it('carries the validation address on a trigger that opens over a full membership', async () => {
+    const tab = await mountTab({ linkedRecipes: LIBRARY, availableRecipes: [] });
+    const trigger = tab.root.querySelector('[data-validation-target="recipe-item-link-recipe"]');
+    assert.ok(trigger === tab.trigger(), 'the address rides the trigger');
+    assert.equal(trigger.tagName, 'BUTTON');
+    assert.equal(trigger.disabled, false);
+    assert.ok(!trigger.hasAttribute('aria-disabled'), 'a full membership still opens the panel');
+    assert.equal(trigger.getAttribute('aria-haspopup'), 'dialog');
+    assert.equal(trigger.textContent.trim(), 'Edit recipes', 'the one control adds and removes');
+  });
+
+  it('names the token group, the panel, its list and its query field', async () => {
+    const tab = await mountTab();
     assert.equal(
-      picker.options()[0].getAttribute('data-recipe-item-link-recipe-option'),
-      'r5',
-      'and the one still linkable under the query is the row that remains'
+      tab.root.querySelector('.fabricate-set-picker [role="group"]').getAttribute('aria-label'),
+      'Recipes inside'
     );
-    assert.equal(root.querySelectorAll('[data-recipe-item-recipe]').length, 1);
-  });
-
-  // AND THE LAST LINK, which is the state the trigger's flag exists for.
-  it('hands focus back to the closed trigger when the last linkable recipe is linked', async () => {
-    const root = await harness.mount({
-      linkedRecipes: [],
-      availableRecipes: [LIBRARY[3]],
-    });
-    const picker = openPicker(root);
-    assert.equal(picker.options().length, 1);
-
-    picker.options()[0].click();
-    flushSync();
-    await harness.setProps({
-      linkedRecipes: [LIBRARY[3]],
-      availableRecipes: [LIBRARY[3]],
-    });
-
-    const button = trigger(root);
-    assert.ok(Boolean(picker.panel()), 'the panel is still open over an empty library');
-    assert.equal(button.getAttribute('aria-disabled'), 'true');
-    assert.equal(button.disabled, false);
-    assert.equal(button.getAttribute('aria-expanded'), 'true');
-
-    await pressKey('Escape');
-    assert.ok(!root.querySelector('.manager-travel-popover'), 'Escape closes it');
-    assert.ok(
-      document.activeElement === button,
-      'and focus returns to the trigger rather than falling to <body>, where Foundry rearms its ' +
-        'canvas keybindings'
-    );
-  });
-
-  // ── THE PANEL AND ITS LIST ARE NAMED (issue 1513, review r1) ───────────────────────
-  // `panelLabel` feeds both the portaled `role="dialog"` and the `role="listbox"` inside it,
-  // and a source read cannot finish that job: the call site's string is present and non-empty
-  // there while resolving to '' at runtime for any caller naming the control by a caption.
-  it('renders a non-empty accessible name on the panel and on its option list', async () => {
-    const root = await harness.mount({ linkedRecipes: [], availableRecipes: LIBRARY });
-    const picker = openPicker(root);
-
-    const panelName = picker.panel().getAttribute('aria-label');
-    const listName = picker.list().getAttribute('aria-label');
-    assert.notEqual(panelName, '', 'the portaled dialog announces a name');
-    assert.notEqual(listName, '', 'and so does the listbox inside it');
-    assert.equal(panelName, 'Link recipe');
-    assert.equal(listName, 'Link recipe');
-  });
-
-  // ── THE COUNT IS THE CHOICE'S ONLY FEEDBACK UNDER `stayOpen` (issue 1513, review r1) ──
-  // A panel that closes on choose confirms the choice by closing. This one stays open, so the
-  // matched-of-total header is what says a link landed — "5 of 5" becomes "4 of 4" — and it can
-  // only say it to a screen reader if it is a live region.
-  it('announces the count as a polite status', async () => {
-    const root = await harness.mount({ linkedRecipes: [], availableRecipes: LIBRARY });
-    const picker = openPicker(root);
-
-    assert.equal(picker.count().getAttribute('role'), 'status');
-    assert.equal(picker.count().getAttribute('aria-live'), 'polite');
-    assert.equal(picker.count().textContent.trim(), '5 of 5');
-
-    picker.options()[0].click();
-    flushSync();
-    await harness.setProps({ linkedRecipes: [LIBRARY[0]], availableRecipes: LIBRARY });
-
+    await tab.click(tab.trigger());
+    assert.equal(tab.panel().getAttribute('aria-label'), 'Recipes inside');
     assert.equal(
-      picker.count().textContent.trim(),
-      '4 of 4',
-      'the live region\u2019s own text is what moves, so the link is announced without a second ' +
-        'element'
+      tab.panel().querySelector('[role="listbox"]').getAttribute('aria-label'),
+      'Recipes inside'
+    );
+    const field = tab.panel().querySelector('input');
+    assert.equal(field.getAttribute('placeholder'), 'Search recipes…');
+    assert.equal(field.getAttribute('aria-label'), 'Search recipes…');
+  });
+
+  it('narrows the panel by the query and counts matched-of-total', async () => {
+    const tab = await mountTab({ linkedRecipes: [], availableRecipes: LIBRARY });
+    await tab.click(tab.trigger());
+    const field = tab.panel().querySelector('input');
+    field.value = 'Verd';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    assert.equal(tab.root.querySelectorAll('[data-recipe-item-link-recipe-option]').length, 2);
+    assert.equal(
+      tab.panel().querySelector('[data-popover-filtered-count]').textContent.trim(),
+      '2 of 5'
     );
   });
 });

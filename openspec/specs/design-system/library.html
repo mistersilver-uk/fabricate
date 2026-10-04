@@ -1740,57 +1740,63 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>The convert control and the group&rsquo;s own &ldquo;Alternative&rdquo; adder open the SAME menu</b> &mdash; the offered kinds, in the same order &mdash; and both append an <b>empty row of the chosen kind</b>. A convert that silently prefills a second alternative has answered a question the GM was about to be asked.<span class="cite"><b>spec.md requirement "One requirement row serves both sides of a recipe"</b></span></div>
   </div>
 
-  <div class="spec" data-status="target" data-status-SetPicker="target">
-    <div class="spec-head"><h4>&lt;SetPicker&gt;</h4><span class="st st-target">target</span><p class="why">Editing membership of a set too large to render inline — a component&rsquo;s tags, which books a recipe appears in, which recipes a book carries. It searches, it never dumps the whole set into the panel it sits in, and every selection is reversible before it is committed.</p></div>
+  <div class="spec" data-status="shipped" data-status-SetPicker="shipped">
+    <div class="spec-head"><h4>&lt;SetPicker&gt;</h4><span class="st st-shipped">shipped</span><p class="why">Editing membership of a set too large to render inline — a component&rsquo;s tags, which books a recipe appears in, which recipes a book carries. It searches, it never dumps the whole set into the panel it sits in, and every selection is reversible before it is committed.</p></div>
     <div class="stage col">
       <div class="unit"><span class="cap">membership &mdash; one record&rsquo;s set</span>
         <div style="max-width:420px;display:grid;gap:8px">
           <div class="k-lbl"><span class="k-kicker">Tags</span>
-            <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
-              <span class="k-token" style="height:26px;border-radius:6px"><span style="font-size:11px;padding-left:6px">#Refined</span><button class="x" style="width:20px;height:20px;border-radius:6px"><svg class="i" style="width:8px;height:8px"><use href="#i-x"/></svg></button></span><span class="k-token" style="height:26px;border-radius:6px"><span style="font-size:11px;padding-left:6px">#Metal</span><button class="x" style="width:20px;height:20px;border-radius:6px"><svg class="i" style="width:8px;height:8px"><use href="#i-x"/></svg></button></span><span class="k-token" style="height:26px;border-radius:6px"><span style="font-size:11px;padding-left:6px">#Smithing</span><button class="x" style="width:20px;height:20px;border-radius:6px"><svg class="i" style="width:8px;height:8px"><use href="#i-x"/></svg></button></span>
-              <button class="k-btn" style="height:26px;min-height:26px;font-size:11px">+4 more</button>
-              <button class="k-btn dashed" style="height:26px;min-height:26px"><svg class="i"><use href="#i-plus"/></svg>Add</button>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+              <span class="k-token" style="height:22px;padding:0 9px;border-radius:999px;font-size:10px;font-weight:600">#Refined</span><span class="k-token" style="height:22px;padding:0 9px;border-radius:999px;font-size:10px;font-weight:600">#Metal</span><span class="k-token" style="height:22px;padding:0 9px;border-radius:999px;font-size:10px;font-weight:600">#Smithing</span>
+              <button class="k-btn" style="height:22px;min-height:22px;border-radius:999px;font-size:10px" aria-label="and 4 more">+4 more</button>
+              <button class="k-btn dashed" style="height:34px;min-height:34px;border-radius:9px;font-size:11px;font-weight:600"><svg class="i"><use href="#i-plus"/></svg>Add</button>
             </div>
           </div>
-          <span class="k-hint">Three tokens, then a count. The control shows a <b>bounded</b> number inline and never grows with the set &mdash; a record in forty books must not push its own editor off the screen.</span>
+          <span class="k-hint">Three tokens, then a count. The control shows a <b>bounded</b> number inline and never grows with the set &mdash; a record in forty books must not push its own editor off the screen. The count is a button named &ldquo;and 4 more&rdquo; that opens the same panel as Add.</span>
         </div>
       </div>
-      <div class="unit"><span class="cap">the picker it opens &mdash; searchable, scrolling, counted</span>
-        <div style="width:330px;border-radius:11px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);padding:10px;display:grid;gap:8px">
-          <div style="display:flex;gap:8px;align-items:center"><div class="k-field" style="height:34px;border-radius:9px;flex:1"><svg class="i"><use href="#i-search"/></svg><span class="ph">smith</span></div><span class="k-count">6 of 412</span></div>
+      <div class="unit"><span class="cap">the picker it opens &mdash; searchable, scrolling, counted, staged</span>
+        <div style="width:330px;border-radius:10px;background:var(--fab-bg-0);border:1px solid var(--fab-border-strong);box-shadow:var(--fab-shadow-lg);padding:7px;display:grid;gap:5px">
+          <div style="display:flex;justify-content:flex-end;padding:4px 7px 6px"><span class="k-count" style="font-size:9px">6 of 412</span></div>
+          <div class="k-field" style="height:30px;border-radius:7px;border-color:var(--fab-accent-border)"><span class="ph">smith</span></div>
           <div style="display:grid;gap:2px;max-height:168px;overflow-y:auto">
-            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;background:var(--fab-surface-active)"><div class="k-cb on"><i><svg class="i"><use href="#i-plus"/></svg></i></div><span class="grow" style="font-size:12px;font-weight:600;color:var(--fab-text)">#Smithing</span><span class="k-count">48</span></div>
-            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px"><div class="k-cb"><i><svg class="i"><use href="#i-check"/></svg></i></div><span class="grow" style="font-size:12px;font-weight:500;color:var(--fab-text-secondary)">#Smithy</span><span class="k-count">12</span></div>
-            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px"><div class="k-cb"><i><svg class="i"><use href="#i-check"/></svg></i></div><span class="grow" style="font-size:12px;font-weight:500;color:var(--fab-text-secondary)">#Blacksmith</span><span class="k-count">31</span></div>
-            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;background:var(--fab-surface-active)"><div class="k-cb on"><i><svg class="i"><use href="#i-plus"/></svg></i></div><span class="grow" style="font-size:12px;font-weight:600;color:var(--fab-text)">#Refined</span><span class="k-count">96</span></div>
-            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px"><div class="k-cb"><i><svg class="i"><use href="#i-check"/></svg></i></div><span class="grow" style="font-size:12px;font-weight:500;color:var(--fab-text-secondary)">#Raw</span><span class="k-count">204</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;border:1px solid var(--fab-accent-border);background:var(--fab-surface-active)"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Smithing</span><svg class="i" style="color:var(--fab-accent)"><use href="#i-check"/></svg></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Smithy</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Blacksmith</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;border:1px solid var(--fab-accent-border);background:var(--fab-surface-active)"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Refined</span><svg class="i" style="color:var(--fab-accent)"><use href="#i-check"/></svg></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px"><span class="grow" style="font-size:13px;color:var(--fab-text)">#Raw</span></div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;padding-top:6px;border-top:1px solid var(--fab-border)">
+          <div style="display:flex;align-items:center;gap:8px;padding-top:4px;border-top:1px solid var(--fab-border)">
             <span class="k-hint grow">2 selected</span>
-            <button class="k-btn ghost" style="height:26px;min-height:26px">Clear</button>
-            <button class="k-btn primary" style="height:26px;min-height:26px">Apply</button>
+            <button class="k-btn ghost">Clear all</button>
+            <button class="k-btn primary">Apply</button>
           </div>
         </div>
-        <span class="k-hint">The list scrolls inside the panel; the count says how much the query matched, so a GM knows when to keep typing rather than keep scrolling.</span>
+        <span class="k-hint">The list scrolls inside the panel; the count says how much the query matched, so a GM knows when to keep typing rather than keep scrolling. A staged member carries the accent ground and a trailing check; while the staged set differs from the committed one the footer says what Apply will add and remove (&ldquo;1 to add &middot; 1 to remove&rdquo;) and Apply is enabled.</span>
       </div>
     </div>
     <div class="notes">
       <div><h5>Canonical spec</h5><ul>
-        <li><b>trigger</b> bounded token run, then a <code>+N more</code> button and a dashed Add</li>
-        <li><b>panel</b> the floating-surface geometry — portalled, measured, flipped</li>
+        <li><b>trigger</b> a bounded run of row chips (22px, pill), then a <code>+N more</code> button named &ldquo;and N more&rdquo; and a dashed Add</li>
+        <li><b>panel</b> <code>SearchablePopover</code> in its <code>multiple</code> mode &mdash; portalled, measured, flipped</li>
         <li><b>list</b> scrolls inside the panel at a fixed max height; never grows the host</li>
-        <li><b>count</b> matched-of-total beside the search, so the GM knows to refine</li>
-        <li><b>commit</b> Apply and Clear in the panel footer — nothing writes on click</li>
+        <li><b>count</b> matched-of-total above the search, so the GM knows to refine</li>
+        <li><b>commit</b> <code>staged</code>: Clear and Apply in the panel footer &mdash; nothing writes on click, and Escape or an outside press discards; <code>choose</code>: the session form, one write per choice, no token run and no footer</li>
       </ul></div>
       <div><h5>Svelte API</h5><ul>
-        <li><b>source</b> (query) — async, returns matched plus total</li>
-        <li><b>value</b> id[] <span class="req">bindable</span> · <b>onApply</b> <span class="req">required</span></li>
-        <li><b>maxInline</b> number = 3 — tokens before the overflow count</li>
-        <li><b>emptyText · loading · error</b></li>
-        <li><b>itemLabel</b> <span class="req">required</span> — the token&rsquo;s accessible name</li>
+        <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>SetPicker.svelte</code>&rsquo;s <code>$props()</code> at issue 1782.</li>
+        <li><b>value</b> id[] &mdash; the committed members</li>
+        <li><b>options</b> {id, label, meta?, img?, data?}[] &middot; or <b>source</b>(query) &mdash; async, answers an array or {options, total}; the latest request wins</li>
+        <li><b>commit</b> &lsquo;staged&rsquo; | &lsquo;choose&rsquo; = &lsquo;staged&rsquo;</li>
+        <li><b>onChange</b>(next, {added, removed}) <span class="req">required</span></li>
+        <li><b>maxTokens</b> number = 3 &mdash; tokens before the overflow count</li>
+        <li><b>label</b> | <b>ariaLabel</b> &mdash; exactly one; names the token group and the panel</li>
+        <li><b>searchLabel</b> &middot; <b>emptyLabel</b> &middot; <b>loading</b> &middot; <b>error</b></li>
+        <li><b>addLabel</b> = &ldquo;Add&rdquo; &middot; <b>addProps</b> {} &mdash; the dashed Add&rsquo;s name, and hooks stamped on that button</li>
+        <li><b>trigger</b> snippet &mdash; replaces the dashed Add &middot; <b>class</b> &middot; rest</li>
       </ul></div>
     </div>
-    <div class="delta"><b>Why it is not just a multi-select popover.</b> Three obligations the search popover does not carry: the trigger is <b>bounded</b>, so a record in forty books renders four tokens and a count rather than forty; selection is <b>staged</b> and applied on commit, so a mis-click costs nothing and Clear is always reachable; and the panel states <b>matched-of-total</b> beside its search, so a GM knows when to refine the query rather than keep scrolling. The MULTI-RECORD edit is NOT one of them: the third state a staged bulk edit needs moved to <b>&lt;BulkStagingInset&gt;</b> at issue 1513, which ships it. Used by: book membership &middot; recipe books.<span class="cite">Book membership is stored as <b>recipeIds</b> on the book, so the same control drives both directions of the relation</span></div>
+    <div class="delta"><b>Why it is not just a multi-select popover.</b> Three obligations the search popover does not carry: the trigger is <b>bounded</b>, so a record in forty books renders four tokens and a count rather than forty; selection is <b>staged</b> and applied on commit, so a mis-click costs nothing and Clear is always reachable; and the panel states <b>matched-of-total</b> beside its search, so a GM knows when to refine the query rather than keep scrolling. The MULTI-RECORD edit is NOT one of them: the third state a staged bulk edit needs moved to <b>&lt;BulkStagingInset&gt;</b> at issue 1513, which ships it. Used by: the recipe-item editor&rsquo;s contents tab (staged) &middot; the crafting component sources bar (<code>choose</code>, the session control).<span class="cite">Book membership is stored as <b>recipeIds</b> on the book, so the same control drives both directions of the relation</span></div>
   </div>
 
   <div class="spec" data-status="shipped" data-status-RuleRow="shipped" data-status-RuleSentence="shipped">
