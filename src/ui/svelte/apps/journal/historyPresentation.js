@@ -44,6 +44,49 @@ export function presentCurrencySpends(spends, localize) {
     }));
 }
 
+/** The amount a credit's roll states, or '' for a fixed amount (issue 1645). */
+function rolledText(rolled, localize) {
+  return named(rolled?.formula) && finite(rolled?.total)
+    ? localize('FABRICATE.App.Journal.RolledAmount', {
+        formula: rolled.formula,
+        total: rolled.total,
+      })
+    : '';
+}
+
+/**
+ * One stage's currency credits and knowledge grants as label/value rows (issue 1773), as its
+ * currency spends are: a credit under its label with its amount, roll and reason, and a grant
+ * saying whether its recipe was learned or already known. `quantity` is what it banked.
+ */
+export function presentRewards(stage, localize) {
+  const credits = list(stage?.currencyCredits).map((credit, index) => {
+    const unit = named(credit.unitName) ? credit.unitName : credit.unit;
+    return {
+      id: `credit-${stage?.stepId ?? ''}-${index}`,
+      kind: 'currency',
+      icon: 'fa-coins',
+      label: named(credit.label) ? credit.label : localize(`${prefix}CurrencyAwarded`),
+      value: [`${credit.amount} ${unit}`, rolledText(credit.rolled, localize), credit.reason]
+        .filter(named)
+        .join(' · '),
+      quantity: credit.amount,
+    };
+  });
+  const grants = list(stage?.knowledgeGrants).map((grant, index) => {
+    const known = grant.outcome === 'alreadyKnown';
+    return {
+      id: `grant-${stage?.stepId ?? ''}-${index}`,
+      kind: 'knowledge',
+      icon: 'fa-book-open',
+      label: localize(`${prefix}${known ? 'RecipeAlreadyKnown' : 'RecipeLearned'}`),
+      value: named(grant.recipeName) ? grant.recipeName : grant.recipeId,
+      quantity: known ? 0 : 1,
+    };
+  });
+  return [...credits, ...grants];
+}
+
 function checkText(check, localize) {
   if (!check) return '';
   if (check.count) return formatCountRoll(check.count, localize);
@@ -118,6 +161,7 @@ export function presentStage(stage, localize) {
     route: stage?.selectedRequirementSnapshot?.name || '',
     consumed: presentMaterials(stage?.consumedIngredients, localize),
     produced: presentMaterials(stage?.createdResults, localize),
+    rewards: presentRewards(stage, localize),
     tools: presentMaterials(stage?.usedTools, localize),
     essence: presentEssenceSpend(stage ?? {}, localize),
   };
@@ -285,6 +329,7 @@ export function presentHistory(run, localize) {
         .filter(attempted)
         .map((stage) => presentStage(stage, localize));
   const results = presentMaterials(run?.createdResults, localize);
+  const rewards = stages.flatMap((stage) => stage.rewards);
   const multi = stages.length > 1;
   const mode = run?.gatheringYield?.mode;
   const gathering = run?.runType === 'gathering';
@@ -316,6 +361,9 @@ export function presentHistory(run, localize) {
         : run?.failureReason ||
           stages.find((entry) => entry.status === 'failed')?.detail?.failureText ||
           localize(`${prefix}FailureReason`),
-    closed: localize(`${prefix}${closedKey(run, stages, results)}`, { count: stages.length }),
+    rewards,
+    closed: localize(`${prefix}${closedKey(run, stages, [...results, ...rewards])}`, {
+      count: stages.length,
+    }),
   };
 }

@@ -976,7 +976,9 @@
           "ChooseShortOption": "Choose {name}: you have {have}, and this needs {need}.",
           "OptionSelected": "Selected",
           "CurrencyCost": "{amount} {unit}",
-          "CurrencyUnaffordable": "Not enough {unit}"
+          "CurrencyUnaffordable": "Not enough {unit}",
+          "RecipeKnowledge": "Recipe knowledge",
+          "UnknownRecipe": "Unknown recipe"
         },
         "Slots": {
           "Title": "Requirements",
@@ -1176,6 +1178,9 @@
         "History": {
           "Title": "Finished",
           "UnknownMaterial": "Unknown material",
+          "CurrencyAwarded": "Currency awarded",
+          "RecipeLearned": "Recipe learned",
+          "RecipeAlreadyKnown": "Already known",
           "NotRecorded": "Not recorded",
           "NoCheck": "No check — it simply completes",
           "NoRoll": "No roll — collecting takes it all",
@@ -1911,7 +1916,9 @@
       "TierStepDown": "Stepped down {steps} tier(s)",
       "TierStepTarget": "Stepped to a target tier",
       "RolledAmount": "Rolled {formula} = {total}",
-      "RolledAmountEmpty": "Rolled {formula} = {total}, nothing produced"
+      "RolledAmountEmpty": "Rolled {formula} = {total}, nothing produced",
+      "RecipeLearned": "Learned the recipe {recipe}",
+      "RecipeAlreadyKnown": "Already knew the recipe {recipe}"
     },
     "Check": {
       "Roll": {
@@ -2240,6 +2247,8 @@
           "macro": "Macros",
           "dropRowItem": "Drop-row items",
           "componentLink": "Component links",
+          "recipeLink": "Taught recipe links",
+          "currencyUnit": "Currency reward units",
           "taskLink": "Task links",
           "eventLink": "Event links",
           "recipeItem": "Recipe item links",

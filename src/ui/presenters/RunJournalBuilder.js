@@ -55,6 +55,7 @@ import {
   recordedNumber,
   taskCountNeed,
 } from './journalCheckText.js';
+import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
@@ -119,25 +120,6 @@ function historicalStepAttempted(step, run, index) {
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 const EXECUTION_JOURNAL_STATUSES = new Set(['planned', 'committed', 'recoveryRequired']);
 const EXECUTION_EFFECT_PHASES = new Set(['planned', 'applying', 'applied']);
-const SAFE_EXECUTION_EFFECT_KINDS = new Set([
-  'executeCraftingStage',
-  'consumeItems',
-  'awardItems',
-  'consumeIngredients',
-  'consumeAlchemyExtras',
-  'spendCurrency',
-  'applyToolUsage',
-  'awardResults',
-  'finalizeCraftingStage',
-  'recordRecipeUse',
-  'learnAlchemyRecipe',
-  'fireComplications',
-  'postCraftChat',
-  'recordAlchemyDeadEnd',
-  'consumeAlchemyItems',
-  'createGatheredResults',
-  'refundStageConsumption',
-]);
 
 /**
  * Defensively drop models that repeat a native run identity, keeping the first

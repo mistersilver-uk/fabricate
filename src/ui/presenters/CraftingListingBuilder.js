@@ -71,6 +71,7 @@ import {
   deriveBrowseStatus,
 } from './craftingBrowseStatus.js';
 import { heldToolBonus } from './heldToolBonus.js';
+import { resultOutputRows, resultSignature } from './resultOutputRows.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 
 /**
@@ -1112,7 +1113,7 @@ export class CraftingListingBuilder {
         id: stringOrNull(tier?.id),
         names: [stringOrEmpty(tier?.name)],
         success,
-        awardedResults: success ? this._resultItemsFromGroups(resolvedGroups, system) : [],
+        awardedResults: success ? this._resultItemsFromGroups(resolvedGroups, system, recipe) : [],
       };
       byKey.set(key, entry);
       groups.push(entry);
@@ -1120,21 +1121,9 @@ export class CraftingListingBuilder {
     return groups;
   }
 
-  /**
-   * Canonical, order-independent signature of a set of resolved result groups,
-   * built from `componentId` + `quantity` pairs (not resolved names) so unknown or
-   * renamed components still group correctly. Empty/failure resolves to `''`.
-   * @private
-   */
+  /** See `resultSignature`: what each result awards and its count, order-independent. @private */
   _resultSignature(groups) {
-    if (!Array.isArray(groups) || groups.length === 0) return '';
-    const pairs = [];
-    for (const group of groups) {
-      for (const result of group?.results ?? []) {
-        pairs.push(`${stringOrEmpty(result?.componentId)}:${Number(result?.quantity || 1)}`);
-      }
-    }
-    return pairs.sort((a, b) => a.localeCompare(b)).join(',');
+    return resultSignature(groups);
   }
 
   /**
@@ -1181,7 +1170,7 @@ export class CraftingListingBuilder {
       ingredientSet: set,
       checkResult: null,
     });
-    return this._resultItemsFromGroups(resolved?.groups, system);
+    return this._resultItemsFromGroups(resolved?.groups, system, recipe);
   }
 
   /**
@@ -1316,26 +1305,11 @@ export class CraftingListingBuilder {
     });
   }
 
-  /**
-   * Flatten resolved result groups into display item rows, resolving each
-   * component id against the system's component library for name/img.
-   * @private
-   */
-  _resultItemsFromGroups(groups, system) {
-    if (!Array.isArray(groups) || groups.length === 0) return [];
-    const components = resolvedComponentsFor(system);
-    const byId = new Map(components.map((component) => [component.id, component]));
-    const items = [];
-    for (const group of groups) {
-      for (const result of group?.results ?? []) {
-        const component = result?.componentId ? byId.get(result.componentId) : null;
-        items.push({
-          name: stringOrEmpty(component?.name) || this.localize(UNKNOWN_COMPONENT_KEY),
-          img: stringOrNull(component?.img),
-          qty: Number(result?.quantity || 1),
-        });
-      }
-    }
-    return items;
+  /** Resolved result groups as display rows of every kind (`resultOutputRows`), a currency row
+   *  naming its unit from the recipe's world units. @private */
+  _resultItemsFromGroups(groups, system, recipe) {
+    const { recipeManager, localize } = this;
+    const currencyUnits = () => recipeManager?._resolveNormalizedCurrencyUnits?.(recipe) ?? [];
+    return resultOutputRows(groups, { system, currencyUnits, recipeManager, localize });
   }
 }

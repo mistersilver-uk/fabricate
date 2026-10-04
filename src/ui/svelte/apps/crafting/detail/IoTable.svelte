@@ -184,10 +184,11 @@
       <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Output')}</Kicker>
       <ul class="crafting-io-outputs">
         {#each outputs as item, index (item.name + index)}
-          <li class="crafting-io-output" data-io-output>
-            <Medallion {...resolveCraftingArt(item.img)} alt="" size={32} />
+          <!-- A currency or knowledge reward draws its kind's glyph and states its own amount. -->
+          <li class="crafting-io-output" data-io-output={item.kind ?? 'component'}>
+            <Medallion {...resolveCraftingArt(item.img, item.glyph)} alt="" size={32} />
             <span class="crafting-io-output-name">{item.name}</span>
-            <span class="crafting-io-output-qty">×{item.qty}</span>
+            <span class="crafting-io-output-qty">{item.amountText ?? `×${item.qty}`}</span>
           </li>
         {/each}
       </ul>

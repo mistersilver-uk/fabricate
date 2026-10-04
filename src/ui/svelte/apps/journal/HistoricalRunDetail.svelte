@@ -65,6 +65,7 @@
       },
       ...(stage.route ? [{ id: 'route', label: text('ChosenRoute'), value: stage.route }] : []),
       ...presentCurrencySpends(stage.currencySpends, localize),
+      ...stage.rewards,
     ];
   }
   // The transient banner's evidence rows, and WHETHER THERE ARE ANY (issue 1648, M22).
@@ -198,6 +199,9 @@
       {/each}
       {@render essenceRecaps()}
       {@render items(resultHeading, account.results, 'produced')}
+      {#each account.rewards as reward (reward.id)}
+        <JournalFactRow icon={reward.icon} label={reward.label} value={reward.value} />
+      {/each}
       {#if (single?.historySettlement ?? run.historySettlement)?.consumption === 'notApplicable'}
         <JournalFactRow label={text('MaterialsUsed')} value={text('NotApplicable')} />
       {/if}

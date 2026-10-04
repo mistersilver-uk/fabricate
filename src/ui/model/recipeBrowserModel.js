@@ -442,8 +442,25 @@ function amountLabelOf(result) {
   return String(Number(result?.quantity) > 0 ? Number(result.quantity) : 1);
 }
 
+/** A non-component result's own fields (issue 1773): its kind, what names it and its glyph. */
+function rewardProduceFields(result, rosters) {
+  if (result?.kind === 'currency') {
+    const name = result.label || result.unit || '';
+    return { kind: 'currency', unit: result.unit || '', name, icon: 'fa-solid fa-coins' };
+  }
+  const taught = findById(rosters.recipeOptions, result?.recipeId);
+  const name = taught?.name || result?.recipeId || '';
+  return {
+    kind: 'knowledge',
+    recipeId: result?.recipeId || '',
+    name,
+    icon: 'fa-solid fa-book-open',
+  };
+}
+
 /**
- * One Produces row per result item, in authoring order, tagged with the result GROUP it belongs to.
+ * One Produces row per result item, in authoring order, tagged with the result GROUP it belongs to;
+ * a currency or knowledge row adds its kind and names itself rather than a component.
  */
 export function buildRecipeProduceRows(recipe, rosters = {}) {
   const components = rosters.componentOptions;
@@ -474,6 +491,8 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
           // The reserved alchemy-Simple failure group: what a FAILED craft makes.
           failure: group?.role === 'failure',
           scopeName: scope.multi ? scope.name : '',
+          ...((result?.kind ?? 'component') !== 'component' &&
+            rewardProduceFields(result, rosters)),
         });
       }
     }
