@@ -896,7 +896,7 @@
         )
       : text(
           'FABRICATE.Admin.Manager.Component.SalvageEditor.DisabledNoGroups',
-          'There is nothing to enable yet. Add a result below to describe what this component yields, then enable salvage.'
+          'There is nothing to enable yet. Add a result set below to describe what this component yields, then enable salvage.'
         )
   );
 
@@ -1022,7 +1022,7 @@
       (n) =>
         text(
           'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupNamePlaceholder',
-          'Group {n}'
+          'Set {n}'
         ).replace('{n}', String(n))
     )
   );
@@ -1925,7 +1925,7 @@
                   <span
                     >{text(
                       'FABRICATE.Admin.Manager.Component.SalvageEditor.ResultGroups',
-                      'Result groups'
+                      'Result sets'
                     )}</span
                   >
                 </span>
@@ -1935,7 +1935,7 @@
                   <p class="manager-muted" data-salvage-simple-hint>
                     {text(
                       'FABRICATE.Admin.Manager.Component.SalvageEditor.SimpleSingleGroupHint',
-                      'Simple mode uses a single result group.'
+                      'Simple mode uses a single result set.'
                     )}
                   </p>
                 {/if}
@@ -1954,11 +1954,11 @@
                             value={group.name}
                             placeholder={text(
                               'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupNamePlaceholder',
-                              'Group {n}'
+                              'Set {n}'
                             ).replace('{n}', String(groupIndex + 1))}
                             aria-label={text(
                               'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupName',
-                              'Result group name'
+                              'Result set name'
                             )}
                             data-salvage-group-name
                             oninput={(event) =>
@@ -1974,7 +1974,7 @@
                             class="is-danger"
                             ariaLabel={text(
                               'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveGroup',
-                              'Remove result group'
+                              'Remove result set'
                             )}
                             data-remove-salvage-group=""
                             onclick={() => removeSalvageGroup(group.id)}
@@ -2012,7 +2012,7 @@
                           <p class="manager-muted">
                             {text(
                               'FABRICATE.Admin.Manager.Component.SalvageEditor.NoResults',
-                              'No results in this group yet.'
+                              'No results in this set yet.'
                             )}
                           </p>
                         {/if}
@@ -2070,7 +2070,7 @@
                   <p class="manager-muted">
                     {text(
                       'FABRICATE.Admin.Manager.Component.SalvageEditor.NoGroups',
-                      'No result groups yet.'
+                      'No result sets yet.'
                     )}
                   </p>
                 {/if}
@@ -2088,7 +2088,7 @@
                     <span
                       >{text(
                         'FABRICATE.Admin.Manager.Component.SalvageEditor.AddGroup',
-                        'Add group'
+                        'Add set'
                       )}</span
                     >
                   </Button>

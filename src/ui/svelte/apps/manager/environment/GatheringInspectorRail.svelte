@@ -356,7 +356,7 @@
       <li>
         {text(
           'FABRICATE.Admin.Manager.Environment.EmptySetup.StepTasks',
-          'Define gathering tasks with their checks, timing, result groups, and failure outcomes.'
+          'Define gathering tasks with their checks, timing, result sets, and failure outcomes.'
         )}
       </li>
       <li>

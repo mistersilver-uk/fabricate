@@ -130,7 +130,7 @@ test('routedByIngredients — an UNNAMED set mapping to a missing group is coded
     `expected the coded reference-integrity issue, got: ${JSON.stringify(result.issues)}`
   );
   assert.equal(coded.params.set, '1', 'the unnamed set reports its 1-based position');
-  assert.match(coded.message, /result group/i);
+  assert.match(coded.message, /result set/i);
   // Neither the set id nor the dangling group id may appear anywhere the user sees.
   assert.doesNotMatch(coded.message, FOUNDRY_ID_RE, `message leaked an id: ${coded.message}`);
   assert.ok(!coded.message.includes(SET_ID));
@@ -224,7 +224,7 @@ test('RecipeManager.updateRecipe — a save-time invalid result-group reference 
   const toast = localizeRecipePersistenceError(thrown, echo);
   assert.ok(toast, 'a persistence error must localize to a toast');
   assert.doesNotMatch(toast, FOUNDRY_ID_RE, `toast leaked an id: ${toast}`);
-  assert.match(toast, /result group/i);
+  assert.match(toast, /result set/i);
 });
 
 test('localizeRecipePersistenceError returns null for a plain (non-persistence) error', () => {
@@ -285,7 +285,7 @@ test('save path — duplicate result-group ids are reported by position, not the
   const toast = localizeRecipePersistenceError(thrown, echo);
   assert.doesNotMatch(toast, FOUNDRY_ID_RE, `toast leaked an id: ${toast}`);
   assert.ok(!toast.includes(DUP), `toast leaked the group id: ${toast}`);
-  assert.match(toast, /duplicate result group/);
+  assert.match(toast, /duplicate result set/);
 });
 
 test('save path — outcome routing to a deleted group is id-free (drops the dangling group id)', async () => {
@@ -309,7 +309,7 @@ test('save path — outcome routing to a deleted group is id-free (drops the dan
   const toast = localizeRecipePersistenceError(thrown, echo);
   assert.doesNotMatch(toast, FOUNDRY_ID_RE, `toast leaked an id: ${toast}`);
   assert.ok(!toast.includes(GHOST));
-  assert.match(toast, /result group/i);
+  assert.match(toast, /result set/i);
 });
 
 test('save path — an unknown essence reference leaks neither the set id nor the raw essence id', async () => {

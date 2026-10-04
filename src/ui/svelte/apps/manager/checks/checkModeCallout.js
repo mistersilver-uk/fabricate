@@ -73,7 +73,7 @@ const MODES = Object.freeze({
     body: [
       'RoutedByCheckBody',
       'One roll is rolled once and mapped onto a band. Each band is a named tier; recipes ' +
-        'bind their result groups to those tiers, so one recipe can produce a ruined, an ' +
+        'bind their result sets to those tiers, so one recipe can produce a ruined, an ' +
         'ordinary or a masterwork result.',
     ],
     facts: ['check:required', 'outcomes:tiers', 'results:tiers'],
@@ -83,7 +83,7 @@ const MODES = Object.freeze({
     title: ['RoutedByIngredients', 'Routed by ingredients'],
     body: [
       'RoutedByIngredientsBody',
-      'The ingredient set a crafter brings decides which result group is produced. The check ' +
+      'The ingredient set a crafter brings decides which result set is produced. The check ' +
         'is a pass/fail gate over that choice rather than the thing that chooses.',
     ],
     facts: ['check:optional', 'outcomes:passFail', 'results:ingredients'],
@@ -94,7 +94,7 @@ const MODES = Object.freeze({
     body: [
       'SimpleBody',
       'One roll is measured against the difficulty. The recipe produces its single result ' +
-        'group when the roll clears it, and nothing when it does not.',
+        'set when the roll clears it, and nothing when it does not.',
     ],
     facts: ['check:optional', 'outcomes:passFail', 'results:single'],
   },
@@ -134,7 +134,7 @@ const MODES = Object.freeze({
     body: [
       'SalvageRoutedBody',
       'One roll is rolled once and mapped onto a band. Each band is a named tier, and a ' +
-        'salvageable item binds its result groups to those tiers.',
+        'salvageable item binds its result sets to those tiers.',
     ],
     facts: ['check:required', 'outcomes:tiers', 'results:tiers'],
   },
@@ -196,7 +196,7 @@ const FACT_VALUES = Object.freeze({
   'outcomes:perDrop': ['OutcomesPerDrop', 'One per drop'],
   'results:tiers': ['ResultsTiers', 'Bound to tiers'],
   'results:ingredients': ['ResultsIngredients', 'Chosen by ingredients'],
-  'results:single': ['ResultsSingle', 'One result group'],
+  'results:single': ['ResultsSingle', 'One result set'],
   'results:spent': ['ResultsSpent', 'Spent down the list'],
   'results:successFailure': ['ResultsSuccessFailure', 'Success or failure set'],
   'results:perDrop': ['ResultsPerDrop', 'Rolled per drop'],
