@@ -55,7 +55,6 @@
   `eyebrow` prop, so it sits above the name inside the row's copy column. A separate
   ordinal tile beside the severity tile would put three leading boxes in a 300px
   column, which is the failure the stage row's `stacked` treatment exists to prevent.
-  One metadata slot, not two.
 
   ## What this card deliberately does NOT grow
 
@@ -180,8 +179,7 @@
           statusLabel={localize('FABRICATE.App.Complications.Forecast')}
           statusTone="neutral"
           bodyClamp={3}
-          dataAttr="data-inventory-bulk-complication"
-          dataValue={row.id}
+          data-inventory-bulk-complication={row.id || true}
         />
       </li>
     {/each}

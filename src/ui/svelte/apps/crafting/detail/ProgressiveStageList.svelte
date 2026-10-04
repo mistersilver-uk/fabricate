@@ -373,8 +373,7 @@
         statusLabel={text(badge[0], badge[1])}
         statusTone={badge[2]}
         bodyClamp={3}
-        dataAttr="data-progressive-stage-complication"
-        dataValue={lead.id}
+        data-progressive-stage-complication={lead.id || true}
       />
       <!-- The FIRST in fire order plus a count, never the whole list: the inspector column
            is 300px and an unbounded list turns one row into several prose paragraphs. The

@@ -20,8 +20,8 @@ const ICON_FACT_ROW = `${MANAGER}/IconFactRow.svelte`;
 const EFFECT_ROW = `${MANAGER}/ComplicationEffectRow.svelte`;
 const SUMMARY_ROW = `${MANAGER}/ComplicationSummaryRow.svelte`;
 
-/** The rows whose `dataAttr`/`dataValue` retired; `ComplicationSummaryRow` keeps them until #1516. */
-const CONVERTED_ROWS = new Set(['IconFactRow', 'ComplicationEffectRow']);
+/** The rows whose `dataAttr`/`dataValue` retired: all three, the summary row after issue 1516. */
+const CONVERTED_ROWS = new Set(['IconFactRow', 'ComplicationEffectRow', 'ComplicationSummaryRow']);
 
 /**
  * The 15 hooked sites at `9b891d90b`, frozen. `rendered` is what the root's attribute is set from:
@@ -193,10 +193,10 @@ describe('row hook parity', () => {
         }
       }
     }
-    assert.ok(scanned >= 10, `the scan reached ${scanned} converted-row tags, short of the table`);
+    assert.ok(scanned >= 15, `the scan reached ${scanned} converted-row tags, short of the table`);
     assert.deepEqual(offenders, []);
     const converted = SITES.filter(([, row]) => CONVERTED_ROWS.has(row));
-    assert.equal(converted.length, 10, 'the frozen table still names the ten converted sites');
+    assert.equal(converted.length, 15, 'the frozen table still names all fifteen sites');
   });
 });
 
@@ -216,7 +216,6 @@ const MOUNTED = [
     root: '.manager-icon-fact-row',
     compiled: ['src/ui/svelte/components/Chip.svelte'],
     props: { icon: 'fas fa-cube', title: 'Title' },
-    hook: (name, value) => ({ [name]: value }),
   },
   {
     path: EFFECT_ROW,
@@ -226,7 +225,6 @@ const MOUNTED = [
       'src/ui/svelte/components/StatusToggle.svelte',
     ],
     props: { title: 'Title' },
-    hook: (name, value) => ({ [name]: value }),
   },
   {
     path: SUMMARY_ROW,
@@ -237,12 +235,10 @@ const MOUNTED = [
       'src/ui/svelte/components/IconButton.svelte',
     ],
     props: { name: 'Name', variant: 'readonly-gm' },
-    hook: (name, value) =>
-      value === true ? { dataAttr: name } : { dataAttr: name, dataValue: value },
   },
 ];
 
-for (const { path, root, compiled, props, hook } of MOUNTED) {
+for (const { path, root, compiled, props } of MOUNTED) {
   describe(`${path.split('/').pop()} lands a caller's hook on its root`, () => {
     const harness = rowHarness(path, compiled);
     before(() => harness.setup());
@@ -254,12 +250,17 @@ for (const { path, root, compiled, props, hook } of MOUNTED) {
       ['id', 'id'],
     ]) {
       it(`renders ${JSON.stringify(value)} as "${rendered}"`, async () => {
-        const target = await harness.mount({ ...props, ...hook('data-x', value) });
+        const target = await harness.mount({ ...props, 'data-x': value });
         const node = target.querySelector('[data-x]');
         assert.ok(Boolean(node), 'the hook renders');
         assert.ok(node.matches(root), `the hook sits on ${root}`);
         assert.equal(node.getAttribute('data-x'), rendered);
       });
     }
+
+    it("appends a caller's class to its root", async () => {
+      const target = await harness.mount({ ...props, class: 'x', 'data-x': true });
+      assert.ok(target.querySelector('[data-x]').matches(`${root}.x`));
+    });
   });
 }

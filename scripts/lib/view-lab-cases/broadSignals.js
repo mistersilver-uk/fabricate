@@ -294,6 +294,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/Callout.svelte': Object.freeze([
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',
+    // The `items` form, which only the essence On craft primer draws (issue 1521).
+    'manager-essence-edit-unscoped-on-craft',
+  ]),
+  // The fact row at `rule` density: the essence catalogue's world-default cards and the tool entry's
+  // effective-rules rail (issue 1521).
+  'src/ui/svelte/apps/manager/IconFactRow.svelte': Object.freeze([
+    'world-essence-catalogue',
+    'world-tool-entry-overview',
+    'world-tool-entry-on-break-replace',
+    'world-tool-entry-destroyed-preview',
   ]),
   // The modal chrome's banded frame (issue 2021), which every dialog draws since epic 1997.
   'src/ui/svelte/components/Modal.svelte': Object.freeze([

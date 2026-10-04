@@ -33,8 +33,6 @@ import {
   calloutStyles,
   disabledProbeMarkup,
   emptyStateStyles,
-  explainerCardSource,
-  explainerCardStyles,
   iconFactRowStyles,
   readShortWindowRailGeometry,
   stackedBodyRule,
@@ -409,7 +407,6 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   for (const [name, styles] of Object.entries({
     EmptyState: emptyStateStyles,
     Callout: calloutStyles,
-    ExplainerCard: explainerCardStyles,
     IconFactRow: iconFactRowStyles,
     Chip: chipStyles,
   })) {
@@ -500,11 +497,12 @@ test('manager empty states use refined heading and setup-panel styling', () => {
 // a compact 0.66rem info banner on one tab and a taller 0.7rem warning band on the other.
 test('the shared callout keeps one shape and lets tone change only its colours', () => {
   const calloutBlock = blockIn(calloutStyles, '.manager-callout');
-  const calloutIconBlock = blockIn(calloutStyles, '.manager-callout > i');
+  const calloutIconBlock = blockIn(calloutStyles, '.manager-callout > i,\n  .manager-callout-item > i');
   const warningBlock = blockIn(calloutStyles, '.manager-callout.is-warning');
   const warningIconBlock = blockIn(
     calloutStyles,
-    '.manager-callout.is-warning > i,\n  .manager-callout.is-warning .manager-callout-title'
+    '.manager-callout.is-warning > i,\n  .manager-callout.is-warning .manager-callout-item > i,\n' +
+      '  .manager-callout.is-warning .manager-callout-title'
   );
 
   // The specimen's treatment — `library.html:219-220` — is the ONLY shape.
@@ -669,79 +667,41 @@ test('the controls nested inside a callout and a notice own their own pointer ta
   }
 });
 
-// Issue 881: three surfaces explained themselves three ways. The Tool Studio preview
-// rendered `.manager-tool-how-it-works` (its own bordered card, its own 0.625rem heading,
-// a glyph-led list at 0.6875rem/1.5); the Tags & Categories inspector rendered the same
-// meaning as a disc-bulleted `.manager-evidence-list` at 0.82rem AND as a bare
-// `.manager-muted` paragraph. `ExplainerCard` is the one implementation, and it reuses the
-// manager's existing card shell and card-title contract rather than restating them.
-test('the shared explainer card reuses the card shell and owns only the explainer parts', () => {
-  const titleBlock = blockIn(explainerCardStyles, '.manager-explainer-card-title');
-  const listBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list');
-  const rowBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list > li');
-  const rowGlyphBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list > li > i');
-
-  // The card shell and the heading come from the manager's ONE contract for each.
+// Each item glyph shares the leading glyph's box and, at every tone, its ink (issue 1521).
+test('the callout items reuse the leading glyph, and no explainer re-derivation survives', () => {
+  const calloutValue = (selector, property) => {
+    const block = blockIn(calloutStyles, selector);
+    return declaration(block.slice(block.indexOf('{') + 1, block.lastIndexOf('}')), property);
+  };
+  const glyphBlock = blockIn(calloutStyles, '.manager-callout > i,\n  .manager-callout-item > i');
   assert.ok(
-    explainerCardSource.includes('<InspectorCard class="manager-explainer-card"'),
-    'the explainer wears the shared side-panel card shell'
+    glyphBlock.includes('width: 13px;') && glyphBlock.includes('color: var(--fab-text-subtle);'),
+    "an item glyph is the leading glyph's 13px box in the same neutral ink"
   );
-  assert.ok(
-    explainerCardSource.includes('class="manager-card-title manager-explainer-card-title"'),
-    'the explainer title wears the shared card-title contract'
-  );
-  assert.equal(
-    /padding:|border-radius:|border: 1px|font-weight:|text-transform:|font-family:/.test(
-      titleBlock + blockIn(explainerCardStyles, '.manager-explainer-card')
-    ),
-    false,
-    'the explainer must not restate the card shell or the heading scale, weight or family'
-  );
-
-  // The body treatment is the Tool Studio's, which issue 881 names as the reference.
-  for (const declaration of [
-    'grid-template-columns: 20px minmax(0, 1fr);',
-    'font-size: 0.6875rem;',
-    'line-height: 1.5;',
-    'color: var(--fab-text-muted);',
-  ]) {
-    assert.ok(rowBlock.includes(declaration), `an explainer row should declare ${declaration}`);
-  }
-  assert.ok(listBlock.includes('list-style: none;'), 'the explainer list drops disc markers');
-  assert.ok(
-    rowGlyphBlock.includes('color: var(--fab-accent);'),
-    'the row glyph is the accent, as in the Tool Studio reference'
-  );
-
-  // Issue 883: the primitive takes a LIST of links.
-  // out of its card and a one-link primitive is exactly the incompatibility that kept a
-  // hand-rolled card alive beside it. The single `docsHref`/`docsLabel` pair is gone rather
-  // than kept alongside — two ways to express one link is the drift this pass removes.
-  assert.ok(/\blinks = \[\]/.test(explainerCardSource), 'the explainer takes a list of docs links');
-  for (const dead of ['docsHref', 'docsLabel']) {
+  for (const tone of ['info', 'accent', 'warning', 'success', 'danger']) {
+    const toneSelector =
+      `.manager-callout.is-${tone} > i,\n  .manager-callout.is-${tone} .manager-callout-item > i,\n` +
+      `  .manager-callout.is-${tone} .manager-callout-title`;
     assert.equal(
-      withoutComments(explainerCardSource).includes(dead),
-      false,
-      `${dead} was replaced by the link list and must not survive as a second way in`
+      calloutValue(toneSelector, 'color'),
+      `var(--fab-${tone}-text)`,
+      `${tone} inks the item glyphs in its own family`
     );
   }
-  // The link ROW is the manager's existing `.manager-setup-links` contract.
-  assert.ok(
-    explainerCardSource.includes('<div class="manager-setup-links">'),
-    'the explainer links reuse the shared card-link row'
-  );
+  assert.equal(calloutValue('.manager-callout-item-lead', 'color'), 'var(--fab-text)');
+  assert.equal(calloutValue('.manager-callout-item-lead', 'font-weight'), '600');
   assert.equal(
-    /manager-explainer-card-docs\s*\{/.test(explainerCardStyles),
-    false,
-    'the explainer must not re-derive the card-link row it now reuses'
+    calloutValue('.manager-callout-items', 'margin-top'),
+    'var(--fab-space-2)',
+    'the list sits one step under the body'
   );
 
-  // Every re-derivation is gone from the global sheet, not merely unused.
   for (const dead of [
     'manager-tool-how-it-works',
     'manager-tool-docs-link',
     'manager-evidence-list',
     'manager-tool-inspector-rule-card',
+    'manager-explainer-card',
   ]) {
     assert.equal(css.includes(dead), false, `${dead} was replaced and must not survive as CSS`);
   }
@@ -791,7 +751,6 @@ test('every explainer and fact-row site renders through the primitive, not by ha
       (entry) =>
         entry.isFile() &&
         entry.name.endsWith('.svelte') &&
-        entry.name !== 'ExplainerCard.svelte' &&
         entry.name !== 'IconFactRow.svelte'
     )
     .map((entry) => readFileSync(resolve(entry.parentPath, entry.name), 'utf8'))
@@ -816,7 +775,10 @@ test('every explainer and fact-row site renders through the primitive, not by ha
   for (const [componentPath, imports] of [
     // The Tool preview renders through the shared scoped-entity shell since issue 1362.
     ['tools/ToolBehaviorPreview.svelte', ['ScopedEntityPreview']],
-    ['scoped/ScopedEntityPreview.svelte', ['ExplainerCard', 'IconFactRow']],
+    ['scoped/ScopedEntityPreview.svelte', ['IconFactRow']],
+    // The world catalogue's default cards and the essence primer (issue 1521).
+    ['scoped/EntityCatalogueShell.svelte', ['IconFactRow']],
+    ['essences/EssenceOnCraftTab.svelte', ['Callout']],
     ['tools/ToolBrowserInspector.svelte', ['IconFactRow']],
     // `CraftingSystemManagerRoot.svelte` is NOT on this list any more (issue 1915). Its two
     // explainer cards belonged to the Tags & Categories inspector rail, and that rail is

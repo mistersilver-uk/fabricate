@@ -648,6 +648,11 @@ export const CASES = Object.freeze([
           styles:
             'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
         },
+        // A world-default card is the fact row's `rule` density, its subtitle muted (issue 1521).
+        {
+          selector: '[data-scoped-list-inherit-note="effectSource"]',
+          styles: 'color: var(--fab-text-muted)',
+        },
       ],
     },
     position: { width: 1280, height: 900 },

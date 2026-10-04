@@ -73,12 +73,14 @@ const PUBLISHING_CASE_IDS = new Set(
 );
 
 /** The V8-escaped source of `BROAD_SIGNAL_PATTERN`, verbatim. */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ExplainerCard|IconFactRow)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(IconFactRow)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
  */
 const EXPECTED_OVERRIDE_KEYS = [
+  // Issue 1521: the fact row, on the frames that draw its `rule` density.
+  'src/ui/svelte/apps/manager/IconFactRow.svelte',
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
@@ -218,8 +220,6 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * RE-KEY between the two primitive directories, which holds the length (issue 1710).
  */
 const PRIMITIVES_WITH_NO_FRAME = [
-  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
-  'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/TintPicker.svelte',
@@ -248,8 +248,8 @@ test('the inputs every property below quantifies over are alive', () => {
   // 75 as of issue 1521, whose `InlineRenameField` replaced the party and realm name fields; 74
   // once the inspector action button became the button primitive at full width.
   // 76 as of issue 1782: `Meter` and `BandedBar`, each on three and two importers; 77 with
-  // `RuleRow` on its two.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 77, 'the shipped primitive set changed size');
+  // `RuleRow` on its two; 76 once issue 1521 folded the explainer card onto the callout's `items`.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 76, 'the shipped primitive set changed size');
   // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
   // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;
   // 17 when `ChoiceGroup` joined at one caller (issue 1516).
@@ -271,7 +271,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 131);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 117);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {
@@ -375,6 +375,16 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'src/ui/svelte/components/EditorTabs.svelte',
       'manager-world-downtime-narrow-settings',
       'the frame that draws the strip wrapped, with its last tab`s description at the card`s end',
+    ],
+    [
+      'src/ui/svelte/components/Callout.svelte',
+      'manager-essence-edit-unscoped-on-craft',
+      'the one frame that draws the `items` form, the essence On craft primer',
+    ],
+    [
+      'src/ui/svelte/apps/manager/IconFactRow.svelte',
+      'world-essence-catalogue',
+      'a frame that draws the `rule` density as catalogue cards',
     ],
   ];
   for (const [file, caseId, because] of expectations) {

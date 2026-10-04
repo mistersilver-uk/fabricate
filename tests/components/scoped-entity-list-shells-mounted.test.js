@@ -83,6 +83,8 @@ const catalogueHarness = createMountedComponentHarness({
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
+    // The world-default cards render through the fact row (issue 1521).
+    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
@@ -359,14 +361,17 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
       // harness supplies none: what it measures is that the FALLBACK is still the one shared
       // section-name list, which is the property this case was written for.
       assert.deepEqual(
-        cells.map((cell) =>
-          cell.querySelector('.manager-scoped-catalogue-card-title').textContent.trim()
-        ),
+        cells.map((cell) => cell.querySelector('strong').textContent.trim()),
         sections.map((section) => LABELS[section])
       );
       // THE CARD'S SECOND LINE IS THE LANE'S NOTE, AND THE COUNT IS ITS FALLBACK.
       for (const cell of cells) {
         assert.match(cell.textContent, /Falls back to /);
+        assert.ok(cell.matches('.manager-icon-fact-row.is-tiled.is-rule'), 'a rule-density tile');
+        assert.ok(
+          Boolean(cell.querySelector(':scope > i.fa-sliders')),
+          'the sliders glyph stands in when the lane names none'
+        );
       }
       const bare = await catalogueHarness.mount({
         ...props,
