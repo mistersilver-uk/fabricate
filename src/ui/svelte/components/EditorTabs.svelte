@@ -43,7 +43,7 @@
     `activeTab`. The hovered tab's description shows, else the focused tab's, and Escape hides it
     until that tab is next hovered or focused — pinned by `tests/components/editor-tabs-capabilities.test.js`.
     A description stays shown while the pointer is over it, and a hover-shown one takes Escape even
-    with focus outside the strip, stopping it at the window so the host stays open.
+    with focus outside the strip, stopping it before the window's keybindings so the host stays open.
 -->
 <script>
   import { localize } from '../util/foundryBridge.js';
