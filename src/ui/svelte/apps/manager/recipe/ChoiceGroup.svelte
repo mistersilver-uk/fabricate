@@ -167,9 +167,30 @@
       options: [...options, { quantity: 1, match: { type: 'component', componentId: null } }],
     });
   }
+
+  // Choosing a kind turns the bare row into the box, unmounting the `or…` trigger focus would
+  // return to, so focus moves to the new alternative's name field once the caller hands it back.
+  let root = $state(null);
+  let focusAlternativeAt = -1;
+  const NAME_FIELD = '[data-recipe-option-search], [data-recipe-add-tag]';
+
+  function selectKind(type) {
+    focusAlternativeAt = options.length;
+    appendAlternative(type);
+  }
+
+  // `options` is read first, so the effect tracks it even while no focus is pending.
+  $effect(() => {
+    const count = options.length;
+    if (!root || focusAlternativeAt < 0 || count <= focusAlternativeAt) return;
+    const row = root.querySelectorAll('[data-recipe-option]')[focusAlternativeAt];
+    focusAlternativeAt = -1;
+    row?.querySelector(NAME_FIELD)?.focus();
+  });
 </script>
 
 <div
+  bind:this={root}
   class="manager-recipe-ingredient-requirement"
   class:has-alternatives={hasAlternatives}
   data-recipe-group
@@ -210,7 +231,7 @@
         />
       {/each}
     </div>
-    <!-- Inside an `ANY ONE OF` box every adder appends an ALTERNATIVE, hence `alt <kind>`. -->
+    <!-- Inside an `Any one of` box every adder appends an alternative, hence `alt <kind>`. -->
     <div class="manager-recipe-requirement-adds">
       {#each adders as adder (adder.id)}
         <Button
@@ -233,7 +254,7 @@
           {catalogue}
           {readonlyKinds}
           allowAny
-          onSelect={appendAlternative}
+          onSelect={selectKind}
           onChange={(value) => updateOption(index, fromValue(option, value))}
           onRemove={() => removeOption(index)}
         />
