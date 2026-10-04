@@ -3224,6 +3224,7 @@ Authority request deduplication and safe prepare-token metadata live in the GM-o
 10. A terminal run accepts one kind of mutation, settling a pending award choice, once per choice.
 Each settle advances `runRevision` and journals into `awardChoiceJournal`, which holds the latest settle and never replaces `executionJournal`.
 Each settle's receipts are appended to the step that held its choice, so a later settle replacing the journal loses none of them.
+A clean-up that forfeits an owed choice (Crafting Runs Flag requirement 5) also advances `runRevision`, without a journal entry.
 An active run's settle journals there too, so the stage's committed journal, its `award-results` receipt and its committed replay are untouched.
 The settle runs under a grant issued for `chooseAward`, a grant issued for another operation is refused, and a new request for a settled choice awards nothing.
 Its effects are `award-choice` (kind `awardChoice`, planned `{ choiceId, picks }`, every pick's amount resolved before the first write), `settle-choice` (kind `settleAwardChoice`) and `post-chat` (kind `postCraftChat`).
@@ -3612,7 +3613,7 @@ Requirements:
    A terminal run holding an unsettled award choice is never evicted by the cap, whatever its age, and the cap counts only the other runs.
 5. Deleting a recipe or crafting system should clean-up its associated crafting runs, both historical and in-progress.
    Where that clean-up would drop a run still owing an award choice, it settles the choice `forfeited` instead and keeps the run until the next clean-up, which drops it as any other.
-   Until then the choice settles against the run's recorded recipe id and system.
+   The forfeit is recorded against the run's recorded recipe id and system.
 6. Run-flag writes must be document-coherent.
    A terminal run, once persisted to `history`, must not be dropped by a subsequent persist whose in-memory view predates it.
    A write must reconcile against the currently-persisted document — union `history` by run `id` (newest-first, capped) and apply `active` add/remove against the fresh document — rather than overwriting from a stale in-memory cache.
