@@ -365,7 +365,7 @@
             rollable
             clearable={false}
             removeHook="result-item"
-            invalid={resultAmountInvalid(item, text)}
+            invalid={resultAmountInvalid(item, localizeOr)}
             class="is-result"
             data-recipe-result-item=""
             onChange={(value) => updateItem(index, fromValue(item, value))}
