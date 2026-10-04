@@ -194,6 +194,15 @@ test('1773 PR4: the reply names a pick the run still owes, and only then', () =>
   assert.ok(!('awardChoicePending' in serializedOperationResult({ success: true, run: settled })));
 });
 
+test('1773 PR4: the stage that left a pick answers awardChoicePending through the reply', async () => {
+  const { executed } = await craftWithGroup(pickGroup());
+  assert.equal(executed.awardChoicePending, true, 'the engine names it');
+  assert.equal(serializedOperationResult(executed).awardChoicePending, true, 'the reply keeps it');
+  const none = pickGroup({ awardCount: undefined, awardCountFormula: '1d2-2' });
+  const { executed: plain } = await craftWithGroup(none, { script: { '1d2-2': [0] } });
+  assert.ok(!('awardChoicePending' in plain), 'a stage owing nothing says nothing');
+});
+
 /** The real engine behind the command service, the sender owning the crafter unless a GM. */
 function realService(world, { senderId }) {
   const { engine, actor, manager } = world;

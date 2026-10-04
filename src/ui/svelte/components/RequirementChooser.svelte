@@ -213,7 +213,13 @@
             {alternative.name}: {alternative.reading}
           </p>
         {/each}
-        <p class="fab-requirement-status" role="status" id={statusId(slot)} data-award-status>
+        <p
+          class="fab-requirement-status"
+          class:is-empty={!slot.status}
+          role="status"
+          id={statusId(slot)}
+          data-award-status
+        >
           {slot.status ?? ''}
         </p>
       </Well>
@@ -359,7 +365,10 @@
     font-size: 10.5px;
   }
 
-  .fab-requirement-status:empty {
+  /* Kept in the tree while empty, because a live region must exist before what it announces. */
+  .fab-requirement-status.is-empty {
+    height: 0;
     margin: 0;
+    overflow: hidden;
   }
 </style>

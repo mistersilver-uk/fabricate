@@ -25,10 +25,10 @@ const AWARD_SOURCES = Object.freeze([
 ]);
 
 /** The face as it opens: a disabled known recipe stating why, and a confirm waiting on a pick. */
-const OPEN_FACE =
-  FACE +
+const OPEN_STATE =
   `:has(${TILE('known')}:disabled):has([data-requirement-reason="known"])` +
   `:has(${TILE('ingot')}:not(:disabled)):has([data-award-confirm]:disabled)`;
+const OPEN_FACE = FACE + OPEN_STATE;
 
 const owedCase = (entry) =>
   playerCase({
@@ -48,7 +48,9 @@ export function journalAwardChoiceCases() {
     owedCase({
       id: 'player-journal-award-choice',
       label: 'Player Journal — a finished craft owing a pick of up to two rewards',
-      expectSelector: `${OPEN_FACE}:has([data-journal-award-pending="true"])`,
+      expectSelector:
+        '[data-journal-detail]:has([data-journal-award-pending="true"]) [data-award-face]' +
+        OPEN_STATE,
       expectCenterHit: TILE('ingot'),
     }),
     owedCase({
@@ -66,6 +68,8 @@ export function journalAwardChoiceCases() {
       id: 'player-journal-award-choice-narrow',
       label: 'Player Journal — the award face at the narrow Journal width',
       position: { width: 1024, height: 760 },
+      // The stacked Journal draws the detail beneath the lists, so the face is scrolled to.
+      steps: [{ selector: '[data-award-face]', scroll: true }],
       expectSelector: OPEN_FACE,
       kinds: ['player', 'journal', 'responsive'],
     }),

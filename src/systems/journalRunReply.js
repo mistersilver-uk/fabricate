@@ -50,7 +50,9 @@ export function serializedOperationResult(result, { secret = false, runId = '' }
     consumed: source.consumed === true,
     // A stage that left a reward for the player to pick says so, so the crafting outcome can name
     // it and open the run in the Journal (issue 1773).
-    ...(holdsUnsettledAwardChoice(run) && { awardChoicePending: true }),
+    ...((source.awardChoicePending === true || holdsUnsettledAwardChoice(run)) && {
+      awardChoicePending: true,
+    }),
     ...(Object.hasOwn(source, 'requiresExecution') && {
       requiresExecution: source.requiresExecution === true,
     }),
