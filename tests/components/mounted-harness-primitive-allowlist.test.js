@@ -46,6 +46,11 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/FillBar.svelte',
+  // The three instruments over it (issue 1782): the player window, the journal and the Checks
+  // Studio render them, so each joins the trees that already compile the leaf.
+  'src/ui/svelte/components/Meter.svelte',
+  'src/ui/svelte/components/BandedBar.svelte',
+  'src/ui/svelte/components/StageBars.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   // THE manager's labelled push-button (issue 1096). It is the sharpest entry on this list
   // after `Chip`: the button class is a CSS convention repeated across more than sixty

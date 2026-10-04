@@ -153,8 +153,8 @@ async function roll(root, done = '[data-checks-simulator-readout], [data-checks-
 const odds = (root) => root.querySelector('[data-checks-odds-state]');
 const rollButton = (root) => root.querySelector('[data-checks-simulator-roll]');
 const oddsRows = (root) =>
-  [...root.querySelectorAll('[data-checks-odds-percent]')].map((cell) => [
-    cell.dataset.checksOddsPercent,
+  [...root.querySelectorAll('[data-banded-bar-percent]')].map((cell) => [
+    cell.dataset.bandedBarPercent,
     cell.textContent.trim(),
   ]);
 
@@ -327,7 +327,14 @@ describe('count odds and the simulator readout', () => {
       }),
       tiers: [],
     });
-    assert.equal(odds(root).querySelector('[data-checks-odds-row]').dataset.checksOddsRow, 'botch');
+    // A one-outcome chart is the single-row `BandedBar`, a meter, rather than a histogram (issue 1782).
+    const only = odds(root).querySelector('[data-banded-bar-track]');
+    assert.equal(only.dataset.bandedBarTrack, 'botch');
+    assert.equal(only.closest('[role="meter"]').getAttribute('aria-valuenow'), '100');
+    assert.ok(
+      only.closest('.fab-banded-bar-band[data-banded-bar-row="botch"]'),
+      'drawn in the band row the histogram draws, not as a chance bar'
+    );
     await roll(root);
     const readout = root.querySelector('[data-checks-simulator-readout][data-checks-simulator-botch]');
     assert.ok(Boolean(readout), 'the readout is marked a botch');

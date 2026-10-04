@@ -4,6 +4,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  dropRateTierColor,
+  hazardFill,
+  rampColour
+} from '../../src/ui/svelte/util/dropRateTier.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const cssPath = resolve(repoRoot, 'styles/fabricate.css');
@@ -265,6 +271,35 @@ describe('Theme colour contract', () => {
         + `src/ — a declared token nothing reads is dead weight in seven theme blocks and in every `
         + `world's stylesheet download:\n${unread.join('\n')}`
     );
+  });
+
+  // Issue 1782: a banded fill is a ramp key or a semantic tone, so the ramp's tokens are the whole
+  // of what a fill can paint. A token this module emits that no theme declares paints nothing.
+  it('declares every token the drop-rate ramp emits, and the banded bars mix no colour', () => {
+    const css = readFileSync(cssPath, 'utf8');
+    const declared = tokenNames(stripCommentedSource(blockFor(css, themeSelectors.fabricate)));
+    // Every fill the ramp can resolve, read through its own functions rather than its text.
+    const fills = [
+      ...Array.from({ length: 101 }, (_, rate) => dropRateTierColor(rate)),
+      ...Array.from({ length: 101 }, (_, percent) => rampColour(hazardFill(percent))),
+    ];
+    const emitted = [...new Set(fills.flatMap(fill => tokenReferences(fill)))];
+
+    assert.ok(emitted.includes('--fab-hazard-mid'), 'the risk scale resolves its named midpoint');
+    assert.deepEqual(
+      emitted.filter(token => !declared.includes(token)),
+      [],
+      'every token util/dropRateTier.js emits is declared in the fabricate theme block'
+    );
+
+    for (const path of [
+      'src/ui/svelte/apps/gathering/ChanceBar.svelte',
+      'src/ui/svelte/components/BandedBar.svelte',
+    ]) {
+      // ratchet-exempt(source-pin): issue 1782 V&A 4 names this absence; a mix is invisible to a mount
+      const source = readFileSync(resolve(repoRoot, path), 'utf8');
+      assert.doesNotMatch(source, /color-mix\(/u, `${path} names a theme token instead of a mix`);
+    }
   });
 
   it('keeps product UI colour literals inside theme token declarations', () => {

@@ -282,6 +282,7 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/PlayerViewState.svelte',
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Meter.svelte',
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Notice.svelte',
@@ -526,6 +527,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Meter.svelte',
   'src/ui/svelte/components/Notice.svelte',
   // The identity row `RecipeDetailHeader` composes (issue 1518), flat for the same reason.
   'src/ui/svelte/apps/PlayerDetailHeader.svelte',

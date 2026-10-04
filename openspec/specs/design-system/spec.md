@@ -118,7 +118,7 @@ Every specimen in `openspec/specs/design-system/library.html` and every row of t
 An entry whose specimen states no Svelte API therefore cannot read `shipped`, because a specimen that names no props gives nothing to match: it stays `target` until that API is written, and the library's "Entries without an API" migrations row is the record of every entry in that position.
 `divergent` means a recorded decision keeps the shipped component different; such an entry MUST name the issue that decided it, and only a maintainer decision may put one there.
 A heading that names several primitives MUST declare a status PER NAME, so every member of the set carries exactly one, and the block's own value is the weakest of them — `divergent` if any name is, otherwise `target` if any name is, otherwise `shipped`.
-The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 30 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
+The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 40 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
 
 Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the `deferred: root convergence pending` exemptions in the source-contract tests record.
 An entry may be `shipped` while most of the tree still hand-rolls the thing it replaces, and an entry whose every caller is perfect may be `target` because the specimen names props nothing has built.
@@ -215,6 +215,7 @@ The three most-imported controls satisfy it too: `Button` emits `fabricate-butto
 None of the three portals anything, so each needs one root, and each writes it on its own root element — for the two buttons as the leading literal of the `classes` array the component composes, for the pager inline on its root `<section>`.
 Six more satisfy it as of issue 1508: `Field` emits `fabricate-field`, `SearchField` emits `fabricate-search`, `FilterBar` emits `fabricate-filter-bar`, `InspectorCard` emits `fabricate-card`, `StatusToggle` emits `fabricate-toggle` and `ChanceSlider` emits `fabricate-slider`.
 None of the six portals anything either, so each needs exactly one root.
+Issue 1782 adds three instruments over the shared fill leaf: `Meter` emits `fab-meter`, `BandedBar` emits `fab-banded-bar` and `StageBars` emits `fab-stage-bars`, each on its own root element; none portals anything, so each needs one root, and each family is scoped to its component as the leaf's own is.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
 The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issues 1523 and 1779.
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
@@ -755,6 +756,8 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 
 A control whose visible text is a glyph or a bare number MUST take its accessible name as a REQUIRED prop, named `ariaLabel`, rather than an optional one.
 A name composed from a value MUST be derived by a shared helper, because the alternative drifted across 23 call sites before `src/ui/svelte/components/stepperLabels.js` existed.
+A stage group (`StageBars`) takes exactly one naming route, `ariaLabel` or `ariaLabelledBy`, the latter where the caller renders the kicker.
+The one bar of a one-stage group takes the group's own name, because "Stage 1 of 1" states a position there is nothing to choose between.
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
@@ -971,6 +974,8 @@ An empty state INSIDE AN OVERLAY the product has already drawn a boundary around
 
 A number a GM can change is a stepper and never a stat box.
 A continuous scale cut into named regions is a range bar whose spans tile; an ordered set of named tiers with a position marker is a tier track.
+`StageBars` is the progress instrument, and `StageNav` chooses the stage on screen.
+`RunProgress` is the same implementation as `StageBars` rather than a neighbour of it: it is `StageBars` under a run heading, and the `<RunProgress>` entry stays `target` in its own library block, whose owner flips it.
 A GRIP is the pointer's drag handle and the keyboard's move control, one per ordered row; a ROCKER is the stacked up and down chevron PAIR that steps a row one position, and neither word names the other's affordance.
 
 #### Scenario: A list row and an editor both show the same record state
