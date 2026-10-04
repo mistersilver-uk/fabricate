@@ -20,7 +20,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/craftingImageDefaults.js',
   ],
   compiledModules: [
-    // `SetPicker` and the primitives it renders (issue 1782): its tokens are the ONE chip, its
+    // `SetPicker` and the primitives it renders (issue 1782): its tokens are the one chip, its
     // rows the shared Avatar, and its panel the searchable popover.
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/Avatar.svelte',
@@ -28,6 +28,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/SetPicker.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
   ],
@@ -152,9 +153,12 @@ describe('RecipeItemContentsTab (mounted)', () => {
   it('forwards only the changed recipes on Apply', async () => {
     const tab = await mountTab();
     await tab.click(tab.trigger());
+    const footer = () => tab.panel().querySelector('[data-set-picker-footer] [role="status"]');
+    assert.equal(footer().textContent.trim(), '2 selected');
     await tab.click(tab.option('r3'));
     await tab.click(tab.option('r5'));
     await tab.click(tab.option('r1'));
+    assert.equal(footer().textContent.trim(), '2 to add · 1 to remove', 'the staged change shows');
     await tab.click(tab.root.querySelector('[data-set-picker-apply]'));
     assert.deepEqual(tab.calls, [
       ['link', 'r3'],
@@ -187,6 +191,35 @@ describe('RecipeItemContentsTab (mounted)', () => {
     });
   }
 
+  it('keeps a recipe linked under the open panel when Apply lands', async () => {
+    const tab = await mountTab();
+    await tab.click(tab.trigger());
+    await tab.click(tab.option('r3'));
+    await harness.setProps({
+      linkedRecipes: [...LINKED, LIBRARY[3]],
+      availableRecipes: [LIBRARY[2], LIBRARY[4]],
+    });
+    await settle();
+    await tab.click(tab.root.querySelector('[data-set-picker-apply]'));
+    assert.deepEqual(tab.calls, [['link', 'r3']], 'r4, linked meanwhile, is not unlinked');
+  });
+
+  it('offers and counts no id-less recipe, so Apply never forwards one', async () => {
+    const tab = await mountTab({
+      linkedRecipes: [...LINKED, null],
+      availableRecipes: [...UNLINKED, { name: 'Nameless', category: 'Alchemy' }],
+    });
+    assert.equal(tab.root.querySelectorAll('[data-set-picker-token]').length, 2);
+    await tab.click(tab.trigger());
+    assert.equal(tab.root.querySelectorAll('[role="option"]').length, 5);
+    await tab.click(tab.panel().querySelector('[data-set-picker-clear]'));
+    await tab.click(tab.root.querySelector('[data-set-picker-apply]'));
+    assert.deepEqual(tab.calls, [
+      ['remove', 'r1'],
+      ['remove', 'r2'],
+    ]);
+  });
+
   it('keeps Clear reachable at zero members', async () => {
     const tab = await mountTab({ linkedRecipes: [], availableRecipes: LIBRARY });
     await tab.click(tab.trigger());
@@ -207,6 +240,7 @@ describe('RecipeItemContentsTab (mounted)', () => {
     assert.equal(trigger.disabled, false);
     assert.ok(!trigger.hasAttribute('aria-disabled'), 'a full membership still opens the panel');
     assert.equal(trigger.getAttribute('aria-haspopup'), 'dialog');
+    assert.equal(trigger.textContent.trim(), 'Edit recipes', 'the one control adds and removes');
   });
 
   it('names the token group, the panel, its list and its query field', async () => {

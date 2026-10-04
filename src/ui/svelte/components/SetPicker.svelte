@@ -9,9 +9,10 @@
   | `options` / `source(query)` | `[{ id, label, meta?, img?, data? }]` / async function | `[]` / `undefined` | The candidates, or a source answering the query with an array or `{ options, total }`; the tokens read their names from `options`, so a caller with a `source` passes the members there. An `img` key draws a square `Avatar`, initials when it is empty. |
   | `commit` | `'staged'` \| `'choose'` | `'staged'` | `staged` buffers the panel's choices and writes them on Apply; `choose` is the session form, writing each choice as it is made and drawing no token run, since a session control draws its working set itself. |
   | `maxTokens` | integer | `3` | Tokens drawn before the `+N more` button, which is named "and N more" and opens the panel. |
-  | `label` / `ariaLabel` | localized strings | `''` | Exactly one names the token group and the panel; `label` also draws as the group's kicker. |
+  | `label` / `ariaLabel` | localized strings | `''` | Exactly one names the token group and the panel; `label` also draws as the group's `Kicker`. |
   | `searchLabel` / `emptyLabel` | localized strings | `Common.SetPicker.Search` / `''` | The query field's placeholder and name, and the line a panel with no candidates shows. |
-  | `loading` / `error` | boolean / localized string | `false` / `''` | Forwarded to the panel, which replaces its list with either; an error disables Apply. |
+  | `addLabel` / `addProps` | localized string / attribute object | `Common.SetPicker.Add` / `{}` | The dashed Add's visible name, and hooks stamped on that button itself. |
+  | `loading` / `error` | boolean / localized string | `false` / `''` | Forwarded to the panel, whose one status they feed; an error disables Apply. |
   | `trigger` | snippet `{ attributes, open }` | `undefined` | Replaces the dashed Add, forwarded to `SearchablePopover`'s own `trigger`. |
 
   Callbacks:
@@ -22,17 +23,20 @@
   - `{...rest}` lands on the root, written after `class={…}`.
 
   Invariants:
-  - In `staged` nothing writes before Apply, and Apply writes only a change; Escape, an outside
-    press and the trigger itself close the panel and DISCARD the buffer; Clear empties the buffer
-    and is never disabled — pinned by `tests/components/set-picker-mounted.test.js`.
+  - In `staged` nothing writes before Apply, and Apply writes only a change. The buffer is a
+    change laid over the live `value`, so a member that changes under an open panel is kept, and
+    the footer states what it will add and remove. Escape, an outside press and the trigger close
+    the panel and discard the buffer, returning focus to whichever button opened it; Clear is never
+    disabled — pinned by `tests/components/set-picker-mounted.test.js`.
 -->
 <script>
   import Avatar from './Avatar.svelte';
   import Button from './Button.svelte';
   import Chip from './Chip.svelte';
+  import Kicker from './Kicker.svelte';
   import SearchablePopover from './SearchablePopover.svelte';
   import { localizeOr } from '../util/localizeOr.js';
-  import { membershipChange } from '../util/pickerOptionModel.js';
+  import { membershipChange, stagedMembership } from '../util/pickerOptionModel.js';
 
   let {
     value = [],
@@ -45,6 +49,8 @@
     ariaLabel = '',
     searchLabel = '',
     emptyLabel = '',
+    addLabel = '',
+    addProps = {},
     loading = false,
     error = '',
     trigger = undefined,
@@ -54,21 +60,19 @@
 
   const labelId = $props.id();
   let open = $state(false);
-  let buffer = $state(null);
+  let staging = $state(null);
+  let moreButton = $state(null);
+  let openedFromMore = false;
 
   const staged = $derived(commit !== 'choose');
   const committed = $derived(Array.isArray(value) ? value : []);
-  const chosen = $derived(staged && buffer ? buffer : committed);
+  const chosen = $derived(staged && staging ? stagedMembership(committed, staging) : committed);
   const change = $derived(membershipChange(committed, chosen));
   const dirty = $derived(change.added.length + change.removed.length > 0);
   const tokenCap = $derived(Number.isInteger(maxTokens) && maxTokens >= 0 ? maxTokens : 3);
   const tokens = $derived(committed.slice(0, tokenCap));
   const hiddenCount = $derived(committed.length - tokens.length);
   const name = $derived(label || ariaLabel);
-
-  $effect(() => {
-    if (!open) buffer = null;
-  });
 
   function tokenLabel(id) {
     return options.find((option) => option.id === id)?.label ?? String(id);
@@ -78,17 +82,40 @@
     return ids.includes(id) ? ids.filter((member) => member !== id) : [...ids, id];
   }
 
+  // Closing discards the buffer; a close the panel's own focus saw goes back to "+N more" when
+  // that opened it, after the popover has returned focus to its trigger.
+  function setOpen(next) {
+    open = next;
+    if (next) return;
+    staging = null;
+    if (openedFromMore && document.activeElement?.closest?.('.fabricate-set-picker-popover')) {
+      setTimeout(() => moreButton?.focus());
+    }
+    openedFromMore = false;
+  }
+
+  // A press on "+N more" while the panel is open is a no-op: cancelling its pointerdown drops the
+  // mousedown the panel's outside-press dismissal listens for, and the click then does nothing.
+  function holdPanelOpen(event) {
+    if (open) event.preventDefault();
+  }
+
+  function openFromMore() {
+    if (open) return;
+    openedFromMore = true;
+    setOpen(true);
+  }
+
   function select(id) {
     if (staged) {
-      buffer = toggled(chosen, id);
+      staging = membershipChange(committed, toggled(chosen, id));
       return;
     }
     const next = toggled(committed, id);
     onChange(next, membershipChange(committed, next));
   }
 
-  function apply(close, failed) {
-    if (failed || error || !dirty) return;
+  function apply(close) {
     onChange([...chosen], change);
     close();
   }
@@ -119,27 +146,37 @@
 
 {#snippet stagedFooter({ close, failed })}
   <div class="fabricate-set-picker-footer" data-set-picker-footer>
-    <span class="fabricate-set-picker-selected" role="status"
-      >{localizeOr('FABRICATE.Common.SetPicker.Selected', '{count} selected', {
-        count: chosen.length,
-      })}</span
+    <span
+      class="fabricate-set-picker-selected"
+      role="status"
+      data-set-picker-pending={dirty ? '' : undefined}
+      >{dirty
+        ? localizeOr('FABRICATE.Common.SetPicker.Pending', '{added} to add · {removed} to remove', {
+            added: change.added.length,
+            removed: change.removed.length,
+          })
+        : localizeOr('FABRICATE.Common.SetPicker.Selected', '{count} selected', {
+            count: chosen.length,
+          })}</span
     >
-    <Button role="ghost" data-set-picker-clear="" onclick={() => (buffer = [])}
-      >{localizeOr('FABRICATE.Common.SetPicker.Clear', 'Clear')}</Button
+    <Button
+      role="ghost"
+      data-set-picker-clear=""
+      onclick={() => (staging = membershipChange(committed, []))}
+      >{localizeOr('FABRICATE.Common.SetPicker.Clear', 'Clear all')}</Button
     >
     <Button
       role="primary"
       data-set-picker-apply=""
-      disabled={failed || Boolean(error) || !dirty}
-      onclick={() => apply(close, failed)}
-      >{localizeOr('FABRICATE.Common.SetPicker.Apply', 'Apply')}</Button
+      disabled={failed || !dirty}
+      onclick={() => apply(close)}>{localizeOr('FABRICATE.Common.SetPicker.Apply', 'Apply')}</Button
     >
   </div>
 {/snippet}
 
 {#snippet panel()}
   <SearchablePopover
-    bind:open
+    bind:open={() => open, setOpen}
     multiple
     showFilteredCount
     {options}
@@ -150,7 +187,8 @@
     value={chosen}
     triggerButton={{ role: 'dashed' }}
     triggerIcon="fas fa-plus"
-    triggerLabel={localizeOr('FABRICATE.Common.SetPicker.Add', 'Add')}
+    triggerLabel={addLabel || localizeOr('FABRICATE.Common.SetPicker.Add', 'Add')}
+    triggerProps={addProps}
     showChevron={false}
     popoverClass="fabricate-set-picker-popover"
     optionClass="fabricate-set-picker-option"
@@ -167,7 +205,7 @@
 
 <div class={['fabricate-set-picker', extraClass]} {...rest}>
   {#if staged}
-    {#if label}<span class="fabricate-set-picker-label" id={labelId}>{label}</span>{/if}
+    {#if label}<span id={labelId}><Kicker as="span">{label}</Kicker></span>{/if}
     <div
       class="fabricate-set-picker-tokens"
       role="group"
@@ -180,18 +218,23 @@
         >
       {/each}
       {#if hiddenCount > 0}
-        <button
+        <Chip
+          tag="button"
+          density="row"
+          bind:element={moreButton}
           type="button"
-          class="fabricate-set-picker-more"
           data-keyboard-focus="true"
-          data-set-picker-more
+          data-set-picker-more=""
+          aria-haspopup="dialog"
+          aria-expanded={open}
           aria-label={localizeOr('FABRICATE.Common.SetPicker.MoreName', 'and {count} more', {
             count: hiddenCount,
           })}
-          onclick={() => (open = true)}
+          onpointerdown={holdPanelOpen}
+          onclick={openFromMore}
           >{localizeOr('FABRICATE.Common.SetPicker.More', '+{count} more', {
             count: hiddenCount,
-          })}</button
+          })}</Chip
         >
       {/if}
       {@render panel()}
@@ -209,35 +252,12 @@
     min-width: 0;
   }
 
-  .fabricate-set-picker-label {
-    color: var(--fab-text-subtle);
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
   .fabricate-set-picker-tokens {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--fab-space-1);
     min-width: 0;
-  }
-
-  .fabricate-set-picker-more {
-    box-sizing: border-box;
-    height: 22px;
-    min-height: 22px;
-    padding: 0 var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 999px;
-    background: var(--fab-bg-2);
-    color: var(--fab-text-secondary);
-    font-size: 10px;
-    font-weight: 600;
-    white-space: nowrap;
-    cursor: pointer;
   }
 
   .fabricate-set-picker-option-lines {

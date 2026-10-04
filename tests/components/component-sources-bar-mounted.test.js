@@ -106,13 +106,16 @@ describe('ComponentSourcesBar mounted behavior', () => {
     assert.deepEqual(calls.remove, ['b'], 'right-click did NOT remove the required source');
   });
 
-  /** THE PANEL IS `SetPicker`'S, IN ITS `choose` FORM, AND IT IS PORTALED (issues 1513, 1782). */
+  /** The panel is `SetPicker`'s, in its `choose` form, and it is portaled (issues 1513, 1782). */
   it('opens the add/edit picker listing every owned actor to toggle, and commits on choose', async () => {
     const { store, calls } = craftingSources();
     const target = await harness.mount({ services: { craftingSources: store } });
 
     assert.ok(!target.querySelector('.fabricate-set-picker-popover'), 'panel closed by default');
-    target.querySelector('[data-crafting-sources-add]').click();
+    const add = target.querySelector('[data-crafting-sources-add]');
+    assert.match(add.getAttribute('aria-label') ?? '', /Sources\.Edit/u, 'the icon-only + is named');
+    assert.equal(add.getAttribute('title'), add.getAttribute('aria-label'), 'and titled alike');
+    add.click();
     flushSync();
 
     const popover = target.querySelector('.fabricate-set-picker-popover');

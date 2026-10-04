@@ -9,7 +9,7 @@
   | --- | --- | --- | --- |
   | `options` | `[{ id, label, icon?, img?, meta?, trailing?, trailingIcon?, addMarker?, dataId?, data?, class?, disabled?, disabledReason?, group? }]` | `[]` | The caller builds the WHOLE list, any leading "special" option included. Every key that stamps an attribute is spread FIRST, so it can never override this component's own `type`, `role`, `aria-selected` or `onclick`. `dataId` and `data` are the singular and general forms of one hook, kept separate because a converted menu usually carries two hooks per row. `meta` promotes the row to two lines, both inside the button and so both in its accessible name. |
   | `option.disabled` / `option.disabledReason` | boolean / string | — | The row is gated with `aria-disabled`, NOT a native `disabled`: the rows are already `tabindex="-1"` and the holder owns focus, so the native attribute would only remove the row from the accessibility tree — exactly where its reason has to be announced from. The reason renders inside the button, and only for a gated row. |
-  | `source(query)` / `loading` / `error` | async function / boolean / localized string | `undefined` / `false` / `''` | `source` replaces `options` and `filterOptions`: it is called with the normalized query on open and on every query change, answers an array or `{ options, total }`, and only the LATEST request settles, so a slow earlier answer never overwrites a later one. While a request or the caller's `loading` is pending the list is replaced by a loading line; `error`, or a rejected request, replaces it with an alert. |
+  | `source(query)` / `loading` / `error` | async function / boolean / localized string | `undefined` / `false` / `''` | `source` replaces `options` and `filterOptions`: it is called with the normalized query on open and on every query change, answers an array or `{ options, total }`, and only the LATEST request settles, so a slow earlier answer never overwrites a later one. A refinement keeps the last answer's rows and total, marked `aria-busy`; a wait with no row to list shows a loading line, and `error` or a rejected request an alert. Either line replaces the list for the keyboard too, so no hidden row is choosable or pointed at. |
   | `optionGroups` | `[{ id, label }]` | `[]` | Buckets the options by `option.group` under ARIA `role="group"` headings. Ungrouped and unknown-group options render last without a heading, and a group whose options all filter out disappears. |
   | `value` | option id, or an ARRAY of ids in `multiple` mode | `''` | One prop rather than two, because a picker has one selection whichever cardinality it has. The scalar path is a BRANCH rather than a normalization: coercing into a set would change the answer for an option whose `id` is `''`. |
   | `multiple` / `stayOpen` / `disabled` | booleans | `false` | `multiple` turns on THREE things at once, because a panel with any two of them lies about itself: `aria-selected` by membership, `aria-multiselectable` on the listbox, and the panel staying open across choices. `stayOpen` is that last gate ALONE — `multiple` implies it and it does not imply `multiple`. `disabled` is a native disabled trigger that refuses to open. |
@@ -67,7 +67,7 @@
     identity.
 -->
 <script>
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { createAttachmentKey } from 'svelte/attachments';
   import Chip from './Chip.svelte';
   import Button from './Button.svelte';
@@ -85,8 +85,10 @@
     groupedOptionBuckets,
     labelSubstringFilter,
     latestSourceRequest,
+    listedOptions,
     optionListGeneration as listGenerationOf,
     pickerEmptiness,
+    refiningSource,
     renderedOptionOrder,
     selectedOptionIds,
     spreadableTriggerAttributes,
@@ -180,15 +182,26 @@
   const requestLatest = latestSourceRequest();
   $effect(() => {
     if (!open || !source) return;
-    remote = PENDING_SOURCE;
+    remote = refiningSource(untrack(() => remote));
     requestLatest(source, normalizedSearch, (settled) => (remote = settled));
   });
-  const totalCount = $derived(source ? remote.total : options.length);
-  const filteredOptions = $derived.by(() => {
-    if (source) return remote.rows;
-    const rows = filterOptions(options, normalizedSearch);
-    return Array.isArray(rows) ? rows : [];
-  });
+  const {
+    rows: filteredOptions,
+    total: totalCount,
+    status,
+  } = $derived(
+    listedOptions({
+      source,
+      remote,
+      options,
+      filterOptions,
+      query: normalizedSearch,
+      loading,
+      error,
+      errorText: localizedText('FABRICATE.Common.Picker.Error', 'The list could not load'),
+      loadingText: localizedText('FABRICATE.Common.Picker.Loading', 'Loading…'),
+    })
+  );
 
   const isGrid = $derived(as === 'grid');
   const gridColumns = $derived(isGrid && Number.isInteger(columns) && columns > 1 ? columns : 1);
@@ -308,6 +321,8 @@
     if (open) return;
     if (search) search = '';
     cursor = { generation: '', index: -1 };
+    remote = PENDING_SOURCE;
+    requestLatest();
   });
 
   function toggle(event) {
@@ -326,19 +341,9 @@
     if (!staysOpenOnChoose) close();
   }
 
-  function stop(event) {
-    event.stopPropagation();
-  }
-
-  const FOCUSABLE_PANEL_CHROME = 'input, button, textarea, select, [href]';
-
-  function keepFocusOnHolder(event) {
-    if (!event.target?.closest?.(FOCUSABLE_PANEL_CHROME)) event.preventDefault();
-  }
-
   function onTriggerKeydown(event) {
     if (!showSearch) onHolderKeydown(event);
-    stop(event);
+    event.stopPropagation();
     triggerOnKeydown?.(event);
   }
 
@@ -489,9 +494,7 @@
       {searchProps}
       {filteredOptions}
       {totalCount}
-      busy={loading || (Boolean(source) && remote.pending)}
-      {error}
-      failed={remote.failed}
+      {status}
       {groupedOptions}
       {isGrouped}
       {renderedOptions}
@@ -512,8 +515,6 @@
       {chooseOption}
       {optionIsSelected}
       {close}
-      {stop}
-      {keepFocusOnHolder}
     />
   {/if}
 </div>

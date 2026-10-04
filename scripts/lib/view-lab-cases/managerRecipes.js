@@ -743,7 +743,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-item-contents-picker-staged',
     label: 'Manager — Recipe item contents, the picker holding staged choices',
-    // A choice staged in each direction (issue 1782): marked in the panel, counted, Apply armed.
+    // One choice staged each way (issue 1782): marked, stated in the footer, Apply armed.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -757,9 +757,10 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-item-link-recipe-option="hb-r-salve"]' },
     ],
     expectView: 'recipe-item-edit',
-    // The footer's Apply, enabled: the staged set differs from the committed one.
+    // The footer stating the pending change, and its Apply enabled.
     expectSelector:
-      '.fabricate-manager .fabricate-set-picker-popover [data-set-picker-apply]:not([disabled])',
+      '.fabricate-manager .fabricate-set-picker-popover [data-set-picker-footer]' +
+      ':has([data-set-picker-pending]) [data-set-picker-apply]:not([disabled])',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,

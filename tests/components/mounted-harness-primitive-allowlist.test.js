@@ -54,6 +54,13 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/RuleSentence.svelte',
   // The set picker (issue 1782): the recipe-item editor's contents tab and the crafting bar.
   'src/ui/svelte/components/SetPicker.svelte',
+  // Three the manager and the player window both render, adjudicated in when the two-root clause
+  // below arrived (issue 1782): the dice faces of a check's evidence and outcome preview, the
+  // segmented choice the browse filters and the Checks Studio share, and the inset well the
+  // requirement chooser and the dice prompt draw.
+  'src/ui/svelte/components/DiceTiles.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Well.svelte',
   // THE manager's labelled push-button (issue 1096). It is the sharpest entry on this list
   // after `Chip`: the button class is a CSS convention repeated across more than sixty
   // components, so every step of the conversion sweep drops this primitive into another
@@ -388,6 +395,29 @@ test('the shared primitives are reachable from a declared application root, so t
       `${primitive} should be reachable from at least one declared application root`
     );
   }
+});
+
+test('a shared component two application roots render is adjudicated, in or out', () => {
+  // The guard above fires only for a suite that compiles a tree holding a listed primitive but not
+  // the primitive, so an entry every suite already compiles could be dropped without a failure.
+  // This clause is what makes dropping one fail by name (issue 1782).
+  const rootClosures = APPLICATION_ROOTS.map((root) => closures.get(root));
+  const adjudicated = new Set([...SHARED_PRIMITIVES, ...ADJUDICATED_NON_MEMBERS]);
+  const shared = componentPaths.filter(
+    (path) =>
+      /^src\/ui\/svelte\/components\/[^/]+\.svelte$/.test(path) &&
+      rootClosures.filter((closure) => closure.has(path)).length >= 2
+  );
+  assert.ok(
+    shared.includes('src/ui/svelte/components/SetPicker.svelte') && shared.length >= 20,
+    `only ${shared.length} components are reachable from two roots, so the walk stopped seeing them`
+  );
+  assert.deepEqual(
+    shared.filter((path) => !adjudicated.has(path)),
+    [],
+    'these components render under two application roots, so a mounted suite of either tree can ' +
+      'hang on them; add each to SHARED_PRIMITIVES, or record why not in ADJUDICATED_NON_MEMBERS'
+  );
 });
 
 // A COMMENT INSIDE A ROSTER IS INSIDE THAT ROSTER'S CAPTURED BODY (issue 1514).

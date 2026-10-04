@@ -48,7 +48,8 @@ const harness = createMountedComponentHarness({
     // The stamina strip's `Meter` (issue 1782), which draws the fill leaf above.
     'src/ui/svelte/components/Meter.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
-    // Its sources picker (issue 1782).
+    // Its sources picker (issue 1782), and the kicker that picker draws a label through.
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/SetPicker.svelte',
     'src/ui/svelte/apps/ActorSelectTopBar.svelte'
   ],

@@ -11,8 +11,8 @@
   shortcut. The required (non-removable) crafting actor renders with a lock badge,
   aria-disabled, and an "always included" aria suffix, and exposes no "×".
 
-  THE PICKER IS THE SHARED `SetPicker` IN ITS `choose` FORM (issue 1782), the session control
-  `openspec/specs/design-system/spec.md` exempts from staging and bounding: it COMMITS ON CHOOSE,
+  The picker is the shared `SetPicker` in its `choose` form (issue 1782), the session control
+  `openspec/specs/design-system/spec.md` exempts from staging and bounding: it commits on choose,
   one `store.toggle` per choice, because the inventory view and the open recipe's rail and pool
   re-derive from the selection live. The portrait row above and the dashed `+` trigger stay this
   file's own markup; the panel, its search, its count and its Avatar rows are the primitive's.
@@ -58,7 +58,7 @@
     store?.remove(source.id);
   }
 
-  // COMMIT ON CHOOSE: the one id a choice moved, straight to `store.toggle`.
+  // Commit on choose: the one id a choice moved, straight to `store.toggle`.
   function toggleSource(next, { added, removed }) {
     store?.toggle(added[0] ?? removed[0]);
   }

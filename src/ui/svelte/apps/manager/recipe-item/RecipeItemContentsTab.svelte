@@ -16,7 +16,6 @@
   // Shared pure resolver: an empty OR generic item-bag image falls back to the
   // alchemical blueprint — matching the player builder + browser exactly (no drift).
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
-  import Button from '../../../components/Button.svelte';
   import SetPicker from '../../../components/SetPicker.svelte';
 
   let {
@@ -26,22 +25,31 @@
     onRemoveRecipe = () => {},
   } = $props();
 
-  const linkedIds = $derived((linkedRecipes || []).map((recipe) => recipe.id));
+  // Each recipe once, by its first appearance; an id-less entry is no recipe a book can carry.
+  // The seen ids are a plain record: `svelte/prefer-svelte-reactivity` refuses a local `Set`.
+  function distinctRecipes(recipes) {
+    const seen = Object.create(null);
+    return recipes.filter((recipe) => {
+      if (!recipe?.id || seen[recipe.id]) return false;
+      seen[recipe.id] = true;
+      return true;
+    });
+  }
 
-  // Every recipe of the system, the linked ones first, each once: the panel marks the members.
+  const linkedIds = $derived(distinctRecipes(linkedRecipes || []).map((recipe) => recipe.id));
+
+  // Every recipe of the system, the linked ones first: the panel marks the members.
   const recipeOptions = $derived(
-    [...(linkedRecipes || []), ...(availableRecipes || [])]
-      .filter((recipe, index, all) => all.findIndex((other) => other.id === recipe.id) === index)
-      .map((recipe) => ({
-        id: recipe.id,
-        label: recipe.name,
-        meta: String(
-          recipe.category ||
-            localizeOr('FABRICATE.Admin.Manager.RecipeItem.Contents.Uncategorized', 'General')
-        ),
-        img: resolveRecipeImage(recipe),
-        data: { 'data-recipe-item-link-recipe-option': recipe.id },
-      }))
+    distinctRecipes([...(linkedRecipes || []), ...(availableRecipes || [])]).map((recipe) => ({
+      id: recipe.id,
+      label: recipe.name,
+      meta: String(
+        recipe.category ||
+          localizeOr('FABRICATE.Admin.Manager.RecipeItem.Contents.Uncategorized', 'General')
+      ),
+      img: resolveRecipeImage(recipe),
+      data: { 'data-recipe-item-link-recipe-option': recipe.id },
+    }))
   );
 
   function applyMembership(next, { added, removed }) {
@@ -49,9 +57,10 @@
     for (const recipeId of removed) onRemoveRecipe(recipeId);
   }
 
-  const linkLabel = $derived(
-    localizeOr('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')
-  );
+  const addProps = {
+    'data-recipe-item-link-recipe-toggle': '',
+    'data-validation-target': 'recipe-item-link-recipe',
+  };
 </script>
 
 <section
@@ -69,7 +78,7 @@
   <p class="manager-muted manager-recipe-item-contents-hint">
     {localizeOr(
       'FABRICATE.Admin.Manager.RecipeItem.Contents.Hint',
-      'The recipes a reader can learn from this item. Remove any that shouldn’t be taught here.'
+      'The recipes a reader can learn from this item. Use “Edit recipes” to add or remove them, then Apply.'
     )}
   </p>
 
@@ -77,7 +86,7 @@
     <p class="manager-muted" data-recipe-item-contents-empty>
       {localizeOr(
         'FABRICATE.Admin.Manager.RecipeItem.Contents.Empty',
-        'No recipes linked yet. Use “Link recipe” to add one.'
+        'No recipes linked yet. Use “Edit recipes” to add one.'
       )}
     </p>
   {/if}
@@ -98,20 +107,9 @@
       'FABRICATE.Admin.Manager.RecipeItem.Contents.NoRecipes',
       'This system has no recipes yet.'
     )}
-  >
-    {#snippet trigger({ attributes })}
-      <!-- ratchet-exempt(design-system): the spread is the picker's own trigger contract (type, ARIA state, handlers, element attachment), never a caller's name -->
-      <Button
-        role="dashed"
-        data-recipe-item-link-recipe-toggle=""
-        data-validation-target="recipe-item-link-recipe"
-        {...attributes}
-      >
-        <i class="fas fa-plus" aria-hidden="true"></i>
-        <span>{linkLabel}</span>
-      </Button>
-    {/snippet}
-  </SetPicker>
+    addLabel={localizeOr('FABRICATE.Admin.Manager.RecipeItem.Contents.EditRecipes', 'Edit recipes')}
+    {addProps}
+  />
 </section>
 
 <style>

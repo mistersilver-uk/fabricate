@@ -87,18 +87,25 @@ export function pickerEmptiness({ total, matched, noMatchesText, emptyHint, empt
   };
 }
 
-/** The state an async `source` starts each request from: no rows yet, and pending. */
+/** The state an async `source` starts each panel session from: no rows yet, and pending. */
 export const PENDING_SOURCE = Object.freeze({ rows: [], total: 0, pending: true, failed: false });
+
+/** A refinement's state: the rows and total the last answer settled stay listed, marked pending. */
+export function refiningSource(state) {
+  return { ...state, pending: true, failed: false };
+}
 
 /**
  * A runner that settles only its LATEST request: `run(source, query, settle)` calls
  * `source(query)` and hands `settle` the source state it resolved to, while a request that an
- * earlier call started and a later call overtook settles nothing, however late it arrives.
+ * earlier call started and a later call overtook settles nothing, however late it arrives; a call
+ * with no source starts nothing and so only retires every request still out.
  */
 export function latestSourceRequest() {
   let latest = 0;
   return (source, query, settle) => {
     const ticket = ++latest;
+    if (!source) return;
     Promise.resolve()
       .then(() => source(query))
       .then(
@@ -115,10 +122,39 @@ export function sourceRows(result) {
   return { rows: Array.isArray(rows) ? rows : [], total, pending: false, failed: false };
 }
 
-/** What the panel shows in place of its list: the error before the wait, and nothing when neither applies. */
-export function pickerStatus({ error, busy, errorText, loadingText }) {
-  if (error) return { kind: 'error', text: errorText };
-  return busy ? { kind: 'loading', text: loadingText } : null;
+/**
+ * The panel's one status: an error replaces the list, a wait replaces it only while no row is
+ * listed and otherwise marks the listed rows `refining`, and a settled list has none.
+ */
+export function pickerStatus({ failed, pending, rowCount, errorText, loadingText }) {
+  if (failed) return { kind: 'error', text: errorText, replacesList: true };
+  if (!pending) return null;
+  if (rowCount > 0) return { kind: 'refining', text: '', replacesList: false };
+  return { kind: 'loading', text: loadingText, replacesList: true };
+}
+
+/**
+ * The rows a panel lists, the total they match within and its one status: a `source`'s settled
+ * answer or `options` through `filterOptions`, and no row at all while a status replaces the list,
+ * so a row the panel is not showing can be neither chosen nor pointed at.
+ */
+export function listedOptions(state) {
+  const { source, remote, options, error, errorText, loadingText } = state;
+  const sourced = Boolean(source);
+  const rows = sourced ? remote.rows : state.filterOptions(options, state.query);
+  const candidates = Array.isArray(rows) ? rows : [];
+  const status = pickerStatus({
+    failed: Boolean(error) || (sourced && remote.failed),
+    pending: Boolean(state.loading) || (sourced && remote.pending),
+    rowCount: candidates.length,
+    errorText: error || errorText,
+    loadingText,
+  });
+  return {
+    rows: status?.replacesList ? [] : candidates,
+    total: sourced ? remote.total : options.length,
+    status,
+  };
 }
 
 const CALLER_OWNED_TRIGGER_KEYS = new Set(['disabled', 'aria-disabled']);
@@ -139,4 +175,12 @@ export function membershipChange(before, after) {
     added: after.filter((id) => !before.includes(id)),
     removed: before.filter((id) => !after.includes(id)),
   };
+}
+
+/** A staged change laid over the live membership, so a member that changed under it is kept. */
+export function stagedMembership(members, { added, removed }) {
+  return [
+    ...members.filter((id) => !removed.includes(id)),
+    ...added.filter((id) => !members.includes(id)),
+  ];
 }

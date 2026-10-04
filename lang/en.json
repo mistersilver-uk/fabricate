@@ -13,7 +13,8 @@
         "Search": "Search…",
         "Count": "{matched} of {total}",
         "Selected": "{count} selected",
-        "Clear": "Clear",
+        "Pending": "{added} to add · {removed} to remove",
+        "Clear": "Clear all",
         "Apply": "Apply",
         "More": "+{count} more",
         "MoreName": "and {count} more"
@@ -8083,10 +8084,10 @@
         "RecipeItem": {
           "BackToBrowse": "Back to Books & Scrolls",
           "Contents": {
-            "Empty": "No recipes linked yet. Use “Link recipe” to add one.",
+            "EditRecipes": "Edit recipes",
+            "Empty": "No recipes linked yet. Use “Edit recipes” to add one.",
             "Heading": "Recipes inside",
-            "Hint": "The recipes a reader can learn from this item. Remove any that shouldn’t be taught here.",
-            "LinkRecipe": "Link recipe",
+            "Hint": "The recipes a reader can learn from this item. Use “Edit recipes” to add or remove them, then Apply.",
             "NoRecipes": "This system has no recipes yet.",
             "SearchRecipes": "Search recipes…",
             "Title": "Recipes inside",

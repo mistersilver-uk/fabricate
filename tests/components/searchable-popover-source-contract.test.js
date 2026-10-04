@@ -19,6 +19,7 @@ import { repoRoot } from '../helpers/sourceScan.js';
 import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
 import {
   SOURCES,
+  componentCallSites,
   definePrimitiveAdoptionContract,
   walkTemplate,
 } from '../helpers/primitiveAdoptionContract.js';
@@ -140,7 +141,7 @@ const MULTI_SELECT_ADOPTERS = Object.freeze([
   'src/ui/svelte/components/SetPicker.svelte',
 ]);
 
-// THE READER IS PROBED rather than trusted: a pattern matching nothing makes the set-equality
+// The reader is probed rather than trusted: a pattern matching nothing makes the set-equality
 // clause pass the day the adopter is removed, which is the direction that hides.
 const MULTIPLE_ADOPTER = 'src/ui/svelte/components/SetPicker.svelte';
 
@@ -228,6 +229,10 @@ test('the declared prop surface is byte-identical to the pre-decomposition block
   );
 });
 
+// `SetPicker` forwards its `trigger` snippet to this primitive as a prop (issue 1782), so a snippet
+// handed to a `<SetPicker>` never appears at a `<SearchablePopover>` node and is read at its own.
+const setPickerSites = componentCallSites('SetPicker');
+
 test('the snippet-trigger naming route reads the element the spread lands on', () => {
   // NON-VACUITY, and it is the whole reason this route can be trusted.
   const snippetSites = popover.callSites.filter((site) => site.snippetSource('trigger'));
@@ -237,9 +242,31 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
     `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; three do — ` +
       "`IconPicker`, `EssenceSourceSelector` and `ComponentEditView`'s salvage adder (issue " +
       '1516). A different number means the route has gained or lost a caller and the figures in ' +
-      'this file need re-measuring. `apps/crafting/ComponentSourcesBar` (issue 1513) hands its ' +
-      'snippet to `SetPicker` since issue 1782, which forwards it as a prop rather than writing one.'
+      'this file need re-measuring.'
   );
+  const setPickerSnippetSites = setPickerSites.filter((site) => site.snippetSource('trigger'));
+  assert.deepEqual(
+    setPickerSnippetSites.map((site) => site.file),
+    ['src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte'],
+    'one `<SetPicker>` hands it a `trigger` snippet: the crafting sources bar, whose 40px `+` ' +
+      'well is sized to its portraits. The contents tab names the default Add by `addLabel`.'
+  );
+
+  for (const site of setPickerSnippetSites) {
+    assert.ok(
+      snippetTriggerName(site),
+      `${site.file} hands \`SetPicker\` a \`trigger\` snippet and writes no \`aria-label\` on ` +
+        'the element the forwarded attributes are spread onto, so its button has no name'
+    );
+    for (const prop of ['addLabel', 'addProps']) {
+      assert.ok(
+        !site.attribute(prop),
+        `${site.file} passes both a \`trigger\` snippet and \`${prop}\`, which belongs to the ` +
+          'default Add the snippet replaces: a label would name nothing, and the attributes ride ' +
+          'the spread onto the snippet’s button, overriding what it writes.'
+      );
+    }
+  }
 
   for (const site of snippetSites) {
     assert.ok(

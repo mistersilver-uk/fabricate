@@ -7,14 +7,17 @@ import {
   groupedOptionBuckets,
   labelSubstringFilter,
   latestSourceRequest,
+  listedOptions,
   membershipChange,
   optionListGeneration,
   pickerEmptiness,
   pickerStatus,
+  refiningSource,
   renderedOptionOrder,
   selectedOptionIds,
   sourceRows,
   spreadableTriggerAttributes,
+  stagedMembership,
 } from '../../src/ui/svelte/util/pickerOptionModel.js';
 
 // The arithmetic a picker's option list is built from, unit-tested without mounting (issue 1719).
@@ -233,6 +236,44 @@ describe('picker option model: the list arithmetic', () => {
       ]);
     });
 
+    it('drops an earlier request that rejects after a later one succeeded', async () => {
+      const answers = new Map();
+      const source = (query) =>
+        new Promise((resolve, reject) => answers.set(query, { resolve, reject }));
+      const settled = [];
+      const run = latestSourceRequest();
+      const settle = (state) => {
+        settled.push(state);
+      };
+      run(source, 'a', settle);
+      run(source, 'ab', settle);
+      await Promise.resolve();
+      answers.get('ab').resolve([{ id: 'fast', label: 'fast' }]);
+      answers.get('a').reject(new Error('stale'));
+      await new Promise((done) => setTimeout(done, 0));
+      assert.deepEqual(settled, [
+        { rows: [{ id: 'fast', label: 'fast' }], total: 1, pending: false, failed: false },
+      ]);
+    });
+
+    it('retires every request still out when called with no source', async () => {
+      const answers = [];
+      const settled = [];
+      const run = latestSourceRequest();
+      const source = () =>
+        new Promise((resolve) => {
+          answers.push(resolve);
+        });
+      run(source, '', (state) => {
+        settled.push(state);
+      });
+      run();
+      await Promise.resolve();
+      answers[0]([{ id: 'late', label: 'late' }]);
+      await new Promise((done) => setTimeout(done, 0));
+      assert.deepEqual(settled, []);
+    });
+
     it('settles a rejected latest request as failed', async () => {
       const settled = [];
       latestSourceRequest()(
@@ -252,17 +293,59 @@ describe('picker option model: the list arithmetic', () => {
       assert.deepEqual(sourceRows(null).rows, []);
     });
 
-    it('puts the error before the wait', () => {
+    it('puts the error before the wait, and replaces the list with a wait only while it is empty', () => {
       const texts = { errorText: 'Failed', loadingText: 'Loading' };
-      assert.deepEqual(pickerStatus({ error: true, busy: true, ...texts }), {
+      assert.deepEqual(pickerStatus({ failed: true, pending: true, rowCount: 3, ...texts }), {
         kind: 'error',
         text: 'Failed',
+        replacesList: true,
       });
-      assert.deepEqual(pickerStatus({ error: false, busy: true, ...texts }), {
+      assert.deepEqual(pickerStatus({ failed: false, pending: true, rowCount: 0, ...texts }), {
         kind: 'loading',
         text: 'Loading',
+        replacesList: true,
       });
-      assert.equal(pickerStatus({ error: false, busy: false, ...texts }), null);
+      assert.deepEqual(pickerStatus({ failed: false, pending: true, rowCount: 2, ...texts }), {
+        kind: 'refining',
+        text: '',
+        replacesList: false,
+      });
+      assert.equal(pickerStatus({ failed: false, pending: false, rowCount: 0, ...texts }), null);
+    });
+
+    it('keeps the settled rows and total while a refinement is out', () => {
+      const rows = [{ id: 'a', label: 'a' }];
+      const settled = { rows, total: 9, pending: false, failed: true };
+      assert.deepEqual(refiningSource(settled), {
+        rows,
+        total: 9,
+        pending: true,
+        failed: false,
+      });
+    });
+
+    it('lists no row at all while a status replaces the list', () => {
+      const base = {
+        options: [
+          { id: 'a', label: 'a' },
+          { id: 'b', label: 'b' },
+        ],
+        filterOptions: labelSubstringFilter,
+        query: '',
+        errorText: 'Failed',
+        loadingText: 'Loading',
+      };
+      const errored = listedOptions({ ...base, error: 'Down' });
+      assert.deepEqual(errored.rows, []);
+      assert.equal(errored.status.text, 'Down');
+      const busy = listedOptions({ ...base, loading: true });
+      assert.equal(busy.rows.length, 2, 'a wait over listed rows keeps them');
+      assert.equal(busy.status.kind, 'refining');
+      const remote = { rows: [], total: 0, pending: false, failed: false };
+      const sourced = listedOptions({ ...base, source: () => [], remote });
+      assert.deepEqual(sourced.rows, [], 'an empty answer never falls back to `options`');
+      assert.equal(sourced.status, null);
+      assert.equal(listedOptions(base).total, 2);
     });
 
     it('spreads no undefined value and no disabled pair onto a trigger snippet', () => {
@@ -280,6 +363,13 @@ describe('picker option model: the list arithmetic', () => {
     it('states what a membership move adds and removes', () => {
       assert.deepEqual(membershipChange(['a', 'b'], ['b', 'c']), { added: ['c'], removed: ['a'] });
       assert.deepEqual(membershipChange(['a'], ['a']), { added: [], removed: [] });
+    });
+
+    it('lays a staged change over the live membership', () => {
+      const change = { added: ['c'], removed: ['a'] };
+      assert.deepEqual(stagedMembership(['a', 'b'], change), ['b', 'c']);
+      assert.deepEqual(stagedMembership(['a', 'b', 'd'], change), ['b', 'd', 'c']);
+      assert.deepEqual(stagedMembership(['b', 'c'], change), ['b', 'c'], 'an add already made');
     });
   });
 });

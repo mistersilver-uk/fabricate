@@ -763,6 +763,7 @@ A stage group (`StageBars`) takes exactly one naming route, `ariaLabel` or `aria
 The one bar of a one-stage group takes the group's own name, because "Stage 1 of 1" states a position there is nothing to choose between.
 A rule's sentence (`RuleSentence`) is assembled from keys and never handed a string: a fragment mid-sentence takes its own key for its casing rather than a lowered string, so a tier a GM named keeps its capital, and a rule with a missing clause, an unknown key or an unfilled placeholder reads as its `missingClauseKey` sentence rather than as half a rule.
 A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel`, for its token group and its panel alike, and its overflow count is a button named "and N more" by a key rather than by its `+N` glyph.
+A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
@@ -1137,6 +1138,7 @@ The picker panel scrolls internally at a fixed maximum height and states how man
 Every selection MUST be reversible before it is committed.
 The panel stages changes and applies them on an explicit action, and a Clear action is reachable at all times.
 Escape, an outside press and the trigger itself close the panel and DISCARD what it staged, and Apply writes only the members it adds and the members it removes.
+While the panel holds staged choices its footer states what Apply will add and remove rather than the size of the set, so a GM can see that a dismissal would discard something.
 
 Where the control edits several entries at once, the panel STAYS OPEN across choices and announces a multi-selectable list.
 

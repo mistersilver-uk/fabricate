@@ -1749,7 +1749,7 @@ a{color:var(--fab-accent)}
             <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
               <span class="k-token" style="height:22px;padding:0 9px;border-radius:999px;font-size:10px;font-weight:600">#Refined</span><span class="k-token" style="height:22px;padding:0 9px;border-radius:999px;font-size:10px;font-weight:600">#Metal</span><span class="k-token" style="height:22px;padding:0 9px;border-radius:999px;font-size:10px;font-weight:600">#Smithing</span>
               <button class="k-btn" style="height:22px;min-height:22px;border-radius:999px;font-size:10px" aria-label="and 4 more">+4 more</button>
-              <button class="k-btn dashed" style="height:26px;min-height:26px"><svg class="i"><use href="#i-plus"/></svg>Add</button>
+              <button class="k-btn dashed" style="height:34px;min-height:34px;border-radius:9px;font-size:11px;font-weight:600"><svg class="i"><use href="#i-plus"/></svg>Add</button>
             </div>
           </div>
           <span class="k-hint">Three tokens, then a count. The control shows a <b>bounded</b> number inline and never grows with the set &mdash; a record in forty books must not push its own editor off the screen. The count is a button named &ldquo;and 4 more&rdquo; that opens the same panel as Add.</span>
@@ -1768,11 +1768,11 @@ a{color:var(--fab-accent)}
           </div>
           <div style="display:flex;align-items:center;gap:8px;padding-top:4px;border-top:1px solid var(--fab-border)">
             <span class="k-hint grow">2 selected</span>
-            <button class="k-btn ghost">Clear</button>
+            <button class="k-btn ghost">Clear all</button>
             <button class="k-btn primary">Apply</button>
           </div>
         </div>
-        <span class="k-hint">The list scrolls inside the panel; the count says how much the query matched, so a GM knows when to keep typing rather than keep scrolling. A staged member carries the accent ground and a trailing check; Apply stays disabled until the staged set differs from the committed one.</span>
+        <span class="k-hint">The list scrolls inside the panel; the count says how much the query matched, so a GM knows when to keep typing rather than keep scrolling. A staged member carries the accent ground and a trailing check; while the staged set differs from the committed one the footer says what Apply will add and remove (&ldquo;1 to add &middot; 1 to remove&rdquo;) and Apply is enabled.</span>
       </div>
     </div>
     <div class="notes">
@@ -1792,6 +1792,7 @@ a{color:var(--fab-accent)}
         <li><b>maxTokens</b> number = 3 &mdash; tokens before the overflow count</li>
         <li><b>label</b> | <b>ariaLabel</b> &mdash; exactly one; names the token group and the panel</li>
         <li><b>searchLabel</b> &middot; <b>emptyLabel</b> &middot; <b>loading</b> &middot; <b>error</b></li>
+        <li><b>addLabel</b> = &ldquo;Add&rdquo; &middot; <b>addProps</b> {} &mdash; the dashed Add&rsquo;s name, and hooks stamped on that button</li>
         <li><b>trigger</b> snippet &mdash; replaces the dashed Add &middot; <b>class</b> &middot; rest</li>
       </ul></div>
     </div>
