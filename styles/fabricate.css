@@ -9202,7 +9202,7 @@
   font-size: 0.75rem;
 }
 
-/* ONE TINT PER KIND, ON EVERY GLYPH THE ROW DRAWS FOR ITS SUBJECT (`proto:4624`-`4627`), and on the kind menu's glyphs through each item's `tone`. */
+/* One tint per kind, on every glyph the row draws for its subject (`proto:4624`-`4627`), and on the kind menu's glyphs through each item's `tone`. */
 .fabricate-manager .manager-recipe-option-lead.is-component,
 .fabricate-manager .manager-recipe-option-mark.is-component,
 .fabricate-action-menu-panel button.manager-action-menu-item.is-component > i {
@@ -17558,8 +17558,9 @@
   gap: 0;
 }
 
-/* `proto:4683`: `gap:8px; padding:7px 8px; border-radius:6px; font:600 11px var(--sans); color:var(--text2)`, the glyph in a 14px column so the four labels share one left edge. */
+/* `proto:4683`: a 28px entry, `font:600 11px` in secondary ink on a 6px corner, the glyph in a 14px column so the four labels share one left edge. */
 .fabricate-action-menu-panel.manager-recipe-or-menu button.manager-action-menu-item {
+  min-height: 28px;
   grid-template-columns: 14px minmax(0, 1fr);
   column-gap: var(--fab-space-2);
   padding: var(--fab-space-chip) var(--fab-space-2);
