@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import { interpolate } from '../src/ui/svelte/apps/manager/checks/checksCopy.js';
 import {
+  TIER_LIST_JOIN,
   summariseCondition,
   summariseEffect,
   summariseRule,
@@ -219,7 +220,16 @@ test('the rule sentence names its frame, its join and one clause key per effect 
     },
   });
   assert.deepEqual(rule.params[`${namespace}SummaryStepTarget`], { tier: 'Ruined' });
-  assert.match(lookup(rule.frameKey), /\{clauses\}/u, 'the frame takes the joined clauses');
+  assert.match(lookup(rule.frameKey), /\{effect\}/u, 'the frame takes the joined clauses as its effect');
+});
+
+test('the tier list joins on a translator key, so a locale chooses its own separator', () => {
+  assert.equal(lookup(TIER_LIST_JOIN.key), TIER_LIST_JOIN.fallback, `${TIER_LIST_JOIN.key} is in lang/en.json`);
+  const condition = { type: 'outcomeTier', tierIds: ['tier-a', 'tier-b'] };
+  assert.equal(
+    render(summariseCondition(condition, { tierNames: TIER_NAMES, tierJoin: ' / ' })),
+    'Outcome tier is Masterwork / Ruined'
+  );
 });
 
 test('an unset step target is a translated fragment, not English pinned in the summary', () => {

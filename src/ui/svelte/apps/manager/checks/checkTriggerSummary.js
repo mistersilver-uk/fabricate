@@ -38,6 +38,9 @@ function copy(entry, inSentence = false) {
     : { key: `${NAMESPACE}${entry[0]}`, fallback: entry[1] };
 }
 
+/** The join between the tier names an outcome-tier condition lists, resolved by the caller. */
+export const TIER_LIST_JOIN = Object.freeze(copy(['SummaryTierListJoin', ', ']));
+
 /**
  * The comparison word for an operator, defaulting to `exactly` rather than the raw symbol: a
  * summary reading "Roll total is >= 15" is the control restated, not a sentence.
@@ -62,11 +65,13 @@ export function aggregateWord(aggregate, inSentence = false) {
  *   roll formula, so a `diceGroup` condition names the die rather than an index a GM never sees.
  * @param {Record<string, string>} [context.tierNames] Outcome tier names by id.
  * @param {boolean} [context.counting] Whether the check counts successes, so its total is the net.
+ * @param {string} [context.tierJoin] `TIER_LIST_JOIN` translated, joining the tiers listed.
  * @param {boolean} [context.inSentence] Whether the fragment sits mid-sentence, keyed accordingly.
  * @returns {{key: string, fallback: string, data: object}}
  */
 export function summariseCondition(condition = {}, context = {}) {
   const { diceGroups = [], tierNames = {}, counting = false, inSentence = false } = context;
+  const tierJoin = context.tierJoin ?? TIER_LIST_JOIN.fallback;
   const type = condition?.type ?? 'rollTotal';
   const comparison = operatorWord(condition?.operator);
   const value = String(condition?.value ?? 0);
@@ -110,7 +115,7 @@ export function summariseCondition(condition = {}, context = {}) {
         }
       : {
           ...phrase(['SummaryOutcomeTier', 'Outcome tier is {tiers}', 'outcome tier is {tiers}']),
-          data: { tiers: named.join(', ') },
+          data: { tiers: named.join(tierJoin) },
         };
   }
   if (counting) {

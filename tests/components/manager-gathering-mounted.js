@@ -2707,18 +2707,39 @@ export function registerGatheringCases() {
         .querySelector('input')
         .dispatchEvent(new globalThis.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
       await settleSaveAttempt();
-      rows()
-        .find((row) => row.textContent.includes('First Light'))
-        .querySelector('[data-rule-row-remove]')
-        .click();
+      picker().querySelector('select').value = 'day';
+      picker().querySelector('select').dispatchEvent(new Event('change', { bubbles: true }));
       await settleSaveAttempt();
+      picker().querySelector('button').click();
+      await settleSaveAttempt();
+      const row = (name) => rows().find((entry) => entry.textContent.includes(name));
+      setInputValue(row('High Day').querySelector('input'), '-3');
+      await settleSaveAttempt();
+      const focused = (node) => node.ownerDocument.activeElement === node;
+      const removeRow = async (name) => {
+        const remove = row(name).querySelector('[data-rule-row-remove]');
+        assert.equal(remove.getAttribute('aria-label'), 'Delete modifier', 'the remove names itself');
+        remove.focus();
+        remove.click();
+        await settleSaveAttempt();
+      };
+      await removeRow('First Light');
+      assert.ok(focused(row('Deep Night').querySelector('input')), 'focus moves to the next modifier');
 
       const saved = await saveSubject(subject, calls);
       assert.deepEqual(
-        saved.conditionModifiers.timeOfDay.map((row) => [row.conditionId, row.operator, row.value]),
-        [['night', '+', 6]],
-        'the typed and stepped value survives on the one modifier left'
+        saved.conditionModifiers.timeOfDay.map((entry) => [entry.conditionId, entry.operator, entry.value]),
+        [
+          ['night', '+', 6],
+          ['day', '-', 3],
+        ],
+        'the typed and stepped value survives, and a typed sign is kept'
       );
+
+      await removeRow('High Day');
+      assert.ok(focused(row('Deep Night').querySelector('input')), 'the last falls back to the previous');
+      await removeRow('Deep Night');
+      assert.ok(focused(picker().querySelector('select')), 'the only one hands focus to the picker');
     });
 
     it(`edits the ${subject}'s Modifier Library reference through the shell's writers`, async () => {

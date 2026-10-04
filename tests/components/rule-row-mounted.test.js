@@ -38,7 +38,7 @@ const harnesses = [sentenceHarness, rowHarness];
 
 /** A translator's table: the mid-sentence key is lower case and the proper noun is not. */
 const KEYS = {
-  'T.Frame': 'When {condition}, {clauses}.',
+  'T.Frame': 'When {condition}, {effect}.',
   'T.Join': ', then ',
   'T.Condition': 'Roll total is {comparison} {value}',
   'T.ConditionInSentence': 'roll total is {comparison} {value}',
@@ -48,6 +48,9 @@ const KEYS = {
   'T.Ruined': 'Ruined',
   'FABRICATE.Common.RuleSentence.Missing': 'This rule is not finished.',
   'T.Unfinished': 'This trigger is not finished.',
+  'FABRICATE.Common.RuleRow.Remove': 'Remove this rule',
+  'FABRICATE.Common.RuleRow.Expand': 'Show this rule',
+  'FABRICATE.Common.RuleRow.Collapse': 'Hide this rule',
 };
 
 const SENTENCE = {
@@ -108,6 +111,10 @@ describe('RuleSentence (mounted)', () => {
           ...SENTENCE,
           params: { ...SENTENCE.params, 'T.Becomes': { tier: { key: 'T.Gone' } } },
         },
+      ],
+      [
+        'a placeholder filled with nothing',
+        { ...SENTENCE, params: { ...SENTENCE.params, 'T.Becomes': { tier: '' } } },
       ],
       ['no sentence', null],
     ];
@@ -186,18 +193,25 @@ describe('RuleRow (mounted)', () => {
         onChange() {},
       });
       const disclosure = root.querySelector('[data-rule-row-disclosure]');
+      const phrase = () => disclosure.querySelector('.visually-hidden').textContent;
       assert.equal(disclosure.getAttribute('aria-expanded'), 'false');
+      assert.ok(!disclosure.hasAttribute('aria-controls'), 'no IDREF names an unmounted body');
+      assert.equal(phrase(), 'Show rule', 'a closed head offers to show');
       disclosure.click();
       flushSync();
       const body = root.querySelector('[data-rule-row-body]');
       assert.ok(Boolean(body), 'the body opens');
       assert.equal(disclosure.getAttribute('aria-controls'), body.id, 'the head controls the body');
+      assert.equal(phrase(), 'Hide rule', 'an open head offers to hide');
       assert.equal(body.querySelector('.fabricate-rule-row-legend').textContent, 'Condition');
       assert.equal(body.querySelector('[data-test-amount]').value, '5', 'the step draws the rule');
       assert.equal(body.querySelector('[data-rule-row-quote]').textContent.trim(), STATED);
       assert.equal(scrolled.length, 1, 'opening asked for exactly one scroll');
       assert.ok(scrolled[0].node.classList.contains('fabricate-rule-row'), 'of the row itself');
       assert.deepEqual(scrolled[0].options, { block: 'nearest' });
+      disclosure.click();
+      flushSync();
+      assert.ok(!disclosure.hasAttribute('aria-controls'), 'closing withdraws the IDREF');
     } finally {
       globalThis.Element.prototype.scrollIntoView = original;
     }
@@ -223,6 +237,44 @@ describe('RuleRow (mounted)', () => {
       'Roll total is at most 9',
       'the bound value is the rule the head restates'
     );
+  });
+
+  it('draws the rule its caller echoes back, so a normalising caller has the last word', async () => {
+    const root = await rowHarness.mount({
+      schema: SCHEMA,
+      value: RULE,
+      collapsible: { open: true, onToggle() {} },
+      onChange: (next) => {
+        rowHarness.setProps({ value: { ...next, amount: Math.min(next.amount, 20) } });
+      },
+    });
+    const input = root.querySelector('[data-test-amount]');
+    input.value = '99';
+    input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await rowHarness.setProps({});
+    assert.equal(
+      root.querySelector('[data-rule-row-title]').textContent,
+      'Roll total is at most 20',
+      'the clamped echo, not the typed 99'
+    );
+  });
+
+  it('names its controls from its own keys when the caller supplies no labels', async () => {
+    const root = await rowHarness.mount({
+      schema: { ...SCHEMA, labels: undefined },
+      value: RULE,
+      collapsible: true,
+      onChange() {},
+    });
+    const disclosure = root.querySelector('[data-rule-row-disclosure]');
+    assert.equal(
+      root.querySelector('[data-rule-row-remove]').getAttribute('aria-label'),
+      'Remove this rule'
+    );
+    assert.equal(disclosure.querySelector('.visually-hidden').textContent, 'Show this rule');
+    disclosure.click();
+    flushSync();
+    assert.equal(disclosure.querySelector('.visually-hidden').textContent, 'Hide this rule');
   });
 
   it('asks its caller to remove it with null', async () => {

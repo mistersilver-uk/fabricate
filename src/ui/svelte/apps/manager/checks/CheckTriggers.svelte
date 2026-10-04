@@ -26,7 +26,12 @@
     countPoolDiceGroup,
     triggerDiceGroups,
   } from './checkTriggerPresets.js';
-  import { summariseCondition, summariseHeadline, summariseRule } from './checkTriggerSummary.js';
+  import {
+    TIER_LIST_JOIN,
+    summariseCondition,
+    summariseHeadline,
+    summariseRule,
+  } from './checkTriggerSummary.js';
   import {
     CONDITION_OPERATORS,
     DICE_AGGREGATES,
@@ -189,6 +194,7 @@
   // being taller than the pane — which is why authoring a preset looked inert. So a new
   // trigger OPENS, and an opened `RuleRow` scrolls itself to the nearest view.
   let expandedId = $state(null);
+  let route = $state(null);
 
   function toggleExpanded(id) {
     expandedId = expandedId === id ? null : id;
@@ -235,9 +241,12 @@
     emit(triggers.map((trigger) => (trigger.id === id ? next : trigger)));
   }
 
+  // The last trigger gone, focus lands on the control that grows the list again.
   function removeTrigger(id) {
     if (expandedId === id) expandedId = null;
+    const last = triggers.length === 1;
     emit(triggers.filter((trigger) => trigger.id !== id));
+    if (last) route?.querySelector('[data-add-trigger]')?.focus();
   }
 
   function withCondition(trigger, patch) {
@@ -293,12 +302,18 @@
 
   // What each trigger says about itself, composed by the pure `checkTriggerSummary` module;
   // this is only the localization bridge, hence the `{ key, fallback }` fragments.
+  const unnamedTier = $derived(
+    localizeOr('FABRICATE.Admin.Manager.Checks.Breakage.UnnamedTier', 'Unnamed tier')
+  );
   const tierNames = $derived(
-    Object.fromEntries((outcomeOptions ?? []).map((option) => [option.id, option.name || '']))
+    Object.fromEntries(
+      (outcomeOptions ?? []).map((option) => [option.id, option.name || unnamedTier])
+    )
   );
   const summaryContext = $derived({
     diceGroups,
     tierNames,
+    tierJoin: localizeOr(TIER_LIST_JOIN.key, TIER_LIST_JOIN.fallback),
     counting,
     progressive: kind === 'progressive',
     showBreakTools,
@@ -445,8 +460,7 @@
               aria-pressed={isOutcomeSelected(condition, option.id)}
               onclick={() => change(withOutcomeTierToggled(trigger, option.id))}
             >
-              {option.name ||
-                localizeOr('FABRICATE.Admin.Manager.Checks.Breakage.UnnamedTier', 'Unnamed tier')}
+              {option.name || unnamedTier}
             </button>
           {/each}
         {/if}
@@ -556,10 +570,7 @@
           options={tierStepTargetOptions({
             outcomeOptions,
             danglingTierId: dangling ? step.tierId : null,
-            unnamedLabel: localizeOr(
-              'FABRICATE.Admin.Manager.Checks.Breakage.UnnamedTier',
-              'Unnamed tier'
-            ),
+            unnamedLabel: unnamedTier,
             missingLabel: localizeOr(
               'FABRICATE.Admin.Manager.Checks.Breakage.TierStepMissingTier',
               'Missing tier'
@@ -676,6 +687,7 @@
   data-validation-target="checks-triggers"
   tabindex="-1"
   data-keyboard-focus="true"
+  bind:this={route}
 >
   {#if triggers.length === 0}
     <p class="manager-muted" data-triggers-empty>
@@ -697,7 +709,8 @@
             open: expandedId === trigger.id,
             onToggle: () => toggleExpanded(trigger.id),
           }}
-          onChange={(next) => (next ? replaceTrigger(trigger.id, next) : removeTrigger(trigger.id))}
+          onChange={(next) =>
+            next === null ? removeTrigger(trigger.id) : replaceTrigger(trigger.id, next)}
         />
       {/each}
     </div>

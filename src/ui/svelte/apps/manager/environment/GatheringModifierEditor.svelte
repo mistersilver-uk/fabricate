@@ -15,6 +15,7 @@
   - every hook name follows `subject` — `manager-environments-mounted.js`.
 -->
 <script>
+  import { tick } from 'svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import Field from '../../../components/Field.svelte';
   import RuleRow from '../../../components/RuleRow.svelte';
@@ -134,6 +135,16 @@
     };
   }
 
+  // Each kind's picker, where focus lands once its last modifier is removed.
+  let pickers = $state({});
+
+  async function deleteConditionModifier(kind, id, last) {
+    onDeleteConditionModifier(kind, id);
+    if (!last) return;
+    await tick();
+    pickers[kind]?.querySelector('select')?.focus();
+  }
+
   /** One hook attribute, spread so its name follows the subject rather than the call site. */
   function hook(name, value = '') {
     const names = HOOK_NAMES[subject] ?? HOOK_NAMES.drop;
@@ -181,7 +192,11 @@
         <p class="manager-muted">{cardHint}</p>
       </div>
     </header>
-    <div class="manager-condition-modifier-add-row" {...hook('conditionModifierPicker', kind)}>
+    <div
+      class="manager-condition-modifier-add-row"
+      {...hook('conditionModifierPicker', kind)}
+      bind:this={pickers[kind]}
+    >
       <label class="fabricate-field manager-condition-modifier-picker">
         <span class="visually-hidden"
           >{localizeOr(
@@ -238,12 +253,12 @@
           {schema}
           value={modifier}
           onChange={(next) =>
-            next
-              ? onUpdateConditionModifier(kind, modifier.id, {
+            next === null
+              ? deleteConditionModifier(kind, modifier.id, attachedModifiers.length === 1)
+              : onUpdateConditionModifier(kind, modifier.id, {
                   operator: next.operator,
                   value: next.value,
-                })
-              : onDeleteConditionModifier(kind, modifier.id)}
+                })}
         />
       {:else}
         <!-- Drop-only, derived from the discriminator: the event copy never carried one. -->

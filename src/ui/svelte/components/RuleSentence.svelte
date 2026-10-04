@@ -1,13 +1,13 @@
 <!--
   A rule restated as one sentence, assembled from localized keys: a translator-owned frame whose
-  `{clauses}` are the rule's clauses joined by a translator-owned join. It is never handed a
+  `{effect}` is the rule's clauses joined by a translator-owned join. It is never handed a
   string and never re-cases one, because casing is the key a fragment names.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `sentence` | `{ frameKey, clauseKeys, joinKey, params }` | `null` | `params` is keyed by the frame or a clause key, and each param is a literal or a nested `{ key, params }` fragment resolved the same way. |
-  | `missingClauseKey` | localization key | `'FABRICATE.Common.RuleSentence.Missing'` | Drawn instead of the sentence when it has no clause, names an unknown key or leaves a placeholder unfilled. |
+  | `missingClauseKey` | localization key | `'FABRICATE.Common.RuleSentence.Missing'` | Drawn instead of the sentence when it has no clause, names an unknown key or leaves a placeholder unfilled or blank. |
 
   Rest spread:
   - `{...rest}` lands on the `<span>` root, written after `class={…}`.
@@ -28,6 +28,8 @@
   } = $props();
 
   const isFragment = (param) => Boolean(param) && typeof param === 'object' && 'key' in param;
+  const isBlank = (value) =>
+    value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
 
   /** One key filled from its params, or null when the key or any placeholder is unresolved. */
   function resolve(key, params = {}) {
@@ -36,7 +38,7 @@
     const values = {};
     for (const [name, param] of Object.entries(params ?? {})) {
       const value = isFragment(param) ? resolve(param.key, param.params) : param;
-      if (value === null || value === undefined) return null;
+      if (isBlank(value)) return null;
       values[name] = value;
     }
     const names = [...template.matchAll(/\{(\w+)\}/g)].map((match) => match[1]);
@@ -51,7 +53,7 @@
     if (clauses.includes(null)) return null;
     const join = clauses.length > 1 ? resolve(rule.joinKey) : '';
     if (join === null) return null;
-    return resolve(rule.frameKey, { ...params[rule.frameKey], clauses: clauses.join(join) });
+    return resolve(rule.frameKey, { ...params[rule.frameKey], effect: clauses.join(join) });
   }
 
   const stated = $derived(compose(sentence));

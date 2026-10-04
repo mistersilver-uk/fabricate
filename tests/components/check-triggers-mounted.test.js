@@ -337,6 +337,56 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     // The outcomeTier pills still render so the trigger can break tools on a tier.
     assert.ok(root.querySelector('[data-trigger-tier="tier-a"]'), 'the tier pill renders');
   });
+
+  it('CLICKING a tier pill toggles that tier in and out of the condition', async () => {
+    const emitted = [];
+    const condition = { type: 'outcomeTier', tierIds: ['tier-a'], outcomeKeys: [] };
+    const root = await harness.mount({
+      value: triggerBlock([routedTrigger({ mode: 'none', steps: 1, tierId: null }, { condition })]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      showBreakTools: false,
+      onChange: (next) => {
+        emitted.push(next);
+      }
+    });
+    expandTrigger(root, 'r1');
+    const pill = () => root.querySelector(':scope [data-trigger="r1"] [data-trigger-tier="tier-b"]');
+    assert.equal(pill().getAttribute('aria-pressed'), 'false');
+    pill().click();
+    assert.deepEqual(emitted.at(-1).triggers[0].condition.tierIds, ['tier-a', 'tier-b'], 'the tier joins');
+    await harness.setProps({ value: emitted.at(-1) });
+    assert.equal(pill().getAttribute('aria-pressed'), 'true', 'and reads as chosen');
+    assert.equal(
+      root.querySelector(':scope [data-trigger="r1"] [data-rule-row-title]').textContent.trim(),
+      'Outcome tier is Ruined, Masterwork'
+    );
+    pill().click();
+    assert.deepEqual(emitted.at(-1).triggers[0].condition.tierIds, ['tier-a'], 'and leaves again');
+  });
+
+  it('names a tier the GM left unnamed by its key, never by a blank', async () => {
+    const root = await harness.mount({
+      value: triggerBlock([
+        routedTrigger(
+          { mode: 'target', steps: 1, tierId: 'tier-x' },
+          { condition: { type: 'outcomeTier', tierIds: ['tier-x'], outcomeKeys: [] } }
+        )
+      ]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: [{ id: 'tier-x', name: '' }],
+      showBreakTools: false
+    });
+    const card = root.querySelector('[data-trigger="r1"]');
+    assert.equal(card.querySelector('[data-rule-row-title]').textContent.trim(), 'Outcome tier is Unnamed tier');
+    assert.equal(
+      card.querySelector('.fabricate-rule-row-lead').textContent.trim(),
+      'When outcome tier is Unnamed tier, the result becomes Unnamed tier.',
+      'the sentence is whole rather than ending on a blank'
+    );
+  });
 });
 
 describe('CheckTriggers (mounted): tier-step effect', () => {
@@ -736,9 +786,39 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
         { block: 'nearest' },
         'nearest, so an already-visible card does not move the pane'
       );
+      const field = root.querySelector(`:scope [data-trigger="${added.id}"] [data-trigger-value]`);
+      field.value = '7';
+      field.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+      await harness.setProps({ value: emitted.at(-1) });
+      assert.equal(scrolled.length, 1, 'an edit inside the open trigger does not pull the pane back');
     } finally {
       globalThis.Element.prototype.scrollIntoView = original;
     }
+  });
+
+  it('REMOVING a trigger hands focus to the next, else the previous, else the add control', async () => {
+    const emitted = [];
+    const third = { ...stepUp, id: 'x1' };
+    const root = await mountPair({
+      value: triggerBlock([stepUp, stepDown, third]),
+      onChange: (next) => {
+        emitted.push(next);
+      }
+    });
+    const focused = (selector) => root.ownerDocument.activeElement === root.querySelector(selector);
+    const remove = async (id) => {
+      const button = root.querySelector(`:scope [data-trigger="${id}"] [data-rule-row-remove]`);
+      assert.equal(button.getAttribute('aria-label'), 'Remove trigger', 'the remove names itself');
+      button.focus();
+      button.click();
+      await harness.setProps({ value: emitted.at(-1) });
+    };
+    await remove('d1');
+    assert.ok(focused(':scope [data-trigger="x1"] [data-rule-row-disclosure]'), 'the next trigger takes focus');
+    await remove('x1');
+    assert.ok(focused(':scope [data-trigger="u1"] [data-rule-row-disclosure]'), 'the last falls back to the previous');
+    await remove('u1');
+    assert.ok(focused('[data-add-trigger]'), 'the only one hands focus to the add control');
   });
 
   it('reads the comparison in words, not in operator symbols', async () => {
@@ -917,8 +997,8 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
       outcomeOptions: ROUTED_TIERS,
       showBreakTools: false
     });
-    const buttons = [...root.querySelectorAll('[data-rule-row-preset]')];
-    assert.equal(buttons.length, 2, 'both presets render');
+    const buttons = [...root.querySelectorAll(':scope [data-check-trigger-presets] [data-rule-row-preset]')];
+    assert.equal(buttons.length, 2, 'both presets render, inside the presets card');
     assert.equal(buttons[0].tagName, 'BUTTON', 'the preset is a real button');
     assert.equal(buttons[0].disabled, false, 'and it is not disabled');
   });
