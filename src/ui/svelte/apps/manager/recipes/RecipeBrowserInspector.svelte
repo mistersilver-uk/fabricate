@@ -744,7 +744,7 @@
         <li>
           {text(
             'FABRICATE.Admin.Manager.Recipe.EmptySetup.StepResults',
-            'Define result groups and enable the recipe when it is ready for players.'
+            'Define result sets and enable the recipe when it is ready for players.'
           )}
         </li>
       </ol>

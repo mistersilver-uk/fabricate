@@ -319,6 +319,7 @@ That separation is what makes the bucket policy safe — denying the derivable s
 
 **Tester path secret (rotation freezes a cohort, not a lockout).**
 The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, where `<segment>` comes from a per-group repository **secret** (`S3_TESTER_PATH_SECRET` for beta, and `S3_APPRENTICE_PATH_SECRET` and `S3_GUILD_ARTISAN_PATH_SECRET` for the two early-access groups, referred to abstractly here — never paste the value) — never the committed config.
+A segment written by the local rotation utility (see [Release Utilities](../../CONTRIBUTING.md#release-utilities)) starts with a label, `<label>-<32 hex characters>` (by default the UTC month, for example `oct2026-…`), so the month a feed was rotated for reads straight off its URL; the publisher takes the value verbatim either way.
 Generate each once and set it before publishing; the publish **refuses to run**, before building, when any tester group a channel declares has its secret unset, so the feed can never fall back to a guessable URL.
 Treat rotation as a **cohort migration, not hygiene**: it starts a new segment for future publishes, and the superseded segment keeps serving its last pre-rotation manifest, because the publisher only ever writes the current segment and nothing in the release path deletes, prunes, or expires an old one.
 No update is ever offered to that superseded cohort and no error is surfaced — it silently stops receiving updates rather than failing.

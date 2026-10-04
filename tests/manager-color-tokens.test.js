@@ -13,6 +13,8 @@ import {
   MANAGER_COLOR_TOKEN_KEY_PREFIX,
   managerColorTokenLabel,
   normalizeManagerColorToken,
+  tintSwatchStyle,
+  validCustomHex,
 } from '../src/ui/svelte/util/managerColorTokens.js';
 import { ESSENCE_COLOR_TOKENS } from '../src/ui/svelte/util/essenceIcons.js';
 
@@ -93,4 +95,20 @@ test('1036: the module is import-free, so it can be added to a mount harness alo
     false,
     'managerColorTokens.js must stay dependency-free'
   );
+});
+
+test('1521: a custom hex is admitted only as six hex digits, trimmed and uppercased', () => {
+  assert.equal(validCustomHex(' #a1b2c3 '), '#A1B2C3');
+  for (const rejected of ['#abc', 'a1b2c3', '#a1b2c3d', '#ggggggg', '', null, undefined]) {
+    assert.equal(validCustomHex(rejected), '', `${rejected} is not a custom colour`);
+  }
+});
+
+test('1521: the swatch paints a valid custom hex, else the normalized preset token', () => {
+  assert.equal(tintSwatchStyle('rose', '#a1b2c3'), '--manager-color-swatch: #A1B2C3');
+  assert.equal(
+    tintSwatchStyle('--fab-tag-rose', '#abc'),
+    '--manager-color-swatch: var(--fab-tag-rose)'
+  );
+  assert.equal(tintSwatchStyle('not-a-colour', ''), '--manager-color-swatch: var(--fab-tag-sage)');
 });

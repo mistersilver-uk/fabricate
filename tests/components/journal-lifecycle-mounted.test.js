@@ -2,21 +2,18 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
+
 import { chromium } from 'playwright';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { getItemSourceReferences } from '../../src/utils/sourceUuid.js';
-import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
-import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
-import { RecipeVisibilityService } from '../../src/systems/RecipeVisibilityService.js';
+import { getCaseById, VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
 import { Recipe } from '../../src/models/Recipe.js';
-import { getCaseById, VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
-import { buildLabActors } from '../view-lab/world/labActors.js';
-import {
-  stockJournalPrototype,
-  JOURNAL_PROTOTYPE_BINDINGS,
-} from '../view-lab/world/labJournalPrototype.js';
+import { RecipeVisibilityService } from '../../src/systems/RecipeVisibilityService.js';
+import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
+import { getItemSourceReferences } from '../../src/utils/sourceUuid.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -24,18 +21,23 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
+import { buildLabActors } from '../view-lab/world/labActors.js';
 import {
   buildLabContent,
   LAB_SYSTEM_IDS,
   seedJournalNoCheckFixture,
 } from '../view-lab/world/labContent.js';
+import { LAB_HISTORY_DATA_STATES } from '../view-lab/world/labHistoryEvidence.js';
+import {
+  stockJournalPrototype,
+  JOURNAL_PROTOTYPE_BINDINGS,
+} from '../view-lab/world/labJournalPrototype.js';
 import {
   LAB_JOURNAL_CASE_STATE_RUN_IDS,
   LAB_RETAINED_CLAIM,
   buildLabRunStates,
   createLabJournalCaseController,
 } from '../view-lab/world/labRunStates.js';
-import { LAB_HISTORY_DATA_STATES } from '../view-lab/world/labHistoryEvidence.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const english = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
@@ -46,6 +48,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',

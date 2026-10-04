@@ -7,7 +7,7 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 // Issue 1510: all three toolbar filters are shared `<Select>`s.
 import {
   assertSelectHasResolvedName,
@@ -25,6 +25,7 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // The creation drop-zone (issue 844) resolves a drop via resolveDropData and
     // wires the drop listeners through the dragDrop action. Omitting either raw

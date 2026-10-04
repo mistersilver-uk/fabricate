@@ -87,7 +87,7 @@ The task editor lets you set:
 | Visibility gate    | Turn task visibility on or off, then set its formula and required threshold                                                                                                                                                                |
 | Time requirement   | Leave clear for immediate tasks, or enter a duration in minutes, hours, days, months, or years                                                                                                                                             |
 | Failure outcome    | Leave clear for Fabricate's default failure feedback, or set custom text or a macro                                                                                                                                                        |
-| Result groups      | Add, rename, delete, and reorder groups                                                                                                                                                                                                    |
+| Result sets        | Add, rename, delete, and reorder sets                                                                                                                                                                                                      |
 | Results            | Add, edit, delete, and reorder component results, each with a component and a quantity                                                                                                                                                     |
 | Required tools     | Reference the system's Tools library. The tools themselves (their source item or component, optional requirement, breakage mechanic, and on-break action) are authored on the system's [Tools]({% link tools.md %}) page, not on the task. |
 
@@ -103,7 +103,7 @@ A task's results have no amount when the task is resolved progressively.
 New environments start as disabled drafts.
 Library-backed automatic environments can be set up without a placeholder task.
 Once a task is enabled, saving requires complete configuration for the way it is resolved.
-For a task resolved progressively that means one result group carrying at least one result.
+For a task resolved progressively that means one result set carrying at least one result.
 
 Task images can be typed directly or chosen with Foundry's image file picker when it is available.
 Cancelling the picker leaves the current path unchanged.
@@ -132,13 +132,13 @@ Clearing visibility removes the gate only when the task already had one saved.
 Routed gathering tasks do not carry their own result-selection setting.
 They are resolved by the system's gathering check, which you configure once for the whole system.
 When a routed task is attempted, the gathering check rolls and produces a named outcome.
-That outcome name is matched to a result group by name, and the matching group is awarded.
+That outcome name is matched to a result set by name, and the matching set is awarded.
 
-A few outcome names are reserved and take the failure path instead of awarding a group.
-Because the match is by name, give each result group a name that lines up with one of your gathering check's outcomes.
-Names are matched ignoring upper and lower case and surrounding spaces, so each result group needs a name that is unique once case is ignored.
+A few outcome names are reserved and take the failure path instead of awarding a result set.
+Because the match is by name, give each result set a name that lines up with one of your gathering check's outcomes.
+Names are matched ignoring upper and lower case and surrounding spaces, so each result set needs a name that is unique once case is ignored.
 
-If the outcome is a success but matches none of your result groups, the attempt fails and no group is awarded.
+If the outcome is a success but matches none of your result sets, the attempt fails and no result set is awarded.
 A routed task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
 
 A routed task can override the gathering check's own difficulty for that task alone, with a single field and a **System default** placeholder.

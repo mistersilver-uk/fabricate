@@ -11,7 +11,8 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -21,6 +22,7 @@ const SCOPED_RAW_MODULES = [
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
   'src/ui/svelte/apps/manager/scoped/componentScoped.js',
@@ -55,10 +57,6 @@ const SHELL_MODULES = [
   'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
-  // The catalogue inspector's pinned foot action (issue 1372). A missing entry here does not
-  // FAIL the suite, it HANGS it and reports `# cancelled` — see
-  // `mounted-harness-primitive-allowlist.test.js`, which is what caught this one.
-  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   // THE manager's icon-only push-button (issue 1422). Not mounted directly by anything here:
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Medallion.svelte',
@@ -423,6 +421,14 @@ describe('the catalogue owns no create affordance; the page header does', () => 
       root.querySelector('[data-scoped-list-row]'),
       'the page rendered its list, so the absences above are measured against a real screen'
     );
+    pageHarness.remount();
+  });
+
+  it('pins Open definition as the rail’s one full-width primary (issue 1521)', async () => {
+    const root = await pageHarness.mount(pageProps());
+    assertInspectorVerbs(root.querySelector('[data-scoped-list-inspector]'), [
+      ['[data-scoped-essence-open-entry]', 'primary'],
+    ]);
     pageHarness.remount();
   });
 });

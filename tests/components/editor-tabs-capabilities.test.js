@@ -12,7 +12,10 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { flushSync, tick } from 'svelte';
 
 import { censusRules } from '../../scripts/lib/stylesheetSelectorCensus.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -22,7 +25,7 @@ const PRIMITIVE = 'src/ui/svelte/components/EditorTabs.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-editor-tabs-capabilities-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   compiledModules: ['src/ui/svelte/components/Chip.svelte', PRIMITIVE],
   componentPath: PRIMITIVE,
 });

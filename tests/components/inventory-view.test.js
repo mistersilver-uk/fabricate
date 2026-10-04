@@ -28,7 +28,10 @@ import {
   multiSystemCardRow,
   multiSystemProgressiveCardRow,
 } from '../helpers/inventoryCollapseFixtures.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
@@ -50,6 +53,7 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...CHECK_EVIDENCE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
@@ -425,9 +429,12 @@ describe('InventoryView (mounted)', () => {
     assert.match(summary.textContent, /1.*of 1/, 'and states the size of what is on screen');
     assert.ok(
       target.querySelector('[data-pagination-size]'),
-      'the per-page control is present — hiding it is what makes a chosen size unrecoverable',
+      'the per-page control is present — hiding it is what makes a chosen size unrecoverable'
     );
-    assert.ok(target.querySelector('[data-pagination-page]'), 'and the page indicator reads Page 1 of 1');
+    assert.ok(
+      target.querySelector('[data-pagination-page]'),
+      'and the page indicator reads Page 1 of 1'
+    );
   });
 
   it('shows essence and tool pips on a component card', async () => {
@@ -609,7 +616,7 @@ describe('InventoryView (mounted)', () => {
 
     assertViewErrorTreatment(target.querySelector('[data-inventory-state="error"]'), {
       view: 'inventory view',
-      message: 'FABRICATE.App.Inventory.Error'
+      message: 'FABRICATE.App.Inventory.Error',
     });
   });
 
@@ -744,11 +751,16 @@ describe('InventoryView (mounted)', () => {
     await harness.setProps({ services: onB });
     await settle();
     assert.deepEqual(
-      [...target.querySelectorAll('[data-inventory-used-by]')].map((row) => row.dataset.inventoryUsedBy),
+      [...target.querySelectorAll('[data-inventory-used-by]')].map(
+        (row) => row.dataset.inventoryUsedBy
+      ),
       ['b0', 'b1'],
       'both of B’s rows render rather than an empty second page'
     );
-    assert.ok(!target.querySelector('[data-inventory-pager="used"]'), 'and B’s list draws no pager');
+    assert.ok(
+      !target.querySelector('[data-inventory-pager="used"]'),
+      'and B’s list draws no pager'
+    );
   });
 });
 
@@ -1403,7 +1415,10 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       target.querySelector('[data-inventory-detail-tab="salvage"]'),
       'a broken tool is still salvageable'
     );
-    assert.ok(target.querySelector('[data-inventory-broken-banner]'), 'and says why it is unusable');
+    assert.ok(
+      target.querySelector('[data-inventory-broken-banner]'),
+      'and says why it is unusable'
+    );
   });
 
   it('AC1: a non-salvageable item shows NO tab bar at all', async () => {
@@ -1504,7 +1519,10 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.ok(target.querySelector('[data-inventory-salvage-body="simple-check"]'));
     const dc = target.querySelector('[data-inventory-salvage-dc]');
     assert.equal(dc.dataset.inventorySalvageDc, '14');
-    assert.ok(dc.matches('.salvage-body-title > .salvage-dc'), 'the short DC sits in the kicker row');
+    assert.ok(
+      dc.matches('.salvage-body-title > .salvage-dc'),
+      'the short DC sits in the kicker row'
+    );
     assert.ok(target.querySelector('[data-inventory-salvage-loss-note]'), 'a roll can cost you');
     assert.match(
       target.querySelector('[data-inventory-salvage-action]').textContent,
@@ -1514,7 +1532,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   });
 
   it('a roll-under salvage states its target, source and rule in place of the DC (issue 2005, R4)', async () => {
-    const rule = 'Roll to break this down. The total must stay at or under the target to recover the materials below.';
+    const rule =
+      'Roll to break this down. The total must stay at or under the target to recover the materials below.';
     const target = {
       rule,
       direction: 'under',
@@ -1530,43 +1549,68 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       'Akra @skills.craft.value 12 · difficulty −2'
     );
     assert.ok(!root.querySelector('[data-inventory-salvage-dc]'), 'no DC beside a target');
-    assert.match(root.querySelector('[data-inventory-salvage-banner]').textContent, /stay at or under the target/);
-    assert.doesNotMatch(root.querySelector('[data-inventory-salvage-banner]').textContent, /Meet the DC/);
+    assert.match(
+      root.querySelector('[data-inventory-salvage-banner]').textContent,
+      /stay at or under the target/
+    );
+    assert.doesNotMatch(
+      root.querySelector('[data-inventory-salvage-banner]').textContent,
+      /Meet the DC/
+    );
   });
 
   it('a count salvage states its successes-needed rule and line in place of the DC (issue 2006)', async () => {
     // The target `salvageCheckTarget` builds for a count check (tests/salvage-check-need.test.js).
-    const rule = 'Roll to break this down. The count must reach the successes needed to recover the materials below.';
-    const target = { rule, direction: 'over', text: 'Salvage check · 2 successes needed · d10s, success on ≥ 7' };
+    const rule =
+      'Roll to break this down. The count must reach the successes needed to recover the materials below.';
+    const target = {
+      rule,
+      direction: 'over',
+      text: 'Salvage check · 2 successes needed · d10s, success on ≥ 7',
+    };
     const { services } = salvageServices(salvageItem({ checkUsable: true, dc: null, target }));
     const root = await openSalvage(services);
     const line = root.querySelector('[data-inventory-salvage-target="over"]');
     assert.equal(line.textContent.trim(), target.text);
     assert.ok(line.matches('p.salvage-target-source'), 'the count line sits on its own line');
     assert.ok(!line.closest('.salvage-body-title'), 'never in the kicker row built for "DC 15"');
-    assert.ok(!root.querySelector('[data-inventory-salvage-dc]'), 'no DC beside the successes needed');
+    assert.ok(
+      !root.querySelector('[data-inventory-salvage-dc]'),
+      'no DC beside the successes needed'
+    );
     const banner = root.querySelector('[data-inventory-salvage-banner]').textContent;
     assert.match(banner, /The count must reach the successes needed/);
     assert.doesNotMatch(banner, /Meet the DC/);
   });
 
   it('a relative routed roll-under salvage states its base target in place of the DC', async () => {
-    const target = { rule: 'unused', direction: 'under', text: 'Target 50 · stay at or under', source: '' };
+    const target = {
+      rule: 'unused',
+      direction: 'under',
+      text: 'Target 50 · stay at or under',
+      source: '',
+    };
     const { services } = salvageServices(
       salvageItem({ mode: 'routed', checkUsable: true, routedType: 'relative', dc: null, target })
     );
     const root = await openSalvage(services);
     assert.equal(
-      root.querySelector('[data-inventory-salvage-body="routed"] [data-inventory-salvage-target="under"]')
+      root
+        .querySelector(
+          '[data-inventory-salvage-body="routed"] [data-inventory-salvage-target="under"]'
+        )
         .textContent.trim(),
       'Target 50 · stay at or under'
     );
     assert.ok(!root.querySelector('[data-inventory-salvage-dc]'));
-    assert.doesNotMatch(root.querySelector('[data-inventory-salvage-banner]').textContent, /unused/);
+    assert.doesNotMatch(
+      root.querySelector('[data-inventory-salvage-banner]').textContent,
+      /unused/
+    );
   });
 
   // AC2, rendering half: the builder decides the numbers, the panel renders `outcome.band`.
-  it('routed + fixed renders the presenter\'s band and NO DC; routed + relative renders thresholds', async () => {
+  it("routed + fixed renders the presenter's band and NO DC; routed + relative renders thresholds", async () => {
     const fixed = salvageServices(
       salvageItem({
         mode: 'routed',
@@ -1613,14 +1657,22 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       target.querySelector('[data-inventory-salvage-body="routed"]').dataset.inventoryRoutedType,
       'fixed'
     );
-    assert.equal(target.querySelector('[data-inventory-salvage-dc]'), null, 'a fixed check has no DC');
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-dc]'),
+      null,
+      'a fixed check has no DC'
+    );
     const bands = [...target.querySelectorAll('[data-inventory-outcome-band]')];
     assert.deepEqual(
       bands.map((node) => node.dataset.inventoryOutcomeBand),
       ['1–9', '10–20', '−2 – −1']
     );
     assert.equal(target.querySelector('[data-inventory-outcome-threshold]'), null);
-    assert.equal(target.querySelector('[data-inventory-outcome-range]'), null, 'no raw start–end attribute');
+    assert.equal(
+      target.querySelector('[data-inventory-outcome-range]'),
+      null,
+      'no raw start–end attribute'
+    );
 
     harness.remount();
     const relative = salvageServices(
@@ -1630,22 +1682,44 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         routedType: 'relative',
         dc: 15,
         routedOutcomes: [
-          { id: 'o1', name: 'Pass', success: true, threshold: 15, start: null, end: null, results: [] },
+          {
+            id: 'o1',
+            name: 'Pass',
+            success: true,
+            threshold: 15,
+            start: null,
+            end: null,
+            results: [],
+          },
         ],
       })
     );
     target = await openSalvage(relative.services);
-    assert.equal(target.querySelector('[data-inventory-salvage-dc]').dataset.inventorySalvageDc, '15');
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-dc]').dataset.inventorySalvageDc,
+      '15'
+    );
     assert.equal(
       target.querySelector('[data-inventory-outcome-threshold]').dataset.inventoryOutcomeThreshold,
       '15'
     );
-    assert.equal(target.querySelector('[data-inventory-outcome-band]'), null, 'no band for a relative threshold tier');
+    assert.equal(
+      target.querySelector('[data-inventory-outcome-band]'),
+      null,
+      'no band for a relative threshold tier'
+    );
   });
 
   // Issue 2137: a counting check's tier states its net-success band, as the Journal does.
   it("routed + relative under a counting check renders each tier's band in net successes", async () => {
-    const tier = (id, band) => ({ id, name: id, success: true, threshold: null, band, results: [] });
+    const tier = (id, band) => ({
+      id,
+      name: id,
+      success: true,
+      threshold: null,
+      band,
+      results: [],
+    });
     const { services } = salvageServices(
       salvageItem({
         mode: 'routed',
@@ -1659,13 +1733,20 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const bands = [...target.querySelectorAll('[data-inventory-outcome-band]')];
     assert.deepEqual(
       bands.map((node) => [node.dataset.inventoryOutcomeBand, node.textContent.trim()]),
-      [['7+', '7+'], ['2–6', '2–6'], ['<0', '<0']]
+      [
+        ['7+', '7+'],
+        ['2–6', '2–6'],
+        ['<0', '<0'],
+      ]
     );
     assert.ok(
       bands.every((node) => node.querySelector('.manager-chip.is-neutral')),
       'each band is the shared Chip, as the Journal ladder draws it'
     );
-    assert.ok(!target.querySelector('[data-inventory-outcome-threshold]'), 'no Reached-at threshold');
+    assert.ok(
+      !target.querySelector('[data-inventory-outcome-threshold]'),
+      'no Reached-at threshold'
+    );
     assert.ok(!target.querySelector('[data-inventory-salvage-dc]'), 'a count names no DC');
   });
 
@@ -1722,8 +1803,20 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const { services } = salvageServices(
       salvageItem({
         toolStates: [
-          { componentId: 'c9', name: "Leatherworker's Tools", img: null, available: true, needsRepair: false },
-          { componentId: 'c8', name: 'Tinker Kit', img: null, available: false, needsRepair: false },
+          {
+            componentId: 'c9',
+            name: "Leatherworker's Tools",
+            img: null,
+            available: true,
+            needsRepair: false,
+          },
+          {
+            componentId: 'c8',
+            name: 'Tinker Kit',
+            img: null,
+            available: false,
+            needsRepair: false,
+          },
         ],
         toolsAvailable: false,
       })
@@ -1745,7 +1838,13 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         checkUsable: true,
         dc: 12,
         toolStates: [
-          { componentId: 'c8', name: 'Tinker Kit', img: null, available: false, needsRepair: false },
+          {
+            componentId: 'c8',
+            name: 'Tinker Kit',
+            img: null,
+            available: false,
+            needsRepair: false,
+          },
         ],
         toolsAvailable: false,
       })
@@ -1789,7 +1888,13 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         misconfigured: true,
         routedType: 'relative',
         toolStates: [
-          { componentId: 'c8', name: 'Tinker Kit', img: null, available: false, needsRepair: false },
+          {
+            componentId: 'c8',
+            name: 'Tinker Kit',
+            img: null,
+            available: false,
+            needsRepair: false,
+          },
         ],
         toolsAvailable: false,
       })
@@ -1888,7 +1993,13 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   it('a committed salvage with stock remaining swaps the footer for the ribbon plus a Salvage again reset', async () => {
     // makeItem() carries totalQuantity 7, so stock remains: "Salvage again" is offered.
     const { services, calls, store } = salvageServices(salvageItem());
-    store.salvageResult = { systemId: 'sys', componentId: 'c1', state: 'success', message: '', awarded: [] };
+    store.salvageResult = {
+      systemId: 'sys',
+      componentId: 'c1',
+      state: 'success',
+      message: '',
+      awarded: [],
+    };
     const target = await openSalvage(services);
 
     assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'));
@@ -1908,10 +2019,19 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   // the header must read honestly rather than a stale count.
   it('a committed salvage of the LAST copy shows the ribbon but withholds "Salvage again" and reads depleted', async () => {
     const { services, store } = salvageServices(salvageItem({}, { totalQuantity: 0 }));
-    store.salvageResult = { systemId: 'sys', componentId: 'c1', state: 'success', message: '', awarded: [] };
+    store.salvageResult = {
+      systemId: 'sys',
+      componentId: 'c1',
+      state: 'success',
+      message: '',
+      awarded: [],
+    };
     const target = await openSalvage(services);
 
-    assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'), 'the result ribbon still shows');
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-ribbon]'),
+      'the result ribbon still shows'
+    );
     assert.equal(
       target.querySelector('[data-inventory-salvage-again]'),
       null,
@@ -1922,7 +2042,11 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       'a depleted note takes the ribbon slot instead'
     );
     const total = target.querySelector('.inventory-detail-total');
-    assert.match(total.textContent, /TotalDepleted/, 'header reads "None remaining", not a stale count');
+    assert.match(
+      total.textContent,
+      /TotalDepleted/,
+      'header reads "None remaining", not a stale count'
+    );
   });
 
   // AC9.
@@ -1939,7 +2063,11 @@ describe('InventoryView (mounted) — player salvage surface', () => {
 
     assert.ok(target.querySelector('[data-inventory-salvage-summary="waiting"]'));
     assert.match(target.textContent, /60s remaining/);
-    assert.equal(target.querySelector('[data-inventory-salvage-ribbon]'), null, 'nothing was awarded');
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-ribbon]'),
+      null,
+      'nothing was awarded'
+    );
     assert.equal(target.querySelector('[data-inventory-salvage-again]'), null);
     assert.equal(
       target.querySelector('[data-inventory-salvage-action]').disabled,
@@ -1951,8 +2079,24 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   // AC8, rendering half.
   it('AC8: a progressive salvage renders reorderable stages with a live region', async () => {
     const stages = [
-      { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 2, difficulty: 4, threshold: 4 },
-      { id: 's2', componentId: 'c3', name: 'Slag', img: null, quantity: 1, difficulty: 3, threshold: 7 },
+      {
+        id: 's1',
+        componentId: 'c2',
+        name: 'Iron Shard',
+        img: null,
+        quantity: 2,
+        difficulty: 4,
+        threshold: 4,
+      },
+      {
+        id: 's2',
+        componentId: 'c3',
+        name: 'Slag',
+        img: null,
+        quantity: 1,
+        difficulty: 3,
+        threshold: 7,
+      },
     ];
     const { services, calls } = salvageServices(
       salvageItem({ mode: 'progressive', checkUsable: true, stages, awardMode: 'equal' }),
@@ -1967,7 +2111,10 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
     const target = await openSalvage(services);
 
-    assert.ok(target.querySelector('[data-inventory-salvage-roll-hint]'), 'hints that a roll resolves it');
+    assert.ok(
+      target.querySelector('[data-inventory-salvage-roll-hint]'),
+      'hints that a roll resolves it'
+    );
     const rows = target.querySelectorAll('[data-progressive-stage-reorderable]');
     assert.equal(rows.length, 2, 'both stages are reorderable');
     // Reorder is the whole of this feature, so the permitted state says so too.
@@ -2006,8 +2153,24 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   // AC8. `canReorder: false` DETACHES the handlers rather than leaving inert rows.
   it('AC8: allowPlayerResultReorder:false drops the grip and detaches the handlers', async () => {
     const stages = [
-      { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 1, difficulty: 4, threshold: 4 },
-      { id: 's2', componentId: 'c3', name: 'Slag', img: null, quantity: 1, difficulty: 3, threshold: 7 },
+      {
+        id: 's1',
+        componentId: 'c2',
+        name: 'Iron Shard',
+        img: null,
+        quantity: 1,
+        difficulty: 4,
+        threshold: 4,
+      },
+      {
+        id: 's2',
+        componentId: 'c3',
+        name: 'Slag',
+        img: null,
+        quantity: 1,
+        difficulty: 3,
+        threshold: 7,
+      },
     ];
     const { services } = salvageServices(
       salvageItem({
@@ -2023,19 +2186,39 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(target.querySelectorAll('[data-progressive-stage-reorderable]').length, 0);
     assert.equal(target.querySelectorAll('[data-progressive-stage-fixed]').length, 2);
     assert.equal(target.querySelector('[data-progressive-stage-move]'), null, 'no move buttons');
-    assert.equal(target.querySelector('[data-progressive-stage-status]'), null, 'nothing to announce');
+    assert.equal(
+      target.querySelector('[data-progressive-stage-status]'),
+      null,
+      'nothing to announce'
+    );
     assert.equal(
       target.querySelector('[data-progressive-stage-fixed-note]').textContent.trim(),
       'Order set by the GM',
-      'and says the GM set it — which, here, is the reason that actually applies',
+      'and says the GM set it — which, here, is the reason that actually applies'
     );
   });
 
   // --- The row's SHAPE (issue 675 fix round) ------------------------------------
 
   const SHAPE_STAGES = [
-    { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 2, difficulty: 4, threshold: 4 },
-    { id: 's2', componentId: 'c3', name: 'Slag', img: null, quantity: 1, difficulty: 3, threshold: 7 },
+    {
+      id: 's1',
+      componentId: 'c2',
+      name: 'Iron Shard',
+      img: null,
+      quantity: 2,
+      difficulty: 4,
+      threshold: 4,
+    },
+    {
+      id: 's2',
+      componentId: 'c3',
+      name: 'Slag',
+      img: null,
+      quantity: 1,
+      difficulty: 3,
+      threshold: 7,
+    },
   ];
 
   function shapeServices(storeOverrides = {}) {
@@ -2046,7 +2229,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         stages: SHAPE_STAGES,
         awardMode: 'equal',
       }),
-      storeOverrides,
+      storeOverrides
     );
   }
 
@@ -2059,12 +2242,12 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.ok(identity, 'the stacked row wraps its identity in a column');
     assert.ok(
       identity.querySelector('.crafting-stage-name'),
-      'the name lives INSIDE that column, not as a row-level flex child',
+      'the name lives INSIDE that column, not as a row-level flex child'
     );
     assert.equal(
       identity.textContent.includes('×'),
       false,
-      'and nothing prints a count beside it: an awarded stage grants exactly one item',
+      'and nothing prints a count beside it: an awarded stage grants exactly one item'
     );
   });
 
@@ -2073,36 +2256,40 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const target = await openSalvage(services);
 
     const row = target.querySelector('[data-progressive-stage="s1"]');
-    const parts = [...row.querySelectorAll('[data-progressive-stage-move], [data-progressive-stage-ordinal]')];
+    const parts = [
+      ...row.querySelectorAll('[data-progressive-stage-move], [data-progressive-stage-ordinal]'),
+    ];
     assert.equal(parts.length, 2);
     assert.ok(
       parts[0].hasAttribute('data-progressive-stage-ordinal'),
-      'the ordinal leads, as the row identity',
+      'the ordinal leads, as the row identity'
     );
     assert.ok(
       parts[1].hasAttribute('data-progressive-stage-move'),
-      'the chevrons come LAST — the same edge they sit on in the GM salvage editor and on the crafting tab',
+      'the chevrons come LAST — the same edge they sit on in the GM salvage editor and on the crafting tab'
     );
     // Read off the stage's own LINE rather than off the row. Since issue 1286 the row is a
     // wrapper that MAY carry a full-bleed complication band beneath its line, so `row`'s
     // last element child is the line (or the band), never the chevrons. The claim under
     // test is unchanged: the chevrons end the line the stage reads on.
     assert.equal(
-      row.querySelector('.crafting-stage-line').lastElementChild.hasAttribute('data-progressive-stage-move'),
+      row
+        .querySelector('.crafting-stage-line')
+        .lastElementChild.hasAttribute('data-progressive-stage-move'),
       true,
-      'far right: after the state chip, not merely after the identity column',
+      'far right: after the state chip, not merely after the identity column'
     );
 
     const handle = row.querySelector('.crafting-stage-handle');
     assert.equal(
       handle.contains(parts[1]),
       false,
-      'the chevrons are no longer inside the grip cluster',
+      'the chevrons are no longer inside the grip cluster'
     );
     assert.equal(
       handle.getAttribute('aria-hidden'),
       'true',
-      'so the cluster is decorative again — the keyboard reorder control lives outside it',
+      'so the cluster is decorative again — the keyboard reorder control lives outside it'
     );
   });
 
@@ -2112,21 +2299,25 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const target = await openSalvage(services);
 
     assert.deepEqual(
-      [...target.querySelectorAll('[data-progressive-stage-difficulty]')].map((n) => n.textContent.trim()),
+      [...target.querySelectorAll('[data-progressive-stage-difficulty]')].map((n) =>
+        n.textContent.trim()
+      ),
       ['DC 4', 'DC 3'],
-      'the component\'s own progressive DC is shown per stage, labelled as a DC',
+      "the component's own progressive DC is shown per stage, labelled as a DC"
     );
     assert.deepEqual(
       [...target.querySelectorAll('[data-progressive-stage-difficulty]')].map((n) =>
-        n.getAttribute('data-progressive-stage-difficulty'),
+        n.getAttribute('data-progressive-stage-difficulty')
       ),
       ['4', '3'],
-      'and the raw DC stays on the marker attribute for smoke selectors',
+      'and the raw DC stays on the marker attribute for smoke selectors'
     );
     assert.deepEqual(
-      [...target.querySelectorAll('[data-progressive-stage-threshold]')].map((n) => n.textContent.trim()),
+      [...target.querySelectorAll('[data-progressive-stage-threshold]')].map((n) =>
+        n.textContent.trim()
+      ),
       ['Reach ≥4', 'Reach ≥7'],
-      'alongside the cumulative reach, which answers "what must I roll to reach this?"',
+      'alongside the cumulative reach, which answers "what must I roll to reach this?"'
     );
   });
 
@@ -2142,10 +2333,14 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.ok(flow, 'the flow banner renders');
     assert.notEqual(flow, banner, 'as its own box, beneath the mode banner');
     assert.match(banner.textContent, /BannerProgressiveTitle/, 'the mode banner names the mode');
-    assert.match(flow.textContent, /Salvage\.ProgressiveFlow/, 'the flow banner states the mechanic');
+    assert.match(
+      flow.textContent,
+      /Salvage\.ProgressiveFlow/,
+      'the flow banner states the mechanic'
+    );
     assert.ok(
       !banner.textContent.includes('ProgressiveFlow'),
-      'and it is not the mode banner repeating itself — deleting either loses a distinct statement',
+      'and it is not the mode banner repeating itself — deleting either loses a distinct statement'
     );
   });
 
@@ -2162,14 +2357,14 @@ describe('InventoryView (mounted) — player salvage surface', () => {
 
     reset.click();
     await settle();
-    assert.equal(calls.resetOrder.length, 1, 'restores the GM\'s authored order');
+    assert.equal(calls.resetOrder.length, 1, "restores the GM's authored order");
     assert.ok(
       calls.resetOrder[0][0],
-      'and carries live-region text: a keyboard user has no other signal that the rows moved',
+      'and carries live-region text: a keyboard user has no other signal that the rows moved'
     );
   });
 
-  it('disables Reset while the order is already the GM\'s', async () => {
+  it("disables Reset while the order is already the GM's", async () => {
     // Disabled rather than absent: a control that appears mid-drag reads as a glitch,
     // and its absence would say the order cannot be restored rather than need not be.
     const { services, calls } = shapeServices({ salvageOrderIsCustom: false });
@@ -2191,13 +2386,13 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         stages: SHAPE_STAGES,
         awardMode: 'equal',
         allowPlayerResultReorder: false,
-      }),
+      })
     );
     const target = await openSalvage(services);
     assert.equal(
       target.querySelector('[data-inventory-salvage-reorder-reset]'),
       null,
-      'there is no player order to reset — the note itself does not apply',
+      'there is no player order to reset — the note itself does not apply'
     );
   });
 
@@ -2210,11 +2405,11 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.match(
       rolled.querySelector('[data-inventory-salvage-footer-note]').textContent,
       /Salvage\.FooterNoteRoll/,
-      'a usable check gets the one-shot warning',
+      'a usable check gets the one-shot warning'
     );
 
     const { services: noCheck } = salvageServices(
-      salvageItem({ mode: 'simple', checkUsable: false, results: [] }),
+      salvageItem({ mode: 'simple', checkUsable: false, results: [] })
     );
     const target = await openSalvage(noCheck);
     const note = target.querySelector('[data-inventory-salvage-footer-note]').textContent;
@@ -2225,10 +2420,34 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   // --- The body reconciles with the resolved roll -------------------------------
 
   const RECON_STAGES = [
-    { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 1, difficulty: 4, threshold: 4 },
-    { id: 's2', componentId: 'c3', name: 'Slag', img: null, quantity: 1, difficulty: 3, threshold: 7 },
+    {
+      id: 's1',
+      componentId: 'c2',
+      name: 'Iron Shard',
+      img: null,
+      quantity: 1,
+      difficulty: 4,
+      threshold: 4,
+    },
+    {
+      id: 's2',
+      componentId: 'c3',
+      name: 'Slag',
+      img: null,
+      quantity: 1,
+      difficulty: 3,
+      threshold: 7,
+    },
     // Unreachable at ANY budget (the award loop skips an invalid cost).
-    { id: 's3', componentId: 'c4', name: 'Dust', img: null, quantity: 1, difficulty: null, threshold: null },
+    {
+      id: 's3',
+      componentId: 'c4',
+      name: 'Dust',
+      img: null,
+      quantity: 1,
+      difficulty: null,
+      threshold: null,
+    },
   ];
 
   function progressiveServices(storeOverrides = {}) {
@@ -2239,13 +2458,13 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         stages: RECON_STAGES,
         awardMode: 'equal',
       }),
-      storeOverrides,
+      storeOverrides
     );
   }
 
-  const chipStates = target =>
+  const chipStates = (target) =>
     [...target.querySelectorAll('[data-progressive-stage-state]')].map(
-      chip => chip.dataset.progressiveStageState,
+      (chip) => chip.dataset.progressiveStageState
     );
 
   it('pre-roll: reachable stages await the roll, an unreachable one never does', async () => {
@@ -2275,15 +2494,15 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(
       target.querySelector('[data-progressive-stage-state="awaiting"]'),
       null,
-      'no row still claims to await a roll beneath the success ribbon',
+      'no row still claims to await a roll beneath the success ribbon'
     );
     // The eyebrow reconciles too, rather than emptying out.
     assert.equal(target.querySelector('[data-inventory-salvage-roll-hint]'), null);
     assert.equal(
       target.querySelector('[data-inventory-salvage-recovered-count]').textContent.trim(),
       'FABRICATE.App.Inventory.Salvage.RecoveredCount:{"recovered":1,"total":3}',
-      'counted over the STAGES: the record can name a component this list does not show, '
-        + 'so counting it directly could print "5 of 4"',
+      'counted over the STAGES: the record can name a component this list does not show, ' +
+        'so counting it directly could print "5 of 4"'
     );
   });
 
@@ -2325,7 +2544,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(
       target.querySelectorAll('[data-progressive-stage-reorderable]').length,
       0,
-      'a committed order is a record, not a choice',
+      'a committed order is a record, not a choice'
     );
     assert.equal(target.querySelector('[data-progressive-stage-move]'), null, 'no move buttons');
     assert.equal(target.querySelectorAll('[data-progressive-stage-fixed]').length, 3);
@@ -2337,7 +2556,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(
       target.querySelector('[data-progressive-stage-fixed-note]').textContent.trim(),
       'Order spent — your roll ran down this list.',
-      'the order is SPENT, not delegated to the GM',
+      'the order is SPENT, not delegated to the GM'
     );
   });
 
@@ -2361,13 +2580,13 @@ describe('InventoryView (mounted) — player salvage surface', () => {
           awardedComponentIds: ['c2'],
           outcomeId: null,
         },
-      },
+      }
     );
     const target = await openSalvage(gmPinned.services);
     assert.equal(
       target.querySelector('[data-progressive-stage-fixed-note]').textContent.trim(),
       'Order set by the GM',
-      'the GM reason stays true after a commit and keeps precedence',
+      'the GM reason stays true after a commit and keeps precedence'
     );
   });
 
@@ -2396,8 +2615,24 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       routedType: 'relative',
       dc: 15,
       routedOutcomes: [
-        { id: 'o1', name: 'Fail', success: false, threshold: 10, start: null, end: null, results: [] },
-        { id: 'o2', name: 'Pass', success: true, threshold: 15, start: null, end: null, results: [] },
+        {
+          id: 'o1',
+          name: 'Fail',
+          success: false,
+          threshold: 10,
+          start: null,
+          end: null,
+          results: [],
+        },
+        {
+          id: 'o2',
+          name: 'Pass',
+          success: true,
+          threshold: 15,
+          start: null,
+          end: null,
+          results: [],
+        },
       ],
     };
 
@@ -2406,7 +2641,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(
       target.querySelector('[data-inventory-outcome-your-roll]'),
       null,
-      'no tier is marked before a roll',
+      'no tier is marked before a roll'
     );
 
     harness.remount();
@@ -2432,7 +2667,14 @@ describe('InventoryView (mounted) — player salvage surface', () => {
   // Issue 2137: a successful count whose net is below the Botch row's floor marks that row, in
   // place of the least demanding tier it routed to; a failed salvage marks no row at all.
   it('routed count: a net below the Botch floor marks the Botch row "Your roll"', async () => {
-    const ruined = { id: 'o1', name: 'Ruined', success: true, threshold: null, band: '−4 – 0', results: [] };
+    const ruined = {
+      id: 'o1',
+      name: 'Ruined',
+      success: true,
+      threshold: null,
+      band: '−4 – 0',
+      results: [],
+    };
     const routed = {
       mode: 'routed',
       checkUsable: true,
@@ -2452,13 +2694,27 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         (node) => node.dataset.inventorySalvageOutcome
       );
     };
-    const success = (rollValue) => ({ systemId: 'sys', componentId: 'c1', state: 'success',
-      message: '', awarded: [], awardedComponentIds: [], outcomeId: 'o1', rollValue });
+    const success = (rollValue) => ({
+      systemId: 'sys',
+      componentId: 'c1',
+      state: 'success',
+      message: '',
+      awarded: [],
+      awardedComponentIds: [],
+      outcomeId: 'o1',
+      rollValue,
+    });
     assert.deepEqual(await marked(success(-5)), ['count-botch'], 'below the floor');
     assert.deepEqual(await marked(success(-4)), ['o1'], 'a net Ruined meets stays on Ruined');
     // As the store's `failureSnapshot` builds it: no roll value and no outcome id.
-    const failure = { systemId: 'sys', componentId: 'c1', state: 'failure', message: 'Salvage check failed',
-      check: null, awarded: [] };
+    const failure = {
+      systemId: 'sys',
+      componentId: 'c1',
+      state: 'failure',
+      message: 'Salvage check failed',
+      check: null,
+      awarded: [],
+    };
     assert.deepEqual(await marked(failure), [], 'a failed salvage marks no row');
   });
 });
@@ -2545,7 +2801,10 @@ describe('InventoryView (mounted) — the per-stage complication band (issue 128
   it('forwards the RESOLVED tense after a roll, so nothing still forecasts beneath it', async () => {
     const { services } = bandServices(false, { salvageResult: RESOLVED });
     const target = await openBand(services);
-    assert.equal(bandOf(target).getAttribute('data-progressive-stage-complication-tense'), 'resolved');
+    assert.equal(
+      bandOf(target).getAttribute('data-progressive-stage-complication-tense'),
+      'resolved'
+    );
     assert.doesNotMatch(
       bandOf(target).textContent,
       /This can go wrong/,
@@ -2622,7 +2881,10 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
       caption.id,
       'the trigger is named by that caption'
     );
-    assert.ok(!target.querySelector('label[for="inventory-system-selector-select"]'), 'the for/id pair is gone');
+    assert.ok(
+      !target.querySelector('label[for="inventory-system-selector-select"]'),
+      'the for/id pair is gone'
+    );
 
     assert.deepEqual(
       selectOptionValues(target, '[data-inventory-system-select]'),
@@ -2772,7 +3034,11 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     target.querySelector('[data-inventory-salvage-action]').click();
     await settle();
 
-    assert.deepEqual(salvageCalls, [[SYS_B, 'cB']], 'System B (selected), never System A (primary)');
+    assert.deepEqual(
+      salvageCalls,
+      [[SYS_B, 'cB']],
+      'System B (selected), never System A (primary)'
+    );
   });
 
   it('withholds the ribbon for a result belonging to a DIFFERENT participation of the same component id', async () => {
@@ -2821,7 +3087,9 @@ describe('InventoryDetailHeader (source contract)', () => {
       .slice(source.indexOf('<style>'))
       .split('\n')
       .map((line) => line.trim())
-      .some((line) => line === `${selector} {` || line === `${selector}{` || line === `${selector},`);
+      .some(
+        (line) => line === `${selector} {` || line === `${selector}{` || line === `${selector},`
+      );
   }
 
   for (const body of ['InventoryComponentDetail', 'InventoryBookDetail']) {
@@ -3698,7 +3966,13 @@ describe('Inventory primitive adoption (issue 1514)', () => {
 
   it('leaves the salvage success ribbon hand-rolled, because a Notice has no children slot', async () => {
     const { services } = salvageServices(salvageItem({}, { totalQuantity: 0 }), {
-      salvageResult: { systemId: 'sys', componentId: 'c1', state: 'success', message: '', awarded: [] },
+      salvageResult: {
+        systemId: 'sys',
+        componentId: 'c1',
+        state: 'success',
+        message: '',
+        awarded: [],
+      },
     });
     const target = await harness.mount({ services });
     await settle();
@@ -3759,7 +4033,11 @@ describe('Inventory primitive adoption (issue 1514)', () => {
         'drop this heading out of the outline; and the primitive forwards no `id`, so the ' +
         'section naming it in `aria-labelledby` would lose its accessible name'
     );
-    assert.match(tools, /aria-labelledby="salvage-tools-title"/u, 'which is the reader in question');
+    assert.match(
+      tools,
+      /aria-labelledby="salvage-tools-title"/u,
+      'which is the reader in question'
+    );
   });
 
   it('leaves the shell section-eyebrow family hand-rolled, one consumer laying out children', () => {

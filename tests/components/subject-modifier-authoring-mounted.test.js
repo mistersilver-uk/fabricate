@@ -15,8 +15,9 @@ import {
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
+  COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -31,6 +32,7 @@ const salvageHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-salvage-modifier-pick-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+  runeModules: COMPONENT_EDIT_VIEW_RUNE_MODULES,
   compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
@@ -298,6 +300,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/utils/rollExpressionAverage.js',
     'src/utils/rollFormulaRollability.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/dropRateTier.js',

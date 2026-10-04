@@ -380,7 +380,7 @@
       icon={usabilityFact.icon}
       title={usabilityFact.title}
       density="rule"
-      dataAttr="data-tool-preview-usability"
+      data-tool-preview-usability
     />
   </section>
 

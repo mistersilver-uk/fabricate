@@ -13,7 +13,10 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -23,6 +26,7 @@ const SCOPED_RAW_MODULES = [
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
   // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's

@@ -11,10 +11,10 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  // No essence offer projection here: the adder creates an unnamed row and the group card applies
-  // the offer to the row's catalogue. The adder gates on the unfiltered roster, because a system
-  // whose essences are all disabled must keep the match type.
-  import RecipeIngredientGroupCard from './RecipeIngredientGroupCard.svelte';
+  // No essence offer projection here: the adder creates an unnamed row and the choice group
+  // applies the offer to the row's catalogue. The adder gates on the unfiltered roster, because a
+  // system whose essences are all disabled must keep the match type.
+  import ChoiceGroup from './ChoiceGroup.svelte';
   import Button from '../../../components/Button.svelte';
   import IconButton from '../../../components/IconButton.svelte';
 
@@ -32,7 +32,7 @@
     showSetName = true,
     // The default display name for an unnamed set, read-only in check mode.
     defaultName = '',
-    // Threaded straight through to every group card: the note beside its `Any one of` pill, and
+    // Threaded straight through to every choice group: the note beside its `Any one of` pill, and
     // empty everywhere but the Tool repair set.
     anyOneOfHint = '',
     onChange = () => {},
@@ -147,7 +147,7 @@
          are AND'd. -->
     <div class="manager-recipe-ingredient-set-groups">
       {#each groups as group, index (group?.id || index)}
-        <RecipeIngredientGroupCard
+        <ChoiceGroup
           {group}
           {componentOptions}
           {itemTags}

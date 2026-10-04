@@ -12,7 +12,7 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { chooseSelectOption, selectTriggerText } from '../helpers/select-control.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -21,6 +21,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-tags-categories-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',

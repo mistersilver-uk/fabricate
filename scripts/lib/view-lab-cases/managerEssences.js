@@ -23,7 +23,6 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
       // The shared studio-library shelf — scroll section, empty states, list-or-grid `<ul>`, pager — is on every browser frame.
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
     ],
@@ -44,7 +43,6 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       // The shared studio-library shelf — scroll section, empty states, list-or-grid `<ul>`, pager — is on every browser frame.
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
     ],
@@ -68,9 +66,43 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       // The shared studio-library shelf — scroll section, empty states, list-or-grid `<ul>`, pager — is on every browser frame.
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-essences-inspector-verbs',
+    label: 'Manager — Essences inspector verbs',
+    // Beyond the smoke: no smoke step scrolls an essence inspector to its verbs.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The rail's four verbs, which sit below its fold on every other essence frame (issue 1521).
+    query: {},
+    steps: [
+      { selector: '#manager-nav-essence-rules' },
+      { selector: '.manager-essence-row[data-essence-id="earth"] .manager-essence-identity' },
+      {
+        selector: '[data-essence-section="source"] [data-essence-action="unlink-source"]',
+        scroll: true,
+      },
+    ],
+    expectView: 'essences',
+    expectSelector: '[data-essence-section="source"] [data-essence-action="unlink-source"]',
+    expectContained: [
+      { container: 'aside.manager-inspector', target: '[data-essence-action="edit"]' },
+      { container: 'aside.manager-inspector', target: '[data-essence-action="unlink-source"]' },
+    ],
+    // Each verb on the manager button's rung, and the one primary in the success family.
+    expectLayout: {
+      controls: ['edit', 'delete', 'copy-source', 'unlink-source'].map((action) => ({
+        selector: `[data-essence-action="${action}"]`,
+        styles: `min-height: 34px; border-radius: 9px; font-size: 0.72rem${action === 'edit' ? '; background-color: var(--fab-success)' : ''}`,
+      })),
+    },
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EssenceBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceBrowserInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -124,7 +156,6 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       // The card is claimed here alone: this is the one frame that renders a grid of them.
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryCard\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
     ],

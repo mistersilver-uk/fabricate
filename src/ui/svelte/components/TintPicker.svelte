@@ -29,6 +29,7 @@
     MANAGER_COLOR_TOKENS,
     managerColorTokenLabel,
     normalizeManagerColorToken,
+    tintSwatchStyle,
   } from '../util/managerColorTokens.js';
 
   let {
@@ -60,16 +61,6 @@
 
   function normalizedToken(value) {
     return normalizeManagerColorToken(value);
-  }
-
-  function validCustomHex(value) {
-    const hex = String(value || '').trim();
-    return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toUpperCase() : '';
-  }
-
-  function swatchStyle(token = colorToken, hex = customColor) {
-    const custom = validCustomHex(hex);
-    return `--manager-color-swatch: ${custom || `var(--fab-tag-${normalizedToken(token)})`}`;
   }
 
   function selectPreset(token) {
@@ -120,7 +111,7 @@
         aria-label={preset.label}
         title={preset.label}
         data-manager-color-token={preset.token}
-        style={swatchStyle(preset.token, '')}
+        style={tintSwatchStyle(preset.token, '')}
         onclick={() => selectPreset(preset.token)}
       >
         <span class="manager-color-swatch" aria-hidden="true"></span>

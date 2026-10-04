@@ -18,11 +18,14 @@ const DEFAULT_PREMIUM_CONFIG = resolve(ROOT, '..', 'fabricate-premium', 'release
 const DEFAULT_FABRICATE_REPO = 'mistersilver-uk/fabricate';
 const DEFAULT_PREMIUM_REPO = 'mistersilver-uk/fabricate-premium';
 const SEGMENT_BYTES = 16;
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const LABEL_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const HELP = `Rotate every tester path segment across both publishing repositories.
 
   --apply                   Write the secrets (default: dry run, writes nothing)
   --group <name>            Rotate only this tester group's secret
+  --label <text>            Prefix each new segment with this label (default: this UTC month, e.g. oct2026)
   --config <path>           This repository's release config
   --premium-config <path>   The premium repository's release config
   --no-premium              Inspect this repository alone (dry run only)
@@ -34,6 +37,7 @@ export function parseArgs(args) {
   const options = {
     apply: false,
     group: null,
+    label: null,
     premium: true,
     config: DEFAULT_FABRICATE_CONFIG,
     premiumConfig: DEFAULT_PREMIUM_CONFIG,
@@ -66,6 +70,10 @@ export function parseArgs(args) {
         options.group = value();
         break;
       }
+      case '--label': {
+        options.label = assertLabel(value());
+        break;
+      }
       case '--config': {
         options.config = resolve(value());
         break;
@@ -93,9 +101,27 @@ export function parseArgs(args) {
   return options;
 }
 
-/** A fresh unguessable path segment: 32 hex characters. */
-export function newSegment() {
-  return randomBytes(SEGMENT_BYTES).toString('hex');
+/** Refuse a label that would not survive verbatim as part of an S3 key and a URL. */
+function assertLabel(label) {
+  if (LABEL_PATTERN.test(label)) return label;
+  throw new Error(
+    `--label "${label}" is not usable in a feed path: use lowercase letters and digits, ` +
+      'optionally joined by single hyphens, e.g. oct2026.'
+  );
+}
+
+/** The current UTC month and year, e.g. `oct2026`. */
+export function defaultLabel(date = new Date()) {
+  return `${MONTHS[date.getUTCMonth()]}${date.getUTCFullYear()}`;
+}
+
+/**
+ * A fresh unguessable path segment: 32 hex characters, prefixed with `<label>-` when labelled.
+ * The label only names the feed's month; every bit of entropy is in the hex.
+ */
+export function newSegment(label) {
+  const random = randomBytes(SEGMENT_BYTES).toString('hex');
+  return label ? `${label}-${random}` : random;
 }
 
 const named = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -307,11 +333,12 @@ function testerFeedLines(baseUrl, feed, segment) {
 }
 
 /** Report the plan and, under `--apply`, write it. */
-export async function runRotation({ plan, apply = false, deps = {} }) {
+export async function runRotation({ plan, apply = false, label = null, deps = {} }) {
   const { runGh, newSegment: nextSegment = newSegment, log = console.log } = deps;
   const writes = plannedWrites(plan);
 
   log(apply ? 'Rotating tester path segments.' : 'DRY RUN — no secret will be written.');
+  if (label) log(`  each new segment is ${label}-<32 hex characters>`);
   for (const secret of plan.secrets) {
     log(`  ${secret.name} -> ${secret.repositories.join(', ')}`);
     log(`    serves tester group(s): ${groupNames(secret).join(', ')}`);
@@ -333,7 +360,7 @@ export async function runRotation({ plan, apply = false, deps = {} }) {
   const landed = [];
   const announcements = [];
   for (const secret of plan.secrets) {
-    const segment = nextSegment();
+    const segment = nextSegment(label);
     for (const repository of secret.repositories) {
       try {
         // Over stdin, never the argument list, which any process on the host can read.
@@ -458,6 +485,7 @@ export async function main({ argv: args = argv.slice(2), deps = {} } = {}) {
   return runRotation({
     plan,
     apply: options.apply,
+    label: options.label ?? defaultLabel(deps.now?.()),
     deps: { runGh: deps.runGh ?? ghRunner(), newSegment: deps.newSegment, log },
   });
 }

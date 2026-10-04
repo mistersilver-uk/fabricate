@@ -1,9 +1,9 @@
 /**
  * The requirement row's kind table and its mapping to both persisted shapes. `KIND_META` holds a
- * kind's icon, tone and label key under the model's match type, for the row's plate and kind select,
- * the choice group's adders and the `or…` menu; `toValue` / `fromValue` carry an ingredient option
- * or a result entry to and from the row's `value`. A tone is a class suffix, not a colour: the
- * `.manager-recipe-option-mark.is-<tone>` rules are in `styles/fabricate.css`.
+ * kind's icon, tone and label key under the model's match type, for the row's plate, its kind
+ * select and the kind menu; `toValue` / `fromValue` carry an ingredient option or a result entry
+ * to and from the row's `value`. A tone is a class suffix, not a colour: the `is-<tone>` tint rules
+ * are in `styles/fabricate.css`.
  */
 
 /**
@@ -58,16 +58,19 @@ export function kindMeta(matchType) {
 }
 
 /**
- * The full class string for a glyph carrying a kind's tint: its icon plus the shared
- * tinted-mark pair. One string, because `SearchablePopover` renders an option's `icon` as the
- * whole `class` attribute of its `<i>` and the row's own marks are written the same way.
+ * The kind menu's `ActionMenu` items: the offered `kinds` in table order, each carrying its glyph,
+ * its tone and the `data-recipe-add="alternative-<tone>"` hook. The convert menu and a choice
+ * group's adders both read this list, so the two state one subset in one order.
  *
- * @param {string} matchType a requirement option's `match.type`
- * @returns {string}
+ * @param {ReadonlyArray<string>} kinds the surface's offered match types
+ * @param {(key: string, fallback: string) => string} [translate] the caller's localizer
  */
-export function kindMarkClass(matchType) {
-  const meta = kindMeta(matchType);
-  return `${meta.icon} manager-recipe-option-mark is-${meta.tone}`;
+export function kindMenuItems(kinds, translate = (_key, fallback) => fallback) {
+  return KIND_ORDER.filter((kind) => kinds.includes(kind)).map((kind) => {
+    const { icon, tone, labelKey, label } = KIND_META[kind];
+    const data = { 'data-recipe-add': `alternative-${tone}` };
+    return { id: kind, label: translate(labelKey, label), icon, tone, data };
+  });
 }
 
 const AMOUNT_ON_MATCH = new Set(['essence', 'currency']);

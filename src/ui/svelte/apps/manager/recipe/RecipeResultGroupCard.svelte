@@ -9,14 +9,13 @@
   Invariants:
   - Rows are keyed by item id, because a row's Fixed | Rolled state is per instance — pinned by
     `tests/components/recipe-result-card-mounted.test.js`.
-  - A row's amount error is the save path's own floor, `quantityFormulaErrors`.
+  - A row's amount error is the save path's own floor, `quantityFormulaErrors` (`resultRows.js`).
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
-  import { normalizeQuantityFormula, quantityFormulaErrors } from '../../../../../models/Result.js';
-  import { diceEngine, maximisedTotal } from '../../../../../utils/rollFormulaRollability.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import PickerRow from './PickerRow.svelte';
   import { fromValue, toValue } from './pickerRowKinds.js';
+  import { componentCatalogue, resultAmountInvalid, withAddedResult } from './resultRows.js';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';
@@ -65,11 +64,6 @@
     onOpenComponent = () => {},
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   // THE CONTROL HALF of the validation row action. An unrouted-result-set warning is about THIS
   // set's routing, so the card is the destination and `recipeReadiness.js` addresses it as
   // `result-group-<id>` — the same literal on both sides, held together behaviourally by the pair
@@ -91,7 +85,7 @@
   // rule this file established, the focus move and the polite live region.
   function componentNameFor(item) {
     const match = (componentOptions || []).find((option) => option.id === item?.componentId);
-    return match?.name || text('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
+    return match?.name || localizeOr('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
   }
 
   // The band's content, decided here because the same filter decides whether the row draws a body
@@ -125,14 +119,7 @@
 
   // A result names a component and nothing else until `Result.kind` lands (issue 1773).
   const RESULT_KINDS = ['component'];
-  const catalogue = $derived({
-    component: (componentOptions || []).map((option) => ({
-      id: option.id,
-      label: option.name,
-      img: option.img,
-      icon: 'fas fa-cube',
-    })),
-  });
+  const catalogue = $derived(componentCatalogue(componentOptions));
 
   function componentFor(item) {
     return (componentOptions || []).find((option) => option.id === item?.componentId) || null;
@@ -146,27 +133,9 @@
 
   // A stage's delete names its component, as a flat row's remove does.
   const removeNameFor = (item) =>
-    text('FABRICATE.Admin.Manager.Recipe.RemoveNamed', 'Remove {name}').replace(
-      '{name}',
-      componentNameFor(item)
-    );
-
-  function amountInvalid(item) {
-    const formula = normalizeQuantityFormula(item?.quantityFormula);
-    if (quantityFormulaErrors(formula, diceEngine()).length === 0) return {};
-    return {
-      amount:
-        maximisedTotal(formula) === null
-          ? text(
-              'FABRICATE.Admin.Manager.Recipe.AmountUnrollable',
-              'This expression cannot be rolled.'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Recipe.AmountNeverPositive',
-              'This expression can never award a positive amount.'
-            ),
-    };
-  }
+    localizeOr('FABRICATE.Admin.Manager.Recipe.RemoveNamed', 'Remove {name}', {
+      name: componentNameFor(item),
+    });
 
   const componentPickerOptions = $derived(
     (componentOptions || []).map((option) => ({
@@ -194,8 +163,6 @@
     onChange({ ...group, results: results.filter((_, i) => i !== index) });
   }
 
-  // Adding a component the group already produces bumps that item's quantity rather than
-  // appending a duplicate, unless that item's amount is rolled, which a bump would not change.
   // Progressive always appends: its award loop ignores `quantity` entirely, so repeating a
   // component IS how the GM asks for more of it.
   function addItem(id) {
@@ -203,24 +170,7 @@
       onChange({ ...group, results: [...results, { id: newId(), componentId: id }] });
       return;
     }
-    const existingIndex = results.findIndex(
-      (item) => item?.componentId === id && !normalizeQuantityFormula(item?.quantityFormula)
-    );
-    if (existingIndex !== -1) {
-      const existing = results[existingIndex];
-      const nextQuantity = Math.min(
-        9999,
-        (Number(existing.quantity) > 0 ? Number(existing.quantity) : 1) + 1
-      );
-      onChange({
-        ...group,
-        results: results.map((item, i) =>
-          i === existingIndex ? { ...existing, quantity: nextQuantity } : item
-        ),
-      });
-      return;
-    }
-    onChange({ ...group, results: [...results, { id: newId(), componentId: id, quantity: 1 }] });
+    onChange({ ...group, results: withAddedResult(results, id, newId()) });
   }
 
   // THE THREE-WAY EMPTY HINT, a guard chain rather than nested ternaries, and its ORDER is the
@@ -228,18 +178,18 @@
   // no outcome tiers at all would be told to change a policy.
   const outcomeTierEmptyHint = $derived.by(() => {
     if (!outcomeTiersDefined) {
-      return text(
+      return localizeOr(
         'FABRICATE.Admin.Manager.Recipe.RoutingNoOutcomeTiers',
         'Define outcome tiers in the routed crafting check first.'
       );
     }
     if (!failureResultsAllowed) {
-      return text(
+      return localizeOr(
         'FABRICATE.Admin.Manager.Recipe.RoutingNoSuccessOutcomeTiersPolicy',
         'Every outcome tier on this check is a failure, and this system produces nothing on a failed check. Mark a tier as a Success, or let failed checks produce a result on the crafting check’s On failure section.'
       );
     }
-    return text(
+    return localizeOr(
       'FABRICATE.Admin.Manager.Recipe.RoutingNoSuccessOutcomeTiers',
       'No outcome tier is marked as a Success. Mark one as Success in the crafting check to route a result set to it.'
     );
@@ -270,16 +220,16 @@
         <RecipeRoutingAssignment
           options={ingredientSetOptions}
           selectedIds={assignedIngredientSetIds}
-          label={text('FABRICATE.Admin.Manager.Recipe.RoutingIngredientSets', 'Produced by')}
-          addLabel={text(
+          label={localizeOr('FABRICATE.Admin.Manager.Recipe.RoutingIngredientSets', 'Produced by')}
+          addLabel={localizeOr(
             'FABRICATE.Admin.Manager.Recipe.RoutingAddIngredientSet',
             'Add ingredient set'
           )}
-          placeholder={text(
+          placeholder={localizeOr(
             'FABRICATE.Admin.Manager.Recipe.RoutingSearchIngredientSets',
             'Search ingredient sets...'
           )}
-          emptyHint={text(
+          emptyHint={localizeOr(
             'FABRICATE.Admin.Manager.Recipe.RoutingNoIngredientSets',
             'Add a named ingredient set first.'
           )}
@@ -290,9 +240,15 @@
         <RecipeRoutingAssignment
           options={outcomeTierOptions}
           selectedIds={checkOutcomeIds}
-          label={text('FABRICATE.Admin.Manager.Recipe.RoutingOutcomeTiers', 'Produced on outcome')}
-          addLabel={text('FABRICATE.Admin.Manager.Recipe.RoutingAddOutcomeTier', 'Add outcome')}
-          placeholder={text(
+          label={localizeOr(
+            'FABRICATE.Admin.Manager.Recipe.RoutingOutcomeTiers',
+            'Produced on outcome'
+          )}
+          addLabel={localizeOr(
+            'FABRICATE.Admin.Manager.Recipe.RoutingAddOutcomeTier',
+            'Add outcome'
+          )}
+          placeholder={localizeOr(
             'FABRICATE.Admin.Manager.Recipe.RoutingSearchOutcomeTiers',
             'Search outcomes...'
           )}
@@ -305,21 +261,24 @@
           type="text"
           class="manager-recipe-ingredient-set-name"
           data-recipe-result-set-field="name"
-          placeholder={text(
+          placeholder={localizeOr(
             'FABRICATE.Admin.Manager.Recipe.ResultSetNamePlaceholder',
             'Result set name'
           )}
           value={group?.name || ''}
           onchange={(e) => setName(e.target.value)}
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
+          aria-label={localizeOr('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
         />
       {/if}
       {#if !hideRemove && !reserved}
         <IconButton
           class="is-danger"
           data-recipe-remove="result-set"
-          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
-          title={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
+          ariaLabel={localizeOr(
+            'FABRICATE.Admin.Manager.Recipe.RemoveResultSet',
+            'Remove result set'
+          )}
+          title={localizeOr('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
           onclick={() => onRemove()}><i class="fas fa-trash" aria-hidden="true"></i></IconButton
         >
       {/if}
@@ -328,7 +287,7 @@
 
   {#if results.length === 0 && !isTerminalStep}
     <p class="manager-muted" data-recipe-result-empty>
-      {text(
+      {localizeOr(
         'FABRICATE.Admin.Manager.Recipe.ResultSetEmptyIntermediatePanel',
         'Nothing produced on this step — it only advances the craft.'
       )}
@@ -337,7 +296,7 @@
     <!-- Danger-bordered dashed panel: an outcome that produces nothing is a gap. -->
     <div class="manager-recipe-result-empty" data-recipe-result-empty>
       <p class="manager-muted">
-        {text(
+        {localizeOr(
           'FABRICATE.Admin.Manager.Recipe.ResultSetEmptyPanel',
           'Nothing produced on this outcome.'
         )}
@@ -406,7 +365,7 @@
             rollable
             clearable={false}
             removeHook="result-item"
-            invalid={amountInvalid(item)}
+            invalid={resultAmountInvalid(item, localizeOr)}
             class="is-result"
             data-recipe-result-item=""
             onChange={(value) => updateItem(index, fromValue(item, value))}
@@ -433,8 +392,8 @@
     class="manager-recipe-stage-dc"
     data-recipe-result-difficulty={difficulty === null ? '' : String(difficulty)}
     >{difficulty === null
-      ? text('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')
-      : `${text('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')} ${difficulty}`}</span
+      ? localizeOr('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')
+      : `${localizeOr('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')} ${difficulty}`}</span
   >
   {#if component}
     <button
@@ -442,14 +401,14 @@
       data-keyboard-focus="true"
       class="manager-recipe-stage-edit"
       data-recipe-result-edit={item.componentId}
-      aria-label={`${text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${component.name}`}
-      title={text(
+      aria-label={`${localizeOr('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${component.name}`}
+      title={localizeOr(
         'FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty',
         'Edit difficulty on the component'
       )}
       onclick={() => onOpenComponent(item.componentId)}
     >
-      <span>{text('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}</span>
+      <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}</span>
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
     </button>
   {/if}
@@ -462,22 +421,25 @@
     triggerClass="fabricate-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
     triggerIcon="fas fa-plus"
     triggerLabel={progressive
-      ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
-      : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
+      ? localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
+      : localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
     ariaLabel={progressive
-      ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
-      : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
+      ? localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
+      : localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
     triggerAddMarker="result-item"
-    panelLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-    searchPlaceholder={text(
+    panelLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+    searchPlaceholder={localizeOr(
       'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
       'Search components...'
     )}
-    searchLabel={text(
+    searchLabel={localizeOr(
       'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
       'Search components...'
     )}
-    emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+    emptyHint={localizeOr(
+      'FABRICATE.Admin.Manager.Recipe.NoComponentsDefined',
+      'No components defined'
+    )}
     showChevron={false}
     onSelect={(id) => addItem(id)}
   />

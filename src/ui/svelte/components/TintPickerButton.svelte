@@ -8,7 +8,7 @@
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
   import { MANAGER_MAIN_SELECTOR } from '../util/overlayBounds.js';
   import TintPicker from './TintPicker.svelte';
-  import { normalizeManagerColorToken } from '../util/managerColorTokens.js';
+  import { tintSwatchStyle } from '../util/managerColorTokens.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
@@ -33,22 +33,6 @@
   let pickerRoot = $state(null);
   let triggerButton = $state(null);
   let popoverRoot = $state(null);
-
-  // ONE constant: the trigger's swatch and the popover's selection marking have to agree about
-  // which token is which.
-  function normalizedToken(value) {
-    return normalizeManagerColorToken(value);
-  }
-
-  function validCustomHex(value) {
-    const hex = String(value || '').trim();
-    return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.toUpperCase() : '';
-  }
-
-  function swatchStyle(token = colorToken, hex = customColor) {
-    const custom = validCustomHex(hex);
-    return `--manager-color-swatch: ${custom || `var(--fab-tag-${normalizedToken(token)})`}`;
-  }
 
   function closePicker() {
     open = false;
@@ -101,7 +85,7 @@
     aria-expanded={open}
     aria-label={ariaLabel || undefined}
     title={ariaLabel || undefined}
-    style={unset ? UNSET_SWATCH : swatchStyle()}
+    style={unset ? UNSET_SWATCH : tintSwatchStyle(colorToken, customColor)}
     onclick={togglePicker}
   >
     <span class="manager-color-swatch" aria-hidden="true"></span>
