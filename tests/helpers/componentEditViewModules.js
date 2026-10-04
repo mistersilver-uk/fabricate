@@ -146,8 +146,6 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/Callout.svelte',
-  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
-  // `ExplainerCard`'s own card shell, two rungs down from this tree's root.
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',

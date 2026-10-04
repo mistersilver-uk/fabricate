@@ -85,8 +85,7 @@ const harness = createMountedComponentHarness({
   ],
   runeModules: TYPEAHEAD_RUNE_MODULES,
   compiledModules: [
-    // The shared side-panel explainer card and icon fact row (issue 881).
-    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
+    // The shared side-panel icon fact row (issue 881).
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/IconButton.svelte',
@@ -1381,8 +1380,7 @@ describe('Tool Studio editor (mounted)', () => {
   // single element's own text, and `manager-layout.test.js` exercises a hand-authored fixture
   // rather than these components. This pins the joins so the NEXT reflow cannot move them
   // unnoticed. Expectations are derived from the children rather than written out, so a copy
-  // change does not fail the test but a whitespace change does — the same shape as the
-  // `ExplainerCard` row assertion above.
+  // change does not fail the test but a whitespace change does.
   //
   // The `data-*-copy` hooks exist for this test. `.manager-kicker` is not usable as a selector
   // here: `ToolBreakageTab` renders four of them, and `:nth-of-type` scoping would silently

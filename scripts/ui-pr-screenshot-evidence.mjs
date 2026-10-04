@@ -66,9 +66,9 @@ const TOOL_STUDIO_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/(?:ToolsBrowserView|ToolEditView)\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/.+\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
-  // The shared side-panel primitives the Tool Studio's preview and library inspector render (issue
+  // The shared side-panel fact row the Tool Studio's preview and library inspector render (issue
   // 881).
-  /^src\/ui\/svelte\/apps\/manager\/(?:ExplainerCard|IconFactRow)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/IconFactRow\.svelte$/,
 ];
 
 // The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue 1132).
@@ -390,10 +390,6 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksRightMenu\.svelte$/,
-      // The rail's standing help card renders through the shared explainer primitive
-      // (issue 883), whose CSS is co-located in its own scoped block; this is the frame
-      // that shows it on this screen.
-      /^src\/ui\/svelte\/apps\/manager\/ExplainerCard\.svelte$/,
     ],
   },
   {

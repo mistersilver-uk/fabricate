@@ -176,8 +176,9 @@
     font-weight: 600;
   }
 
+  /* Muted rather than subtle (issue 1521), the correction `Kicker` and `EmptyState` carry. */
   .manager-icon-fact-row.is-rule small {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 9.5px;
   }
 

@@ -80,7 +80,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
-    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     // THE LINKED-ITEM CARD AND THE REQUIREMENTS TAB (issue 1373). Both are shipped components
     // this page now renders rather than second copies of them, so both join the manifest; a
     // rendered `.svelte` the harness omits HANGS this suite and reports `# cancelled`.

@@ -77,6 +77,8 @@ const SHELL_MODULES = [
   // The extracted `SYSTEM RULES n / m` panel (issue 1372). A rendered child missing from this
   // list does not fail — it HANGS, and `node --test` reports the blocked tests as `# cancelled`.
   'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
+  // The world-default cards render through the fact row (issue 1521).
+  'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
 ];
 
@@ -126,7 +128,6 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
@@ -270,9 +271,20 @@ describe('the essence catalogue opens with its first shown row inspected', () =>
     assert.deepEqual(selectedIds(root), [], 'a stale catalogue id leaves the inspector resting');
     assert.ok(root.querySelector('[data-scoped-list-inspector-state="resting"]'));
   });
+
+  it('rolls the member systems up into one enabled card beside the world defaults', async () => {
+    const root = await pageHarness.mount(pageProps());
+    const card = root.querySelector('[data-scoped-list-extra-card]');
+    assert.ok(Boolean(card?.closest('[data-scoped-list-defaults]')), 'a member draws the card');
+    assert.equal(card.getAttribute('data-scoped-list-extra-card'), 'enabled');
+    assert.ok(card.matches('.manager-icon-fact-row.is-tiled.is-rule'), 'as a rule-density tile');
+    assert.equal(card.querySelector('strong').textContent.trim(), '1 of 2 systems have it enabled');
+    assert.match(card.querySelector('small').textContent, /run nothing on craft/);
+    pageHarness.remount();
+  });
 });
 
-describe('criterion 4 — the essence catalogue renders NO source-item affordance', () => {
+describe('criterion 4— the essence catalogue renders NO source-item affordance', () => {
   it('renders the identity as a GLYPH, with no image and no source badge anywhere', async () => {
     const root = await pageHarness.mount(pageProps());
 

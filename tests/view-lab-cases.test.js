@@ -717,7 +717,31 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
 const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) => caseId);
-const CONTROL_LAYOUT_CASE_IDS = Object.keys(CONTROL_LAYOUT_CASES);
+// The measured controls that are not verbs: the `rule` fact row's subtitle ink, and the On craft
+// primer's item list offset and lead (issue 1521).
+const PRIMER = '[data-essence-on-craft-explainer]';
+const NON_VERB_CONTROLS = Object.freeze({
+  'world-essence-catalogue': [
+    {
+      selector: '[data-scoped-list-inherit-note="effectSource"]',
+      styles: 'color: var(--fab-text-muted)',
+    },
+  ],
+  'manager-essence-edit-unscoped-on-craft': [
+    { selector: `${PRIMER} .manager-callout-items`, styles: 'margin-top: var(--fab-space-2)' },
+    {
+      selector: `${PRIMER} .manager-callout-item:first-child .manager-callout-item-lead`,
+      styles: 'color: var(--fab-text); font-weight: 600',
+    },
+  ],
+});
+const NON_VERB_SELECTORS = new Set(
+  Object.values(NON_VERB_CONTROLS).flatMap((controls) => controls.map(({ selector }) => selector))
+);
+const isVerbControl = (control) => !NON_VERB_SELECTORS.has(control.selector);
+const CONTROL_LAYOUT_CASE_IDS = [
+  ...new Set([...Object.keys(CONTROL_LAYOUT_CASES), ...Object.keys(NON_VERB_CONTROLS)]),
+];
 const LAYOUT_CASE_IDS = [
   ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
   ...RESPONSIVE_LAYOUT_CASE_IDS,
@@ -812,19 +836,23 @@ test('the inspector-rail cases measure every verb on the manager rung, one prima
   const byText = (left, right) => left.localeCompare(right);
   const measured = VIEW_LAB_CASES.flatMap((viewCase) => viewCase.expectLayout?.controls ?? []);
   assert.deepEqual(
-    measured.map((control) => control.selector).sort(byText),
+    measured
+      .filter(isVerbControl)
+      .map((control) => control.selector)
+      .sort(byText),
     INSPECTOR_VERB_SITES.map((site) => site.selector).sort(byText),
     'the cases measure exactly the eight rail verbs'
   );
   for (const [id, sites] of Object.entries(CONTROL_LAYOUT_CASES)) {
     const { expectLayout } = getCaseById(id);
+    const verbs = expectLayout.controls.filter(isVerbControl);
     assert.equal(expectLayout.gridSelector, undefined, `${id} measures controls, not a grid`);
     assert.deepEqual(
-      expectLayout.controls.map((control) => control.selector),
+      verbs.map((control) => control.selector),
       sites.map((site) => site.selector),
       `${id} measures each verb it renders`
     );
-    const success = expectLayout.controls
+    const success = verbs
       .filter((control) => control.styles.includes('background-color: var(--fab-success)'))
       .map((control) => control.selector);
     assert.deepEqual(
@@ -832,11 +860,21 @@ test('the inspector-rail cases measure every verb on the manager rung, one prima
       sites.filter((site) => site.role === 'primary').map((site) => site.selector),
       `${id} measures its primary, and only it, in the success family`
     );
-    for (const { selector, styles } of expectLayout.controls) {
+    for (const { selector, styles } of verbs) {
       for (const declaration of ['min-height: 34px', 'border-radius: 9px', 'font-size: 0.72rem']) {
         assert.ok(styles.includes(declaration), `${id} ${selector} measures ${declaration}`);
       }
     }
+  }
+});
+
+test('the subtitle ink and the primer items are measured by the cases that draw them', () => {
+  for (const [caseId, expected] of Object.entries(NON_VERB_CONTROLS)) {
+    assert.deepEqual(
+      getCaseById(caseId).expectLayout.controls.filter((candidate) => !isVerbControl(candidate)),
+      expected,
+      `${caseId} measures its non-verb controls`
+    );
   }
 });
 
