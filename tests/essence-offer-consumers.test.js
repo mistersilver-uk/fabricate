@@ -15,7 +15,6 @@ const PICKER_ROW = 'src/ui/svelte/apps/manager/recipe/PickerRow.svelte';
 /** The enumerated consumers, each with the projection it applies. */
 const CONSUMERS = Object.freeze([
   ['src/ui/svelte/apps/manager/ComponentEditView.svelte', 'visibleEssenceOptions'],
-  ['src/ui/svelte/apps/ComponentEditorRoot.svelte', 'visibleEssenceOptions'],
   [
     'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
     'visibleEssenceOptions',
