@@ -69,10 +69,10 @@ The library is where the vocabulary lives and this document is where its rules l
 A member that has SHIPPED MUST also carry a row in `scripts/lib/designSystemPrimitives.json` naming its implementation path, which is what lets a diff be attributed to a primitive.
 A member that has not shipped carries no row, because the manifest enumerates what ships and a row naming no file is a correspondence to nothing.
 `tests/design-system-coverage.test.js` reads both artifacts and fails when a name is in one and not the other, in either direction.
+`EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry; issue 1782 merged `<ValidationList>` into it, so the 40 naming headings declare 71 distinct names.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
-`EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry, into which issue 1782 merged `<ValidationList>`, so the 40 naming headings declare 71 distinct names.
 
 A candidate that decomposes entirely into existing members is a COMPOSITION and MUST NOT enter the set; it is recorded with the composition that replaces it so it is not re-proposed.
 A candidate MUST have two or more independent callers to enter the set.
