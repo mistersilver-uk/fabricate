@@ -116,7 +116,7 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   unnamedOutcome: [
     'IssueUnnamedOutcome',
-    'An unnamed tier cannot be routed to a result group. Name every tier.',
+    'An unnamed tier cannot be routed to a result set. Name every tier.',
   ],
   noSuccessOutcome: [
     'IssueNoSuccessOutcome',
@@ -570,11 +570,11 @@ export function countOutcomeCopy(required, record, text) {
     required === 1
       ? text(
           'FABRICATE.Admin.Manager.Checks.Count.Outcomes.SuccessOne',
-          "Reaches 1 success — the {record}'s result group is produced in full."
+          "Reaches 1 success — the {record}'s result set is produced in full."
         )
       : text(
           'FABRICATE.Admin.Manager.Checks.Count.Outcomes.Success',
-          "Reaches {required} successes — the {record}'s result group is produced in full."
+          "Reaches {required} successes — the {record}'s result set is produced in full."
         );
   const failure =
     required === 1
@@ -648,7 +648,7 @@ export function checkTypeOptions(text, { record, records }) {
       description: interpolate(
         text(
           'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixedDesc',
-          'Bands are absolute roll values and never move — 13 to 17 is always Good. {records} carry no DC at all; they only route their result groups to these tiers.'
+          'Bands are absolute roll values and never move — 13 to 17 is always Good. {records} carry no DC at all; they only route their result sets to these tiers.'
         ),
         words
       ),

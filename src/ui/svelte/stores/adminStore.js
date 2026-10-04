@@ -5886,7 +5886,7 @@ export function createAdminStore(services) {
 
     if (strippedGroupCount > 0) {
       services.notify?.info?.(
-        `Removed deleted tier from ${strippedGroupCount} recipe result group(s).`
+        `Removed deleted tier from ${strippedGroupCount} recipe result set(s).`
       );
     }
   }

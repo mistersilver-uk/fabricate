@@ -323,7 +323,7 @@ export const CASES = Object.freeze([
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL, { selector: RESULT_BOX, scroll: true }],
     expectSelector:
       `${RESULT_BOX}[data-roll-success="true"]` +
-      ':has([data-roll-summary]:text-is("The result group is produced.")) ' +
+      ':has([data-roll-summary]:text-is("The result set is produced.")) ' +
       EVIDENCE_ROWS('target', 'preRolled', 'margin'),
     kinds: ['player', 'crafting'],
     sourceMatches: RESULT_SOURCES,
