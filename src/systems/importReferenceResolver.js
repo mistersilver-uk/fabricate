@@ -348,13 +348,16 @@ function rewriteScopeSliceReferences(prepared, remappers, remapId) {
   }
 }
 
-/** Every result a recipe authors, top level and per step. */
+/** Every result a recipe authors, top level and per step, a choice group's members included. */
 function recipeResults(recipe) {
   const groups = [
     ...arrayOf(recipe?.resultGroups),
     ...arrayOf(recipe?.steps).flatMap((step) => arrayOf(step?.resultGroups)),
   ];
-  return [...groups.flatMap((group) => arrayOf(group?.results)), ...arrayOf(recipe?.results)];
+  return [
+    ...groups.flatMap((group) => arrayOf(group?.results)),
+    ...arrayOf(recipe?.results),
+  ].flatMap((result) => [result, ...arrayOf(result?.alternatives)]);
 }
 
 /**
@@ -641,16 +644,7 @@ function collectBrokenInternalReferences(payload, out) {
     for (const alt of arrayOf(ref.alternatives)) reportIngredientRef(alt, owner, ownerType);
   };
   const recipeIds = idSet(payload.recipes);
-  const reportRewardRef = rewardReferenceReporter(payload, recipeIds, push);
-  const reportResultRef = (result, owner, ownerType) => {
-    reportRewardRef(result, owner, ownerType);
-    const references = new Set([result?.componentId, result?.systemItemId].filter(Boolean));
-    for (const componentId of references) {
-      if (!componentIds.has(componentId)) {
-        push(REFERENCE_KINDS.COMPONENT_LINK, ownerType, owner, componentId);
-      }
-    }
-  };
+  const reportResultRef = resultReferenceReporter(payload, { componentIds, recipeIds }, push);
   const reportResultGroups = (resultGroups, owner, ownerType) => {
     for (const group of arrayOf(resultGroups)) {
       for (const result of arrayOf(group?.results)) reportResultRef(result, owner, ownerType);
@@ -724,6 +718,22 @@ function reportRecipeItemLinks(payload, { recipeIds, recipeItemIds }, push) {
       }
     }
   }
+}
+
+/** Reports a result's absent component, taught recipe or unit, a choice group's members included. */
+function resultReferenceReporter(payload, { componentIds, recipeIds }, push) {
+  const reportRewardRef = rewardReferenceReporter(payload, recipeIds, push);
+  const report = (result, owner, ownerType) => {
+    for (const member of arrayOf(result?.alternatives)) report(member, owner, ownerType);
+    reportRewardRef(result, owner, ownerType);
+    const references = new Set([result?.componentId, result?.systemItemId].filter(Boolean));
+    for (const componentId of references) {
+      if (!componentIds.has(componentId)) {
+        push(REFERENCE_KINDS.COMPONENT_LINK, ownerType, owner, componentId);
+      }
+    }
+  };
+  return report;
 }
 
 /** Reports a `knowledge` result's absent taught recipe and a `currency` result's absent unit. */

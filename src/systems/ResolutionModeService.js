@@ -146,10 +146,15 @@ export class ResolutionModeService {
     }
   }
 
-  /** A progressive stage awards one COMPONENT by its difficulty, so a result of another kind, or
-   *  whose component has no positive difficulty, is a misconfiguration (issue 1773). */
+  /** A progressive stage awards one COMPONENT by its difficulty, so a choice group, a result of
+   *  another kind, or one whose component has no positive difficulty is a misconfiguration
+   *  (issue 1773). */
   _progressiveResultIssues(system, results) {
     return results.flatMap((result, index) => {
+      if (Array.isArray(result?.alternatives)) {
+        const message = `Progressive result ${index + 1} cannot be a choice group`;
+        return [{ code: null, params: {}, message }];
+      }
       if ((result?.kind ?? 'component') !== 'component') {
         const message = `Progressive result ${index + 1} must award a component`;
         return [{ code: null, params: {}, message }];
