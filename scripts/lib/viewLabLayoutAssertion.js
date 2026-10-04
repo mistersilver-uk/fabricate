@@ -63,7 +63,7 @@ async function assertGridLayout(page, expectation, label) {
     fillSelector = '',
   } = expectation;
   if (typeof containerSelector !== 'string') {
-    throw new Error(`${label}: a layout expectation needs a containerSelector`);
+    throw new TypeError(`${label}: a layout expectation needs a containerSelector`);
   }
   const container = await requiredLocator(page, containerSelector, 'container', label);
   if (Number.isFinite(maxContentBoxInlineSize)) {

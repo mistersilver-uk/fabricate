@@ -52,8 +52,8 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
-import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
+import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
@@ -807,10 +807,11 @@ test('exactly the declared layout cases carry complete layout expectations', () 
 });
 
 test('the inspector-rail cases measure every verb on the manager rung, one primary in success', () => {
+  const byText = (left, right) => left.localeCompare(right);
   const measured = VIEW_LAB_CASES.flatMap((viewCase) => viewCase.expectLayout?.controls ?? []);
   assert.deepEqual(
-    measured.map((control) => control.selector).sort(),
-    INSPECTOR_VERB_SITES.map((site) => site.selector).sort(),
+    measured.map((control) => control.selector).sort(byText),
+    INSPECTOR_VERB_SITES.map((site) => site.selector).sort(byText),
     'the cases measure exactly the eight rail verbs'
   );
   for (const [id, sites] of Object.entries(CONTROL_LAYOUT_CASES)) {
