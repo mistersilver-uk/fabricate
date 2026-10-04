@@ -173,6 +173,16 @@ function renderReward(entry, localize) {
   ].join('');
 }
 
+/** A reward the player still has to pick in the Journal (issue 1773), as a full-width row. */
+function renderAwardChoice(localize) {
+  return [
+    '<li class="fabricate-craft-chat__item fabricate-craft-chat__item--reward" data-reward-kind="awardChoice">',
+    '<i class="fabricate-craft-chat__icon fa-solid fa-gift" aria-hidden="true"></i>',
+    `<span class="fabricate-craft-chat__label"><span>${esc(localize('FABRICATE.Chat.AwardChoicePending'))}</span></span>`,
+    '</li>',
+  ].join('');
+}
+
 /**
  * Render one image-backed entry (created result, consumed ingredient, or tool)
  * as a list item. `quantity` is rendered as a `N×` prefix when present and > 1.
@@ -183,6 +193,7 @@ function renderReward(entry, localize) {
  * without reaching the card-level total row. An entry without one renders byte-identically.
  */
 export function renderItem(entry, localize = (key) => key) {
+  if (entry?.kind === 'awardChoice') return renderAwardChoice(localize);
   if (Object.hasOwn(RESULT_KIND_GLYPHS, entry?.kind)) return renderReward(entry, localize);
   const { name, img, quantity, rolled } = entry;
   const label = Number(quantity) > 1 ? `${Number(quantity)}× ${esc(name)}` : esc(name);

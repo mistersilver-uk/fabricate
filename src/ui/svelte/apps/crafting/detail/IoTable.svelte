@@ -29,6 +29,7 @@
   import ConsumptionPlanPanel from './ConsumptionPlanPanel.svelte';
   import { essenceOvershoots } from './essenceOvershoot.js';
   import Kicker from '../../../components/Kicker.svelte';
+  import Well from '../../../components/Well.svelte';
   import AwardPill from './AwardPill.svelte';
 
   let {
@@ -185,7 +186,20 @@
       <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Output')}</Kicker>
       <ul class="crafting-io-outputs">
         {#each outputs as item, index (item.name + index)}
-          <AwardPill {item} variant="output" />
+          {#if item.kind === 'group'}
+            <!-- A choice group (issue 1773): who chooses and how many, over its alternatives. -->
+            <li class="crafting-io-output-group" data-io-output="group">
+              <Well label={item.name}>
+                <ul class="crafting-io-outputs">
+                  {#each item.members as member, memberIndex (member.name + memberIndex)}
+                    <AwardPill item={member} variant="output" />
+                  {/each}
+                </ul>
+              </Well>
+            </li>
+          {:else}
+            <AwardPill {item} variant="output" />
+          {/if}
         {/each}
       </ul>
     </div>
@@ -270,5 +284,10 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+  }
+
+  .crafting-io-output-group {
+    flex: 1 1 100%;
+    min-width: 0;
   }
 </style>

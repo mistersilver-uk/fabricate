@@ -335,6 +335,11 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       this._selectTab('crafting');
     };
     services.journal = createJournalStore({ services });
+    // A crafting outcome that left a reward to pick opens that run in the Journal (issue 1773).
+    services.navigateToJournalRun = (runId) => {
+      if (runId) services.journal.select(runId, 'crafting');
+      this._selectTab('journal');
+    };
     return services;
   }
 

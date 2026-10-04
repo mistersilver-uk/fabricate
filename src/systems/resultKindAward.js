@@ -201,7 +201,10 @@ export function awardHistory(items) {
   return { createdResults: awardReceipts(items), ...rewardHistory(items) };
 }
 
-/** What a card states about rewards: one row per credit and grant, and the credit rolls. */
+/**
+ * What a card states about rewards: one row per credit and grant, one row per award choice the
+ * player still owes (issue 1773), and the credit, count and selection rolls.
+ */
 export function rewardChatParts(items) {
   const awards = items?.rewardAwards;
   return {
@@ -213,6 +216,10 @@ export function rewardChatParts(items) {
       ...list(awards?.knowledgeGrants)
         .filter(Boolean)
         .map((grant) => ({ kind: 'knowledge', ...grant })),
+      ...list(items?.groupRecords?.pendingAwardChoices).map(({ choiceId }) => ({
+        kind: 'awardChoice',
+        choiceId,
+      })),
     ],
   };
 }

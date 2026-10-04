@@ -312,6 +312,7 @@
             busy={craftInFlight}
             onCraftNext={onCraft}
             onDismiss={onDismissRun}
+            onOpenRun={(runId) => services?.navigateToJournalRun?.(runId)}
           />
         {:else}
           <ShoppingList

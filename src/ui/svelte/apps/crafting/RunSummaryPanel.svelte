@@ -4,12 +4,14 @@
   just-completed / in-flight craft run. It is a compact, self-contained summary of
   the latest outcome with a "craft next step" advance action (re-invokes
   store.craft for the same recipe — used to advance a progressive run or craft
-  another). A visible/keyboard Back affordance returns to the shopping list. There
-  is NO Journal cross-link in this PR.
+  another). A visible/keyboard Back affordance returns to the shopping list. An
+  outcome that left a reward to pick names it, and `onOpenRun(runId)` opens that
+  run in the Journal (issue 1773).
 -->
 <script>
   import Button from '../../components/Button.svelte';
   import Medallion from '../../components/Medallion.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { localize } from '../../util/foundryBridge.js';
   import CraftButton from './CraftButton.svelte';
@@ -22,6 +24,7 @@
     busy = false,
     onCraftNext = null,
     onDismiss = null,
+    onOpenRun = null,
   } = $props();
 
   const name = $derived(String(recipe?.name ?? ''));
@@ -56,6 +59,19 @@
   </div>
 
   <RollResultBox result={rollResult} />
+
+  {#if rollResult?.awardChoicePending === true}
+    <Notice
+      tone="info"
+      title={localize('FABRICATE.App.Crafting.Run.AwardPending')}
+      detail={localize('FABRICATE.App.Crafting.Run.AwardPendingDetail')}
+      action={{
+        label: localize('FABRICATE.App.Crafting.Run.OpenJournal'),
+        onClick: () => onOpenRun?.(rollResult.runId),
+      }}
+      data-crafting-award-pending=""
+    />
+  {/if}
 
   <div class="crafting-run-action">
     <CraftButton

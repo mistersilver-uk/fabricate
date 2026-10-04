@@ -117,6 +117,30 @@ describe('CraftingView mounted behavior', () => {
     assert.equal(target.querySelector('[data-crafting-shopping]'), null, 'shopping list hidden while the run summary is shown');
   });
 
+  it('1773: an outcome that left a reward to pick names it and opens that run in the Journal', async () => {
+    const opened = [];
+    const store = fakeCraftingStore({
+      recipes: [recipe()],
+      lastRollResult: { 'recipe-1': { success: true, runId: 'run-7', awardChoicePending: true } },
+    });
+    const target = await harness.mount({
+      services: services(store, { navigateToJournalRun: (runId) => opened.push(runId) }),
+    });
+    const notice = target.querySelector('[data-crafting-award-pending]');
+    assert.match(notice.textContent, /Crafting\.Run\.AwardPending/);
+    notice.querySelector('button').click();
+    assert.deepEqual(opened, ['run-7']);
+  });
+
+  it('1773: an outcome that owes nothing names no reward', async () => {
+    const store = fakeCraftingStore({
+      recipes: [recipe()],
+      lastRollResult: { 'recipe-1': { success: true, runId: 'run-7' } },
+    });
+    const target = await harness.mount({ services: services(store) });
+    assert.ok(!target.querySelector('[data-crafting-award-pending]'));
+  });
+
   // Issue 1648: a failed CHECK now records an outcome too.
   it('paints the run summary as a failure when the recorded outcome is a failed check', async () => {
     const built = recipe();
