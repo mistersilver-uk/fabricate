@@ -99,8 +99,8 @@
   const HOVER_GRACE_MS = 150;
   const TOOLTIP_GAP_PX = 7;
 
-  const buttonNodes = {};
-  const tooltipNodes = {};
+  const buttonNodes = $state({});
+  const tooltipNodes = $state({});
   let tablistNode = null;
   let hoverClear = null;
   let tooltipPlacement = $state({ id: null, style: undefined });
