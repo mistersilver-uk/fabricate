@@ -27,11 +27,15 @@ You manage which recipes a book contains on the book's own page in [Books & Scro
 You link recipes to a book from the book's own page in [Books & Scrolls](#books--scrolls), not from the recipe editor.
 Open a recipe item, then use its **Contents** tab to build the list of recipes the book teaches.
 
-- Use **Link recipe** to open a searchable list of the crafting system's recipes not already in this book.
-  Type to find one by name, then choose it to link it.
-  The list stays open, so you can link several recipes in a row.
-- Use **Remove recipe** on a listed recipe to take it out of the book.
-- A book with no recipes yet says so until you link the first one.
+- The recipes already in the book appear as read-only chips.
+  When there are too many to show, the overflow reads **+N more** and opens the picker.
+- Use **Edit recipes** to open a searchable panel of the crafting system's recipes.
+  Type to find one by name, then tick a recipe to add it or untick a linked one to remove it.
+- The panel footer states the pending change, for example "1 to add · 1 to remove".
+  **Clear all** resets your choices.
+- **Apply** links each addition and unlinks each removal in a single change.
+  Pressing Escape, clicking outside the panel, or pressing **Edit recipes** again discards your staged choices.
+- A book with no recipes yet says so until you add the first one.
 
 Because membership works this way, the same recipe can be linked from more than one book, and a single book can teach many recipes.
 The book is backed by a game-world item that sets its name, image, and description.
