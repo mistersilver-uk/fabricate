@@ -6,8 +6,8 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `stages` | `{ id?, name?, value }[]` | `[]` | `value` is the stage's fill, 0–100. `name` is already localized; an unnamed stage is announced as "Stage {index} of {count}". |
-  | `currentIndex` | number | `0` | The stage being worked; its bar takes the accent until it fills. A finished bar reads success and the rest neutral. |
+  | `stages` | `{ id?, name?, value }[]` | `[]` | `value` is the stage's fill, 0–100. `name` is already localized; an unnamed stage is announced as "Stage {index} of {count}", and the only stage of a one-stage list takes the group's own name. |
+  | `currentIndex` | number | `0` | The stage being worked; its bar takes the accent until it fills and carries `aria-current="step"`. A finished bar reads success and the rest neutral. |
   | `numbered` | boolean | `true` | Draws the caption beneath each bar: its position and its name. |
   | `ariaLabel` / `ariaLabelledBy` | string / string | `''` / `''` | Exactly one names the group; `ariaLabelledBy` where the caller renders the kicker. |
 
@@ -42,10 +42,11 @@
   }
 
   function nameOf(stage, index) {
-    return (
-      stage?.name ||
-      localize('FABRICATE.Common.StageBars.Unnamed', { index: index + 1, count: stages.length })
-    );
+    if (stage?.name) return { label: stage.name };
+    if (stages.length === 1 && ariaLabelledBy) return { by: ariaLabelledBy };
+    if (stages.length === 1 && ariaLabel) return { label: ariaLabel };
+    const position = { index: index + 1, count: stages.length };
+    return { label: localize('FABRICATE.Common.StageBars.Unnamed', position) };
   }
 </script>
 
@@ -58,11 +59,14 @@
 >
   {#each stages as stage, index (stage?.id ?? index)}
     {@const tone = toneOf(stage, index)}
+    {@const name = nameOf(stage, index)}
     <span class="fab-stage-bars-stage" data-stage-bars-stage={index} data-stage-bars-state={tone}>
       <span
         class="fab-stage-bars-track"
         role="progressbar"
-        aria-label={nameOf(stage, index)}
+        aria-label={name.label || undefined}
+        aria-labelledby={name.by || undefined}
+        aria-current={index === currentIndex ? 'step' : undefined}
         aria-valuemin="0"
         aria-valuemax="100"
         aria-valuenow={percentOf(stage)}
