@@ -78,7 +78,7 @@ function serializeResultGroup(group) {
   };
 }
 
-/** A crafting recipe; its Recipe mode (`complex`) is an authoring shape, not a resolution mode. */
+/** A crafting recipe; its complexity is emergent from its ingredient-set count, not a stored mode. */
 export class Recipe {
   constructor(data = {}) {
     this.id = data.id || foundry.utils.randomID();

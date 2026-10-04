@@ -69,7 +69,7 @@
   data-recipe-tab="access"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Access', 'Access')}
 >
-  <div class="manager-recipe-tab-intro">
+  <div class="manager-recipe-tab-intro" data-tab-heading>
     <h2 class="manager-recipe-tab-title">
       {text('FABRICATE.Admin.Manager.Recipe.AccessTab.Title', 'Who can craft this')}
     </h2>

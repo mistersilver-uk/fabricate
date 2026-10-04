@@ -1,4 +1,5 @@
 manager-recipe-edit-normal
+manager-recipe-edit-save-failed
 manager-recipe-edit-check-tier-under
 manager-recipe-edit-check-tier-under-attribute
 manager-recipe-edit-check-tier-count
@@ -42,6 +43,8 @@ manager-recipe-edit-results-learning-off
 manager-recipe-edit-results-missing-recipe
 manager-multistep-disable-confirm
 manager-recipe-edit-collapsed
+manager-recipe-edit-ingredients-collapsed
+manager-recipe-edit-results-collapsed
 manager-recipe-edit-results-progressive
 manager-recipe-edit-results-progressive-adder
 manager-recipe-edit-results-alchemy

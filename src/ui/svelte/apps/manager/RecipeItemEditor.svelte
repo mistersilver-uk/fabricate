@@ -1,9 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Recipe-item editor BODY. A fully CONTROLLED component: it holds no draft and no
-  persistence — it renders the tab strip, the active tab panel, and a right rail, and
-  emits callbacks the router (which owns the draft, header, sticky footer, breadcrumb,
-  dirty state and save) merges and persists.
+  Recipe-item editor body, fully controlled: it renders the tab strip, the active panel and a right
+  rail, and emits callbacks the router, which owns the draft, header, dirty state and save, merges.
 
   Layout mirrors the Books & Scrolls prototype "Edit recipe item" screen: a tab bar
   (Overview / Contents / Limits / Validation), the active panel, and a right rail with
@@ -18,12 +16,14 @@
    - visibilityMode: 'item' | 'knowledge' (drives the Limits card and the rail).
    - activeTab / onSelectTab(tabId): the router owns the active tab.
    - validation: optional `{ checks, criticalCount }`; when absent it is computed here.
+   - saveFailed: the router's last save was refused; a blocking notice states it on every tab.
    - onPatch(patch): partial recipe-item patch (deep-merged upstream).
    - onLinkItem(uuid) / onUnlinkItem(): set / clear the linked game-world item.
    - onLinkRecipe(recipeId) / onRemoveRecipe(recipeId): link / unlink a recipe.
 -->
 <script>
   import EmptyState from '../../components/EmptyState.svelte';
+  import Notice from '../../components/Notice.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { prerequisitePreview } from '../../../../systems/characterPrerequisites.js';
@@ -51,6 +51,7 @@
     visibilityMode = 'item',
     activeTab = 'overview',
     validation = null,
+    saveFailed = false,
     onSelectTab = () => {},
     onPatch = () => {},
     onLinkItem = () => {},
@@ -90,18 +91,11 @@
   let tabPanel = $state(null);
 
   /**
-   * Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
-   * the offending control.
-   *
-   * THE ORDER IS THE MECHANISM, not a preference. The route is requested synchronously and
-   * FIRST — `onSelectTab` is the router's own state write, exactly as the tab strip's own click
-   * is — so Svelte has flushed it and the destination panel exists by the time the focus
-   * helper's `queueMicrotask` runs its query. Everything after that — the panel fallback for a
-   * route-only row, the sentence, and the delay that queues it behind the focus utterance —
-   * belongs to `validationAnnouncement.js`, which owns it for all five hosts.
-   *
-   * @param {string} targetTab the ROUTE the row carries.
-   * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   * Deep-link from a validation issue: switch tab, then move focus. The order is the mechanism:
+   * the route is requested synchronously and first, so the destination panel exists by the time
+   * the focus helper's `queueMicrotask` runs; the rest is `validationAnnouncement.js`'s.
+   * @param {string} targetTab the route the row carries.
+   * @param {string} [focusTarget] the control's `data-validation-target` value, if it named one.
    */
   function selectIssue(targetTab, focusTarget) {
     const route = Object.hasOwn(ISSUE_TABS, targetTab) ? targetTab : null;
@@ -407,19 +401,9 @@
   aria-label={text('FABRICATE.Admin.Manager.RecipeItem.EditTitle', 'Edit recipe item')}
   bind:this={editorRoot}
 >
-  <!--
-    THE ROW ACTION'S LIVE REGION, and it is HOSTED HERE rather than in the validation surface
-    for a reason that is not stylistic (issue 1517). Activating a row action changes `activeTab`
-    to another value, which unmounts the whole validation panel — live region included — in the
-    same update that was supposed to announce. So the element carrying `aria-live` is ALWAYS in
-    the DOM, outside both the `{#if recipeItem}` guard and the `{#if activeTab}` chain below,
-    with its own `{#if}` INSIDE it.
-
-    `.visually-hidden` is `position: absolute`, so this element is out of flow and takes no track
-    in the route's layout.
-
-    It is addressed by a `data-` hook rather than a class, so it joins no pinned class family.
-  -->
+  <!-- The row action's live region (issue 1517): a row action unmounts the validation panel in
+       the update meant to announce, so this stays in the DOM outside both guards with its own
+       `{#if}`, out of flow (no layout track) and hooked by `data-` (no pinned class family). -->
   <div class="visually-hidden" role="status" aria-live="polite" data-recipe-item-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
   </div>
@@ -428,10 +412,24 @@
       <div class="manager-recipe-item-editor-body">
         <RecipeItemEditorTabs {activeTab} {badges} onSelect={onSelectTab} />
 
-        <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus
-             destination (issue 1517): a row that names a tab and no control leaves focus on a
-             button this update unmounts, and `<body>` is where every Foundry keybinding is
-             live. `-1`, not `0`: the panel is a programmatic destination, not a tab stop. -->
+        <!-- The page notice position, inset as the panel insets its cards (issue 1522). -->
+        {#if saveFailed}
+          <div class="manager-editor-notice-position" data-notice-position="page">
+            <Notice
+              blocking
+              tone="danger"
+              data-recipe-item-save-error
+              title={text('FABRICATE.Admin.Manager.RecipeItem.SaveFailed', 'Save failed')}
+              detail={text(
+                'FABRICATE.Admin.Manager.RecipeItem.SaveFailedDetail',
+                'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+              )}
+            />
+          </div>
+        {/if}
+
+        <!-- The route-only row's focus destination (issue 1517): its row leaves focus on a button
+             this update unmounts. `-1`, not `0`: a programmatic destination, not a tab stop. -->
         <div
           class="manager-editor-tab-panel manager-recipe-item-editor-panel"
           role="tabpanel"

@@ -108,7 +108,7 @@
   data-recipe-tab="books-scrolls"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.BooksScrolls', 'Books & Scrolls')}
 >
-  <div class="manager-recipe-tab-intro">
+  <div class="manager-recipe-tab-intro" data-tab-heading>
     <h2 class="manager-recipe-tab-title">
       {text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.Title', 'Appears in')}
     </h2>

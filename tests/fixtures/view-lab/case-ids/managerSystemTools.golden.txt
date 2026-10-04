@@ -16,6 +16,7 @@ manager-tool-rules-breakage-overridden-1280x720
 manager-tool-editor-rail-scrolled-1280x720
 manager-tool-preview-actor-list
 manager-tool-editor-dirty-1280x720
+manager-tool-editor-save-failed
 manager-tool-parity-02-remove-1280x720
 manager-tool-stress-long-name
 manager-tool-parity-03-breakage-1280x720

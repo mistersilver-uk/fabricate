@@ -23,7 +23,11 @@
   } = $props();
 </script>
 
-<section class="manager-edit-card manager-scoped-shared-card" data-scoped-shared-definition>
+<section
+  class="manager-edit-card manager-scoped-shared-card"
+  data-scoped-shared-definition
+  data-tab-heading
+>
   <div class="manager-scoped-shared-head">
     <Medallion {icon} {tint} size={40} glyph={20} />
     <div class="manager-scoped-shared-copy">

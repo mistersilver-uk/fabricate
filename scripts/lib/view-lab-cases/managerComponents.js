@@ -567,6 +567,26 @@ export const CASES = Object.freeze([
     // The three complication components are claimed by the four complication and stage-strip cases below (issue 1286).
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
+  // Issue 1522: the refused save's blocking notice, a row of the entry column above the scroller.
+  managerCase({
+    id: 'manager-component-edit-save-failed',
+    label: 'Manager — Component edit save failed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { saveFails: '1' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-edit]' },
+      { selector: '[data-component-edit-tag-toggle]' },
+      { selector: '[data-component-edit-save]' },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager #manager-component-edit-form > [data-notice-position] > [role="alert"]',
+    expectCenterHit: '#manager-component-edit-form > [data-notice-position] > [role="alert"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  }),
   managerCase({
     // The other consumer of the shared frame, stacked (issue 1371 r19-entry2).
     id: 'manager-component-edit-stacked',

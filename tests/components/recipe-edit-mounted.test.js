@@ -169,8 +169,10 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/ToggleCard.svelte',
   // The switch that card composes (issue 1040). Omitting it HANGS the suite.
   'src/ui/svelte/components/StatusToggle.svelte',
-  // The resolution-mode banner heads every editor tab (issue 643 §5).
-  'src/ui/svelte/apps/manager/recipe/RecipeModeBanner.svelte',
+  // The resolution-mode callout heads the tabs the mode shapes (issue 1522).
+  'src/ui/svelte/apps/manager/recipe/RecipeModeCallout.svelte',
+  // The failed save's blocking notice (issue 1522).
+  'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
   'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
@@ -2946,8 +2948,8 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('progressive: the reorder card is placed ABOVE the result sets, under the info strip', async () => {
-    // Issue 676: matching the progressive SALVAGE editor.
+  it('progressive: the reorder card leads, and the info strip sits directly above the list', async () => {
+    // Issue 1522: an info strip precedes the cards it describes, so it follows the policy card.
     const { target } = await mountProgressiveResults([
       { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
     ]);
@@ -2956,12 +2958,12 @@ describe('RecipeEditView (mounted)', () => {
     const card = reorderCard(target);
     assert.ok(strip && results && card);
     assert.ok(
-      strip.compareDocumentPosition(card) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
-      'the reorder card follows the info strip'
+      card.compareDocumentPosition(strip) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
+      'the info strip follows the reorder card'
     );
     assert.ok(
-      card.compareDocumentPosition(results) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
-      'the result sets follow the card — the policy is stated before the list it governs'
+      strip.compareDocumentPosition(results) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
+      'the result sets follow the strip that explains their order'
     );
     editHarness.remount();
   });

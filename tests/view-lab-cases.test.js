@@ -1263,9 +1263,11 @@ test('the capture runner threads the per-case console allowance into the render'
     // The Knowledge error frame's rejected read is rethrown by the store (issue 1969), and a failed
     // roll-under or counting craft or salvage raises the resolved-failure toast the lab reports as
     // a warning (issues 2005, 2092, 2006, 2007 and 2132). The GM complication card's skipped macro
-    // is reported as a warning beside the card that names it (issue 2153).
+    // is reported as a warning beside the card that names it (issue 2153). A refused Tool save
+    // raises the store's own failure toast (issue 1522).
     [
       'manager-recipes-blocked-enable-flash',
+      'manager-tool-editor-save-failed',
       'manager-knowledge-error',
       'player-salvage-under-result-fail',
       'player-crafting-roll-result-under-fail',

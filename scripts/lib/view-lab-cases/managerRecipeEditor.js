@@ -77,6 +77,27 @@ export const CASES = Object.freeze([
       CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
+  // Issue 1522: the refused save's blocking notice, in the page position above the scrolling panel.
+  managerCase({
+    id: 'manager-recipe-edit-save-failed',
+    label: 'Manager — Recipe edit save failed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { saveFails: '1' },
+    steps: [
+      'Crafting',
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-field="name"]', fill: 'Moonlit Draught' },
+      { selector: '.manager-header-actions .fabricate-button.is-primary' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-manager [data-recipe-editor] > [data-notice-position] > [role="alert"]',
+    expectCenterHit: '[data-recipe-editor] > [data-notice-position] > [role="alert"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/],
+  }),
   // Issue 2005 (T6): the Check tier select names a roll-under Target, or a character value's adjustment.
   ...[
     [
@@ -1137,6 +1158,31 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
+  // Issue 1522: on the tabs a collapsed chain empties, its note is lede text in the heading block.
+  ...[
+    ['manager-recipe-edit-ingredients-collapsed', 'ingredients', 'data-recipe-collapsed-note'],
+    ['manager-recipe-edit-results-collapsed', 'results', 'data-recipe-collapsed-results-note'],
+  ].map(([id, tab, note]) =>
+    managerCase({
+      id,
+      label: `Manager — Recipe edit ${tab} collapsed`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-jewelry' },
+      steps: [
+        'Crafting',
+        { selector: '[data-recipe-edit="jw-r-circlet"]' },
+        { selector: `#recipe-tab-${tab}` },
+      ],
+      expectView: 'recipe-edit',
+      expectSelector: `[data-recipe-tab="${tab}"] [data-tab-heading] [${note}]`,
+      kinds: ['manager', 'recipes'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      ],
+    })
+  ),
   managerCase({
     id: 'manager-recipe-edit-results-progressive',
     label: 'Manager — Recipe edit results progressive',

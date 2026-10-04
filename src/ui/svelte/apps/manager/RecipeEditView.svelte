@@ -13,10 +13,11 @@
 -->
 <script>
   import EmptyState from '../../components/EmptyState.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import RecipeEditorTabs from './recipe/RecipeEditorTabs.svelte';
-  import RecipeModeBanner from './recipe/RecipeModeBanner.svelte';
+  import RecipeModeCallout from './recipe/RecipeModeCallout.svelte';
   import RecipeOverviewTab from './recipe/RecipeOverviewTab.svelte';
   import RecipeIngredientsTab from './recipe/RecipeIngredientsTab.svelte';
   import RecipeResultsTab from './recipe/RecipeResultsTab.svelte';
@@ -31,7 +32,6 @@
   } from './recipe/recipeReadiness.js';
   import { focusValidationTarget } from './validationFocus.js';
   import { announceValidationOutcome } from './validationAnnouncement.js';
-  import { resolutionModeOptions } from './resolutionModeOptions.js';
 
   let {
     recipe = null,
@@ -89,8 +89,8 @@
     // `component.difficulty` is consumed by recipes, salvage, gathering AND system validation, so
     // a progressive result row deep-links to the component editor rather than stepping it here.
     onOpenComponent = () => {},
-    // The SYSTEM's resolution mode. Never per-recipe: the banner reports it on every tab and
-    // routes to Crafting Settings, which is the only place it can change.
+    // The system's resolution mode. Never per-recipe: the mode callout reports it on the tabs it
+    // shapes and routes to Crafting Settings, which is the only place it can change.
     resolutionMode = 'simple',
     // The craftingEffect matrix row gating the Access and Books & Scrolls tabs (676); not `effect`.
     visibilityEffect = { showAccess: false, showBooksScrolls: true },
@@ -340,14 +340,6 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // The resolution-mode banner's copy and icon are NOT re-authored: `resolutionModeOptions.js`
-  // owns the canonical list, and the lookup lives here so a second banner can reuse the chrome with
-  // its own copy — folding it back into `RecipeModeBanner` would re-create the drift.
-  const modeOption = $derived(
-    resolutionModeOptions.find((option) => option.value === resolutionMode) ||
-      resolutionModeOptions[0]
-  );
-
   // Always editable: `recipeIds[]` is many-to-many, so this mirrors no single linked item.
   async function chooseImage() {
     if (typeof onPickImagePath !== 'function') return;
@@ -415,6 +407,10 @@
   }
 </script>
 
+{#snippet modeCallout()}
+  <RecipeModeCallout mode={resolutionMode} {text} {onOpenCraftingSettings} />
+{/snippet}
+
 <main
   class="manager-main manager-recipe-edit-main"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}
@@ -432,8 +428,6 @@
   </div>
   {#if recipe}
     <div class="fab-stack" data-gap="3" data-recipe-editor>
-      <!-- Header, tabs, banner, content (§4.2): the banner sits BELOW the tab strip so the tabs
-           stay attached to the header above them. -->
       <RecipeEditorTabs
         {activeTab}
         {badges}
@@ -443,23 +437,21 @@
         }}
       />
 
-      <RecipeModeBanner
-        value={modeOption.value}
-        icon={modeOption.icon}
-        kicker={text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Kicker', 'Resolution mode')}
-        label={text(modeOption.labelKey, modeOption.fallback)}
-        scope={text(
-          'FABRICATE.Admin.Manager.Recipe.ModeBanner.SetForSystem',
-          'set for this crafting system'
-        )}
-        description={text(modeOption.descKey, modeOption.descFallback)}
-        actionLabel={text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Settings', 'System settings')}
-        actionHint={text(
-          'FABRICATE.Admin.Manager.Recipe.ModeBanner.SettingsHint',
-          'Resolution mode is set for the whole crafting system, not per recipe.'
-        )}
-        onAction={onOpenCraftingSettings}
-      />
+      <!-- The blocking notice's page position, outside the scroller so a failed save stays in view
+           on every tab, inset as the panel insets its cards. -->
+      {#if saveFailed}
+        <div class="manager-editor-notice-position" data-notice-position="page">
+          <Notice
+            blocking
+            tone="danger"
+            title={text('FABRICATE.Admin.Manager.Recipe.SaveFailed', 'Save failed')}
+            detail={text(
+              'FABRICATE.Admin.Manager.Recipe.SaveFailedDetail',
+              'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+            )}
+          />
+        </div>
+      {/if}
 
       <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus
            destination (issue 1517), since `<body>` is where every Foundry keybinding is live. `-1`,
@@ -475,13 +467,13 @@
       >
         {#if activeTab === 'overview'}
           <RecipeOverviewTab
+            {modeCallout}
             {recipe}
             {name}
             {description}
             {img}
             {enabled}
             {saving}
-            {saveFailed}
             {onPickImagePath}
             onNameInput={(value) => onUpdateRecipe({ name: value })}
             onDescriptionInput={(value) => onUpdateRecipe({ description: value })}
@@ -515,6 +507,7 @@
           />
         {:else if activeTab === 'ingredients'}
           <RecipeIngredientsTab
+            {modeCallout}
             {recipe}
             {canAddSet}
             {isMultiStep}
@@ -531,6 +524,7 @@
           />
         {:else if activeTab === 'results'}
           <RecipeResultsTab
+            {modeCallout}
             recipe={resultsRecipe}
             {alchemySimple}
             {simpleFailureSlot}
@@ -554,6 +548,7 @@
           />
         {:else if activeTab === 'tools'}
           <RecipeToolsTab
+            {modeCallout}
             {recipe}
             {isMultiStep}
             {collapsed}
