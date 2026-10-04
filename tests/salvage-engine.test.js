@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import { createPersistedSalvageHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
+import { rollDataRollClass, withRoll } from './helpers/seededRoll.js';
 
 for (const timed of [false, true]) {
   test(`real salvage writer keeps duplicate-source row linkage through reload and projection (timed=${timed})`, async () => {
@@ -2144,6 +2145,48 @@ test('processPendingSalvageRuns() auto-completes timed salvage runs after world-
     1,
     'timed completion should create results automatically'
   );
+});
+
+test('1516: a resumed timed salvage refused by the actor’s new roll data fails its run, consuming nothing', async () => {
+  const engine = makeEngine();
+  const { salvageRunManager } = engine;
+  const compItem = makeItem('comp-item', 'Dormant Core', 1);
+  const actor = makeActor('actor-refused', [compItem]);
+  const rolled = { id: 'r-1', componentId: 'shard', quantity: 1, quantityFormula: '1d4 + @bonus' };
+  const component = {
+    id: 'comp-resume',
+    name: 'Dormant Core',
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      resultGroups: [{ id: 'rg-1', name: 'Shards', results: [rolled] }],
+      timeRequirement: { minutes: 5 },
+    },
+  };
+  const system = makeSystem({
+    id: 'sys-refused',
+    components: [component, { id: 'shard', name: 'Shard' }],
+  });
+  setupGame(system, actor);
+  globalThis.game.actors = [actor];
+
+  await withRoll(rollDataRollClass().Roll, async () => {
+    actor.getRollData = () => ({ bonus: 2 });
+    const started = await engine.salvage(actor.uuid, system.id, component.id);
+    assert.equal(started.salvageRun?.status, 'waitingTime');
+
+    actor.getRollData = () => ({ bonus: 'Elf' });
+    globalThis.game.time.worldTime = started.salvageRun.timeGate.availableAt;
+    await engine.processPendingSalvageRuns(globalThis.game.time.worldTime);
+  });
+
+  assert.equal(compItem.system.quantity, 1, 'the core is still there');
+  assert.ok(!compItem.updateCalled && !compItem.deleteCalled, 'and nothing touched it');
+  assert.equal(actor.createdItems.length, 0, 'no shard was awarded');
+  assert.equal(salvageRunManager.getActiveRuns(actor).length, 0, 'the run is no longer active');
+  const [run] = salvageRunManager.getRunHistory(actor);
+  assert.equal(run?.status, 'failed');
+  assert.match(run.failureReason, /Invalid salvage configuration: .*cannot be rolled for this character/);
 });
 
 // Group 7 (issue 859): the additive `salvage()` return flags, and `suppressChat`, each driven

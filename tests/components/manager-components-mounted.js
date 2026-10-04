@@ -958,13 +958,14 @@ export function registerComponentsCases() {
     );
   });
 
-  it('the salvage yield picker is NOT filtered by the component browser search', async () => {
-    // THE DEFECT (issue 676): `salvageComponentOptions` projected from `itemCards`.
+  it('the salvage result adder is NOT filtered by the component browser search', async () => {
+    // THE DEFECT (issue 676): `salvageComponentOptions` projected from `itemCards`. The rows
+    // name from the same options, through the requirement row (issue 1516).
     const calls = [];
     await openComponentSalvageEditor(calls, {
       // Matches ONLY "Iron Ore" (c1) — the component being edited.
       itemSearchTerm: 'iron',
-      salvageResolutionMode: 'progressive',
+      salvageResolutionMode: 'simple',
       componentSalvage: {
         enabled: true,
         resultGroups: [
@@ -974,7 +975,7 @@ export function registerComponentsCases() {
     });
 
     const root = target.querySelector('.fabricate-manager');
-    target.querySelector('.manager-salvage-component-trigger').click();
+    target.querySelector(':scope [data-salvage-section] [data-add-salvage-result]').click();
     await tick();
     flushSync();
 
@@ -1036,7 +1037,11 @@ export function registerComponentsCases() {
     section.querySelector('[data-add-salvage-group]').click();
     await tick();
     flushSync();
-    target.querySelector('[data-salvage-section] [data-add-salvage-result]').click();
+    // The adder picks the component it adds (issue 1516).
+    target.querySelector(':scope [data-salvage-section] [data-add-salvage-result]').click();
+    await tick();
+    flushSync();
+    target.querySelector(':scope .fabricate-manager .manager-travel-option').click();
     await tick();
     flushSync();
 

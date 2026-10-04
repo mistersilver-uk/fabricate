@@ -80,11 +80,12 @@ async function assertFillsGrid(page, grid, { gridSelector, fillSelector }, label
 
 /**
  * The requirement row's geometry (issue 1516): `oneLineRows` rows whose direct children share a
- * line, `alignedRight` and `alignedLeft` controls on one edge, and `minInlineSize`
+ * line, `wrappedRows` `{ rows, lines }` rows whose `lines` of selectors each share a line below the
+ * last, `alignedRight` and `alignedLeft` controls on one edge, and `minInlineSize`
  * `{ selector, pixels }` fields no narrower than their stated minimum.
  */
 async function assertRowGeometry(page, expectation, label) {
-  const { oneLineRows, alignedRight, alignedLeft, minInlineSize } = expectation;
+  const { oneLineRows, wrappedRows, alignedRight, alignedLeft, minInlineSize } = expectation;
   if (oneLineRows) {
     const rows = await measureAll(page, oneLineRows, { label, measure: childSpans });
     for (const [index, spans] of rows.entries()) {
@@ -102,6 +103,13 @@ async function assertRowGeometry(page, expectation, label) {
             `${(stray[0] + stray[1]) / 2}px lies outside the first child's ${bandTop}-${bandBottom}px`
         );
       }
+    }
+  }
+  if (wrappedRows) {
+    const { rows, lines } = wrappedRows;
+    const measured = await measureAll(page, rows, { label, measure: lineSpans, arg: lines });
+    for (const [index, spans] of measured.entries()) {
+      assertLines(spans, lines, `${label}: ${rows} #${index + 1}`);
     }
   }
   for (const [selector, edge] of [
@@ -141,6 +149,39 @@ function childSpans(rows) {
       .filter((box) => box.width > 0 && box.height > 0)
       .map((box) => [box.top, box.bottom])
   );
+}
+
+function lineSpans(rows, lines) {
+  return rows.map((row) =>
+    lines.map((line) =>
+      line.map((selector) => {
+        const box = row.querySelector(selector)?.getBoundingClientRect();
+        return box && box.width > 0 && box.height > 0 ? [box.top, box.bottom] : null;
+      })
+    )
+  );
+}
+
+/** Each line's boxes centred on its first box's band, and each line wholly below the one before. */
+function assertLines(spans, lines, where) {
+  let above = -Infinity;
+  for (const [line, boxes] of spans.entries()) {
+    const missing = boxes.indexOf(null);
+    if (missing !== -1) throw new Error(`${where} has no visible ${lines[line][missing]}`);
+    const [bandTop, bandBottom] = boxes[0];
+    const stray = boxes.findIndex(([top, bottom]) => {
+      const centre = (top + bottom) / 2;
+      return centre < bandTop || centre > bandBottom;
+    });
+    if (stray !== -1) throw new Error(`${where}: ${lines[line][stray]} is off line ${line + 1}`);
+    const top = Math.min(...boxes.map(([edge]) => edge));
+    if (top < above) {
+      throw new Error(
+        `${where}: line ${line + 1} starts at ${top}px, above line ${line}'s ${above}px end`
+      );
+    }
+    above = Math.max(...boxes.map(([, edge]) => edge));
+  }
 }
 
 function boxEdge(elements, key) {
