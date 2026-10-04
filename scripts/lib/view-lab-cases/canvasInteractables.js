@@ -69,6 +69,29 @@ export const CASES = Object.freeze([
       /^src\/ui\/InteractableBrowserApp\.svelte\.js$/,
     ],
   }),
+  browserCase({
+    id: 'interactables-browser-no-matches',
+    label: 'Interactable browser — search matches no Tool',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      ...chooseSelectOption(
+        '[data-interactable-browser-system]',
+        'lab-smithing',
+        '.fabricate-interactable-browser-app'
+      ),
+      { selector: '[data-interactable-browser-search]', fill: 'zzzz' },
+    ],
+    // The search-empty note, which is not the system-has-no-tools note.
+    expectSelector:
+      '#fab-ib-panel-tools .manager-empty.is-note[data-interactable-browser-empty="no-matches"]',
+    expectNoHorizontalOverflow: ['.fabricate-interactable-browser', '#fab-ib-panel-tools'],
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableBrowserRoot\.svelte$/,
+      /^src\/ui\/InteractableBrowserApp\.svelte\.js$/,
+    ],
+  }),
   configCase({
     id: 'interactables-config-configured',
     label: 'Interactable config — configured gathering-task interactable',
@@ -203,7 +226,8 @@ export const CASES = Object.freeze([
     // A world whose scene carries no `fabricate.interactable` behaviour at all.
     query: { noInteractables: '1' },
     steps: [],
-    expectSelector: '.fabricate-interactables-manager-body .fab-im-list-section .fab-im-empty',
+    expectSelector:
+      '.fabricate-interactables-manager-body .fab-im-list-section .manager-empty:not(.is-note):not(.is-filtered)[data-interactable-manager-empty]',
     kinds: ['canvas', 'interactables'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/interactables\//,

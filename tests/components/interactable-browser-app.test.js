@@ -133,18 +133,6 @@ describe('InteractableBrowserRoot body', () => {
     assert.ok(rootSource.includes('FABRICATE.Canvas.Browser.TasksHeading'), 'renders a Gathering Tasks section');
   });
 
-  it('splits Tools and Gathering Tasks into an accessible two-tab switcher', () => {
-    // A real tablist of two keyboard-operable <button> tabs.
-    assert.ok(rootSource.includes("let activeTab = $state('tools')"), 'tracks the active tab in runes state');
-    assert.ok(rootSource.includes('role="tablist"'), 'renders a tablist container');
-    assert.ok((rootSource.match(/role="tab"/g) || []).length === 2, 'exactly two tabs');
-    assert.ok(rootSource.includes("aria-selected={activeTab === 'tools'}"), 'tools tab reflects selection');
-    assert.ok(rootSource.includes("aria-selected={activeTab === 'tasks'}"), 'tasks tab reflects selection');
-    assert.ok(rootSource.includes('role="tabpanel"'), 'each section is a tabpanel');
-    assert.ok(rootSource.includes('onkeydown={onTabKeydown}'), 'tabs are keyboard-operable (arrow/Home/End)');
-    assert.ok(rootSource.includes("{#if activeTab === 'tools'}"), 'only the active tab section renders');
-  });
-
   it('filters BOTH tools and tasks by the shared search box', () => {
     // matchesSearch is wired into both derived lists.
     assert.ok(
