@@ -210,7 +210,8 @@ export function groupEvidenceFields(source = {}) {
     ['groupAwards', groupAwardRecord],
     ['pendingAwardChoices', pendingAwardChoiceRecord],
   ]) {
-    if (Array.isArray(source?.[key])) evidence[key] = source[key].map(record).filter(Boolean);
+    if (Array.isArray(source?.[key]))
+      evidence[key] = source[key].map((entry) => record(entry)).filter(Boolean);
   }
   return evidence;
 }
@@ -275,7 +276,7 @@ export function awardPickRefusal(choice, picks, isClaimable) {
   const members = new Map(list(choice.alternatives).map((member) => [member.id, member]));
   if (picks.some((id) => !members.has(id))) return 'A pick names no alternative of this choice';
   if (new Set(picks).size !== picks.length) return 'An alternative can be picked once';
-  const claimable = [...members.values()].filter(isClaimable);
+  const claimable = [...members.values()].filter((member) => isClaimable(member));
   if (picks.length === 0) return claimable.length > 0 ? 'Pick a reward to claim' : null;
   if (picks.length > choiceCeiling(choice)) return 'Too many rewards were picked';
   if (picks.some((id) => !isClaimable(members.get(id)))) return 'A picked reward cannot be claimed';
