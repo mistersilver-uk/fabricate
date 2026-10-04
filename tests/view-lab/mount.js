@@ -203,6 +203,9 @@ function readParams() {
         ? { width: Number(params.get('w')), height: Number(params.get('h')) }
         : null,
     chromeOnly: params.get('chromeOnly') === '1',
+    // Mount a fixture-only SPECIMEN in the window instead of the window's own root, by the key
+    // `LAB_SPECIMENS` declares (issue 1782).
+    specimen: params.get('specimen') ?? null,
     // Who is looking. Defaults below to the viewer each window is normally used by — player for the
     // player app, GM for the manager — because that is what every existing case assumes (issue
     // 901).
@@ -692,6 +695,36 @@ async function mountManagerApp(content, params) {
 }
 
 /**
+ * Fixture-only SPECIMENS (issue 1782): wrappers under `tests/view-lab/fixtures/` that mount one
+ * shipped component directly, for props no shipped caller passes yet. Nothing in `src/` imports
+ * them, so a specimen frame depicts a state no GM can reach, and its case label says so.
+ */
+const LAB_SPECIMENS = Object.freeze({
+  'bulk-edit-panel-shell': () => import('./fixtures/BulkEditPanelShellStates.svelte'),
+});
+
+/**
+ * Mount a specimen into the built frame in place of the window's own root.
+ *
+ * @param {HTMLElement} content The frame's `.window-content`.
+ * @param {object} params The parsed query params.
+ * @returns {Promise<{instance: object, services: null, props: object}>} The mounted specimen.
+ */
+async function mountSpecimen(content, params) {
+  const load = LAB_SPECIMENS[params.specimen];
+  // Loudly, and by name, as an unknown interactable is: a blank window would publish as evidence.
+  if (!load) {
+    throw new Error(
+      `view lab: unknown specimen "${params.specimen}"; ` +
+        `mount.js declares ${Object.keys(LAB_SPECIMENS).join(', ')}`
+    );
+  }
+  const { default: Specimen } = await load();
+  const props = {};
+  return { instance: mount(Specimen, { target: content, props }), services: null, props };
+}
+
+/**
  * The mount path for the window a case names (issue 1520).
  *
  * @param {HTMLElement} content The frame's `.window-content`.
@@ -699,6 +732,7 @@ async function mountManagerApp(content, params) {
  * @returns {Promise<object>} The mounted window.
  */
 async function mountAppFor(content, params) {
+  if (params.specimen) return mountSpecimen(content, params);
   if (params.appId === 'fabricate-app') return mountPlayerApp(content, params);
   if (params.appId === 'fabricate-crafting-system-manager') return mountManagerApp(content, params);
   if (CANVAS_APP_MOUNTS[params.appId]) return mountCanvasApp(content, params);

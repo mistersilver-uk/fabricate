@@ -59,10 +59,10 @@
     {
       "path": "src/ui/svelte/apps/manager/BulkEditPanelShell.svelte",
       "library": "<BulkEditPanel>",
-      "status": "target",
+      "status": "shipped",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "The bulk panel shell (3 callers, issue 1010). `library.html:1134` names it and calls this \"the largest uncovered surface in the corpus\". Targeted: exactly two studios consume it and both claim it by `sourceMatches`. Scoped `manager-only`: it is the manager studios’ bulk rail, and its own scoped block writes four `:global` Apply rules at four classes against the manager button cascade specifically."
+      "why": "The bulk panel shell (5 callers, issue 1010): `recipes/RecipeBulkEditPanel`, `essences/EssenceBulkEditPanel`, `components/ComponentBulkEditPanel`, `scoped/ComponentCatalogueBulkPanel` and `scoped/ToolCatalogueBulkPanel`. `library.html:1358` names it, and it is `shipped` since issue 1782 built the entry's `blocked`, `report` and `subjectCount` and redrew the specimen from the Essence Rules browser, moving no screen. Targeted: the studios that render it claim it by `sourceMatches`. Scoped `manager-only`: it is the manager studios’ bulk rail, and its own scoped block writes four `:global` Apply rules at four classes against the manager button cascade specifically."
     },
     {
       "path": "src/ui/svelte/apps/manager/BulkEditSection.svelte",
@@ -75,10 +75,10 @@
     {
       "path": "src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte",
       "library": "<SelectionBar>",
-      "status": "target",
+      "status": "shipped",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "The bulk selection toolbar (3 callers, issue 1010). Named at `library.html:1134`. Targeted for the same reason as its shell. Scoped `manager-only`: it reports a manager studio’s selection count and drives that studio’s bulk actions."
+      "why": "The bulk selection toolbar (4 callers, issue 1010): `RecipesBrowserView`, `EssenceBrowserView`, `ComponentsBrowserView` and `scoped/EntityListInspectorFrame`. Named at `library.html:1358`, and `shipped` with its shell at issue 1782. Targeted for the same reason as its shell. Scoped `manager-only`: it reports a manager studio’s selection count and drives that studio’s bulk actions."
     },
     {
       "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",

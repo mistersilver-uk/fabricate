@@ -41,6 +41,7 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     // The three insets (issue 1371 r16-list) and the dock's danger control. Both are STATIC
     // imports of the component under test; omitting either HANGS this suite as `# cancelled`.

@@ -46,6 +46,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     // THE BULK PANEL AND THE SHARED CHROME IT COMPOSES (issue 1373, maintainer feedback round 2).
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte',
     'src/ui/svelte/components/Callout.svelte',
