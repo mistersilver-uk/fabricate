@@ -538,6 +538,7 @@ describe('run primitives mounted behavior', () => {
       held: () => 3,
       spare: () => 1,
       essenceLabel: (essence) => `${essence} channelled`,
+      meterValueLabel: (got, need) => `${got} of ${need}`,
       sourceReading: (_source, contributions, held, spare) =>
         `${contributions.map((entry) => `+${entry.amount} ${entry.label}`).join(' · ')} each · ${held} held · ${spare} spare`,
       overshootLabel: (essence, amount) => `${essence} is ${amount} over the requirement`,
@@ -556,6 +557,13 @@ describe('run primitives mounted behavior', () => {
       '3',
       'overshoot does not put the meter value beyond its maximum'
     );
+    const radiant = target.querySelector('[data-essence-threshold="radiant"]');
+    const head = radiant.querySelector('.fab-essence-name');
+    const radiantMeter = radiant.querySelector('[role="meter"]');
+    assert.ok(head.id, 'the drawn essence name carries an id');
+    assert.equal(radiantMeter.getAttribute('aria-labelledby'), head.id, 'and names the meter');
+    assert.ok(!radiantMeter.querySelector('.visually-hidden'), 'no second copy of the name');
+    assert.equal(radiantMeter.getAttribute('aria-valuetext'), '4 of 4', 'the caller words the reading');
     const overshoot = target.querySelector('[data-essence-overshoot]');
     assert.match(overshoot.textContent, /shadow channelled is 1 over/u);
     assert.ok(
@@ -594,6 +602,8 @@ describe('run primitives mounted behavior', () => {
       progress.querySelector('.fab-run-progress-kicker').id,
       'the drawn kicker names the stage group'
     );
+    assert.ok(!group.hasAttribute('aria-label'), 'exactly one naming route');
+    assert.ok(!group.querySelector('.fab-stage-bars-caption'), 'the run heading draws no captions');
     expectGeometry('StageBars', '.fab-stage-bars-track', [/height:\s*6px/u, /border-radius:\s*999px/u]);
 
     const nav = await stageNavHarness.mount({

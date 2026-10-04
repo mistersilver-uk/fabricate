@@ -182,6 +182,8 @@ describe('RunCard mounted behavior', () => {
       'FABRICATE.App.Journal.Progress.Label',
       'the stage group carries the localized progress label'
     );
+    assert.ok(!group.hasAttribute('aria-labelledby'), 'exactly one naming route');
+    assert.ok(!group.querySelector('.fab-stage-bars-caption'), 'the card draws no captions');
     const bar = group.querySelector('[role="progressbar"]');
     assert.equal(bar.getAttribute('aria-valuenow'), '50', 'the one stage reads its clock');
     assert.equal(bar.getAttribute('aria-label'), 'Brew', 'and is named by its stage');

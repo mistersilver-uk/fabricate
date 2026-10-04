@@ -275,7 +275,7 @@ describe('Theme colour contract', () => {
 
   // Issue 1782: a banded fill is a ramp key or a semantic tone, so the ramp's tokens are the whole
   // of what a fill can paint. A token this module emits that no theme declares paints nothing.
-  it('declares every token the drop-rate ramp emits, and the chance bar mixes no colour', () => {
+  it('declares every token the drop-rate ramp emits, and the banded bars mix no colour', () => {
     const css = readFileSync(cssPath, 'utf8');
     const declared = tokenNames(stripCommentedSource(blockFor(css, themeSelectors.fabricate)));
     // Every fill the ramp can resolve, read through its own functions rather than its text.
@@ -292,12 +292,14 @@ describe('Theme colour contract', () => {
       'every token util/dropRateTier.js emits is declared in the fabricate theme block'
     );
 
-    // ratchet-exempt(source-pin): issue 1782 V&A 4 names this absence; a mix is invisible to a mount
-    const chanceBar = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/gathering/ChanceBar.svelte'),
-      'utf8'
-    );
-    assert.doesNotMatch(chanceBar, /color-mix\(/u, 'the event scale names a theme token instead');
+    for (const path of [
+      'src/ui/svelte/apps/gathering/ChanceBar.svelte',
+      'src/ui/svelte/components/BandedBar.svelte',
+    ]) {
+      // ratchet-exempt(source-pin): issue 1782 V&A 4 names this absence; a mix is invisible to a mount
+      const source = readFileSync(resolve(repoRoot, path), 'utf8');
+      assert.doesNotMatch(source, /color-mix\(/u, `${path} names a theme token instead of a mix`);
+    }
   });
 
   it('keeps product UI colour literals inside theme token declarations', () => {
