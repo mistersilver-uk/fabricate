@@ -65,6 +65,44 @@ export function itemReceipt(entry = {}) {
   return receipt;
 }
 
+const rewardExtras = (entry, keys) =>
+  Object.fromEntries(keys.filter((key) => text(entry?.[key])).map((key) => [key, entry[key]]));
+
+/** A step's currency credit (issue 1773), or `null` when malformed; `amount` 0 is an empty award. */
+export function currencyCreditRecord(entry) {
+  const [resultId, unit, amount] = [text(entry?.resultId), text(entry?.unit), entry?.amount];
+  if (!resultId || !unit || !Number.isSafeInteger(amount) || amount < 0) return null;
+  const rolled = rolledRecord(entry.rolled);
+  return {
+    resultId,
+    ...rewardExtras(entry, ['alternativeId']),
+    unit,
+    amount,
+    ...(rolled && { rolled }),
+    ...rewardExtras(entry, ['label', 'reason', 'unitName']),
+  };
+}
+
+/** A step's knowledge grant (issue 1773), or `null` when malformed. */
+export function knowledgeGrantRecord(entry) {
+  const [resultId, recipeId] = [text(entry?.resultId), text(entry?.recipeId)];
+  if (!resultId || !recipeId || !['granted', 'alreadyKnown'].includes(entry.outcome)) return null;
+  return {
+    resultId,
+    ...rewardExtras(entry, ['alternativeId']),
+    recipeId,
+    outcome: entry.outcome,
+    ...rewardExtras(entry, ['recipeName']),
+  };
+}
+
+/** An uncertain effect's confirmed prefix: Item receipts, credits and grants each keep their shape. */
+function historyReceipt(entry) {
+  if (text(entry?.unit)) return currencyCreditRecord(entry) ?? itemReceipt(entry);
+  if (text(entry?.recipeId)) return knowledgeGrantRecord(entry) ?? itemReceipt(entry);
+  return itemReceipt(entry);
+}
+
 /** Map one `_consumeIngredients` entry to the persisted run-record shape, capturing the item's
  * `name`/`img` at consume time (issue 738) — a consumed item is DELETED immediately. */
 export function mapConsumedIngredientRef({ item, quantity, receipt }) {
@@ -89,6 +127,12 @@ export function historyEvidenceFields(source = {}, options = {}) {
       mode: source.resolutionSnapshot.mode,
       ...checkResolutionEvidence(source, options),
     };
+  }
+  for (const [key, record] of [
+    ['currencyCredits', currencyCreditRecord],
+    ['knowledgeGrants', knowledgeGrantRecord],
+  ]) {
+    if (Array.isArray(source[key])) evidence[key] = source[key].map(record).filter(Boolean);
   }
   if (source.historySettlement) {
     evidence.historySettlement = Object.fromEntries(
@@ -116,7 +160,7 @@ export function nativeHistoryRecord(record) {
 export function unconfirmedHistoryError(message, receipts = [], cause = null) {
   const error = new Error(message, { cause });
   error.code = 'HISTORY_EFFECT_UNCERTAIN';
-  error.receipts = list(receipts).map(itemReceipt);
+  error.receipts = list(receipts).map(historyReceipt);
   return error;
 }
 
@@ -297,7 +341,7 @@ export async function retainUncertainReceipt(
   const effect = run.executionJournal?.effects.find((entry) => entry.effectId === effectId);
   if (run.executionJournal?.operationId !== executionOperationId || effect?.phase !== 'applying')
     throw unconfirmedHistoryError('The uncertain effect is not owned by this operation');
-  effect.receipt = { confirmed: list(receipts).map(itemReceipt), uncertain: true };
+  effect.receipt = { confirmed: list(receipts).map(historyReceipt), uncertain: true };
   incrementRunRevision(run);
   return location.persist();
 }

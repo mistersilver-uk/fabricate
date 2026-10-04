@@ -67,21 +67,27 @@ export function rolledAmountRefusals(resultGroups, Roll, rollData) {
 }
 
 /**
- * `recipe.validate({ Roll })`, then `rolledAmountRefusals` over every result group the recipe and
- * its steps author, against `actor`. A progressive award drops every formula
- * (`ResolutionModeService`), so neither reads one there.
+ * `recipe.validate({ Roll })`, then `rolledAmountRefusals` and the injected `refuseRewards` over
+ * every result group the recipe and its steps author, against `actor`. A progressive award drops
+ * every formula (`ResolutionModeService`), so neither reads one there.
  */
-export function validateCraft(recipe, actor, modeService) {
+export function validateCraft(recipe, actor, modeService, refuseRewards = null) {
   const Roll = diceEngine();
   const modes = modeService ?? globalThis.game?.fabricate?.getResolutionModeService?.();
   const progressive = modes?.getMode?.(recipe) === 'progressive';
   const validation = recipe.validate?.({ Roll, progressive }) ?? { valid: true, errors: [] };
-  if (!validation.valid || progressive) return validation;
-  const groups = new Set([
-    ...(recipe.resultGroups ?? []),
-    ...(recipe.steps ?? []).flatMap((step) => step?.resultGroups ?? []),
-  ]);
-  const errors = rolledAmountRefusals([...groups], Roll, actorData(actor));
+  if (!validation.valid) return validation;
+  const groups = [
+    ...new Set([
+      ...(recipe.resultGroups ?? []),
+      ...(recipe.steps ?? []).flatMap((step) => step?.resultGroups ?? []),
+    ]),
+  ];
+  const errors = [
+    ...(progressive ? [] : rolledAmountRefusals(groups, Roll, actorData(actor))),
+    ...(refuseRewards?.(groups, { actor, recipe, progressive }) ?? []),
+  ];
+  if (progressive && errors.length === 0) return validation;
   return { valid: errors.length === 0, errors };
 }
 

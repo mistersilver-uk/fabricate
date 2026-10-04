@@ -12,11 +12,8 @@ import {
   tierStepForCard,
 } from './craftCardFields.js';
 import { checkCurrencySpends } from './currencyAffordance.js';
-import {
-  assertNativeEffectsUninvoked,
-  awardReceipts,
-  mapConsumedIngredientRef,
-} from './runHistoryEvidence.js';
+import { awardHistory } from './resultKindAward.js';
+import { assertNativeEffectsUninvoked, mapConsumedIngredientRef } from './runHistoryEvidence.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { selectedIngredientItems } from './stageReadiness.js';
 
@@ -446,7 +443,7 @@ async function publishCheckFailure(engine, ctx, craftInputs, failure) {
         // In the SUCCESS branch's shape, through the same mapper: the record lands
         // in the actor's run-container flag, so an empty list beside real items is a
         // durable contradiction rather than a cosmetic gap.
-        createdResults: awardReceipts(failureResults),
+        ...awardHistory(failureResults),
       },
       engine._versionedMutationOptions(options, run)
     );
@@ -702,7 +699,7 @@ export async function commitCraft(engine, ctx, craftInputs) {
         },
         consumedIngredients: consumedItems.map(mapConsumedIngredientRef),
         usedTools,
-        createdResults: awardReceipts(resultItems),
+        ...awardHistory(resultItems),
       },
       engine._versionedMutationOptions(options, run)
     );
