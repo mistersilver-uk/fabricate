@@ -15,7 +15,7 @@ import {
   normalizeCharacterPrerequisiteList,
 } from '../../../systems/characterPrerequisites.js';
 // THE ONE HOME OF "IS THIS SYSTEM-SCOPE ESSENCE WRITE AN OVERRIDE" (issue 1371 r19-store2).
-// Shared with the standalone component editor app, which writes the same rows without this store.
+// Shared with componentEditorSave.js, which writes the same rows without this store.
 import { componentEssenceOverrideOn } from '../../../systems/componentEssenceOverride.js';
 import {
   buildExportPayload,
