@@ -418,10 +418,8 @@
         />
       {/if}
     </section>
-    <!-- Carriers, not the seeded envelope. Every stage with a resolution snapshot persists an
-         `essenceSpend: {labels:{}, carriers:[]}`, which `presentEssenceSpend` answers truthy, so a
-         recipe needing no essence drew an empty band. Same filter the terminal screen applies
-         (issue 1648, M20 then UX2-4). -->
+    <!-- Carriers, not the envelope: a resolved stage persists a truthy empty `essenceSpend`, so a
+         recipe needing no essence would draw an empty band; the terminal screen filters alike. -->
     {#if consumedEssence?.carriers?.length > 0}
       <EssencePool
         history={consumedEssence}
