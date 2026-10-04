@@ -651,10 +651,9 @@ the Validation tab renders a full-width `role="note"` callout explaining that pl
 ### System-Blocker Banner
 
 When the selected system's report has `blocksSystem === true`,
-the System Overview page's Settings tab SHALL render a full-width `role="note"` callout
-(reusing the `manager-environment-comp-callout` treatment) above the identity card.
-The banner is GM-only, explains that the system is blocked from player visibility, and links to the Validation tab.
-Activating the banner link switches the page to the Validation tab in place.
+the System Overview page's Settings tab SHALL render a non-blocking warning `Notice` in the notice stacking region above the identity card.
+The notice is GM-only, explains that the system is blocked from player visibility, and its action links to the Validation tab.
+Activating that action switches the page to the Validation tab in place.
 It is not shown when `blocksSystem` is false.
 
 ## Item Sheets
@@ -1064,10 +1063,10 @@ The recipe-edit view is the **five-tab editor** specified in `ui-entity-editors/
 Ingredients, essences, tools, steps and results are all authored there; none of them is deferred, and there is no _Catalyst_ concept in the editor (Tools replaced it).
 Identity edits track a dirty state surfaced by a header dirty chip, persist via `store.updateRecipe` → `RecipeManager.updateRecipe(recipeId, updates, { allowIncomplete: true })` (so an identity-only save is not blocked by the shell's still-empty ingredients/results), and a dirty draft prompts a discard confirmation on route exit.
 The recipe-edit header follows the standard editor convention shared with the gathering-task, gathering-event, and environment editors: an `Unsaved` chip (when dirty), `Back to recipes`, `Delete recipe` (danger, enabled whenever a recipe is selected), and `Save`.
-Which of its read-only tabs the editor offers is decided by the system's canonical `visibilityMode` through `craftingEffect` (see `ui-entity-editors/spec.md` `### No right rail`): the Access tab's roster in `restricted`, the Books & Scrolls tab in `item` / `knowledge`, and neither in `global`.
+Which of these tabs the editor offers is decided by the system's canonical `visibilityMode` through `craftingEffect` (see `ui-entity-editors/spec.md` `### No right rail`): the Access tab's roster in `restricted`, the Books & Scrolls tab in `item` / `knowledge`, and neither in `global`.
 It is **not** gated on the superseded `knowledge.mode`.
 The layout collapses to a single column at the Manager container's narrow breakpoint (`@container fabricate-manager (max-width: 960px)`), mirroring the environment editor.
-The recipe editor carries **no** per-recipe visibility editor: the legacy `recipe.visibility { restricted, allowedUserIds }` card is retired (see `ui-entity-editors/spec.md` `### Visibility Form`), and the canonical `recipe.access` grant is authored on the Access tab.
+The recipe editor carries **no** per-recipe visibility editor: the legacy `recipe.visibility { restricted, allowedUserIds }` card is retired (see `ui-entity-editors/spec.md` `### Visibility Form`), and the canonical `recipe.access` grant is authored on the Access screen.
 The `recipe == null` form of this view shows a `Select a recipe` empty state.
 
 Recipe browse row quick-actions render in a single non-wrapping action group, consistent with the environment and gathering-task browse rows.

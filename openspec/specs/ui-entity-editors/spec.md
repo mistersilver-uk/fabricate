@@ -24,7 +24,8 @@ Its copy and icons come from the canonical `resolutionModeOptions` list that Sys
 ### No right rail
 
 The editor has no right rail (issue 676); Category and Step mode live on Overview, the access roster on the Access tab, and the books that teach the recipe on Books & Scrolls.
-Both of those tabs are **read-only**, and each renders only when the system's canonical `visibilityMode` asks for it through the `craftingEffect(mode)` matrix: Access under `restricted`, Books & Scrolls under `item` and `knowledge`, and neither under `global`.
+The Access tab is read-only; Books & Scrolls offers only the per-book remove described under `### Visibility Form`.
+Each renders only when the system's canonical `visibilityMode` asks for it through the `craftingEffect(mode)` matrix: Access under `restricted`, Books & Scrolls under `item` and `knowledge`, and neither under `global`.
 Authoring lives on the owning screen: the Access screen owns `recipe.access`, and Books & Scrolls owns book membership.
 
 ### Access rosters (restricted mode)
@@ -63,7 +64,7 @@ Note: alchemy `checkMode: tiered` dispatches through the same routed-check runne
 
 ### Visibility Form
 
-Per-recipe visibility is authored on the **Access tab** (`recipe.access = { characterIds, playerIds }`), gated by the system's `visibilityMode: 'restricted'`.
+Per-recipe visibility is authored on the **Access screen** (`recipe.access = { characterIds, playerIds }`), gated by the system's `visibilityMode: 'restricted'`.
 The recipe editor itself carries **no** per-recipe visibility editor: the legacy `recipe.visibility { restricted, allowedUserIds }` card (gated on the superseded `recipeVisibility.listMode`) is retired, and `access` is read-forward-seeded from `visibility.allowedUserIds` for legacy systems.
 The recipe editor's Access tab shows a **read-only** summary of the grant plus a deep-link to the screen that authors it.
 

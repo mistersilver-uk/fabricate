@@ -2499,7 +2499,7 @@ a{color:var(--fab-accent)}
     </div>
     <div class="notes">
       <div><h5>Order is fixed</h5><ul><li>Breadcrumb · title + lede · action pair (<b>back, then save</b>) · <b>TabBar</b> · body + rail</li><li>Between the tab bar and the first card: the <b>Notice</b>s (blocking in the page position, non-blocking stacked beneath), then the tab's heading block — its heading and lede, and at most one callout.</li><li><b>InfoStrip</b> before the cards it describes, never inside them; before the first card, only the heading block's callout.</li></ul></div>
-      <div><h5>Rules</h5><ul><li>The rail is <b>read-only</b> — consequences and links, never editing controls.</li><li>The record's own Enabled state is a <b>Toggle</b> here, not a StatusButton.</li><li>Grid is <code>220px minmax(0,1fr) 300px</code> today; the <code>minmax(0, &hellip;)</code> bound is proposed, and the manager declares a min-width.</li><li>Cards are radius 11 / padding 16; a nested body is a <b>Well</b> at radius 9 / padding 12.</li></ul></div>
+      <div><h5>Rules</h5><ul><li>The rail is <b>read-only</b> — consequences and links, never editing inputs or drop targets; preview-only controls are allowed.</li><li>The record's own Enabled state is a <b>Toggle</b> here, not a StatusButton.</li><li>Grid is <code>220px minmax(0,1fr) 300px</code> today; the <code>minmax(0, &hellip;)</code> bound is proposed, and the manager declares a min-width.</li><li>Cards are radius 11 / padding 16; a nested body is a <b>Well</b> at radius 9 / padding 12.</li></ul></div>
     </div>
   </div>
 
