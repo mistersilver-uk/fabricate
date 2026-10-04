@@ -702,6 +702,16 @@ test('the default label is the UTC month and year, whatever the local clock says
   // Both edges of a year boundary, where a local-time reading would name the wrong month AND year.
   assert.equal(defaultLabel(new Date('2026-12-31T23:59:59Z')), 'dec2026');
   assert.equal(defaultLabel(new Date('2027-01-01T00:00:00Z')), 'jan2027');
+
+  // The edges above cannot tell UTC from local time on a host whose zone sits at UTC+0 (and `TZ`
+  // is not honoured by Node on Windows), so this double makes the two readings disagree outright.
+  const disagreeing = {
+    getUTCMonth: () => 9,
+    getUTCFullYear: () => 2026,
+    getMonth: () => 0,
+    getFullYear: () => 2027,
+  };
+  assert.equal(defaultLabel(disagreeing), 'oct2026');
 });
 
 test('--label overrides the month, and an unusable label is refused before any `gh` call', async () => {
