@@ -36,7 +36,7 @@ const MANIFEST_NAMES = MANIFEST_ROWS.filter((row) => row.library !== null).map((
   row.library.slice(1, -1)
 );
 
-/** The nine name-shaped ruled-out candidates, DERIVED rather than re-typed. */
+/** The ten name-shaped ruled-out candidates, DERIVED rather than re-typed. */
 const RULED_OUT_NAMES = RULED_OUT.flatMap((entry) => primitiveNamesIn(entry.name));
 
 /** Every shipped component, as the repository-relative POSIX path a manifest row names. */
@@ -63,7 +63,7 @@ test('the corpus every property below quantifies over is alive', () => {
   assert.ok(MANIFEST_ROWS.length > 0, 'the manifest is empty, so every comparison is vacuous');
   assert.equal(
     RULED_OUT_NAMES.length,
-    9,
+    10,
     'the name-shaped ruled-out register changed size; it is the subtrahend in the residue check ' +
       'below, so a silent change there silently changes what counts as an orphan citation'
   );
@@ -85,10 +85,10 @@ test('the library has the exact structure the parser assumes', () => {
     'the one-heading-per-block relation broke: a block with two h4s double-counts its entry, and ' +
       'a block with none drops it out of the set entirely'
   );
-  assert.equal(library.names.length, 72, 'distinct primitive names');
+  assert.equal(library.names.length, 71, 'distinct primitive names');
   assert.equal(
     library.nameOccurrences,
-    72,
+    71,
     'occurrences no longer equal distinct names, so one primitive is now named by two entries ' +
       'and the set has a duplicate'
   );
@@ -97,7 +97,7 @@ test('the library has the exact structure the parser assumes', () => {
 
   // The only pair that pins the ANCHOR as narrower than a file-wide scan.
   assert.equal(library.fileWideNames.length, 83, 'file-wide primitive-shaped names');
-  assert.equal(library.namesOutsideHeadings.length, 11, 'names outside every spec-head heading');
+  assert.equal(library.namesOutsideHeadings.length, 12, 'names outside every spec-head heading');
 });
 
 /**
@@ -190,20 +190,20 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 18 library entries with no shipped implementation (issue 1505). Re-derived from the array
+ * The 16 library entries with no shipped implementation (issue 1505). Re-derived from the array
  * rather than carried forward: `SortableList` left it at issue 1512, `Well` at issue 2008,
- * `PickerRow` at issue 1516, `RequirementChooser` at issue 1518 and the three instruments at issue
- * 1782, when each specified primitive shipped, and `ChoiceGroup` and `Menu` at issue 1516, when
- * each specified entry gained its manifest row; the count this docblock states is the array's own
- * length.
+ * `PickerRow` at issue 1516, `RequirementChooser` at issue 1518, and the three instruments and the
+ * validation pair at issue 1782 — `ValidationSummary` by naming its shipped component and
+ * `ValidationList` by being merged into it — when each specified primitive shipped, and
+ * `ChoiceGroup` and `Menu` at issue 1516, when each specified entry gained its manifest row; the
+ * count this docblock states is the array's own length.
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BrowseCard',
   'DataTable', 'InfoStrip', 'LogList',
   'NavSidebar', 'PageHeader', 'Rail',
   'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
-  'TierTrack', 'ValidationList', 'ValidationSummary',
-  'ViewToggle', 'XrefList',
+  'TierTrack', 'ViewToggle', 'XrefList',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {
@@ -587,7 +587,10 @@ test('every entry recorded as specified-but-unbuilt is declared a target', () =>
  * member rows only and the target ratchet fails only on additions, so a non-member such as
  * `StageBars` left at `target` would pass both.
  */
-const BUILT_BY_1782 = ['Meter', 'BandedBar', 'StageBars'];
+const BUILT_BY_1782 = ['Meter', 'BandedBar', 'StageBars', 'ValidationSummary'];
+
+/** Names issue 1782 merged away, which must be no entry and must be on the ruled-out register. */
+const DELETED_BY_1782 = ['ValidationList'];
 
 test('every name issue 1782 built reads shipped in the library', () => {
   for (const name of BUILT_BY_1782) {
@@ -597,6 +600,13 @@ test('every name issue 1782 built reads shipped in the library', () => {
       `${name} ships as a component and its specimen still declares ` +
         JSON.stringify(PER_NAME_STATUS.get(name))
     );
+  }
+});
+
+test('every name issue 1782 merged away is no entry and is recorded as ruled out', () => {
+  for (const name of DELETED_BY_1782) {
+    assert.ok(!library.names.includes(name), `${name} was merged and still heads an entry`);
+    assert.ok(RULED_OUT_NAMES.includes(name), `${name} was merged and the register omits it`);
   }
 });
 
@@ -673,7 +683,6 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-  'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/IconPicker.svelte',

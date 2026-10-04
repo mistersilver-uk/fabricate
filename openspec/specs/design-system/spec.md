@@ -72,6 +72,7 @@ A member that has not shipped carries no row, because the manifest enumerates wh
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
+`EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry, into which issue 1782 merged `<ValidationList>`, so the 40 naming headings declare 71 distinct names.
 
 A candidate that decomposes entirely into existing members is a COMPOSITION and MUST NOT enter the set; it is recorded with the composition that replaces it so it is not re-proposed.
 A candidate MUST have two or more independent callers to enter the set.
@@ -1681,6 +1682,7 @@ Each issue offers an action that moves focus to the offending control.
   Focus moves first and the announcement follows.
 
 The arrangement is fixed because validation is where a GM goes when something is wrong, which is the worst moment to make them learn a second layout.
+Its one implementation is `src/ui/svelte/components/EditorValidationSurface.svelte`, the library's `<ValidationSummary>`: the verdict and the grouped rows are one entry, not two.
 
 A row MAY carry one action of its own, `{ labelKey, descriptionKey?, onAction }`, for an issue whose fix is a single staged edit.
 It is drawn by the same button IN PLACE OF View, so each row still offers one verb; its accessible name composes as View's does, from the verb and the row's title, `descriptionKey` becomes its accessible description, and activating it runs the action instead of the focus move.
@@ -2037,6 +2039,8 @@ The following are recorded as compositions and MUST NOT be reintroduced as compo
 
 A premium panel is recorded as out of scope rather than as a composition: its only original content is marketing copy, which is a product decision, and binding copy to a component makes the offer untranslatable against a codebase where every primitive takes pre-localized strings.
 A toast and a bespoke destructive-confirmation panel are recorded as surfaces Foundry already owns.
+
+A validation list is recorded as MERGED into `<ValidationSummary>` by maintainer ruling 4 (2026-09-18), "One component, merge the entries": the grouped rows and the verdict are one tab drawn by one shipped surface, so a second name pointed at no implementation of its own.
 
 A control caption — a one-line sentence documenting the control directly above it — is recorded as a shape the set does not name, and is neither the standing-statement callout nor a mark.
 The deciding question is whether the sentence states something about the WORLD or captions a CONTROL: a callout owns the standing statement, which is true whether or not anything is drawn beside it, while a caption documents a control and says nothing about the world.
