@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES
@@ -18,6 +19,8 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-actorbar-bar-',
   rawModules: [
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    // `SetPicker` localizes through `localizeOr` (issue 1782).
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/gatheringConditionIcons.js'
   ],
   compiledModules: [
@@ -45,6 +48,8 @@ const harness = createMountedComponentHarness({
     // The stamina strip's `Meter` (issue 1782), which draws the fill leaf above.
     'src/ui/svelte/components/Meter.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+    // Its sources picker (issue 1782).
+    'src/ui/svelte/components/SetPicker.svelte',
     'src/ui/svelte/apps/ActorSelectTopBar.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/ActorSelectTopBar.svelte',

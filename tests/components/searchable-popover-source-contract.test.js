@@ -134,21 +134,15 @@ function snippetTriggerName(site) {
 
 /** ISSUE 1513'S TWO CAPABILITIES ARE DEFAULT-OFF, AND THAT IS ASSERTED AS A CONJUNCTION. */
 const MULTI_SELECT_ADOPTERS = Object.freeze([
-  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
-  // The link-recipe picker, which takes the GATE ALONE (issue 1513, phase 4). Linking stays one
-  // choice at a time — no `multiple`, so the panel still announces a single-value listbox — but
-  // linking a second recipe is the common next action and each choice SHRINKS the option list it
-  // was made from, which is the case the gate's cursor clamp exists for.
-  'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
+  // `SetPicker` (issue 1782) is the one adopter: the crafting sources bar and the recipe-item
+  // contents tab, the two files issue 1513 converted onto `multiple` and `stayOpen`, reach the
+  // panel through it. No caller passes the gate ALONE since the contents tab became staged.
+  'src/ui/svelte/components/SetPicker.svelte',
 ]);
 
-// THE TWO PROPS ARE READ THROUGH SEPARATE NON-VACUITY PROBES rather than through the adopter
-// list's first entry, because the entries no longer agree about which prop they pass. A single
-// probe against one file cannot see a reader that has stopped finding the other, and the
-// set-equality clause above passes either way: a pattern matching nothing makes it pass the day
-// both adopters are removed, which is the direction that hides.
-const MULTIPLE_ADOPTER = 'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte';
-const STAY_OPEN_ADOPTER = 'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte';
+// THE READER IS PROBED rather than trusted: a pattern matching nothing makes the set-equality
+// clause pass the day the adopter is removed, which is the direction that hides.
+const MULTIPLE_ADOPTER = 'src/ui/svelte/components/SetPicker.svelte';
 
 /** Every file with a `<SearchablePopover>` node that passes one of the two capability props. */
 function adopterFiles() {
@@ -191,12 +185,6 @@ test('`multiple` and `stayOpen` are passed by the adopters alone, so every other
     'the reader must find a `multiple` ATTRIBUTE on the call site in the one file that passes ' +
       'it, or it is finding nothing anywhere and this clause is decorative'
   );
-  assert.ok(
-    popover.callSites.some((site) => site.file === STAY_OPEN_ADOPTER && site.attribute('stayOpen')),
-    'the reader must find a `stayOpen` ATTRIBUTE on the call site in the one file that passes ' +
-      'it WITHOUT `multiple`, or the gate is being asserted through the prop that implies it ' +
-      'and its own adoption is unmeasured'
-  );
 });
 
 /**
@@ -213,8 +201,9 @@ function propsBlock() {
 }
 
 /** The destructure's digest (issues 1719, 1507). */
-const PROPS_BLOCK_DIGEST = '2d703e11311a156897b414f0863280abc69cc8ddd34b4e92cd038763d9339218';
-const PROPS_BLOCK_NAMES = 59;
+// Re-derived at issue 1782, which added `source`, `loading` and `error` after `options`.
+const PROPS_BLOCK_DIGEST = 'e8349aa1252b4539dc5a7da0affedbad25c32a9e30ac4a8cf3467e9e4fbea124';
+const PROPS_BLOCK_NAMES = 62;
 
 test('the declared prop surface is byte-identical to the pre-decomposition block', () => {
   // Why a digest and not a list. The decomposition at issue 1719 moved two thirds of this
@@ -244,15 +233,12 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
   const snippetSites = popover.callSites.filter((site) => site.snippetSource('trigger'));
   assert.equal(
     snippetSites.length,
-    4,
-    `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; four do — ` +
-      '`IconPicker`, `EssenceSourceSelector`, `apps/crafting/ComponentSourcesBar` (issue 1513) ' +
-      "and `ComponentEditView`'s salvage adder (issue 1516). A different number means the route has gained or " +
-      'lost a caller and the figures in this file need re-measuring. The third took the route ' +
-      'for a reason neither of the first two states: its trigger is a 40px dashed well sized to ' +
-      'the row of portrait buttons beside it, and the rule that draws it is in the CALLER`s ' +
-      'scoped block — which cannot reach the primitive`s own button, so `triggerClass` would ' +
-      'have named an element no rule of its could paint.'
+    3,
+    `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; three do — ` +
+      "`IconPicker`, `EssenceSourceSelector` and `ComponentEditView`'s salvage adder (issue " +
+      '1516). A different number means the route has gained or lost a caller and the figures in ' +
+      'this file need re-measuring. `apps/crafting/ComponentSourcesBar` (issue 1513) hands its ' +
+      'snippet to `SetPicker` since issue 1782, which forwards it as a prop rather than writing one.'
   );
 
   for (const site of snippetSites) {

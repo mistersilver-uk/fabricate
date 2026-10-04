@@ -523,6 +523,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+  // Its sources picker (issue 1782).
+  'src/ui/svelte/components/SetPicker.svelte',
   // The ONE not-yet-ready chrome the five player views draw (issue 1514). `CraftingView` below
   // renders the composition, so this roster is where the crafting suites acquire it.
   'src/ui/svelte/components/Callout.svelte',

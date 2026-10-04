@@ -259,8 +259,9 @@ describeValidationAddressPairing({
   },
   routeNoun: 'tab',
   destinationNoun: 'tab',
-  // TWO OF THE FOUR RIDE AN ATTRIBUTE BAG.
-  focusProvenElsewhere: ['recipe-item-link-recipe', 'recipe-item-source'],
+  // ONE OF THE FOUR RIDES AN ATTRIBUTE BAG; the link-recipe address is written on the contents
+  // tab's own trigger button since its picker became a `SetPicker` (issue 1782).
+  focusProvenElsewhere: ['recipe-item-source'],
 });
 
 describeValidationHostContract({

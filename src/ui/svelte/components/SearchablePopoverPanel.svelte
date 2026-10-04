@@ -15,10 +15,15 @@
     is the query field element, two-way because the parent's `inlineSearchTrigger` branch writes the
     same cell; `query` is the query value. `optionsList` is private — every reader of it moved here.
   - The compact presentation's rules root on this panel, so they live in this file's scoped block.
+  - A STATUS REPLACES THE LIST: `failed` or `error` renders an alert and `busy` a polite loading line
+    (issue 1782), while the header, the query row and the footer stay, so a commit action in the
+    footer is reachable in every state; the footer is told whether the panel is showing an error.
 -->
 <script>
   import { anchoredPopover } from '../actions/anchoredPopover.js';
+  import { localize } from '../util/foundryBridge.js';
   import { activeOptionId } from '../util/listboxNavigation.js';
+  import { pickerStatus } from '../util/pickerOptionModel.js';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
 
@@ -45,6 +50,9 @@
     searchProps = {},
     filteredOptions = [],
     totalCount = 0,
+    busy = false,
+    error = '',
+    failed = false,
     groupedOptions = [],
     isGrouped = false,
     renderedOptions = [],
@@ -73,6 +81,20 @@
   } = $props();
 
   let optionsList = $state(null);
+
+  function localizedText(key, fallback) {
+    const translated = localize(key);
+    return translated && translated !== key ? translated : fallback;
+  }
+
+  const status = $derived(
+    pickerStatus({
+      error: error || failed,
+      busy,
+      errorText: error || localizedText('FABRICATE.Common.Picker.Error', 'The list could not load'),
+      loadingText: localizedText('FABRICATE.Common.Picker.Loading', 'Loading…'),
+    })
+  );
 </script>
 
 <div
@@ -188,7 +210,16 @@
 
   {#if header}{@render header(filteredOptions.length, totalCount)}{/if}
 
-  {#if filteredOptions.length > 0}
+  {#if status}
+    <div
+      class="manager-travel-popover-empty"
+      role={status.kind === 'error' ? 'alert' : 'status'}
+      aria-live={status.kind === 'error' ? undefined : 'polite'}
+      data-popover-status={status.kind}
+    >
+      <EmptyState note title={status.text} />
+    </div>
+  {:else if filteredOptions.length > 0}
     <div
       bind:this={optionsList}
       class={`manager-travel-popover-options ${listClass}`}
@@ -230,7 +261,7 @@
     </div>
   {/if}
 
-  {#if footer}{@render footer()}{/if}
+  {#if footer}{@render footer({ close, failed: status?.kind === 'error' })}{/if}
 </div>
 
 <style>

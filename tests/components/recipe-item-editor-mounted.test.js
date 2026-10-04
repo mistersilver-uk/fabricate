@@ -109,8 +109,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
-    // The Contents tab's Link-recipe menu is a `SearchablePopover` (issue 1458).
+    // The Contents tab's membership is a `SetPicker` over the searchable popover (issue 1782).
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
+    'src/ui/svelte/components/SetPicker.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
     // THE validation surface and the push-button its View rows render (issue 1444). The
     // Validation tab hands the surface its checks and renders no markup itself, so omitting
@@ -631,8 +632,10 @@ describe('RecipeItemEditor — the validation row action reaches the control (is
     );
   });
 
-  it('changes route and focuses the destination PANEL for a route-only row', async () => {
-    // `recipeLinked` names the CONTENTS tab and no control.
+  it('routes to Contents and focuses the link-recipe trigger, which never disables', async () => {
+    // The trigger opens a staged `SetPicker` over every recipe of the system (issue 1782), so a
+    // book linking nothing still has a control to land on; the panel fallback this row used to
+    // take is held by the recipe editor's own route-only row (`recipe-edit-mounted`).
     const root = await openValidation({
       recipeItem: draft(),
       linkedItem: LINKED_ITEM,
@@ -642,15 +645,10 @@ describe('RecipeItemEditor — the validation row action reaches the control (is
     await activateIssueView(root, 'recipeLinked');
 
     assert.ok(Boolean(root.querySelector('[data-recipe-item-tab="contents"]')), 'the route changed');
-    const panel = root.querySelector('.manager-recipe-item-editor-panel');
-    assert.ok(Boolean(panel), 'the editor renders its tab panel');
-    assertIs(document.activeElement, panel, 'and the panel holds focus, not `<body>`');
-    assert.equal(panel.getAttribute('tabindex'), '-1', 'a programmatic destination, not a tab stop');
-    assert.equal(panel.getAttribute('data-keyboard-focus'), 'true', 'and it declares itself focused');
-    assert.ok(
-      !root.querySelector('[data-validation-focused]'),
-      'nothing is MARKED: the accent ring names the control a row addressed, and this row ' +
-        'addressed none — the panel is where focus went, not what the row was about'
-    );
+    const trigger = root.querySelector('[data-validation-target="recipe-item-link-recipe"]');
+    assert.ok(Boolean(trigger), 'the Contents tab carries the addressed trigger');
+    assertIs(document.activeElement, trigger, 'and it holds focus, not `<body>`');
+    assert.equal(trigger.tagName, 'BUTTON', 'a native button, focusable without a tabindex');
+    assert.equal(trigger.getAttribute('data-validation-focused'), '', 'and it is marked');
   });
 });

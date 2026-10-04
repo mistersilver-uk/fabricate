@@ -52,6 +52,8 @@ const SHARED_PRIMITIVES = [
   // a gathering inspector's condition modifiers renders both.
   'src/ui/svelte/components/RuleRow.svelte',
   'src/ui/svelte/components/RuleSentence.svelte',
+  // The set picker (issue 1782): the recipe-item editor's contents tab and the crafting bar.
+  'src/ui/svelte/components/SetPicker.svelte',
   // THE manager's labelled push-button (issue 1096). It is the sharpest entry on this list
   // after `Chip`: the button class is a CSS convention repeated across more than sixty
   // components, so every step of the conversion sweep drops this primitive into another

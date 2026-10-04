@@ -6,10 +6,15 @@ import {
   filteredCountLabel,
   groupedOptionBuckets,
   labelSubstringFilter,
+  latestSourceRequest,
+  membershipChange,
   optionListGeneration,
   pickerEmptiness,
+  pickerStatus,
   renderedOptionOrder,
   selectedOptionIds,
+  sourceRows,
+  spreadableTriggerAttributes,
 } from '../../src/ui/svelte/util/pickerOptionModel.js';
 
 // The arithmetic a picker's option list is built from, unit-tested without mounting (issue 1719).
@@ -24,7 +29,10 @@ describe('picker option model: the list arithmetic', () => {
     });
 
     it('matches a lower-cased substring of the label, anywhere in it', () => {
-      const options = [{ id: 'a', label: 'Iron Ingot' }, { id: 'b', label: 'Copper Wire' }];
+      const options = [
+        { id: 'a', label: 'Iron Ingot' },
+        { id: 'b', label: 'Copper Wire' },
+      ];
       assert.deepEqual(
         labelSubstringFilter(options, 'ingot').map((option) => option.id),
         ['a']
@@ -131,7 +139,11 @@ describe('picker option model: the list arithmetic', () => {
     });
 
     it('is stable across two reads of the same list, so a cursor survives a re-render', () => {
-      const first = optionListGeneration({ open: true, query: 'ir', options: [row('a'), row('b')] });
+      const first = optionListGeneration({
+        open: true,
+        query: 'ir',
+        options: [row('a'), row('b')],
+      });
       const second = optionListGeneration({
         open: true,
         query: 'ir',
@@ -198,6 +210,76 @@ describe('picker option model: the list arithmetic', () => {
         }),
         { message: 'No matches', body: '' }
       );
+    });
+  });
+
+  describe('the async source and the trigger spread (issue 1782)', () => {
+    it('settles only the latest request, however late an earlier one answers', async () => {
+      const answers = new Map();
+      const source = (query) => new Promise((resolve) => answers.set(query, resolve));
+      const settled = [];
+      const run = latestSourceRequest();
+      const settle = (state) => {
+        settled.push(state);
+      };
+      run(source, 'a', settle);
+      run(source, 'ab', settle);
+      await Promise.resolve();
+      answers.get('ab')([{ id: 'fast', label: 'fast' }]);
+      answers.get('a')([{ id: 'slow', label: 'slow' }]);
+      await new Promise((done) => setTimeout(done, 0));
+      assert.deepEqual(settled, [
+        { rows: [{ id: 'fast', label: 'fast' }], total: 1, pending: false, failed: false },
+      ]);
+    });
+
+    it('settles a rejected latest request as failed', async () => {
+      const settled = [];
+      latestSourceRequest()(
+        () => Promise.reject(new Error('offline')),
+        '',
+        (state) => {
+          settled.push(state);
+        }
+      );
+      await new Promise((done) => setTimeout(done, 0));
+      assert.deepEqual(settled, [{ rows: [], total: 0, pending: false, failed: true }]);
+    });
+
+    it('reads an array or `{ options, total }`', () => {
+      assert.deepEqual(sourceRows([{ id: 'a', label: 'a' }]).total, 1);
+      assert.deepEqual(sourceRows({ options: [{ id: 'a', label: 'a' }], total: 412 }).total, 412);
+      assert.deepEqual(sourceRows(null).rows, []);
+    });
+
+    it('puts the error before the wait', () => {
+      const texts = { errorText: 'Failed', loadingText: 'Loading' };
+      assert.deepEqual(pickerStatus({ error: true, busy: true, ...texts }), {
+        kind: 'error',
+        text: 'Failed',
+      });
+      assert.deepEqual(pickerStatus({ error: false, busy: true, ...texts }), {
+        kind: 'loading',
+        text: 'Loading',
+      });
+      assert.equal(pickerStatus({ error: false, busy: false, ...texts }), null);
+    });
+
+    it('spreads no undefined value and no disabled pair onto a trigger snippet', () => {
+      assert.deepEqual(
+        spreadableTriggerAttributes({
+          type: 'button',
+          title: undefined,
+          disabled: false,
+          'aria-disabled': 'true',
+        }),
+        { type: 'button' }
+      );
+    });
+
+    it('states what a membership move adds and removes', () => {
+      assert.deepEqual(membershipChange(['a', 'b'], ['b', 'c']), { added: ['c'], removed: ['a'] });
+      assert.deepEqual(membershipChange(['a'], ['a']), { added: [], removed: [] });
     });
   });
 });

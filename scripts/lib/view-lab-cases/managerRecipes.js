@@ -703,8 +703,9 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-item-tab-button="contents"]' },
     ],
     expectView: 'recipe-item-edit',
-    // The panel and the populated list inside it: the list is what says the fixture's membership reached the screen.
-    expectSelector: '[data-recipe-item-tab="contents"] [data-recipe-item-contents-list]',
+    // The tab and a member token in it: the token is what says the fixture's membership reached the screen.
+    expectSelector:
+      '[data-recipe-item-tab="contents"] [data-recipe-item-contents-picker] [data-set-picker-token]',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
@@ -737,6 +738,58 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
       ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-item-contents-picker-staged',
+    label: 'Manager — Recipe item contents, the picker holding staged choices',
+    // A choice staged in each direction (issue 1782): marked in the panel, counted, Apply armed.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="contents"]' },
+      { selector: '[data-recipe-item-link-recipe-toggle]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-antitoxin"]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-salve"]' },
+    ],
+    expectView: 'recipe-item-edit',
+    // The footer's Apply, enabled: the staged set differs from the committed one.
+    expectSelector:
+      '.fabricate-manager .fabricate-set-picker-popover [data-set-picker-apply]:not([disabled])',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-item-contents-overflow',
+    label: 'Manager — Recipe item contents, more members than the token bound',
+    // Two links applied over the book's three (issue 1782): three tokens, then "+2 more".
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="contents"]' },
+      { selector: '[data-recipe-item-link-recipe-toggle]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-antitoxin"]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-oil"]' },
+      { selector: '[data-set-picker-apply]' },
+    ],
+    expectView: 'recipe-item-edit',
+    expectSelector: '[data-recipe-item-contents-picker] [data-set-picker-more]',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
     ],
   }),
   managerCase({
@@ -796,7 +849,8 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-item-link-recipe-option="hb-r-antitoxin"]' },
       { selector: '[data-recipe-item-link-recipe-option="hb-r-tincture"]' },
       { selector: '[data-recipe-item-link-recipe-option="hb-r-oil"]' },
-      { selector: '[data-recipe-item-link-recipe-toggle]' },
+      // The picker stages its choices (issue 1782), so Apply is what links them and closes it.
+      { selector: '[data-set-picker-apply]' },
       { selector: '[data-recipe-item-preview] [data-inventory-recipe-pager]', scroll: true },
     ],
     expectView: 'recipe-item-edit',
