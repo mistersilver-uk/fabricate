@@ -1689,7 +1689,7 @@ export function registerChecksCases() {
     // Add appends a new trigger; remove drops one.
     triggers.querySelector('[data-add-trigger]').click();
     assert.equal(emitted.at(-1).checkBreakage.triggers.length, 3, 'add appends a trigger');
-    triggers.querySelector('[data-trigger="c1"] [data-remove-trigger]').click();
+    triggers.querySelector(':scope [data-trigger="c1"] [data-rule-row-remove]').click();
     assert.deepEqual(
       emitted.at(-1).checkBreakage.triggers.map((t) => t.id),
       ['c2'],
@@ -1873,13 +1873,13 @@ export function registerChecksCases() {
 
   // A trigger's controls sit behind a disclosure (issue 1096).
   function openTrigger(root, id) {
-    const disclosure = root.querySelector(`[data-trigger-disclosure="${id}"]`);
+    const disclosure = root.querySelector(`:scope [data-trigger="${id}"] [data-rule-row-disclosure]`);
     assert.ok(Boolean(disclosure), `the head of trigger ${id} renders`);
     disclosure.click();
     flushSync();
     const card = root.querySelector(`[data-trigger="${id}"]`);
     assert.ok(
-      Boolean(card.querySelector(`[data-trigger-body="${id}"]`)),
+      Boolean(card.querySelector('[data-rule-row-body]')),
       `the head of trigger ${id} opens its body`
     );
     return card;

@@ -1,7 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The condition-modifier cards and the character-modifier search, suggestions and reference rows
-  for one record: a gathering task's drop, or a gathering event. Written once (issue 1707).
+  The condition-modifier cards, each attached modifier a `RuleRow`, and the character-modifier
+  search, suggestions and reference rows for one record: a gathering task's drop, or a gathering
+  event. Written once (issue 1707).
 
   `subject` is the record a modifier attaches to, never the persisted condition `kind` this markup
   binds. It picks the hook prefix, feeds the card-copy helpers their `scope`, and gates the
@@ -14,8 +15,10 @@
   - every hook name follows `subject` — `manager-environments-mounted.js`.
 -->
 <script>
+  import { tick } from 'svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import Field from '../../../components/Field.svelte';
+  import RuleRow from '../../../components/RuleRow.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localizeOr } from '../../../util/localizeOr.js';
@@ -83,12 +86,12 @@
 
   // Literals, not composed: every mirror guard that resolves a selector greps `src/` for the
   // attribute name (the View Lab registry's does), and a composed name is invisible to all of
-  // them. So the eight names are written twice and the 300 lines of markup once.
+  // them. So the seven names are written twice and the 300 lines of markup once; the modifier
+  // row's id hook is written on its `RuleRow` tag for both subjects.
   const HOOK_NAMES = Object.freeze({
     drop: Object.freeze({
       conditionModifiers: 'data-gathering-drop-condition-modifiers',
       conditionModifierPicker: 'data-gathering-drop-condition-modifier-picker',
-      modifierId: 'data-gathering-drop-modifier-id',
       characterModifiers: 'data-gathering-drop-character-modifiers',
       characterModifierSearch: 'data-gathering-drop-character-modifier-search',
       characterModifierSuggestions: 'data-gathering-drop-character-modifier-suggestions',
@@ -98,7 +101,6 @@
     event: Object.freeze({
       conditionModifiers: 'data-gathering-event-condition-modifiers',
       conditionModifierPicker: 'data-gathering-event-condition-modifier-picker',
-      modifierId: 'data-gathering-event-modifier-id',
       characterModifiers: 'data-gathering-event-character-modifiers',
       characterModifierSearch: 'data-gathering-event-character-modifier-search',
       characterModifierSuggestions: 'data-gathering-event-character-modifier-suggestions',
@@ -116,6 +118,33 @@
     ].map(([key, label]) => ({ key, label, ...stepperLabels(label) }))
   );
 
+  /** A condition modifier as a `RuleRow`: the condition heads it and its value is the effect. */
+  function conditionModifierSchema(kind, valueStep) {
+    return {
+      head: (modifier) => ({
+        glyph: gatheringModifierKindIcon(kind, modifier.conditionId),
+        title: gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId,
+      }),
+      steps: [{ key: 'value', render: valueStep }],
+      labels: {
+        remove: localizeOr(
+          'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
+          'Delete modifier'
+        ),
+      },
+    };
+  }
+
+  // Each kind's picker, where focus lands once its last modifier is removed.
+  let pickers = $state({});
+
+  async function deleteConditionModifier(kind, id, last) {
+    onDeleteConditionModifier(kind, id);
+    if (!last) return;
+    await tick();
+    pickers[kind]?.querySelector('select')?.focus();
+  }
+
   /** One hook attribute, spread so its name follows the subject rather than the call site. */
   function hook(name, value = '') {
     const names = HOOK_NAMES[subject] ?? HOOK_NAMES.drop;
@@ -129,6 +158,30 @@
   {@const availableConditions = gatheringConditionAvailableOptions(row, kind)}
   {@const pickerSelection = modifierPickerSelection(kind)}
   {@const attachedModifiers = gatheringConditionModifierRows(row, kind)}
+  {@const schema = conditionModifierSchema(kind, modifierValue)}
+  {#snippet modifierValue(modifier, change)}
+    <label class="manager-condition-modifier-value">
+      <span class="visually-hidden"
+        >{localizeOr(
+          'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
+          'Modifier value'
+        )}</span
+      >
+      <input
+        type="text"
+        inputmode="numeric"
+        value={gatheringModifierDisplayValue(modifier)}
+        aria-label={localizeOr(
+          'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
+          'Modifier value'
+        )}
+        oninput={(event) =>
+          change({ ...modifier, ...signedToOperatorValue(event.currentTarget.value) })}
+        onkeydown={(event) => onConditionModifierKeydown(kind, modifier, event)}
+      />
+      <span aria-hidden="true">%</span>
+    </label>
+  {/snippet}
   <section
     class="fabricate-card manager-drop-editor-condition-modifier-card"
     {...hook('conditionModifiers', kind)}
@@ -139,7 +192,11 @@
         <p class="manager-muted">{cardHint}</p>
       </div>
     </header>
-    <div class="manager-condition-modifier-add-row" {...hook('conditionModifierPicker', kind)}>
+    <div
+      class="manager-condition-modifier-add-row"
+      {...hook('conditionModifierPicker', kind)}
+      bind:this={pickers[kind]}
+    >
       <label class="fabricate-field manager-condition-modifier-picker">
         <span class="visually-hidden"
           >{localizeOr(
@@ -188,56 +245,21 @@
     </div>
     <div class="manager-condition-modifier-row-list">
       {#each attachedModifiers as modifier (modifier.id)}
-        <article
+        <!-- A condition → drop-chance rule; each hook is written per subject, never composed. -->
+        <RuleRow
           class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`}
-          {...hook('modifierId', modifier.id)}
-        >
-          <header class="manager-character-modifier-row-reference-header">
-            <span class="manager-character-modifier-icon">
-              <i class={gatheringModifierKindIcon(kind, modifier.conditionId)} aria-hidden="true"
-              ></i>
-            </span>
-            <span class="manager-character-modifier-row-reference-label"
-              >{gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId}</span
-            >
-            <label class="manager-condition-modifier-value">
-              <span class="visually-hidden"
-                >{localizeOr(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
-                  'Modifier value'
-                )}</span
-              >
-              <input
-                type="text"
-                inputmode="numeric"
-                value={gatheringModifierDisplayValue(modifier)}
-                aria-label={localizeOr(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
-                  'Modifier value'
-                )}
-                oninput={(event) =>
-                  onUpdateConditionModifier(
-                    kind,
-                    modifier.id,
-                    signedToOperatorValue(event.currentTarget.value)
-                  )}
-                onkeydown={(event) => onConditionModifierKeydown(kind, modifier, event)}
-              />
-              <span aria-hidden="true">%</span>
-            </label>
-            <button
-              type="button"
-              class="fabricate-icon-button is-danger manager-character-modifier-row-reference-delete"
-              aria-label={localizeOr(
-                'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
-                'Delete modifier'
-              )}
-              onclick={() => onDeleteConditionModifier(kind, modifier.id)}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-            </button>
-          </header>
-        </article>
+          data-gathering-drop-modifier-id={subject === 'event' ? undefined : modifier.id}
+          data-gathering-event-modifier-id={subject === 'event' ? modifier.id : undefined}
+          {schema}
+          value={modifier}
+          onChange={(next) =>
+            next === null
+              ? deleteConditionModifier(kind, modifier.id, attachedModifiers.length === 1)
+              : onUpdateConditionModifier(kind, modifier.id, {
+                  operator: next.operator,
+                  value: next.value,
+                })}
+        />
       {:else}
         <!-- Drop-only, derived from the discriminator: the event copy never carried one. -->
         {#if subject === 'drop'}

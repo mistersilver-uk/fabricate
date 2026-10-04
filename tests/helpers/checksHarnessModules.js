@@ -199,6 +199,9 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // icon button it draws every one of its controls through.
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/IconButton.svelte',
+  // Each trigger is a rule row restating itself as a rule sentence (issue 1782).
+  'src/ui/svelte/components/RuleRow.svelte',
+  'src/ui/svelte/components/RuleSentence.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   // The shared labelled-field primitive (issue 1428).

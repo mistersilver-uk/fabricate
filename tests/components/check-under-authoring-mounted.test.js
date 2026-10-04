@@ -645,7 +645,7 @@ describe('the simple editor draws an under target read-only', () => {
 
   it("offers a roll-under check's best trigger preset on face 1, through the editor", async () => {
     const state = await mountControlled(simpleHarness, simple(evaluation({}, { source: 'fixed' })));
-    const labels = [...state.root.querySelectorAll('[data-add-trigger-preset]')].map((button) =>
+    const labels = [...state.root.querySelectorAll('[data-rule-row-preset]')].map((button) =>
       button.textContent.trim()
     );
     assert.match(labels[0], /^Natural 1 on 1d20 → /, 'the editor passes its evaluation down');

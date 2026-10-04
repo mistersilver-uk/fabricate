@@ -31,15 +31,15 @@ const CLASS_EXCEPTIONS = Object.freeze([
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
-    count: 3,
+    count: 2,
     why:
       'deferred with a named reason. The root\'s six became three: issue 1707 wrote the ' +
       'twice-authored modifier panel once, so the drop and event copies of the condition-modifier ' +
       'add and the two reference deletes collapsed into one of each. The other three were ' +
-      'de-duplicated, not converted, and no sweep may count them as progress. The three that ' +
-      'remain are this shared panel\'s own attach control and its two delete controls, so ' +
-      'converting them is one decision about one shared unit rather than the tail of an 82-site ' +
-      'sweep. Pinned by count so a later partial pass fails here instead of silently halving a ' +
+      'de-duplicated, not converted, and no sweep may count them as progress. Issue 1782 moved ' +
+      'the condition-modifier delete onto `RuleRow`, which draws it through `IconButton`, so two ' +
+      'remain: this shared panel\'s own attach control and its character-modifier delete. ' +
+      'Pinned by count so a later partial pass fails here instead of silently halving a ' +
       'deferral. Each one still leads its `class` with the root token (issue 1502), because the ' +
       'sheet is rooted at it and a carrier without it would lose its entire paint.',
   }),
