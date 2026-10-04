@@ -128,6 +128,18 @@ If a recipe a row teaches is deleted, the row shows **Missing recipe** in place 
 No craft can award it, so the recipe cannot be enabled until you remove the row or choose another recipe.
 The recipe's validation tab lists this as a blocking issue.
 
+### Rewards the Player Chooses
+
+A result choice group offers one reward, or up to a set number, from several alternatives.
+You decide whether the dice or the player choose.
+When the player chooses, the craft pauses at that result until the player picks.
+They settle it in the Journal's run detail, where the [Journal]({% link player-app/journal.md %}) page describes the pick.
+The GM can always settle a pick for a player.
+A rolled group needs no pick, because the roll decides.
+
+A reward the player chooses needs a run on the current lifecycle.
+A run on the older lifecycle refuses to award one.
+
 ### Moving a World Back to an Older Version
 
 {: .warning }
