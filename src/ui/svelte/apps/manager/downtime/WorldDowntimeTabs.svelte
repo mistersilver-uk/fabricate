@@ -49,9 +49,9 @@
 </div>
 
 <style>
-  /* The host states no inset, so each row carries its own; this card is the LAST row and needs a
-     bottom gutter. `position: relative` makes the CARD the containing block of the strip's
-     descriptions, which is what bounds each one to the pane. The card is a ROW — identity left,
+  /* The host states no inset, so each row carries its own; this card is the last row and needs a
+     bottom gutter. `position: relative` makes the card the containing block of the strip's
+     descriptions, which is what bounds each one to the pane. The card is a row — identity left,
      strip at the right end — which is why the parity spec measures `display`/`flex-direction` here. */
   .downtime-tab-card {
     position: relative;

@@ -28,7 +28,7 @@ const TABS = [
   { id: 'outcomes', icon: 'fas fa-list', labelKey: 'x.Outcomes', label: 'Outcomes' },
 ];
 
-/** The classes the strip AUTHORS on an element, in order, without Svelte's scoping class. */
+/** The classes the strip authors on an element, in order, without Svelte's scoping class. */
 function authoredClasses(element) {
   return [...element.classList].filter((name) => !name.startsWith('svelte-')).join(' ');
 }
