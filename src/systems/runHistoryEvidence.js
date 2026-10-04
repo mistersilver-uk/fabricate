@@ -145,7 +145,8 @@ export function historyEvidenceFields(source = {}, options = {}) {
     ['currencyCredits', currencyCreditRecord],
     ['knowledgeGrants', knowledgeGrantRecord],
   ]) {
-    if (Array.isArray(source[key])) evidence[key] = source[key].map(record).filter(Boolean);
+    if (Array.isArray(source[key]))
+      evidence[key] = source[key].map((entry) => record(entry)).filter(Boolean);
   }
   if (source.historySettlement) {
     evidence.historySettlement = Object.fromEntries(
