@@ -235,6 +235,8 @@ export const KIND_MENU_COMPILED_MODULES = Object.freeze([
 // both lists, which restate the kind menu's paths because the harness guard reads literals only.
 export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/actionMenuLayout.js',
+  // Issue 1521: the card and the requirement row localize through `localizeOr`.
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
   'src/ui/svelte/apps/manager/recipe/resultRows.js',
   'src/systems/characterModifierPrerequisiteCopy.js',
