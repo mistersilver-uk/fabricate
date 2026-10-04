@@ -1,15 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  One requirement inside a set (the data model still calls it an `ingredientGroup`), satisfied by
-  ANY one of its alternatives. Two or more render linked by a "— or —" separator inside a
-  bracketed box; a single alternative renders as a bare row. The requirement emits a
-  shallow-updated copy via `onChange(nextGroup)` and is dropped entirely via `onRemove()`.
+  The choice group: one requirement inside a set (the data model's `ingredientGroup`), satisfied by
+  ANY one of its alternatives. Two or more render linked by a "— or —" separator inside the
+  `Any one of` box, whose member rows draw no convert control; a single alternative renders as a
+  bare `PickerRow allowAny`. It emits a shallow-updated copy via `onChange(nextGroup)` and is
+  dropped entirely via `onRemove()`.
 
-  The add-affordances diverge by SHAPE — a bare row keeps ONE compact "or…" popover inline, a box
-  carries four explicit dashed adders at its foot — and both append a real OR ALTERNATIVE for the
-  row's own picker to fill in. Which kinds are offered, how the panel and the adders are worded
-  and why, are stated in `openspec/specs/ui-entity-editors/spec.md` → "Adding a requirement, and
-  adding an alternative"; the `data-recipe-add` token family is PRESERVED on the choices.
+  The bare row's `or…` menu and the box's `alt <kind>` adders both read `kindMenuItems(kinds)`,
+  so they offer one subset in one order, and both append an OR alternative for the row's own field
+  to name. Their wording is `openspec/specs/ui-entity-editors/spec.md` → "Adding a requirement, and
+  adding an alternative"; the `data-recipe-add` token family is preserved on both.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -18,11 +18,8 @@
   import { visibleEssenceOptions } from '../../../../model/essenceValidation.js';
   import { currencyUnitIcon, currencyUnitLabel } from '../../../util/recipeCurrency.js';
   import PickerRow from './PickerRow.svelte';
-  import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import Button from '../../../components/Button.svelte';
-  // The ONE kind table, shared with the row's plate and kind select: the `or…` menu's entries and
-  // the choice group's adders read their glyph, tint class and one-word name from it.
-  import { fromValue, kindMarkClass, kindMeta, toValue } from './pickerRowKinds.js';
+  import { fromValue, kindMenuItems, toValue } from './pickerRowKinds.js';
 
   let {
     group = {},
@@ -98,29 +95,24 @@
     };
   });
 
-  // The accessible name for the trigger, the dialog and its search field.
-  const orMenuLabel = $derived(
-    text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')
+  // The box's adders: the kind menu's own list, worded `alt <kind>`. The currency adder's hook
+  // says `cost`, as the set's own currency adder does.
+  const ADDERS = {
+    component: [
+      'alternative-component',
+      'FABRICATE.Admin.Manager.Recipe.AltComponent',
+      'alt component',
+    ],
+    tags: ['alternative-tag', 'FABRICATE.Admin.Manager.Recipe.AltTag', 'alt tag'],
+    essence: ['alternative-essence', 'FABRICATE.Admin.Manager.Recipe.AltEssence', 'alt essence'],
+    currency: ['alternative-cost', 'FABRICATE.Admin.Manager.Recipe.AltCurrency', 'alt currency'],
+  };
+  const adders = $derived(
+    kindMenuItems(kinds).map(({ id, icon }) => {
+      const [marker, key, fallback] = ADDERS[id];
+      return { id, icon, marker, label: text(key, fallback) };
+    })
   );
-
-  // THE FOUR CHOICES. Each entry is ONE WORD, the kind it appends, from the same table the row's
-  // kind select reads; the verb lives once in the panel's `Accept instead` header. The glyph
-  // carries `manager-recipe-option-mark is-<kind>`, the SAME class the row's plate and chosen chip
-  // wear, so the menu's tints are the row's tints by construction — `SearchablePopover` renders an
-  // option's `icon` as the whole `class` attribute of its `<i>`, which is what allows that. No
-  // option groups, so `SearchablePopover` renders no lone heading.
-  const orMenuChoice = (kind, addMarker) => ({
-    id: kind,
-    addMarker,
-    icon: kindMarkClass(kind),
-    label: text(kindMeta(kind).labelKey, kindMeta(kind).label),
-  });
-  const orMenuOptions = $derived([
-    orMenuChoice('component', 'alternative-component'),
-    orMenuChoice('tags', 'alternative-tag'),
-    ...(hasEssences ? [orMenuChoice('essence', 'alternative-essence')] : []),
-    ...(canAddCost ? [orMenuChoice('currency', 'alternative-currency')] : []),
-  ]);
 
   function updateOption(index, nextOption) {
     onChange({
@@ -177,37 +169,6 @@
   }
 </script>
 
-{#snippet orMenu()}
-  <SearchablePopover
-    options={orMenuOptions}
-    optionGroups={[]}
-    pickerClass="manager-recipe-or-picker"
-    triggerClass="manager-recipe-or-trigger"
-    triggerIcon="fa-solid fa-code-branch"
-    triggerLabel={text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}
-    ariaLabel={orMenuLabel}
-    triggerTitle={text(
-      'FABRICATE.Admin.Manager.Recipe.OrTriggerHint',
-      'Accept another kind of ingredient in place of this one.'
-    )}
-    panelLabel={orMenuLabel}
-    searchPlaceholder={text(
-      'FABRICATE.Admin.Manager.Recipe.OrSearchPlaceholder',
-      'Search options...'
-    )}
-    searchLabel={orMenuLabel}
-    emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
-    showChevron={false}
-    showSearch={false}
-    triggerHasPopup="listbox"
-    popoverTitle={orMenuLabel}
-    popoverClass="manager-recipe-or-popover"
-    minWidth={150}
-    maxWidth={150}
-    onSelect={(type) => appendAlternative(type)}
-  />
-{/snippet}
-
 <div
   class="manager-recipe-ingredient-requirement"
   class:has-alternatives={hasAlternatives}
@@ -249,49 +210,21 @@
         />
       {/each}
     </div>
-    <!-- THE CHOICE GROUP'S OWN ADDERS: dashed accent chips reading `alt <kind>`, in the kind
-         order the row's own select offers, because inside an `ANY ONE OF` group every one of
-         them appends an ALTERNATIVE. The `data-recipe-add` marker family is preserved. -->
+    <!-- Inside an `ANY ONE OF` box every adder appends an ALTERNATIVE, hence `alt <kind>`. -->
     <div class="manager-recipe-requirement-adds">
-      <Button
-        role="dashed"
-        data-recipe-add="alternative-component"
-        onclick={() => appendAlternative('component')}
-      >
-        <i class={kindMeta('component').icon} aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.AltComponent', 'alt component')}</span>
-      </Button>
-      <Button
-        role="dashed"
-        data-recipe-add="alternative-tag"
-        onclick={() => appendAlternative('tags')}
-      >
-        <i class={kindMeta('tags').icon} aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.AltTag', 'alt tag')}</span>
-      </Button>
-      {#if hasEssences}
+      {#each adders as adder (adder.id)}
         <Button
           role="dashed"
-          data-recipe-add="alternative-essence"
-          onclick={() => appendAlternative('essence')}
+          data-recipe-add={adder.marker}
+          onclick={() => appendAlternative(adder.id)}
         >
-          <i class={kindMeta('essence').icon} aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.AltEssence', 'alt essence')}</span>
+          <i class={adder.icon} aria-hidden="true"></i>
+          <span>{adder.label}</span>
         </Button>
-      {/if}
-      {#if canAddCost}
-        <Button
-          role="dashed"
-          data-recipe-add="alternative-cost"
-          onclick={() => appendAlternative('currency')}
-        >
-          <i class={kindMeta('currency').icon} aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.AltCurrency', 'alt currency')}</span>
-        </Button>
-      {/if}
+      {/each}
     </div>
   {:else}
-    <!-- Bare requirement: a single row with the "or…" popover inline at its right end. -->
+    <!-- Bare requirement: a single row with the "or…" menu inline at its right end. -->
     <div class="manager-recipe-ingredient-requirement-options">
       {#each options as option, index (index)}
         <PickerRow
@@ -299,7 +232,8 @@
           {kinds}
           {catalogue}
           {readonlyKinds}
-          convert={orMenu}
+          allowAny
+          onSelect={appendAlternative}
           onChange={(value) => updateOption(index, fromValue(option, value))}
           onRemove={() => removeOption(index)}
         />

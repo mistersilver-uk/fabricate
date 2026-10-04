@@ -20,6 +20,7 @@ manager-recipe-edit-ingredients-choice-group
 manager-recipe-edit-ingredients-currency-off
 manager-recipe-edit-tag-picker
 manager-recipe-edit-ingredients-or-menu
+manager-recipe-edit-choice-group-menu
 manager-recipe-edit-validation
 manager-recipe-edit-multistep
 manager-recipe-edit-step-open

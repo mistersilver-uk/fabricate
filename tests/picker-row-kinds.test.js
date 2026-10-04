@@ -8,6 +8,7 @@ import {
   KIND_ORDER,
   fromValue,
   isKnownKind,
+  kindMenuItems,
   shownAmount,
   toValue,
 } from '../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
@@ -268,4 +269,34 @@ test('an ingredient never gains a formula, whatever the row is handed', () => {
     quantityFormula: '1d4',
   });
   assert.equal(next, INGREDIENTS.component);
+});
+
+test('the kind menu lists the offered kinds in table order, toned and hooked from the one table', () => {
+  const items = kindMenuItems(
+    ['currency', 'tags', 'component'],
+    (key, fallback) => `${key}|${fallback}`
+  );
+  assert.deepEqual(
+    items.map(({ id, tone, icon }) => [id, tone, icon]),
+    ['component', 'tags', 'currency'].map((kind) => [
+      kind,
+      KIND_META[kind].tone,
+      KIND_META[kind].icon,
+    ])
+  );
+  assert.deepEqual(
+    items.map((item) => item.data['data-recipe-add']),
+    ['alternative-component', 'alternative-tag', 'alternative-currency']
+  );
+  assert.equal(
+    items[1].label,
+    `${KIND_META.tags.labelKey}|Tag`,
+    'the label is the caller’s localization'
+  );
+  assert.equal(kindMenuItems(['essence'])[0].label, 'Essence', 'and the fallback without one');
+  assert.deepEqual(
+    kindMenuItems(['unknown']),
+    [],
+    'a kind the table does not name is never offered'
+  );
 });

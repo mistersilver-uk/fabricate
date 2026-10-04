@@ -9202,24 +9202,28 @@
   font-size: 0.75rem;
 }
 
-/* ONE TINT PER KIND, ON EVERY GLYPH THE ROW DRAWS FOR ITS SUBJECT (`proto:4624`-`4627`). */
+/* ONE TINT PER KIND, ON EVERY GLYPH THE ROW DRAWS FOR ITS SUBJECT (`proto:4624`-`4627`), and on the kind menu's glyphs through each item's `tone`. */
 .fabricate-manager .manager-recipe-option-lead.is-component,
-.fabricate-manager .manager-recipe-option-mark.is-component {
+.fabricate-manager .manager-recipe-option-mark.is-component,
+.fabricate-action-menu-panel button.manager-action-menu-item.is-component > i {
   color: var(--fab-success);
 }
 
 .fabricate-manager .manager-recipe-option-lead.is-tag,
-.fabricate-manager .manager-recipe-option-mark.is-tag {
+.fabricate-manager .manager-recipe-option-mark.is-tag,
+.fabricate-action-menu-panel button.manager-action-menu-item.is-tag > i {
   color: var(--fab-purple);
 }
 
 .fabricate-manager .manager-recipe-option-lead.is-currency,
-.fabricate-manager .manager-recipe-option-mark.is-currency {
+.fabricate-manager .manager-recipe-option-mark.is-currency,
+.fabricate-action-menu-panel button.manager-action-menu-item.is-currency > i {
   color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-recipe-option-lead.is-essence,
-.fabricate-manager .manager-recipe-option-mark.is-essence {
+.fabricate-manager .manager-recipe-option-mark.is-essence,
+.fabricate-action-menu-panel button.manager-action-menu-item.is-essence > i {
   color: var(--fab-info);
 }
 
@@ -17541,24 +17545,23 @@
   outline-offset: -2px;
 }
 
-/* ── THE "or…" MENU (`proto:2292`-`2293`, `proto:4683`) ── A COMPACT MENU OF KINDS, not a picker of records — which is what the shared popover above is sized for, and why this one needs its own scale. */
-.fabricate-picker-popover.manager-recipe-or-popover {
-  /* THE 240px FLOOR IS RELEASED, and that is not tidiness. `SearchablePopover` writes its computed `width` inline, but the shared box declares `min-width: 240px`, and a floor beats a used width — so a caller asking for 150 rendered at 240 with the inline declaration sitting there looking honoured. */
+/* ── THE "or…" MENU (`proto:2292`-`2293`, `proto:4683`) ── The requirement row's kind menu: `ActionMenu` at the exemplar's 150px, headed `Accept instead`, over one-word entries. */
+.fabricate-action-menu-panel.manager-recipe-or-menu {
+  width: 150px;
   min-width: 150px;
   max-width: 150px;
   border-radius: 9px;
 }
 
-/* The panel IS the inset, so the list adds none of its own, and the entries stack without a gap exactly as `proto:2292` draws them. */
-.fabricate-picker-popover.manager-recipe-or-popover .manager-travel-popover-options {
+/* The panel IS the inset, so the entries stack without a gap exactly as `proto:2292` draws them. */
+.fabricate-action-menu-panel.manager-recipe-or-menu .manager-action-menu-list {
   gap: 0;
-  padding: 0;
 }
 
-/* `proto:4683`: `display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:6px; font:600 11px var(--sans); color:var(--text2)`. */
-.fabricate-picker-popover.manager-recipe-or-popover .manager-travel-option {
-  gap: var(--fab-space-2);
-  min-height: 0;
+/* `proto:4683`: `gap:8px; padding:7px 8px; border-radius:6px; font:600 11px var(--sans); color:var(--text2)`, the glyph in a 14px column so the four labels share one left edge. */
+.fabricate-action-menu-panel.manager-recipe-or-menu button.manager-action-menu-item {
+  grid-template-columns: 14px minmax(0, 1fr);
+  column-gap: var(--fab-space-2);
   padding: var(--fab-space-chip) var(--fab-space-2);
   border-radius: 6px;
   color: var(--fab-text-secondary);
@@ -17566,9 +17569,7 @@
   font-weight: 600;
 }
 
-/* THE KIND'S GLYPH (`proto:4683`: `font-size:10px; width:14px`). A fixed column so the four labels start on one left edge whatever glyph precedes them. */
-.fabricate-picker-popover.manager-recipe-or-popover .manager-travel-option > i {
-  flex: 0 0 auto;
+.fabricate-action-menu-panel.manager-recipe-or-menu button.manager-action-menu-item > i {
   width: 14px;
   font-size: 10px;
   text-align: center;

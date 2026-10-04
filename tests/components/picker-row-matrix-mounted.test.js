@@ -21,6 +21,8 @@ import {
 } from '../helpers/select-control.js';
 import {
   createMountedComponentHarness,
+  KIND_MENU_COMPILED_MODULES,
+  KIND_MENU_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   TYPEAHEAD_RUNE_MODULES,
@@ -31,6 +33,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-picker-row-',
   rawModules: [
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...KIND_MENU_RAW_MODULES,
     'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
     // The roll-expression field's display helpers, and what they import.
     'src/systems/characterModifierPrerequisiteCopy.js',
@@ -40,6 +43,7 @@ const harness = createMountedComponentHarness({
   runeModules: TYPEAHEAD_RUNE_MODULES,
   compiledModules: [
     ...SELECT_COMPILED_MODULES,
+    ...KIND_MENU_COMPILED_MODULES,
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
@@ -51,12 +55,12 @@ const harness = createMountedComponentHarness({
 
 /**
  * What each authoring surface passes the row. Recipe ingredients and tool repair offer every kind
- * and the convert control; the three result surfaces offer `component` alone and a rolled amount;
+ * and the `or…` kind menu (`allowAny`); the three result surfaces offer `component` alone and a rolled amount;
  * a progressive stage draws neither an amount nor a remove, and puts its own controls in `trailing`.
  */
 const SURFACES = Object.freeze({
-  'recipe ingredient': { kinds: [...KIND_ORDER], convert: true },
-  'tool repair': { kinds: [...KIND_ORDER], convert: true },
+  'recipe ingredient': { kinds: [...KIND_ORDER], allowAny: true },
+  'tool repair': { kinds: [...KIND_ORDER], allowAny: true },
   'recipe result': { kinds: ['component'], rollable: true },
   'gathering task result': { kinds: ['component'], rollable: true },
   'salvage result': { kinds: ['component'], rollable: true },
@@ -106,7 +110,7 @@ const KIND_TRIGGER = '.fabricate-select-trigger[data-recipe-option-kind]';
 
 const unnamed = (kind) => ({ kind, id: '', tags: [], tagMatch: 'any', quantity: 1 });
 const snippet = (html) => createRawSnippet(() => ({ render: () => html }));
-const CONVERT = snippet('<button type="button" data-test-convert>or…</button>');
+const CONVERT = '.manager-recipe-or-trigger';
 const TRAILING = snippet('<span data-test-trailing>DC 12</span>');
 
 const settle = () => new Promise((done) => setTimeout(done, 0));
@@ -122,7 +126,7 @@ async function mountRow(config, value, extra = {}) {
     rollable: config.rollable === true,
     amount: config.amount === false ? false : {},
     removable: config.removable !== false,
-    convert: config.convert ? CONVERT : null,
+    allowAny: config.allowAny === true,
     trailing: config.trailing ? TRAILING : null,
     onChange: (...args) => {
       changes.push(args);
@@ -203,13 +207,13 @@ describe('PickerRow: unreachable cells are absent', () => {
         const rollable = config.rollable === true && kind === 'component';
         assert.equal(Boolean(target.querySelector(TOGGLE)), rollable, `${kind}: toggle`);
         assert.equal(
-          Boolean(target.querySelector('[data-test-convert]')),
-          config.convert === true,
+          Boolean(target.querySelector(CONVERT)),
+          config.allowAny === true,
           `${kind}: convert`
         );
         assert.equal(
           Boolean(target.querySelector('.manager-recipe-option-divider')),
-          config.convert === true,
+          config.allowAny === true,
           `${kind}: the divider belongs to the convert control`
         );
         assert.equal(
@@ -658,9 +662,7 @@ describe('PickerRow: the remaining branches', () => {
     ];
     for (const [config, value] of rows) {
       const { target } = await mountRow(config, value, { disabled: true });
-      const own = [...target.querySelectorAll('button, input')].filter(
-        (node) => !node.matches('[data-test-convert]')
-      );
+      const own = [...target.querySelectorAll('button, input')];
       assert.ok(own.length >= 4, `the scan found ${own.length} controls`);
       for (const control of own) {
         assert.ok(
@@ -821,7 +823,8 @@ describe('PickerRow: the remaining branches', () => {
     const { target } = await mountRow({ ...ingredient, trailing: true }, unnamed('component'));
     const order = [...target.querySelector('.manager-recipe-option-controls').children].map(
       (node) => {
-        if (node.matches('[data-test-convert]')) return 'convert';
+        if (node.matches('.fabricate-action-menu:has(.manager-recipe-or-trigger)'))
+          return 'convert';
         if (node.matches('[data-test-trailing]')) return 'trailing';
         if (node.matches('[data-recipe-remove]')) return 'remove';
         return node.classList[0];
@@ -834,5 +837,60 @@ describe('PickerRow: the remaining branches', () => {
       'trailing',
       'remove',
     ]);
+  });
+});
+
+const KIND_MENU_SURFACES = Object.entries(SURFACES).filter(([, config]) => config.allowAny);
+
+describe('PickerRow: allowAny opens the kind menu', () => {
+  const menuItems = () => [
+    ...globalThis.document.querySelectorAll('.manager-recipe-or-menu [role="menuitem"]'),
+  ];
+
+  for (const [surface, config] of KIND_MENU_SURFACES) {
+    it(`${surface}: the menu lists the surface's kinds in table order, under its heading`, async () => {
+      const chosen = [];
+      const { target } = await mountRow(config, unnamed('component'), {
+        onSelect: (...args) => {
+          chosen.push(args);
+        },
+      });
+      await click(target.querySelector(CONVERT));
+      assert.deepEqual(
+        menuItems().map((item) => item.getAttribute('data-recipe-add')),
+        config.kinds.map((kind) => `alternative-${kind === 'tags' ? 'tag' : kind}`)
+      );
+      const list = globalThis.document.querySelector('.manager-recipe-or-menu [role="menu"]');
+      const heading = globalThis.document.querySelector(
+        `[id="${list.getAttribute('aria-labelledby')}"]`
+      );
+      assert.equal(heading?.textContent.trim(), 'Accept instead');
+
+      await click(menuItems()[1]);
+      assert.deepEqual(chosen, [[config.kinds[1]]], 'onSelect receives the kind and nothing else');
+    });
+  }
+
+  it('offers only the kinds the caller passes', async () => {
+    const { target } = await mountRow(
+      { ...SURFACES['recipe ingredient'], kinds: ['component', 'tags'] },
+      unnamed('component')
+    );
+    await click(target.querySelector(CONVERT));
+    assert.deepEqual(
+      menuItems().map((item) => item.getAttribute('data-recipe-add')),
+      ['alternative-component', 'alternative-tag']
+    );
+  });
+
+  it('a disabled row does not open the menu', async () => {
+    const { target } = await mountRow(SURFACES['recipe ingredient'], unnamed('component'), {
+      disabled: true,
+    });
+    const trigger = target.querySelector(CONVERT);
+    assert.ok(trigger.disabled);
+    trigger.dispatchEvent(new globalThis.window.MouseEvent('click', { bubbles: true }));
+    await settle();
+    assert.equal(menuItems().length, 0);
   });
 });
