@@ -113,10 +113,12 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 8,
     files: Object.freeze([
-      // 14 sites across the recipe editor tree, all `<button>` — 13 booked here now.
+      // 14 sites across the recipe editor tree, all `<button>` — 10 booked here now.
+      // 4 -> 1 at issue 1516: the choice group's four `alt <kind>` adders render from one
+      // `{#each}` over the kind menu's own list, so the four sites are one.
       Object.freeze({
-        file: 'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-        sites: 4,
+        file: 'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
+        sites: 1,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
@@ -1096,14 +1098,14 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    123,
-    'the conversion is 123 sites, whether or not a given one has been converted yet'
+    120,
+    'the conversion is 120 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
     48,
     // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), and one for the
-    // salvage DC card's move into `CheckOverrideField` (issue 2005); the 123-site total above is
+    // salvage DC card's move into `CheckOverrideField` (issue 2005); the 120-site total above is
     // unchanged, because nothing converted.
     'across 48 components'
   );

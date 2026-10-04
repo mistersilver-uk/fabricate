@@ -2496,9 +2496,8 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
       'manager-components-normal',
       'manager-essences-source-picker',
       'manager-gathering-task-availability-menu',
-      'manager-recipe-edit-ingredients-or-menu',
       'manager-recipe-edit-tag-picker',
-      // THE NINTH AND TENTH OVERRIDES (issue 1513), and they are two capabilities rather than two
+      // THE EIGHTH AND NINTH OVERRIDES (issue 1513), and they are two capabilities rather than two
       // more instances of one.
       'manager-recipe-item-contents-picker',
       'manager-world-parties-actor-picker',
@@ -2515,7 +2514,7 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   ]).map((viewCase) => viewCase.id);
 
-  // The representative pair plus the panel's fifteen overrides.
+  // The representative pair plus the panel's fourteen overrides.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
@@ -2525,7 +2524,6 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
       'manager-essences-source-picker',
       'manager-gathering-task-availability-menu',
       'manager-recipe-edit-crafting-modifier-cap-reached',
-      'manager-recipe-edit-ingredients-or-menu',
       'manager-recipe-edit-tag-picker',
       'manager-recipe-item-contents-picker',
       'manager-recipes-bulk-edit-check-tier',
@@ -2565,6 +2563,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-task-node-respawn-list',
   'manager-gathering-task-stamina-modifier-list',
   'manager-gathering-tasks-availability-filter-list',
+  'manager-recipe-edit-choice-group-menu',
   'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-ingredients-suggestions',

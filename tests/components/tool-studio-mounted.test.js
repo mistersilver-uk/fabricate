@@ -6,6 +6,8 @@ import { tick } from 'svelte';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   createMountedComponentHarness,
+  KIND_MENU_COMPILED_MODULES,
+  KIND_MENU_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
@@ -78,6 +80,7 @@ const harness = createMountedComponentHarness({
     // would go on naming a module the real one had moved past.
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...KIND_MENU_RAW_MODULES,
   ],
   runeModules: TYPEAHEAD_RUNE_MODULES,
   compiledModules: [
@@ -108,9 +111,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
+    'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
     'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
     'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+    ...KIND_MENU_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     // The shared scoped-entity patterns the Tool Studio is converted onto (issue 1362).
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
