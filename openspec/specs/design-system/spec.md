@@ -952,7 +952,9 @@ The vehicles are cited by SELECTOR and never by line number, because a line into
 Naming the primitive here therefore binds the unsaved mark and leaves the four-mark rule intact.
 The family reaches a TAB STRIP as well as the rail, because a tab's mark states a fact about what is behind that tab exactly as a rail entry's does, and the tab-strip primitive MUST own the drawing of every vehicle it offers so that a call site names which one its mark uses and never how it looks.
 A caller that cannot name the vehicle it needs is a MISSING CAPABILITY on that primitive, never a licence to hand-roll a second strip or to draw one vehicle with another: a difference recorded between two strips MUST be a functional or informational one the shared primitive absorbs, because a deliberate STYLE divergence is precisely what a shared primitive exists to remove.
-The PREMIUM vehicle stays a rail mark and is not offered on a tab strip, since a vehicle no caller on a surface can reach is configuration that cannot be exercised.
+The PREMIUM vehicle stays a rail mark and is not offered on a tab strip, because the rail's PREMIUM chip and the title-bar badge already state the tier once and loudly, and a chip on every tab of a strip whose tabs are all gated would repeat it.
+A tab whose destination is tier-gated carries the strip's premium PADLOCK instead — the premium signal the rail's Downtime sub-items already carry — drawn by the tab-strip primitive, hidden from assistive technology, its meaning stated in words by the tab's description.
+The padlock is a state of the tab and not a mark of the family, so it does not enter the four-mark set and no call site names its glyph; it is not `<Locked>`, because a padlocked tab stays selectable; and like every premium signal it is drawn in the manager only, so no player-window caller marks a tab with it.
 A mark carries a LABEL and a TONE and never a glyph: a PASS mark is the issue vehicle carrying a tick character, not a fourth vehicle and not a caller-supplied icon, because a call site naming a Font Awesome class is a call site choosing a shape and that is the one thing the ownership rule above forbids.
 
 A rule that is always true is a callout, which stays put.
@@ -977,6 +979,36 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **WHEN** a navigation item's only visible content is a glyph
 - **THEN** its count is the filled pip on the well's outer corner
 - **AND** a labelled row's count renders as a bare numeral
+
+#### Scenario: A tier-gated tab carries the premium padlock
+
+- **WHEN** a manager caller marks a tab `tierGated`
+- **THEN** the strip draws one padlock in that tab, hidden from assistive technology
+- **AND** the tab stays selectable
+- **AND** no call site supplies the glyph or its class
+
+### Requirement: A tab strip always keeps a tab stop, and names and describes a tab from its own entry
+
+The tab-strip primitive's roving tab stop is the selected tab, or the first rendered tab when the selected id names no rendered tab, while `aria-selected` stays bound to the selected id.
+A tab entry MAY override its accessible name, and an overriding name MUST contain the tab's visible label.
+A tab entry MAY carry a description that the strip renders as a `role="tooltip"` element beside the tablist rather than inside it — a tablist owns only tabs — referenced by the tab's `aria-describedby`.
+The strip shows the hovered tab's description, else the focused tab's, and Escape hides it until that tab is next hovered or focused, without moving focus or selection.
+A pointer activation focuses the tab it selects.
+A tier-gated tab stays focusable and selectable, carrying neither `disabled` nor `aria-disabled`.
+The strip does not move focus when the focused tab is removed; the caller that removed it owns the recovery.
+Apart from that fallback, an entry naming none of these renders exactly what it rendered before they existed.
+
+#### Scenario: The selected id names no rendered tab
+
+- **WHEN** a strip's selected id matches none of its tabs
+- **THEN** the first tab carries `tabindex="0"` and every other tab `-1`
+- **AND** no tab reports `aria-selected="true"`
+
+#### Scenario: The focused tab becomes tier-gated
+
+- **WHEN** the focused, selected tab re-renders `tierGated`
+- **THEN** it keeps `tabindex="0"` and `aria-selected="true"`
+- **AND** it carries neither `disabled` nor `aria-disabled`
 
 ### Requirement: An ordered row opens in place to its editing body
 
