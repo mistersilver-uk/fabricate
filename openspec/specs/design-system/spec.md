@@ -1594,7 +1594,7 @@ It resolves against the CRAFTING CHARACTER, the actor every other rolled amount 
 Where a roll awards more than one alternative, the selection expression is rolled ONCE PER AWARD rather than once for the group.
 A single roll would select the same alternative every time, which is not a selection at all.
 
-A roll that lands outside every authored range CLAMPS to the nearest one: below the lowest it selects the lowest alternative, above the highest it selects the highest.
+A roll that lands below every range start selects the lowest alternative, and one above the highest end selects the highest.
 A roll selects the member with the highest range start at or below it, and a roll below every start selects the lowest, so no authored group can produce nothing.
 This is deliberately unlike outcome-tier routing, where a value no tier claims is a blocking GAP — a craft that has already succeeded must still award what it was routed to, so the group clamps rather than failing at the last step.
 

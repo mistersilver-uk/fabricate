@@ -132,8 +132,8 @@ and the browse half is the one that scales with the corpus.
 - A non-GM crafts directly against owned actors; there is no GM relay for player
   crafting.
 - An outcome that left a reward for the player to pick (`awardChoicePending` on the result,
-  issue 1773) names it in the run summary and offers to open that run in the Journal, where the
-  pick is made; the crafting tab never hosts the pick itself.
+  issue 1773) names it in the run summary until it is settled from this client, and offers to
+  open that run in the Journal, where the pick is made; the crafting tab never hosts the pick.
 - Time-based countdowns are driven by world time only: a new `subscribeWorldTime`
   bridge refreshes calendar-aware durations and re-fetches the listing quietly when
   the GM advances the clock.
@@ -402,7 +402,8 @@ A refused choice cancels the whole batch with zero mutation, and a resource that
   A credit reads its label, when authored, beside its amount and unit, states a rolled amount's roll in the same `{formula} = {total}` treatment, and carries its reason; an empty credit is stated rather than omitted.
   A grant names the recipe it taught and says whether it was learned or already known.
   A rolled credit's evaluated roll rides the message's `rolls` after the rolled Item amounts.
-- **A card states a reward still to pick** (issue 1773): a result group whose chooser is the player awards nothing at the stage, so its card adds one row, "A reward awaits your choice", and the group's count and selection rolls ride the message's `rolls` after the credit rolls.
+- **A card states a reward still to pick** (issue 1773): a result group whose chooser is the player awards nothing at the stage, so its card adds one row, "A reward is waiting to be chosen in the Journal", and the group's count roll rides the message's `rolls` after the credit rolls.
+  The selection roll appears only on the card of a group whose chooser is a roll.
   The settle posts its own card, listing what was claimed, when `features.chatOutput` is on.
 - **A counting check states its executed dice.**
   For a public, non-secret counting check (`publicroll` on V13, `public` on V14) the crafting, salvage and bulk salvage cards show the die tiles and the count rows, and the summary line `{pool}d{die}, each {sym} {threshold}` replaces the numeric roll row.

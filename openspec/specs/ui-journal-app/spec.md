@@ -189,7 +189,9 @@ Until the choice is settled the run is counted by the badge and listed under Act
 The face's confirm is the one primary allowed on that run, and the run is not dismissible.
 A later stage cannot begin until the choice is settled, and the pick is one `chooseAward` command, settled once.
 The owner of the crafting actor or a GM may settle it, and anyone else sees read-only tiles with no confirm.
-A settle that stops before it applies anything is sent again under its own request; one that stops while applying reads as recovery, which the run may then be dismissed from.
+A viewer not entitled to the run's evidence sees no tiles, and the notice tells them the GM can choose the reward; the notice and attention ask only a viewer who can pick to choose.
+One settle runs at a time: while one is in flight another is refused and changes nothing.
+A settle interrupted before it applied anything is discarded when the GM reconciles it or Fabricate reloads, so the choice can be made again; one interrupted after it applied anything reads as recovery, which the run may then be dismissed from.
 
 ##### Scenario: No GM is connected
 

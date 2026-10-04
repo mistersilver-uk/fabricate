@@ -3768,9 +3768,9 @@ RunModel = {
   pausedDurationSeconds: number,
   actions: { execute, pause, resume, setCompletionMode, beginStep, atStageStart, setSelection, cancel, dismiss, chooseAward, disabledReason },
   awaitingChoice: boolean,               // the stage cannot proceed until this viewer chooses
-  awardChoicePending: boolean,           // the run still owes an award choice; absent when it owes none
-  awardChoices: AwardChoiceModel[],      // each owed choice for an entitled viewer; [] otherwise
-  awardChoiceBlocker: string | null,     // why this viewer may not settle now: notOwner, an authority reason, recoveryRequired, executionInProgress
+  awardChoicePending: boolean,           // the run still owes an unsettled award choice; false when it owes none.
+  awardChoices: AwardChoiceModel[],      // each owed choice for an entitled viewer; [] for one not entitled; absent when none is owed
+  awardChoiceBlocker: string | null,     // why this viewer may not settle now: notOwner, notEntitled, an authority reason, recoveryRequired, executionInProgress
   recoveryEvidence: { status, required?, appliedEffectCount, effectCount, effects, uncertainEffectIndex } | null,
   status: string,                        // the native persisted status, passed through verbatim
   derivedStatus: "paused" | "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
@@ -3825,8 +3825,7 @@ AwardChoiceModel = {                     // one award choice a run still owes (i
   countRoll: { formula, total } | null,
   ceiling: number,                       // 1 under anyOne, else min(N, alternative count)
   alternatives: Array<{ id, kind, name, img, glyph, quantity, quantityFormula, amountText,
-    unclaimable: string | null }>,       // why it cannot be claimed now, judged by the settle's own rule
-  resume: { requestId, choiceId, picks } | null, // a settle whose plan persisted before it applied anything
+    unclaimable: string | null }>,       // why it cannot be claimed now, judged by the settle's own rule: one of alreadyKnown, recipeMissing, knowledgeNotObservable, componentMissing, currencyDisabled, unitMissing, other
 }
 ```
 
@@ -3924,7 +3923,7 @@ StepModel = {
    The player's own pick MUST be judged on the PERSISTED plan, not on the resolver's verdict: the resolver invents a greedy option and a suggested essence allocation when neither is persisted and then reports success, so a stage whose multi-option group or essence allocation is unrecorded is waiting on a choice however well its inputs resolve.
    Which control renders — the begin decision in place of the resolve action, or the resolve action itself — is decided by `actions.atStageStart` alone, never by `actions.beginStep` being truthy nor by matching `actions.disabledReason`: a refused cause at a stage's start boundary MUST keep the (disabled) begin control on screen rather than silently fall back to an enabled resolve action the command would refuse.
    An untimed stage has no separate start boundary to withhold the begin control instead, so `actions.execute` MUST itself stay refused for the same causes.
-   `actions.disabledReason` reports the cause in its own words — `routeRequired`, `choiceRequired`, `selectionRequired`, `essenceRequired`, `currencyRequired`, `toolRequired` or `sourcesUnavailable` — and they MUST NOT be conflated, because an essence gap, a price and a missing tool are different problems with different fixes and none of them is "choose a route".
+   `actions.disabledReason` reports the cause in its own words — `routeRequired`, `choiceRequired`, `selectionRequired`, `essenceRequired`, `currencyRequired`, `toolRequired`, `sourcesUnavailable` or `awardChoicePending` — and they MUST NOT be conflated, because an essence gap, a price and a missing tool are different problems with different fixes and none of them is "choose a route".
    `awardChoicePending` is the cause while an earlier stage owes an award choice with a claimable alternative, the same predicate the engine's stage start refuses on; it is distinct from `choiceRequired`, because what is owed is a reward to pick rather than a stage input.
    `sourcesUnavailable` is the run whose recorded component source actors no longer resolve: the engine refuses it outright, so the projection MUST report that rather than judging the stage against the crafting actor's inventory alone and naming whatever shortfall THAT inventory shows.
    The two PICK causes are themselves distinct: `routeRequired` is the one decision a stage with more than one authored ingredient set opens, and `choiceRequired` names the option picks and essence allocation made WITHIN the route already taken, so a player on a single-route stage is never told to choose a route that has one value while the real gap is an allocation.
@@ -3937,7 +3936,8 @@ StepModel = {
    Unsupported versions MUST remain readable without inheriting legacy mutation fallbacks.
    Authority, owner, pause, execution/recovery and check eligibility MUST govern the exposed capabilities; raw manual-advance flags cannot override a refusal.
    User-specific terminal dismissals filter the composite key before counts without deleting native history.
-   `actions.chooseAward` is offered on a crafting run that still owes an award choice, to the actor's owner or a GM, while the authority is available and neither of the run's journals is recovery-required or the stage's own is planned; a settle that stopped before it applied anything is offered again under its own request.
+   `actions.chooseAward` is offered on a crafting run that still owes an award choice, to a GM or to the actor's owner when entitled to the run's evidence, while the authority is available and neither of the run's journals is recovery-required or planned, so one settle runs at a time.
+   A settle interrupted between its journal writes is resolved when the GM reconciles it or boot recovery runs: its plan is discarded when nothing applied, so the choice can be sent again under any request, and it becomes recovery-required otherwise.
    A terminal run that still owes a choice is listed and counted under `activeRuns` and is not dismissible, unless its settle is recovery-required, which the run's `recoveryEvidence` then reports.
 
 4. **Stage browsing is not execution.**
