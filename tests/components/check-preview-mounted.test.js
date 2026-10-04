@@ -398,10 +398,10 @@ describe('the outcome-preview readout', () => {
       breakdown: 'd20 9 +3 · Sera Vane',
       total: '12',
       line: ['vs DC 12 · +0', 'margin'],
-      card: ['success', 'Success', 'Counts as a success · result group bound to this tier'],
+      card: ['success', 'Success', 'Counts as a success · result set bound to this tier'],
       note: null,
       rows: [
-        ['result-group', 'Result group produced', 'Success'],
+        ['result-group', 'Result set produced', 'Success'],
         ['ingredients', 'Ingredients consumed', 'as listed'],
       ],
     });
@@ -978,9 +978,9 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
       breakdown: '9 · raw · Sera Vane',
       total: '9',
       line: ['target 12 · margin +3', 'margin'],
-      card: ['success', 'Regular', 'The recipe’s result group is produced'],
+      card: ['success', 'Regular', 'The recipe’s result set is produced'],
       note: MARGIN_NOTES.under,
-      rows: [['result-group', 'Result group produced', 'Regular']],
+      rows: [['result-group', 'Result set produced', 'Regular']],
     });
 
     await choosePreviewActor(root, 'no-actor');
@@ -1080,9 +1080,9 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
       breakdown: '9 · raw',
       total: '9',
       line: ['target 10 · margin +1', 'margin'],
-      card: ['success', 'Success', 'The recipe’s result group is produced'],
+      card: ['success', 'Success', 'The recipe’s result set is produced'],
       note: MARGIN_NOTES.under,
-      rows: [['result-group', 'Result group produced', 'Success']],
+      rows: [['result-group', 'Result set produced', 'Success']],
     });
     assert.equal(root.querySelector('[data-checks-simulator-target]').dataset.checksSimulatorTarget, '10');
   });
@@ -1161,7 +1161,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       .map((rule) => rule.style.getPropertyValue(property))
       .filter(Boolean);
   const SUCCESS_ROWS = [
-    ['result-group', 'Result group produced', 'full'],
+    ['result-group', 'Result set produced', 'full'],
     ['ingredients', 'Ingredients consumed', 'as listed'],
   ];
   const withTriggers = (check, triggers) => ({ ...check, checkBreakage: { triggers } });
@@ -1180,7 +1180,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       breakdown: 'd20 9 +3 · Sera Vane',
       total: '12',
       line: ['vs DC 10', ''],
-      card: ['success', 'Success', 'The recipe’s result group is produced'],
+      card: ['success', 'Success', 'The recipe’s result set is produced'],
       note: null,
       rows: SUCCESS_ROWS,
     });
@@ -1282,7 +1282,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
     const readout = await rolledAs(root);
     assert.deepEqual([readout.line, readout.card, readout.rows], [
       ['vs DC 16 · −4', 'margin'],
-      ['failure', 'Flawed', 'Counts as a failure · result group bound to this tier'],
+      ['failure', 'Flawed', 'Counts as a failure · result set bound to this tier'],
       [['failure-result', 'Failure result if this gathering task defines one', 'per gathering task']],
     ]);
     harness.remount();
@@ -1362,7 +1362,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       await mountChecks({ craftingCheck: withTriggers(ROUTED_CHECK, [stepTrigger('down', 2)]) })
     );
     assert.deepEqual([down.card, down.note], [
-      ['failure', 'Ruined', 'Counts as a failure · result group bound to this tier'],
+      ['failure', 'Ruined', 'Counts as a failure · result set bound to this tier'],
       ['trigger', 'Trigger fired — the result steps down 2 tiers.'],
     ]);
   });
@@ -1372,7 +1372,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       await simple(withTriggers({ ...SIMPLE_CHECK, dc: 15 }, [forceTrigger('success')]))
     );
     assert.deepEqual([rescued.card, rescued.note, rescued.rows], [
-      ['success', 'Success', 'The recipe’s result group is produced'],
+      ['success', 'Success', 'The recipe’s result set is produced'],
       ['forced', 'Trigger fired — automatic success.'],
       SUCCESS_ROWS,
     ]);
@@ -1386,7 +1386,7 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       await mountChecks({ craftingCheck: withTriggers(ROUTED_CHECK, [forceTrigger('failure')]) })
     );
     assert.deepEqual([forced.card, forced.note], [
-      ['failure', 'Ruined', 'Counts as a failure · result group bound to this tier'],
+      ['failure', 'Ruined', 'Counts as a failure · result set bound to this tier'],
       ['forced', 'Trigger fired — forced to the worst failing tier.'],
     ]);
   });
@@ -1404,8 +1404,8 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
     const readout = await rolledAs(await mountChecks({ craftingCheck: fixed }));
     assert.deepEqual([readout.line, readout.card, readout.rows[0]], [
       ['in the 10–14 band', ''],
-      ['success', 'Mid', 'Counts as a success · result group bound to this tier'],
-      ['result-group', 'Result group produced', 'Mid'],
+      ['success', 'Mid', 'Counts as a success · result set bound to this tier'],
+      ['result-group', 'Result set produced', 'Mid'],
     ]);
   });
 
@@ -1500,9 +1500,9 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
         breakdown: '9 · raw · Sera Vane',
         total: '9',
         line: ['target 12 · margin +3', 'margin'],
-        card: ['success', 'Success', 'The recipe’s result group is produced'],
+        card: ['success', 'Success', 'The recipe’s result set is produced'],
         note: MARGIN_NOTES.under,
-        rows: [['result-group', 'Result group produced', 'Success']],
+        rows: [['result-group', 'Result set produced', 'Success']],
       });
     });
 

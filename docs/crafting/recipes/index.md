@@ -21,14 +21,14 @@ Every recipe brings together a few things.
 - A name and a piece of flavour text that describe it.
 - An optional category that helps you organise recipes, when your crafting system groups recipes by category.
 - The ingredients it needs, made up of one or more sets of required materials.
-- The results it produces, made up of one or more groups of items.
+- The results it produces, made up of one or more sets of items.
 - Any reusable tools it requires, such as a forge or a cauldron.
 - Whether active effects carried by the ingredients are copied onto the results.
 - Whether the recipe is enabled, which controls if it can be crafted.
 - Whether the recipe is locked, which lets players see it exists but stops anyone other than the GM from crafting it.
 - Who can see it, which is set by the crafting system's visibility settings.
 - For a recipe that teaches itself through an in-world item, the item that unlocks it for knowledge-based visibility.
-- In a routed system, the result groups it can produce when more than one outcome is possible.
+- In a routed system, the result sets it can produce when more than one outcome is possible.
 
 {: .note }
 > For multi-step recipes, the ingredients and results are defined on each individual step rather than on the recipe as a whole.
@@ -130,7 +130,7 @@ The resolution mode determines how ingredients map to results:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Mode                                                          | Sets | Result Groups | Check Required | Use When                                                     |
+| Mode                                                          | Sets | Result Sets   | Check Required | Use When                                                     |
 |:--------------------------------------------------------------|:-----|:--------------|:---------------|:-------------------------------------------------------------|
 | [Simple]({% link crafting/recipes/simple.md %})                        | 1    | 1             | Optional       | Basic A + B = C crafting                                     |
 | [Routed by ingredients]({% link crafting/recipes/routed.md %})         | 1+   | 1+            | Optional       | The ingredients used select the result                      |

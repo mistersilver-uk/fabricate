@@ -101,7 +101,7 @@ You will be asked to confirm before anything changes.
 When no recipe needs deleting, the confirmation does not mention deletion at all.
 
 A recipe is only deleted when its shape cannot fit the new mode.
-This happens in two cases: narrowing into Simple or Progressive mode (which each expect exactly one ingredient set and one result group) from a recipe that has more than one of either, and moving a multi-step recipe into Alchemy mode (which does not support multi-step recipes).
+This happens in two cases: narrowing into Simple or Progressive mode (which each expect exactly one ingredient set and one result set) from a recipe that has more than one of either, and moving a multi-step recipe into Alchemy mode (which does not support multi-step recipes).
 Every other recipe is kept and adjusted to suit the new mode.
 
 A missing setup at the system level never deletes a recipe.
@@ -121,12 +121,12 @@ Any component whose salvage setup is incompatible with the new mode simply has i
 You will be asked to confirm.
 
 Switching a system **into** Simple mode is the one case that changes component setups.
-Simple mode awards a single result group, so any component that has more than one is trimmed back to its first when you switch.
+Simple mode awards a single result set, so any component that has more than one is trimmed back to its first when you switch.
 Fabricate warns you by name when this happens, listing every component it trimmed, so nothing is dropped silently.
 
 The **Salvage resolution mode** card offers Simple (the default), Progressive, and Routed by check.
 A salvaged component has a single ingredient, so ingredient-set routing (and Alchemy) does not apply and is not offered.
-Simple returns one result group with an optional pass/fail salvage check.
+Simple returns one result set with an optional pass/fail salvage check.
 
 ### Chat Output
 

@@ -361,7 +361,7 @@
             subtitle={countOutcomes?.success ??
               text(
                 'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
-                'The roll reaches the DC, and the recipe’s result group is produced in full.'
+                'The roll reaches the DC, and the recipe’s result set is produced in full.'
               )}
           />
           <IconFactRow

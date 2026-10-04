@@ -16,12 +16,12 @@ Each step can have its own ingredients, required tools, results, and time requir
 An ingredient inside a step can still offer a currency cost as an alternative to its items, the same as in a single-step recipe.
 
 A step that comes before the last one does not have to produce anything.
-Leave its result group empty and the step still costs its materials, its tools, its time and its crafting check.
+Leave its result set empty and the step still costs its materials, its tools, its time and its crafting check.
 The run simply advances to the next step with nothing awarded.
 This is how you author preparation work that has no item to show for it.
 The last step is different.
-Each of its result groups must produce something, because that is what the recipe makes.
-An on-failure result group is the exception, as always, and is allowed to award nothing.
+Each of its result sets must produce something, because that is what the recipe makes.
+An on-failure result set is the exception, as always, and is allowed to award nothing.
 Progressive mode is the exception, and every one of its steps must still award results, because a progressive stage is defined by what it awards.
 
 ---
@@ -101,14 +101,14 @@ A three-step recipe for creating enchanted plate armour:
 ### Creating the recipe
 
 A multi-step recipe is made up of an ordered list of steps.
-Each step has its own ingredient sets, result groups, optional required tools, and an optional time requirement.
+Each step has its own ingredient sets, result sets, optional required tools, and an optional time requirement.
 For the example above, the Forge step requires the Forge tool and a 4-hour time gate, the Assemble step consumes the unfinished plates plus leather straps, and the Enchant step combines the plate armour with an enchanting gem.
 You author each step on the Ingredients and Results tabs of the recipe editor in the Crafting Admin panel.
 
 A step you have deliberately left without results is not treated as unfinished work.
 Its result set on the Results tab, and the matching step in the recipe browser's inspector, show a plain note that the step only advances the craft.
 This replaces the red warning an empty last step still gets.
-A step with no result group at all is a different thing.
+A step with no result set at all is a different thing.
 That is unfinished authoring, so it keeps the red warning wherever it sits.
 
 {% include screenshot.html case="manager-recipe-edit-multistep" caption="The steps of a multi-step recipe on the Overview tab." %}

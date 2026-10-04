@@ -376,10 +376,10 @@ export const VIEW_RECIPES = Object.freeze([
     ],
   },
   {
-    // Issue 764: the Simple-mode salvage editor at its one-success-group cap — the Add group
+    // Issue 764: the Simple-mode salvage editor at its one-success-group cap — the Add result set
     // control hidden and the required hint shown.
     id: 'manager-component-edit-salvage-simple',
-    label: 'Manager component editor — Simple-mode salvage single-group cap (no Add group, required hint)',
+    label: 'Manager component editor — Simple-mode salvage single-group cap (no Add result set, required hint)',
     smokeLabels: ['manager-component-edit-salvage-simple'],
     matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   },
