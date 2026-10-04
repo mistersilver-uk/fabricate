@@ -730,15 +730,32 @@ describe('RunDetail mounted behavior', () => {
     Object.assign(run.steps[0], {
       consumedIngredients: [],
       createdResults: [],
-      currencyCredits: [{ resultId: 'coin', unit: 'gp', unitName: 'gp', amount: 9, label: 'Guild bounty' }],
-      knowledgeGrants: [{ resultId: 'lore', recipeId: 'r-sword', recipeName: 'Forge Longsword', outcome: 'granted' }],
+      currencyCredits: [
+        { resultId: 'coin', unit: 'gp', unitName: 'gp', amount: 9, label: 'Guild bounty' },
+      ],
+      knowledgeGrants: [
+        {
+          resultId: 'lore',
+          recipeId: 'r-sword',
+          recipeName: 'Forge Longsword',
+          outcome: 'granted',
+        },
+      ],
     });
     const target = await harness.mount({ run, journal: { commandResult: { runKey: run.key } } });
     const band = target.querySelector(':scope [data-journal-verdict] .fab-notice-evidence');
     assert.ok(Boolean(band), 'the banner keeps its evidence band');
-    const facts = [...band.querySelectorAll('[data-journal-fact]')].map((row) => row.textContent.replaceAll(/\s+/g, ' ').trim());
-    assert.ok(facts.some((fact) => /Guild bounty\s*9 gp/.test(fact)), facts.join(' | '));
-    assert.ok(facts.some((fact) => /Forge Longsword/.test(fact)), facts.join(' | '));
+    const facts = [...band.querySelectorAll('[data-journal-fact]')].map((row) =>
+      row.textContent.replaceAll(/\s+/g, ' ').trim()
+    );
+    assert.ok(
+      facts.some((fact) => /Guild bounty\s*9 gp/.test(fact)),
+      facts.join(' | ')
+    );
+    assert.ok(
+      facts.some((fact) => /Forge Longsword/.test(fact)),
+      facts.join(' | ')
+    );
     assert.ok(Boolean(band.querySelector(':scope [data-journal-fact] i.fa-coins')));
   });
 
