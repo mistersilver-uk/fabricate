@@ -1230,6 +1230,8 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
           justifyContent: style.justifyContent,
           fontSize: style.fontSize,
           fontWeight: style.fontWeight,
+          minHeight: style.minHeight,
+          height: Number(box.height.toFixed(2)),
           // The offset of the glyph from the entry's own padding edge.
           glyphIndent: Number(
             (
@@ -1279,6 +1281,8 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
       );
       assert.equal(entry.fontSize, '11px', `\`proto:4683\`: the ${entry.kind} entry is 11px`);
       assert.equal(entry.fontWeight, '600', `\`proto:4683\`: the ${entry.kind} entry is 600`);
+      assert.equal(entry.minHeight, '28px', `\`proto:4683\`: a 28px ${entry.kind} entry`);
+      assert.ok(entry.height >= 28, `the ${entry.kind} entry paints 28px or more (${entry.height}px)`);
       assert.equal(entry.glyphFontSize, '10px', '`proto:4683`: a 10px glyph');
       assert.equal(entry.glyphWidth, '14px', '`proto:4683`: a 14px glyph column');
       assert.ok(
@@ -1305,7 +1309,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
     await context.close();
   }
 
-  // THE WIDTH'S OWN SOURCE. The sheet sizes the panel by the class the caller hands the menu.
+  // The width's own source. The sheet sizes the panel by the class the caller hands the menu.
   assert.match(
     orMenuSource,
     /menuClass="manager-recipe-or-menu"/,
