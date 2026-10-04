@@ -14,53 +14,43 @@ Every edit stages into that draft and commits in one `updateRecipe` call on Save
 The shared header carries an `Unsaved` chip, `Back to recipes`, `Delete recipe` and `Save`, and every route exit runs the Manager confirm-discard guard.
 A recipe whose ingredients or results are still empty is a persistable _incomplete shell_: it stays non-craftable (the engine gates on completeness) and the browse row shows the derived authoring-state pill for a recipe the activation check would refuse — `Incomplete` while it is on, `Can't enable` while it is off.
 
-### Resolution-mode banner
+### Resolution-mode callout
 
-Every tab is headed by a **resolution-mode banner** naming the crafting system's `resolutionMode`, describing what it means, and offering a chip that routes to Crafting Settings.
-Resolution mode is a property of the **system**, never of a recipe: the banner reports it and offers no per-recipe control, because the mode dictates the editor's whole shape (one ingredient set or many, tier routing, the alchemy result slots) from outside the recipe.
+Overview, Ingredients, Results and Tools — the tabs the mode shapes — each carry in their heading block a neutral callout naming the system's `resolutionMode`, describing it, and offering an action that routes to Crafting Settings; the action gives it `role="note"`.
+Resolution mode is a property of the **system**, never of a recipe: the callout reports it and offers no per-recipe control, because the mode dictates the editor's whole shape (one ingredient set or many, tier routing, the alchemy result slots) from outside the recipe.
+Access, Books & Scrolls and Validation carry no mode callout.
 Its copy and icons come from the canonical `resolutionModeOptions` list that System Settings and Crafting Settings already render, so no second, drifting table exists.
 
-### Context rail
+### No right rail
 
-The editor's right-hand column is the shell's existing `manager-inspector` aside (not a second nested grid), and it is **always present** on `recipe-edit`.
-
-Its top section is **mode-conditional**, driven by the system's canonical `visibilityMode` through the `craftingEffect(mode)` matrix — the same single source of truth the crafting nav and Crafting Settings consume:
-
-| `visibilityMode`    | `craftingEffect`   | Rail top section                                                                                                              |
-| ------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `restricted`        | `showAccess`       | **Who can craft this** — the players and characters granted this recipe, plus a **Manage access** deep-link to the Access tab |
-| `item`, `knowledge` | `showBooksScrolls` | **Appears in** — the books/scrolls that teach this recipe, plus an **Open Books & Scrolls** deep-link                         |
-| `global`            | neither            | No section: a globally-visible system grants no per-recipe access and uses no books                                           |
-
-The rail is **read-only in every mode**.
-Authoring lives on the owning screen: the Access tab owns `recipe.access`, and Books & Scrolls owns book membership.
-
-Below the mode-conditional section, in every mode, the rail carries the recipe's **Category** selector, the **Recipe mode** (Simple / Complex) segmented control when the system's resolution mode permits multiple ingredient sets, the **Step mode** (Single / Multi-step) segmented control, and a **Validation** mini-list showing either an _All clear_ pill or the failing readiness checks with a deep-link into the Validation tab.
+The editor has no right rail (issue 676); Category and Step mode live on Overview, the access roster on the Access tab, and the books that teach the recipe on Books & Scrolls.
+Both of those tabs are **read-only**, and each renders only when the system's canonical `visibilityMode` asks for it through the `craftingEffect(mode)` matrix: Access under `restricted`, Books & Scrolls under `item` and `knowledge`, and neither under `global`.
+Authoring lives on the owning screen: the Access screen owns `recipe.access`, and Books & Scrolls owns book membership.
 
 ### Access rosters (restricted mode)
 
-The rail's access rows are **resolved in the admin store** and handed to the rail as display rows; the rail never resolves an id itself.
+The Access tab's rows are **resolved in the admin store** and handed to the tab as display rows; the tab never resolves an id itself.
 Three rules govern that resolution, and each exists because the naive alternative silently misreports who can craft a recipe:
 
 - **A character's controlling players are a SET, not one user.**
   The runtime predicate grants access to any viewer whose **assigned character** is that actor **OR** who holds Foundry `OWNER` on it — a union, not a fallback chain.
   Each resolved character therefore carries `controlledBy: Array<{ id, name, avatar, assigned }>` (assigned-first, then name-sorted), never a singular "played by" field.
 - **`ownership.default >= OWNER` reaches the whole table.**
-  When it does, the character carries `sharedWithAllPlayers: true` and the rail renders **"Shared with all players"** — a distinct string, never "Played by ⟨one name⟩", which would tell the GM that one player got the recipe when in fact everyone did.
-  With no controllers at all, the rail renders **no** sub-line rather than inventing an attribution.
+  When it does, the character carries `sharedWithAllPlayers: true` and the Access tab renders **"Shared with all players"** — a distinct string, never "Played by ⟨one name⟩", which would tell the GM that one player got the recipe when in fact everyone did.
+  With no controllers at all, the Access tab renders **no** sub-line rather than inventing an attribution.
 - **GMs are filtered before ownership is tested.**
   `Document#testUserPermission` short-circuits every GM (Assistant GMs included) to `OWNER`, so the roster is derived from Foundry's non-GM `game.users.players` roster first.
   The same roster now backs the Access tab's grantable **Players** list, which previously offered GMs as targets even though granting one had no effect.
 
 Granted **character** ids resolve over **every world actor**, not the player-character roster: the runtime predicate applies no type filter, so a grant naming a non-player-character actor is still honoured by the engine and must still be displayed.
-An id that no longer resolves (a deleted actor or user) is **dropped from display and never persisted away** — rendering the rail must not mutate the grant.
+An id that no longer resolves (a deleted actor or user) is **dropped from display and never persisted away** — rendering the Access tab must not mutate the grant.
 The rosters re-project on user CRUD and on actor CRUD, with `updateActor` key-filtered to `ownership` / `name` / `img` changes so an ordinary HP update does not re-project.
 
 ### Base Form
 
 - Name (implemented in Manager)
 - Description (implemented in Manager)
-- Category (always includes reserved `General`) — implemented, in the context rail
+- Category (always includes reserved `General`) — implemented, on the Overview tab
 - Locked toggle — see `### Locked`
 
 In Manager, the recipe-edit identity card additionally edits a player-facing image (via the FilePicker) and an `enabled` on/off toggle alongside Name and Description.
@@ -75,11 +65,11 @@ Note: alchemy `checkMode: tiered` dispatches through the same routed-check runne
 
 Per-recipe visibility is authored on the **Access tab** (`recipe.access = { characterIds, playerIds }`), gated by the system's `visibilityMode: 'restricted'`.
 The recipe editor itself carries **no** per-recipe visibility editor: the legacy `recipe.visibility { restricted, allowedUserIds }` card (gated on the superseded `recipeVisibility.listMode`) is retired, and `access` is read-forward-seeded from `visibility.allowedUserIds` for legacy systems.
-The recipe editor's context rail shows a **read-only** summary of the grant plus a deep-link to the Access tab.
+The recipe editor's Access tab shows a **read-only** summary of the grant plus a deep-link to the screen that authors it.
 
 If the system's visibility mode consumes an item or teaches by knowledge (`item` / `knowledge`):
 
-- The recipe's context rail lists **every** book/scroll that teaches it, because recipe↔book membership is **many-to-many** (`RecipeItemDefinition.recipeIds`, projected onto the recipe row as `recipe.recipeItemIds`).
+- The recipe editor's Books & Scrolls tab lists **every** book/scroll that teaches it, because recipe↔book membership is **many-to-many** (`RecipeItemDefinition.recipeIds`, projected onto the recipe row as `recipe.recipeItemIds`).
   There is no book/scroll `kind` — `RecipeItemDefinition` manages every recipe item regardless of Foundry item type.
 - Each row previews that book's name/image/source status (falling back to the legacy scalar `recipe.recipeItemId` only while the system's membership-basis marker is unset), offers Open item, and offers a per-book **remove**, which removes the recipe from **that** book's membership only and does **not** delete the shared definition.
   A multi-row selection can remove membership the same way from the recipe browser's bulk edit panel.
@@ -105,16 +95,16 @@ The change persists immediately (like `enabled`), outside the recipe draft's Sav
 
 The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the WORLD modifier library resolves non-empty for that system (issue 1308).
 `bySubject` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
-Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no banner: a control the engine will ignore is worse than no control, and a banner explaining its absence would appear on every recipe of every system that never chose `bySubject`.
+Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no callout: a control the engine will ignore is worse than no control, and a callout explaining its absence would appear on every recipe of every system that never chose `bySubject`.
 
 Under `bySubject` with a catalogue, exactly one of two mutually exclusive dispositions renders, in this priority order:
 
-1. **Inert banner** — shown when the system's active check applies no check modifiers, for one of TWO causes: `noCheck` (this resolution mode rolls no crafting check at all) or `noFormula` (a check slot exists but has no authored roll formula).
+1. **Inert callout** — shown when the system's active check applies no check modifiers, for one of TWO causes: `noCheck` (this resolution mode rolls no crafting check at all) or `noFormula` (a check slot exists but has no authored roll formula).
 The third cause, `noPlaceholder`, is REMOVED together with the roll-formula placeholder it named: the resolved scalar is appended to whatever the GM authored, so "a formula is authored but never references it" is not a reachable state.
 `noCheck` and `noFormula` remain, and their copy states the real remaining cause **without naming any placeholder**, because a GM told to reference one would be told to do something that does nothing.
 The control gains no new state.
-   The control is replaced entirely — nothing authored here could change a roll — and the banner names which cause applies from the recipe's point of view (distinct copy from the Checks card's equivalent notice).
-   The banner wins the priority order precisely BECAUSE the rule delegates here: the system asked this recipe to pick, and its picks would reach no roll.
+   The control is replaced entirely — nothing authored here could change a roll — and the callout names which cause applies from the recipe's point of view (distinct copy from the Checks card's equivalent notice).
+   The callout wins the priority order precisely BECAUSE the rule delegates here: the system asked this recipe to pick, and its picks would reach no roll.
 2. **Controls** — the grid renders a picker cell for the eligible-id subset.
    There is **no combination-rule select**: a recipe chooses WHICH modifiers apply, never HOW they combine.
 
@@ -133,8 +123,8 @@ The add-menu button is disabled at the cap and an add is refused a second time i
 A legacy `craftingModifier.policy` left on disk by a pre-1055 world is CARRIED FORWARD untouched by every writer on this tab.
 This surface no longer authors a rule and must not silently delete one either — dropping a key while editing a neighbouring one is data loss disguised as a set edit — and the key is inert regardless, because the resolver never reads it.
 
-The inert banner reuses the resolution-mode banner's chrome (`RecipeModeBanner`, prop-ified with a `tone` and a `dataAttr` name so it can render alongside its sibling on one tab without colliding) rather than inventing a second visual language for "this is set elsewhere".
-It renders full-bleed below the grid, replacing the control the grid would otherwise hold, rather than squeezing into a single grid cell.
+The inert statement is the shared `Callout` (tone `warning`, its Checks action giving it `role="note"`), full-bleed below the modifier grid.
+It replaces the control the grid would otherwise hold rather than squeezing into a single grid cell, and it is never the tab's heading-block callout, which the resolution-mode callout already is.
 
 **Five-mode active-check-formula table.** WHICH `craftingCheck` sub-config the active resolution mode actually rolls — the precondition for every disposition above — is resolved by `resolveActiveCraftingCheckFormula(system)` (`checkModifierResolver.js`, which replaced the crafting-only `craftingModifierResolver.js` in issue 1095), which maps `resolutionMode` (and, for `alchemy`, the system's `alchemy.checkMode`) to that sub-config:
 
@@ -383,7 +373,7 @@ A click-only stepper is a keyboard regression.
 
 ### Step Structure UI
 
-Step mode (Single / Multi-step) is authored from the context rail's segmented control, and is offered when the system enables multi-step recipes — or whenever the recipe already has steps, so a multi-step recipe can always be reverted.
+Step mode (Single / Multi-step) is authored from the Overview tab's segmented control, and is offered when the system enables multi-step recipes — or whenever the recipe already has steps, so a multi-step recipe can always be reverted.
 
 If multistep is enabled:
 

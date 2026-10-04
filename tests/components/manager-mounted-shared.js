@@ -121,6 +121,12 @@ export function managerComponents() {
   return preparing;
 }
 
+/** Any other component of the shared compiled tree, for a suite that mounts it directly. */
+export async function managerComponent(sourcePath) {
+  await managerComponents();
+  return importCompiledComponent(tempRoot, sourcePath);
+}
+
 /** Drop the compiled tree and the DOM, once, after every route module's cases have run. */
 export function disposeManagerSuite() {
   rmSync(tempRoot, { recursive: true, force: true });

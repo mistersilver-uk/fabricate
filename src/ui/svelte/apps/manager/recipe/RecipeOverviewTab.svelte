@@ -9,8 +9,9 @@
 -->
 <script>
   import { untrack } from 'svelte';
+  import Button from '../../../components/Button.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
-  import RecipeModeBanner from './RecipeModeBanner.svelte';
   import { formatList, localize } from '../../../util/foundryBridge.js';
   import { resolveMaxModifierPicks } from '../../../../../systems/checkModifierResolver.js';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
@@ -35,13 +36,14 @@
   } from './recipeOverviewSelectOptions.js';
 
   let {
+    // The resolution-mode callout, rendered as this tab's heading block (issue 1522).
+    modeCallout = undefined,
     recipe = null,
     name = '',
     description = '',
     img = '',
     enabled = true,
     saving = false,
-    saveFailed = false,
     onPickImagePath = null,
     onNameInput = () => {},
     onDescriptionInput = () => {},
@@ -84,7 +86,7 @@
     craftingModifierMaxPicks = null,
     // Why the system's active crafting check applies no check modifiers ('' when it does):
     // 'noCheck' | 'noFormula'. Either makes this recipe's picks inert, so the control is replaced
-    // by a banner saying which — the Checks tab explaining it is no use to a GM looking here.
+    // by a callout saying which — the Checks tab explaining it is no use to a GM looking here.
     craftingModifierInertCause = '',
     // Deep link to the Checks tab, where the catalogue and the combination rule live.
     onOpenChecks = () => {},
@@ -131,7 +133,7 @@
   const checkTierCaptionId = `${instanceId}-check-tier`;
   const minSuccessTierCaptionId = `${instanceId}-min-success-tier`;
 
-  // The banner copy for each inert cause: the same two causes the Checks card names, said from
+  // The callout copy for each inert cause: the same two causes the Checks card names, said from
   // this tab's point of view — what the GM loses here, not what to fix there. Each sentence closes
   // on the RECIPE's outcome, so it stays true however the surface below it is arranged.
   const MODIFIER_INERT_COPY = {
@@ -158,7 +160,7 @@
   const modifierDeferredToRecipe = $derived(
     hasModifierCatalogue && craftingModifierPolicy === 'bySubject'
   );
-  // Two mutually exclusive dispositions under that rule, and the inert banner wins: the system
+  // Two mutually exclusive dispositions under that rule, and the inert callout wins: the system
   // asked this recipe to pick but rolls no check for the picks to reach.
   const showModifierInert = $derived(modifierDeferredToRecipe && !!modifierInert);
   const showModifierControls = $derived(modifierDeferredToRecipe && !modifierInert);
@@ -438,6 +440,10 @@
   data-recipe-tab="overview"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Overview', 'Overview')}
 >
+  {#if modeCallout}
+    <div data-tab-heading>{@render modeCallout()}</div>
+  {/if}
+
   <div class="manager-recipe-overview-identity" data-recipe-section="identity">
     <div class="manager-recipe-overview-media">
       <!-- Always editable: a recipe can belong to many books & scrolls, so its image mirrors no
@@ -490,15 +496,6 @@
       </label>
     </div>
   </div>
-
-  {#if saveFailed}
-    <p class="manager-muted manager-form-warning">
-      {text(
-        'FABRICATE.Admin.Manager.Recipe.SaveFailed',
-        'Save failed. Check for duplicate or blank names and try again.'
-      )}
-    </p>
-  {/if}
 
   <!-- Select row: Category, then the conditional DC-check + Minimum-success-tier selects that
        only a fixed-type routed check surfaces. -->
@@ -652,35 +649,36 @@
   </div>
 
   <!-- FULL-BLEED below the grid rather than a grid cell: it REPLACES the picker cell, and the
-       sentence would wrap to five lines in a 220px column. It reuses the resolution-mode banner's
-       chrome in its own tone, so the tab has one visual language for "this is set elsewhere".
-
-       This is the tab's ONLY check-modifier banner: under `addAll`/`highest`/`playerPicks` the tab
-       renders nothing rather than a banner on every recipe of every system that never delegated.
-       What remains is a genuine contradiction — the rule DID hand the pick to this recipe and the
-       system rolls no check for it to reach — and earns the interruption. -->
+       sentence would wrap to five lines in a 220px column. Warning-toned, because the rule DID hand
+       the pick to this recipe and the system rolls no check for it to reach; under every other
+       rule the tab renders nothing rather than a callout on every recipe. -->
   {#if showModifierInert}
-    <RecipeModeBanner
+    <Callout
       tone="warning"
-      dataAttr="data-recipe-modifier-inert"
-      actionDataAttr="data-recipe-modifier-inert-checks"
-      value={craftingModifierInertCause}
-      icon="fas fa-triangle-exclamation"
-      kicker={text('FABRICATE.Admin.Manager.Recipe.CraftingModifier', 'Check modifiers')}
-      label={text(
+      title={`${text('FABRICATE.Admin.Manager.Recipe.CraftingModifier', 'Check modifiers')}: ${text(
         'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertLabel',
-        // Sentence case: it renders through the `{kicker}: {label}` slot, where a
-        // lowercase fragment would read as a broken sentence rather than a state name.
         'Not used by this system’s check'
-      )}
-      description={text(modifierInert.key, modifierInert.fallback)}
-      actionLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierOpenChecks', 'Checks tab')}
-      actionHint={text(
-        'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertHint',
-        'These modifiers are added to the crafting check, which is authored for the whole crafting system on the Checks tab.'
-      )}
-      onAction={onOpenChecks}
-    />
+      )}`}
+      text={text(modifierInert.key, modifierInert.fallback)}
+      data-recipe-modifier-inert={craftingModifierInertCause}
+    >
+      {#snippet actions()}
+        <Button
+          role="ghost"
+          data-recipe-modifier-inert-checks
+          title={text(
+            'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertHint',
+            'These modifiers are added to the crafting check, which is authored for the whole crafting system on the Checks tab.'
+          )}
+          onclick={() => onOpenChecks()}
+        >
+          <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+          <span
+            >{text('FABRICATE.Admin.Manager.Recipe.CraftingModifierOpenChecks', 'Checks tab')}</span
+          >
+        </Button>
+      {/snippet}
+    </Callout>
   {/if}
 
   <!-- Two side-by-side status cards. "Locked" means the recipe stays visible to players but only

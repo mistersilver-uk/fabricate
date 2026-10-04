@@ -235,6 +235,26 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
+  // Issue 1522: the refused save's blocking notice, first in the form above the tab panel.
+  managerCase({
+    id: 'manager-essence-edit-save-failed',
+    label: 'Manager — Essence edit save failed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { saveFails: '1' },
+    steps: [
+      { selector: '#manager-nav-essence-rules' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .fabricate-icon-button' },
+      { selector: '[data-recipe-field="essence-enabled"]' },
+      { selector: '[data-essence-edit-save]' },
+    ],
+    expectView: 'essence-edit',
+    expectSelector:
+      '.fabricate-manager #manager-essence-edit-form > [data-notice-position][role="alert"]',
+    expectCenterHit: '#manager-essence-edit-form > [data-notice-position]',
+    kinds: ['manager', 'essences'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/],
+  }),
   managerCase({
     id: 'manager-essence-edit-on-craft',
     label: 'Manager — Essence edit On craft',

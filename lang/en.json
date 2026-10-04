@@ -3355,9 +3355,8 @@
             "OnHint": "Players can see this recipe but cannot craft it.",
             "OffHint": "Players who can see this recipe can craft it."
           },
-          "ModeBanner": {
+          "ModeCallout": {
             "Kicker": "Resolution mode",
-            "SetForSystem": "set for this crafting system",
             "Settings": "System settings",
             "SettingsHint": "Resolution mode is set for the whole crafting system, not per recipe."
           },

@@ -2,6 +2,7 @@
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
   import Callout from '../../components/Callout.svelte';
+  import Notice from '../../components/Notice.svelte';
   import EditorTabs from '../../components/EditorTabs.svelte';
   import EditorValidationSurface from '../../components/EditorValidationSurface.svelte';
   import WorldComponentEntryPreviewRail from './scoped/WorldComponentEntryPreviewRail.svelte';
@@ -1241,11 +1242,19 @@
       tabindex="-1"
       data-keyboard-focus="true"
     >
+      {#if saveFailed}
+        <Notice
+          blocking
+          tone="danger"
+          data-notice-position="page"
+          title={text(
+            'FABRICATE.Admin.Manager.Component.SaveFailed',
+            'Save failed. Try again or refresh the manager.'
+          )}
+        />
+      {/if}
       {#if activeTab === 'rules'}
-        <!--
-        ONE IDENTITY CALLOUT; the source Item is authored on the world entry rather than here. See
-        `ComponentIdentityStrip`'s own header for why both smoke hooks survive.
-      -->
+        <!-- The rules tab's heading block; see `ComponentIdentityStrip` for its two smoke hooks. -->
         <ComponentIdentityStrip
           {component}
           {saving}
@@ -2205,15 +2214,6 @@
             complicationsDraft = next;
           }}
         />
-
-        {#if saveFailed}
-          <p class="manager-muted manager-form-warning">
-            {text(
-              'FABRICATE.Admin.Manager.Component.SaveFailed',
-              'Save failed. Try again or refresh the manager.'
-            )}
-          </p>
-        {/if}
       {:else}
         <!--
         THE VALIDATION TAB: the same `EditorValidationSurface` shape the world entry's draws. Its

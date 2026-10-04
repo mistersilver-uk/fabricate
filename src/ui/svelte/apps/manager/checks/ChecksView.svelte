@@ -1160,13 +1160,9 @@
   data-checks-editor
   bind:this={checksRoot}
 >
-  <!--
-        THE ROW ACTION'S LIVE REGION, HOSTED HERE rather than in the validation surface: a row
-        action routes to another ACTIVITY, unmounting the validation panel — live region included
-        — in the update that was supposed to announce. So the `aria-live` element is ALWAYS in the
-        DOM, outside the validation branch, with its own `{#if}` inside it. A THIRD CHILD OF THIS
-        TWO-ROW GRID IS SAFE because `.visually-hidden` is `position: absolute`.
-      -->
+  <!-- THE ROW ACTION'S LIVE REGION: a row action routes to another activity and unmounts the
+       validation panel, so the `aria-live` element stays outside that branch with its own `{#if}`;
+       being `position: absolute`, it is a safe third child of this two-row grid. -->
   <div class="visually-hidden" role="status" aria-live="polite" data-checks-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
   </div>
@@ -1193,10 +1189,13 @@
       data-keyboard-focus="true"
       bind:this={sectionPanel}
     >
-      <!-- The section's warning dot, explained IN the panel and first in it, as the prototype
-           draws it: amber, title over detail, with a Review action. -->
+      <!-- The section's warning dot, explained first in the panel: the notices' stacking region. -->
       {#if activity !== 'validation' && !routeIsOff && sectionNotices.length > 0}
-        <div class="manager-checks-section-notices" data-checks-section-notices={activeSection}>
+        <div
+          class="manager-checks-section-notices"
+          data-notice-position="stack"
+          data-checks-section-notices={activeSection}
+        >
           {#each sectionNotices as issue (issue.key)}
             <Notice
               tone="warning"
@@ -1209,23 +1208,24 @@
         </div>
       {/if}
 
-      {#if paneHead && !routeIsOff}
-        <header class="manager-checks-pane-head" data-checks-pane-head={activeSection}>
-          <h2 class="manager-checks-pane-title">{paneHead.title}</h2>
-          <p class="manager-checks-pane-lead">{paneHead.lead}</p>
-        </header>
-      {/if}
-
-      <!-- WHAT THIS MODE DOES stays a callout: it documents the mode, where a notice reports
-           THIS check's state. -->
-      {#if activity !== 'validation' && !routeIsOff && activeSection === 'roll'}
-        <CheckModeCallout
-          {activity}
-          mode={calloutMode}
-          {alchemyCheckMode}
-          outcomeCount={outcomeCount ?? 0}
-        />
-      {/if}
+      <!-- The heading block, in plain block flow so the head's margin collapses through it. The
+           mode stays a callout: it documents the mode, where a notice reports THIS check's state. -->
+      <div data-tab-heading>
+        {#if paneHead && !routeIsOff}
+          <header class="manager-checks-pane-head" data-checks-pane-head={activeSection}>
+            <h2 class="manager-checks-pane-title">{paneHead.title}</h2>
+            <p class="manager-checks-pane-lead">{paneHead.lead}</p>
+          </header>
+        {/if}
+        {#if activity !== 'validation' && !routeIsOff && activeSection === 'roll'}
+          <CheckModeCallout
+            {activity}
+            mode={calloutMode}
+            {alchemyCheckMode}
+            outcomeCount={outcomeCount ?? 0}
+          />
+        {/if}
+      </div>
 
       {#if activity === 'validation'}
         <ChecksValidationTab

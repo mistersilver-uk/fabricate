@@ -301,6 +301,7 @@
                   class="manager-environment-comp-callout manager-system-edit-blocker"
                   role="note"
                   data-system-edit-blocker
+                  data-notice-position="page"
                 >
                   <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
                   <div class="manager-system-edit-blocker-copy">
@@ -317,11 +318,10 @@
                       )}</span
                     >
                   </div>
-                  <!-- Ghost (issue 1118, row 8). `ui-visual-style/spec.md` defines the role
-                       as the quiet NAVIGATIONAL verb — "Back, Open, View" — which moves the
-                       GM and changes no record, and this control is literally an Open. It
-                       sits inside a blocker callout that already carries the alarm, so at
-                       the base weight it competed with the copy explaining it. -->
+                  <!-- Ghost (issue 1118, row 8): `ui-visual-style/spec.md`'s quiet NAVIGATIONAL
+                       verb — "Back, Open, View" — and this control is literally an Open. It
+                       sits inside a blocker that already carries the alarm, so at the base
+                       weight it competed with the copy explaining it. -->
                   <Button
                     role="ghost"
                     class="manager-system-edit-blocker-link"

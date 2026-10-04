@@ -45,6 +45,7 @@
     essenceOnCraftCount,
   } from './essences/essenceStudio.js';
   import Callout from '../../components/Callout.svelte';
+  import Notice from '../../components/Notice.svelte';
   import ToggleCard from '../../components/ToggleCard.svelte';
   import CopyRulesCard from './scoped/CopyRulesCard.svelte';
   import MembershipActions from './scoped/MembershipActions.svelte';
@@ -544,15 +545,10 @@
     wrapper keeps the grid at two children whatever this head grows to carry.
   -->
   <!--
-    THE ROW ACTION'S LIVE REGION, hosted here rather than in the validation surface (issue 1517):
-    activating a row action sets `activeTab` to another value, which unmounts the whole validation
-    panel — live region included — in the same update that was supposed to announce. So the element
-    carrying `aria-live` is ALWAYS in the DOM, outside the `{#if activeTab}` chain, with its own
-    `{#if}` inside it.
-
-    A third child of this `<main>` does not break the two-row grid above: `.visually-hidden` is
-    `position: absolute`, so it is out of flow and takes no grid track. It is addressed by a
-    `data-` hook rather than a class, so it joins no pinned class family.
+    THE ROW ACTION'S LIVE REGION (issue 1517): a row action unmounts the validation panel in the
+    update that was meant to announce, so the `aria-live` element is ALWAYS in the DOM, outside the
+    `{#if activeTab}` chain, with its own `{#if}` inside it. As `.visually-hidden` is
+    `position: absolute` it takes no grid track, and its `data-` hook joins no pinned class family.
   -->
   <div class="visually-hidden" role="status" aria-live="polite" data-essence-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
@@ -569,8 +565,18 @@
   </div>
 
   <form id="manager-essence-edit-form" class="manager-essence-edit-view" onsubmit={handleSave}>
-    <!-- The pair below was already declared for the keyboard; since issue 1517 it is also the
-         ROUTE-ONLY validation row's focus destination, which is why the panel is BOUND. -->
+    {#if saveFailed}
+      <Notice
+        blocking
+        tone="danger"
+        data-notice-position="page"
+        title={text(
+          'FABRICATE.Admin.Manager.Essence.SaveFailed',
+          'Save failed. Check for duplicate or blank names and try again.'
+        )}
+      />
+    {/if}
+    <!-- BOUND: the ROUTE-ONLY validation row's focus destination (issue 1517). -->
     <div
       class="manager-essence-tab-panel"
       id={`essence-panel-${activeTab}`}
@@ -760,15 +766,6 @@
         </div>
       {/if}
     </div>
-
-    {#if saveFailed}
-      <p class="manager-muted manager-form-warning" role="alert">
-        {text(
-          'FABRICATE.Admin.Manager.Essence.SaveFailed',
-          'Save failed. Check for duplicate or blank names and try again.'
-        )}
-      </p>
-    {/if}
   </form>
 </main>
 

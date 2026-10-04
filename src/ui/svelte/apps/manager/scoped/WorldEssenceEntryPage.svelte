@@ -559,16 +559,16 @@
         data-keyboard-focus="true"
       >
         {#if activeTab === 'definition'}
-          <!--
-            TWO COLUMNS, AND THE RIGHT ONE IS THE PLAYER PREVIEW (`essEntry.png`): the panel used
-            to stack the aside below the danger card, where the GM could not see it change.
-          -->
+          <!-- TWO COLUMNS, AND THE RIGHT ONE IS THE PLAYER PREVIEW (`essEntry.png`). -->
           <div class="manager-scoped-entry-body">
             <div class="manager-scoped-entry-main">
-              <!-- THE SCOPE BANNER: everything under it is one record shared by every crafting
-            system, reached from a system-scoped rail. A heading rather than a `Callout`, because
-            it introduces a region rather than warning about one. -->
-              <div class="manager-scoped-entry-kicker is-world" data-scoped-entry-world-banner>
+              <!-- THE SCOPE BANNER, the tab's heading block: one record shared by every system. A
+                   heading rather than a `Callout`, because it introduces a region. -->
+              <div
+                class="manager-scoped-entry-kicker is-world"
+                data-scoped-entry-world-banner
+                data-tab-heading
+              >
                 <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
                   <i class="fas fa-globe"></i>
                 </span>

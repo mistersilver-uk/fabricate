@@ -134,6 +134,8 @@ function readParams() {
     // error frames (issue 1969).
     knowledgeLoading: params.get('knowledgeLoading') === '1',
     knowledgeError: params.get('knowledgeError') === '1',
+    // Refuse every recipe, component and essence save, for the save-failed frames (issue 1522).
+    saveFails: params.get('saveFails') === '1',
     // Build a world with NO Tools at all, for the world Tools Catalogue's empty state.
     noTools: params.get('noTools') === '1',
     // Seed NO world component records of the lab's own, so the world's tag vocabulary is empty and
@@ -674,6 +676,11 @@ async function mountManagerApp(content, params) {
     props.managerExtensions.publicApi.registerWorldNavProvider(labDowntimeProvider());
   }
   if (params.clearSystem) await props.store.selectSystem('');
+  if (params.saveFails) {
+    for (const action of ['updateRecipe', 'updateComponent', 'updateEssence']) {
+      props.store[action] = async () => false;
+    }
+  }
   const instance = mount(CraftingSystemManagerRoot, { target: content, props });
   return { instance, services, props, store: props.store, tab: params.tab };
 }

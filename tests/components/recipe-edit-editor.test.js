@@ -4,7 +4,7 @@
  * shipped global stylesheet are not `src/` text and keep their reads.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
@@ -44,7 +44,9 @@ const MODEL = 'src/models/Recipe.js';
 const RECIPE_MANAGER = 'src/systems/RecipeManager.js';
 const GRAPH = 'src/ui/svelte/util/recipeGraphBuilder.js';
 const ICONS = 'src/ui/svelte/util/recipeImageIcons.js';
-const BANNER = `${MANAGER}/recipe/RecipeModeBanner.svelte`;
+const MODE_CALLOUT = `${MANAGER}/recipe/RecipeModeCallout.svelte`;
+const COMPONENT_EDIT = `${MANAGER}/ComponentEditView.svelte`;
+const ESSENCE_EDIT = `${MANAGER}/EssenceEditView.svelte`;
 const ROUTING_ASSIGNMENT = `${MANAGER}/recipe/RecipeRoutingAssignment.svelte`;
 const RESULT_GROUP_CARD = `${MANAGER}/recipe/RecipeResultGroupCard.svelte`;
 
@@ -349,103 +351,68 @@ describe('Step mode lives on the Overview tab (issue 676: rehomed from the delet
   });
 });
 
-describe('RecipeModeBanner (issue 643 §5)', () => {
-  // Retargeted for issue 1055: the banner is now FULLY PROP-DRIVEN.
+describe('RecipeModeCallout (issue 1522)', () => {
   defineStructureContract(
     'reuses the canonical resolution-mode option list rather than re-authoring one',
-    EDIT,
-    { imports: ['./resolutionModeOptions.js'], names: ['resolutionModeOptions'] }
+    MODE_CALLOUT,
+    { imports: ['../resolutionModeOptions.js'], names: ['resolutionModeOptions'] }
   );
 
-  defineStructureContract('and the banner itself authors no copy at all now', BANNER, {
-    namesNo: ['resolutionModeOptions', 'MODE_INFO', 'onChange'],
-    spellsNo: ['ModeBanner.'],
-  });
-
   defineStructureContract(
-    'states that the mode is system-level and routes to Crafting Settings',
-    BANNER,
+    'is the shared Callout, its action a Button, localized through the host`s text prop',
+    MODE_CALLOUT,
     {
-      defaults: [['actionDataAttr', 'data-recipe-mode-banner-settings']],
-      names: ['actionHint'],
-      declaresProp: ['actionHint'],
+      renders: ['Callout', 'Button'],
+      declaresProp: ['text', 'onOpenCraftingSettings'],
+      namesNo: ['localize', 'localizeOr'],
+      writes: ['data-recipe-mode-callout', 'data-recipe-mode-callout-settings'],
+      spells: ['ModeCallout.SettingsHint'],
     }
   );
 
   defineStructureContract(
-    'and the resolution-mode call site still says the mode is system-wide',
+    'is handed by the editor shell to the four tabs the mode shapes, and no other',
     EDIT,
-    { spells: ['ModeBanner.SettingsHint'] }
-  );
-
-  // Two banners can stack on the Overview tab (issue 1055). `dataAttr` carries the reported value,
-  // so a shared hook would resolve to whichever rendered first.
-  defineStructureContract(
-    'takes its capture hook as a prop so two banners on one tab cannot collide',
-    BANNER,
     {
-      declaresProp: ['dataAttr', 'actionDataAttr'],
-      defaults: [['dataAttr', 'data-recipe-mode-banner']],
-      spellsNo: [
-        'data-recipe-modifier-inert',
-        'data-recipe-modifier-inert-checks',
+      renders: ['RecipeModeCallout'],
+      passesProps: [
+        ['RecipeOverviewTab', 'modeCallout'],
+        ['RecipeIngredientsTab', 'modeCallout'],
+        ['RecipeResultsTab', 'modeCallout'],
+        ['RecipeToolsTab', 'modeCallout'],
+      ],
+      passesPropsNo: [
+        ['RecipeAccessTab', 'modeCallout'],
+        ['RecipeBooksScrollsTab', 'modeCallout'],
+        ['RecipeValidationTab', 'modeCallout'],
       ],
     }
   );
 
-  defineStructureContract('and the Overview tab passes its own hooks', OVERVIEW, {
-    spells: ['data-recipe-modifier-inert', 'data-recipe-modifier-inert-checks'],
+  it('and the retired banner is gone from the tree', () => {
+    assert.equal(existsSync(resolve(repoRoot, `${MANAGER}/recipe/RecipeModeBanner.svelte`)), false);
+  });
+
+  defineStructureContract('the Overview tab hands its own hooks to the inert callout', OVERVIEW, {
+    renders: ['Callout', 'Button'],
+    writes: ['data-recipe-modifier-inert', 'data-recipe-modifier-inert-checks'],
     // The rejected design's neutral "the system decides" banner is gone.
-    spellsNo: ['data-recipe-modifier-banner-checks', 'data-recipe-modifier-banner'],
+    writesNo: ['data-recipe-modifier-banner-checks', 'data-recipe-modifier-banner'],
   });
+});
 
-  // Visual differentiation was promised by the design and is delivered as colour only.
-  defineStructureContract(
-    'differentiates a second banner by tone without moving its geometry',
-    BANNER,
-    {
-      defaults: [['tone', 'info']],
-      styleDeclares: [
-        [[['manager-recipe-mode-banner', 'is-neutral']], 'border-color', 'var(--fab-border)'],
-        [[['manager-recipe-mode-banner', 'is-neutral']], 'background', 'var(--fab-surface-soft)'],
-        [[['manager-recipe-mode-banner', 'is-warning']], 'border-color', 'var(--fab-warning-border)'],
-      ],
-      styleDeclaresNo: [
-        [[['manager-recipe-mode-banner', 'is-neutral']], 'padding'],
-        [[['manager-recipe-mode-banner', 'is-neutral']], 'width'],
-        [[['manager-recipe-mode-banner', 'is-neutral']], 'height'],
-        [[['manager-recipe-mode-banner', 'is-neutral']], 'gap'],
-        [[['manager-recipe-mode-banner', 'is-neutral']], 'font-size'],
-      ],
-    }
-  );
+describe('the save-failed statement is a blocking notice (issue 1522)', () => {
+  for (const file of [EDIT, COMPONENT_EDIT, ESSENCE_EDIT]) {
+    defineStructureContract(`${file} renders it through Notice`, file, {
+      renders: ['Notice'],
+      spellsNo: ['manager-form-warning'],
+    });
+  }
 
-  defineStructureContract(
-    'is rendered by the editor shell below the tab strip so the tabs stay attached (§4.2)',
-    EDIT,
-    { renders: ['RecipeModeBanner'], rendersBefore: [['RecipeEditorTabs', 'RecipeModeBanner']] }
-  );
-
-  defineStructureContract('reads as an info banner with an icon medallion, not one more card', BANNER, {
-    attributes: [['class', 'manager-recipe-mode-banner-medallion']],
-    styleDeclares: [
-      [['manager-recipe-mode-banner'], 'background', 'var(--fab-info-soft)'],
-      [['manager-recipe-mode-banner'], 'border', '1px solid var(--fab-info-border)'],
-    ],
+  defineStructureContract('and Overview no longer takes the flag', OVERVIEW, {
+    spellsNo: ['manager-form-warning'],
+    namesNo: ['saveFailed'],
   });
-
-  defineStructureContract(
-    'lets the description wrap — it is the one sentence the banner exists to deliver',
-    BANNER,
-    {
-      // It was `white-space: nowrap` + ellipsis.
-      styleDeclares: [
-        [['manager-recipe-mode-banner-desc'], '-webkit-line-clamp', '2'],
-        [['manager-recipe-mode-banner-desc'], 'line-height', '1.45'],
-        [['manager-recipe-mode-banner-desc'], 'white-space', 'normal'],
-      ],
-    }
-  );
 });
 
 describe('the progressive reorder announcement', () => {

@@ -57,6 +57,27 @@ export const CASES = Object.freeze([
       CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
+  // Issue 1522: the refused save's blocking notice, in the page position above the tab panel.
+  managerCase({
+    id: 'manager-recipe-edit-save-failed',
+    label: 'Manager — Recipe edit save failed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { saveFails: '1' },
+    steps: [
+      'Crafting',
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-field="name"]', fill: 'Moonlit Draught' },
+      { selector: '.manager-header-actions .fabricate-button.is-primary' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-manager [data-recipe-editor] > [data-notice-position][role="alert"]',
+    expectCenterHit: '[data-recipe-editor] > [data-notice-position]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/],
+  }),
   // Issue 2005 (T6): the Check tier select names a roll-under Target, or a character value's adjustment.
   ...[
     [

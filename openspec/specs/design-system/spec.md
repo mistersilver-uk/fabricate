@@ -1892,11 +1892,14 @@ The two opt-ins are mutually exclusive by meaning and rendering-always wins if b
 
 An EDITOR screen orders the breadcrumb, the title block with its lede, the action pair with back before save, the tab bar, and then the body.
 An inspector rail is OPTIONAL and several shipped editors have none; where one is present it is the third track, and where an editor repurposes that track for something else it says so.
-A blocking notice is the only element permitted between the tab bar and the first card.
-An info strip precedes the cards it describes and is never nested inside them.
+Between the tab bar and the first card sit only the notices — the blocking notice in the page position, with non-blocking notices in the stacking region beneath it — and then, where the tab has one, its heading block: the tab's own heading and lede where it has them, distinct from the page's title block, and at most one callout, which documents the tab or identifies the record the tab edits.
+An info strip precedes the cards it describes and is never nested inside them; before the first card, the only strip is that heading block's callout.
 The inspector rail is READ-ONLY by convention: it shows consequences and links out, and never hosts editing controls.
 `openspec/specs/ui-visual-style/spec.md` contradicts that sentence at its "Right-inspector actions" rule, which requires every GM studio's inspector to END in a stack of verbs rendered through the button primitive's roles, and the contradiction is recorded as an OPEN row in the library's planned-migrations table for a maintainer to rule on rather than resolved here.
 The reading that register recommends is that READ-ONLY means no editing INPUTS — nothing that edits the record in place — and that a stack of verbs rendered through the shared button is permitted.
+Read-only means no editing inputs, drop targets included.
+A control that changes only a preview — the Checks Studio's Preview as and record selectors, and its progressive sandbox, whose persisted `preview.difficulties` no engine reads and export strips; the recipe item editor's Satisfied? switches — is permitted.
+The Checks Studio's activation card is a declared exception, because its switch governs every section and its off state collapses the strip.
 The environments screen's inspector rail is a declared repurposing of that third track: its gathering task, gathering event and gathering rules leaves all edit in place, and issue 1707 gave that departure file names in `environment/GatheringTaskInspector.svelte`, `environment/GatheringEventInspector.svelte`, `environment/GatheringRulesInspector.svelte` and the `environment/GatheringModifierEditor.svelte` the first two share.
 The maintainer ruled on 2026-09-19 that this departure is a declared exception to the read-only convention rather than an open row in the library's planned-migrations table.
 The departure predates the extraction and is neither widened nor narrowed by it, and the read-only convention stands as the default for every other rail.

@@ -19,6 +19,8 @@
   import RecipeIngredientsSection from './RecipeIngredientsSection.svelte';
 
   let {
+    // The resolution-mode callout, rendered in this tab's heading block (issue 1522).
+    modeCallout = undefined,
     recipe = null,
     isMultiStep = false,
     // COLLAPSED chain (issue 710): the system's multi-step feature is off but the
@@ -96,18 +98,24 @@
   data-recipe-tab="ingredients"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Ingredients', 'Ingredients')}
 >
-  <div class="manager-recipe-tab-intro">
-    <h2 class="manager-recipe-tab-title">{heading.title}</h2>
-    <p class="manager-muted">{heading.intro}</p>
+  <div class="fab-stack" data-gap="3" data-tab-heading>
+    <div class="manager-recipe-tab-intro">
+      <h2 class="manager-recipe-tab-title">{heading.title}</h2>
+      <p class="manager-muted">{heading.intro}</p>
+      {#if collapsed}
+        <p class="manager-muted" data-recipe-collapsed-note>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote',
+            'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.'
+          )}
+        </p>
+      {/if}
+    </div>
+    {@render modeCallout?.()}
   </div>
 
   {#if collapsed}
-    <p class="manager-muted" data-recipe-collapsed-note>
-      {text(
-        'FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote',
-        'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.'
-      )}
-    </p>
+    <!-- The heading block's note says why there is nothing to author here. -->
   {:else if isMultiStep}
     {#if steps.length === 0}
       <p class="manager-muted">
