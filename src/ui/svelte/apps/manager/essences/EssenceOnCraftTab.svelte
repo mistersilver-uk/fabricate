@@ -198,6 +198,7 @@
       )}
       items={explainerItems}
       data-essence-on-craft-explainer
+      data-tab-heading
     />
   {/if}
 
