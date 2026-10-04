@@ -5883,6 +5883,12 @@ describe('RecipeEditView (mounted)', () => {
         ],
         props: { simpleFailureSlot: true },
       },
+      'alchemy success': {
+        groups: [
+          { id: 'grp-gold', name: '', results: [GOLD] },
+        ],
+        props: { alchemySimple: true },
+      },
     };
     for (const [path, { groups, recipe = {}, props }] of Object.entries(PATHS)) {
       const { target } = await mountResultGroups(groups, { recipe, props: { ...AWARDS, ...props } });
