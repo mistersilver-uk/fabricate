@@ -111,9 +111,29 @@ const JOURNAL_HISTORY_DATA_EVIDENCE = Object.freeze({
     ':not(:has([data-history-summary]))',
 });
 
-/** Sixteen full-window history-data witnesses: eight persisted states at both Journal widths. */
+/** Issue 1773: a craft's credit and grants read as result rows, labelled, rolled and reasoned. */
+const REWARD_AWARDS_CASE = playerCase({
+  id: 'player-journal-reward-awards',
+  label: 'Player Journal — a craft that credited currency and taught recipes',
+  smokeLabels: [],
+  reaches: 'beyond',
+  query: { tab: 'journal', journalCaseState: 'history-data-reward-awards' },
+  position: { width: 1240, height: 880 },
+  steps: [{ selector: '[data-history-run-id="lab-v1-history-data-reward-awards"]' }],
+  expectTab: 'journal',
+  expectSelector:
+    '[data-journal-detail]' +
+    ':has([data-history-items="produced"] [title="Iron Ingot"])' +
+    ':has([data-journal-fact] i.fa-coins)' +
+    ':has([data-journal-fact] i.fa-book-open + * + *)',
+  kinds: ['player', 'journal'],
+  sourceMatches: [JOURNAL_SOURCES, /^src\/systems\/(?:runHistoryEvidence|resultKindAward)\.js$/],
+});
+
+/** Sixteen full-window history-data witnesses (eight persisted states at both Journal widths),
+ *  then the reward-award witness. */
 export function journalHistoryDataCases() {
-  return [1240, 1024].flatMap((width) =>
+  const states = [1240, 1024].flatMap((width) =>
     Object.entries(JOURNAL_HISTORY_DATA_EVIDENCE).map(([state, evidence]) =>
       playerCase({
         id: `fabricate-journal-history-data-${state}-${width}`,
@@ -140,4 +160,5 @@ export function journalHistoryDataCases() {
       })
     )
   );
+  return [...states, REWARD_AWARDS_CASE];
 }

@@ -38,6 +38,7 @@ player-gathering-blind
 player-gathering-realm-locked
 player-gathering-stacked
 player-crafting-simple
+player-crafting-results-kinds
 player-crafting-authority-blocked
 player-crafting-category-filter-list
 player-crafting-sources-picker

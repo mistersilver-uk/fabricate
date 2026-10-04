@@ -773,6 +773,27 @@ export const CASES = Object.freeze([
       PLAYER_DETAIL_HEADER,
     ],
   }),
+  // Issue 1773: the Produces list previews a currency reward by its label and expression, and a
+  // knowledge reward by the recipe it teaches, each with its kind's glyph.
+  playerCase({
+    id: 'player-crafting-results-kinds',
+    label: 'Player app — Crafting outputs of every result kind',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', resultRowState: 'reward-kinds' },
+    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' }],
+    position: { width: 1100, height: 860 },
+    expectTab: 'crafting',
+    expectSelector:
+      '[data-io-group="outputs"]:has([data-io-output="component"])' +
+      ':has([data-io-output="currency"]):has([data-io-output="knowledge"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/presenters\/(?:resultOutputRows|CraftingListingBuilder)\.js$/,
+    ],
+  }),
   // The Crafting header withholds `Ready to craft` and leads the blocking callout with the authority's own reason.
   playerCase({
     id: 'player-crafting-authority-blocked',

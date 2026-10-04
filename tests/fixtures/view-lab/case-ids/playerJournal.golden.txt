@@ -123,3 +123,4 @@ fabricate-journal-history-data-settled-zero-1024
 fabricate-journal-history-data-uncertain-awards-1024
 fabricate-journal-history-data-fizzle-1024
 fabricate-journal-history-data-salvage-1024
+player-journal-reward-awards

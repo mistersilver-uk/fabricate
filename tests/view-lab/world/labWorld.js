@@ -30,7 +30,29 @@ const FABRICATE_NAMESPACE = 'fabricate';
 // world remains unchanged, including every existing d100 editor and gathering screenshot.
 
 /** `unnamed`: the horseshoe recipe's result names no component, as an item-only one does (1516). */
+/** `reward-kinds` (issue 1773): Bend Horseshoe also pays a labelled, rolled bounty and teaches
+ *  Forge Longsword, under a Smithing that takes part in currency. */
+function seedRewardKinds(content) {
+  const recipe = content.recipes.find((entry) => entry.id === 'sm-r-horseshoe');
+  const system = content.systems.find((entry) => entry.id === recipe?.craftingSystemId);
+  if (!recipe || !system) throw new Error('view lab: reward-kinds requires Bend Horseshoe');
+  system.requirements = { ...system.requirements, currency: { enabled: true } };
+  recipe.resultGroups[0].results.push(
+    {
+      id: 'sm-r-horseshoe-bounty',
+      kind: 'currency',
+      unit: 'gp',
+      quantity: 5,
+      quantityFormula: '2d6',
+      label: 'Guild bounty',
+      reason: 'Paid by the smiths’ guild for the commission',
+    },
+    { id: 'sm-r-horseshoe-lore', kind: 'knowledge', recipeId: 'sm-r-longsword', quantity: 1 }
+  );
+}
+
 function seedResultRowState(content, state) {
+  if (state === 'reward-kinds') return seedRewardKinds(content);
   if (state !== 'unnamed') return;
   const recipe = content.recipes.find((entry) => entry.id === 'sm-r-horseshoe');
   const [result] = recipe?.resultGroups?.[0]?.results ?? [];
@@ -470,7 +492,8 @@ function stripAuthoredWorldComponents(content) {
  * @param {boolean} [options.noSceneRegions] Give the active scene NO regions, for the Map Region
  *   Links no-regions empty state. It also skips the interactable seed, which needs a region.
  * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
- * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component.
+ * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component,
+ *   or `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.

@@ -369,6 +369,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/characterLibraries.js',
   'src/ui/presenters/CraftingListingBuilder.js',
+  'src/ui/presenters/resultOutputRows.js',
   // Issue 2005: the check card's roll-under or character-value target line.
   'src/ui/presenters/checkDescriptor.js',
   // Issue 2006: a count card's successes needed, read as the engine reads it.
