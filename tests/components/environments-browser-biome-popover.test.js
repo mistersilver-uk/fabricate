@@ -63,7 +63,9 @@ const harness = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     // THE shared overflow action menu (issue 1477). All three browsers in this tree render one
-    // per row since issue 1515, and it renders `IconButton` above as its trigger.
+    // per row since issue 1515, and it renders `IconButton` above as its trigger and `Kicker` as
+    // its heading.
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/ActionMenu.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/Pagination.svelte',
