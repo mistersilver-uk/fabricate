@@ -25,7 +25,6 @@ const MANAGER = 'src/ui/svelte/apps/manager';
 // Importers of the strip that are not under the rule yet, with the reason each is exempt.
 const EXEMPT = Object.freeze({
   [`${MANAGER}/knowledge/KnowledgeTabs.svelte`]: 'a browse route, not an editor',
-  [`${MANAGER}/EnvironmentEditView.svelte`]: 'its rails convert in issue 1522 P2',
   [`${MANAGER}/downtime/WorldDowntimeTabs.svelte`]:
     'the World > Downtime route`s strip, over a companion preview rather than a record editor',
 });
@@ -291,6 +290,15 @@ const EDITORS = {
     notice: '[data-tool-save-error][role="alert"]',
     position: 'page',
   },
+  [`${MANAGER}/EnvironmentEditView.svelte`]: {
+    open: async () => {
+      mountManager();
+      await press(navButton('Gathering'), 'Gathering');
+      await press(gatheringSubitem('Environments'), 'Environments');
+      await press(target.querySelector('[aria-label="Edit Quiet Cavern"]'), 'the cavern editor');
+    },
+    cards: `[data-overview-section], .manager-environment-comp, ${VALIDATION}`,
+  },
   [`${MANAGER}/scoped/WorldComponentEntryPage.svelte`]: {
     open: () =>
       openScopedEntry('component', { id: 'vial', name: 'Glass Vial' }, 'component-catalogue'),
@@ -517,18 +525,6 @@ describe('the EDITOR recipe (issue 1522)', () => {
       stripImporters('src/ui/svelte').filter((path) => !path.endsWith('.svelte')),
       [],
       'a module re-exporting the strip hides its importers from the derivation'
-    );
-  });
-
-  it('still fails the environment editor, so P2 has to retire its exemption', async () => {
-    mountManager();
-    await press(navButton('Gathering'), 'Gathering');
-    await press(gatheringSubitem('Environments'), 'Environments');
-    await press(target.querySelector('[aria-label="Edit Quiet Cavern"]'), 'the cavern editor');
-    await press(target.querySelector('#environment-tab-tasks'), 'the Tasks tab');
-    assert.throws(
-      () => assertGapRule(target, firstCardOf(target, '.manager-environment-comp')),
-      /only notices and the heading block/
     );
   });
 

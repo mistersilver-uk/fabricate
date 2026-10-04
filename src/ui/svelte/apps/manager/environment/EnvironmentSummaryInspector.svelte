@@ -1,15 +1,13 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize, viewScene } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import Chip from '../../../components/Chip.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
-  import { dragDrop } from '../../../actions/dragDrop.js';
-  import { resolveDropData } from '../../../util/dropUtils.js';
-  import { sceneDocumentImage } from '../../../util/sceneImages.js';
   import { countReadiness, evaluateEnvironmentReadiness } from './environmentReadiness.js';
-  import IconButton from '../../../components/IconButton.svelte';
+  import { linkedScene } from './linkedScene.svelte.js';
 
-  let { environment = null, composition = { counts: {} }, onUpdate = () => {} } = $props();
+  let { environment = null, composition = { counts: {} } } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -31,40 +29,13 @@
   const warning = $derived(validationCounts.warnings);
 
   const sceneUuid = $derived(String(environment?.sceneUuid || ''));
-  let sceneThumb = $state('');
-  let sceneName = $state('');
-  $effect(() => {
-    const uuid = sceneUuid;
-    sceneThumb = '';
-    sceneName = '';
-    if (!uuid || typeof globalThis.fromUuid !== 'function') return;
-    let cancelled = false;
-    Promise.resolve(globalThis.fromUuid(uuid))
-      .then((doc) => {
-        if (cancelled || !doc) return;
-        sceneName = String(doc.name || '');
-        sceneThumb = sceneDocumentImage(doc);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  });
-  const sceneLabel = $derived(sceneName || sceneUuid);
-
-  function handleSceneDrop(data) {
-    const { uuid, type } = resolveDropData(data);
-    if (type !== 'Scene' || !uuid) return;
-    onUpdate({ sceneUuid: uuid });
-  }
-  function unlinkScene() {
-    onUpdate({ sceneUuid: '' });
-  }
-  function onLinkedSceneMouseDown(event) {
-    if (event.button !== 2) return;
-    event.preventDefault();
-    unlinkScene();
-  }
+  // Read-only (issue 1522): the link is authored on the Overview tab's Linked scene card.
+  const scene = linkedScene(() => sceneUuid);
+  const sceneLabel = $derived(
+    scene.missing
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneNotFound', 'Scene not found')
+      : scene.name || sceneUuid
+  );
 </script>
 
 <InspectorCard data-environment-summary-inspector="">
@@ -102,27 +73,9 @@
     {text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Scene', 'Linked scene')}
   </h3>
   {#if sceneUuid}
-    <!-- Drop-to-replace and right-click-to-unlink are enhancements; the visible
-         Open/Unlink buttons inside provide the accessible path. -->
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div
-      class="manager-environment-scene-linked"
-      data-overview-scene-linked
-      role="group"
-      aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Scene', 'Linked scene')}
-      title={text(
-        'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneReplaceTooltip',
-        'Drop a scene to replace it, or right-click to unlink.'
-      )}
-      use:dragDrop={{ onDrop: handleSceneDrop, activeClass: 'is-drop-active' }}
-      oncontextmenu={(event) => {
-        event.preventDefault();
-        unlinkScene();
-      }}
-      onmousedown={onLinkedSceneMouseDown}
-    >
-      {#if sceneThumb}
-        <img class="manager-environment-scene-thumb" src={sceneThumb} alt="" />
+    <div class="manager-environment-scene-linked is-readonly" data-environment-summary-scene-linked>
+      {#if scene.thumb}
+        <img class="manager-environment-scene-thumb" src={scene.thumb} alt="" />
       {:else}
         <span class="manager-environment-scene-thumb is-placeholder" aria-hidden="true"
           ><i class="fas fa-map"></i></span
@@ -130,43 +83,23 @@
       {/if}
       <button
         type="button"
-        class="manager-environment-scene-name"
-        onclick={(event) => {
-          event.stopPropagation();
-          viewScene(sceneUuid);
-        }}
+        class="manager-environment-scene-name is-route"
+        data-rail-route-out
+        onclick={() => viewScene(sceneUuid)}
         title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.OpenScene', 'Open scene')}
-        >{sceneLabel}</button
-      >
-      <IconButton
-        class="is-danger"
-        ariaLabel={text(
-          'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnlinkScene',
-          'Unlink scene'
+        aria-label={localizeOr(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.OpenSceneNamed',
+          'Open scene: {name}',
+          { name: sceneLabel }
         )}
-        title={text(
-          'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnlinkScene',
-          'Unlink scene'
-        )}
-        onclick={(event) => {
-          event.stopPropagation();
-          unlinkScene();
-        }}><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
+        ><span>{sceneLabel}</span>
+        <i class="fas fa-up-right-from-square" aria-hidden="true"></i></button
       >
     </div>
   {:else}
-    <div
-      class="manager-environment-scene-dropzone"
-      use:dragDrop={{ onDrop: handleSceneDrop, activeClass: 'is-drop-active' }}
-    >
-      <i class="fas fa-map-location-dot" aria-hidden="true"></i>
-      <span
-        >{text(
-          'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneDropHint',
-          'Drag a scene here to link it.'
-        )}</span
-      >
-    </div>
+    <p class="manager-muted" data-environment-summary-scene-empty>
+      {text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoLinkedScene', 'No linked scene')}
+    </p>
   {/if}
 </InspectorCard>
 
