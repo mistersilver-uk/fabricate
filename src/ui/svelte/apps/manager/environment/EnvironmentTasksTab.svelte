@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Callout from '../../../components/Callout.svelte';
   import CompositionList from './CompositionList.svelte';
 
   let {
@@ -48,17 +49,16 @@
 </script>
 
 <section
-  class="manager-environment-tab"
+  class="manager-environment-tab fab-stack"
+  data-gap="3"
   data-environment-tab="tasks"
   aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Tasks.Title', 'Tasks')}
 >
-  <p class="manager-environment-comp-callout" data-composition-mode={mode}>
-    <i
-      class={mode === 'manual' ? 'fas fa-hand-pointer' : 'fas fa-wand-magic-sparkles'}
-      aria-hidden="true"
-    ></i>
-    <span
-      >{mode === 'manual'
+  <!-- The tab's heading block (issue 1522): one callout documenting the composition mode. -->
+  <div data-tab-heading>
+    <Callout
+      icon={mode === 'manual' ? 'fas fa-hand-pointer' : 'fas fa-wand-magic-sparkles'}
+      text={mode === 'manual'
         ? text(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Tasks.ManualIntro',
             'Only tasks you add are available to players, whether or not they match this environment.'
@@ -66,9 +66,10 @@
         : text(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Tasks.AutomaticIntro',
             'All matching enabled library tasks are available. Exclude any of them here, or force add a non-matching task.'
-          )}</span
-    >
-  </p>
+          )}
+      data-composition-mode={mode}
+    />
+  </div>
 
   <CompositionList
     kind="task"
@@ -85,5 +86,7 @@
     onRestore={onRestoreRecord}
     onReorder={onReorderRecord}
     onOpenSource={(_, id) => onOpenSourceTask(id)}
+    {environment}
+    onUpdateEnvironment={onUpdate}
   />
 </section>

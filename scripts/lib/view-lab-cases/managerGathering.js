@@ -23,6 +23,7 @@ const OPEN_PROSPECT_TASK = Object.freeze([
   },
 ]);
 const TASK_PREVIEW = '[data-gathering-task-dc] [data-override-preview-actor]';
+const AVAILABLE_SPRING_ROW = '[data-section="available-to-add"] [data-record-id="hb-task-spring"]';
 /** A Direct task's result rows; a step or a single-element check reads the first. */
 const STRAIGHT_RESULT = '[data-gathering-task-results="straight"] [data-recipe-result-item]';
 const taskOverrideCase = ({ id, label, field, frame, sees, claim = '' }) =>
@@ -692,6 +693,143 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager:has([data-environment-tab="events"] .manager-environment-comp-entry.is-selected)' +
       ' [data-record-inspector="event"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
+      ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+    ],
+  }),
+  // Issue 1522: a composition row's overrides open in place in that row, and the scene link is
+  // authored on the Overview tab's own card, so the rail beside both is read-only.
+  ...[
+    { suffix: 'normal', width: 1280, height: 820 },
+    { suffix: 'narrow', width: 1000, height: 720 },
+  ].flatMap(({ suffix, width, height }) =>
+    [
+      ['task', 'lab-smithing', 'sm-env-mine', 'tasks', 'sm-task-prospect'],
+      ['event', 'lab-herbalism', 'hb-env-grove', 'events', 'hb-event-storm'],
+    ].map(([kind, system, environment, tab, record]) => {
+      const row = `[data-environment-tab="${tab}"] .fabricate-sortable-list-row.is-expanded[data-record-id="${record}"]`;
+      const input = `${row} [data-drop-rate-adjustment-input]`;
+      return managerCase({
+        id: `manager-environment-edit-${kind}-row-open-${suffix}`,
+        label: `Manager — Environment edit ${kind} row overrides open ${suffix}`,
+        reaches: 'beyond',
+        smokeLabels: [],
+        query: { system },
+        position: { width, height },
+        steps: [
+          'Gathering',
+          {
+            selector: `.manager-environment-row[data-environment-id="${environment}"] .fabricate-icon-button[aria-label^="Edit"]`,
+          },
+          { selector: `#environment-tab-${tab}` },
+          { selector: `[data-sortable-disclosure="${record}"]` },
+          { selector: input, scroll: true },
+        ],
+        expectView: 'environment-edit',
+        expectSelector: `.fabricate-manager ${row} [data-composition-override-body="${kind}"]`,
+        expectNoHorizontalOverflow: `[data-environment-tab="${tab}"]`,
+        expectCenterHit: input,
+        kinds: ['manager', 'environments', ...(suffix === 'narrow' ? ['responsive'] : [])],
+        sourceMatches: [
+          GATHERING_ROUTE_MODEL_PATTERN,
+          ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+          /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+        ],
+      });
+    })
+  ),
+  ...[
+    ['linked', 'hb-env-grove', { width: 1280, height: 820 }, '[data-overview-scene-unlink]'],
+    [
+      'unlinked-narrow',
+      'hb-env-ridge',
+      { width: 1000, height: 720 },
+      '[data-overview-section="scene"] [data-manager-item-drop-zone]',
+    ],
+  ].map(([state, environment, position, hit]) =>
+    managerCase({
+      id: `manager-environment-edit-scene-${state}`,
+      label: `Manager — Environment edit Linked scene card, ${state}`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-herbalism' },
+      position,
+      steps: [
+        'Gathering',
+        {
+          selector: `.manager-environment-row[data-environment-id="${environment}"] .fabricate-icon-button[aria-label^="Edit"]`,
+        },
+        { selector: '[data-overview-section="scene"]', scroll: true },
+      ],
+      expectView: 'environment-edit',
+      expectSelector:
+        state === 'linked'
+          ? '.fabricate-manager [data-overview-section="scene"] [data-overview-scene-linked]'
+          : '.fabricate-manager [data-overview-section="scene"] [data-item-drop-zone="scene"]:not([data-overview-scene-linked])',
+      expectNoHorizontalOverflow: '[data-overview-section="scene"]',
+      expectCenterHit: hit,
+      kinds: ['manager', 'environments', ...(state === 'linked' ? [] : ['responsive'])],
+      sourceMatches: [
+        GATHERING_ROUTE_MODEL_PATTERN,
+        ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+        /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+      ],
+    })
+  ),
+  // A row outside the ordered list opens the same body through its own grid track, at the floor.
+  managerCase({
+    id: 'manager-environment-edit-available-row-open-narrow',
+    label: 'Manager — Environment edit Available-to-add row overrides open narrow',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    position: { width: 1000, height: 720 },
+    steps: [
+      'Gathering',
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .fabricate-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#environment-tab-tasks' },
+      { selector: '[data-composition-disclosure="hb-task-spring"]' },
+      { selector: `${AVAILABLE_SPRING_ROW} [data-drop-rate-adjustment-input]`, scroll: true },
+    ],
+    expectView: 'environment-edit',
+    expectSelector: `.fabricate-manager ${AVAILABLE_SPRING_ROW} [data-composition-override-body="task"]`,
+    expectNoHorizontalOverflow: '[data-environment-tab="tasks"]',
+    expectCenterHit: `${AVAILABLE_SPRING_ROW} [data-drop-rate-adjustment-input]`,
+    kinds: ['manager', 'environments', 'responsive'],
+    sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
+      ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+    ],
+  }),
+  // The ranked event strip's 94px lead: the grip, the badge and the disclosure over each row.
+  managerCase({
+    id: 'manager-environment-edit-events-ranked',
+    label: 'Manager — Environment edit Events tab, highest-ranked event selection',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      { selector: '#manager-gathering-rule-events', select: 'highestRankedDrop' },
+      { selector: '#manager-gathering-nav-environments' },
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#environment-tab-events' },
+    ],
+    expectView: 'environment-edit',
+    expectSelector:
+      '.fabricate-manager [data-environment-tab="events"] .manager-environment-comp-head.has-rank-controls',
+    expectCenterHit: '[data-environment-tab="events"] [data-sortable-grip]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,

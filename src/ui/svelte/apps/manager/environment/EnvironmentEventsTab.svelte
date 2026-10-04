@@ -1,14 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Callout from '../../../components/Callout.svelte';
   import CompositionList from './CompositionList.svelte';
 
   let {
+    environment = null,
     composition = { compositionMode: 'automatic', events: [] },
     eventSelectionMode = 'allDrops',
     selectedKind = '',
     selectedId = '',
     onSelectRecord = () => {},
+    onUpdate = () => {},
     onIncludeRecord = () => {},
     onForceIncludeRecord = () => {},
     onExcludeRecord = () => {},
@@ -28,17 +31,16 @@
 </script>
 
 <section
-  class="manager-environment-tab"
+  class="manager-environment-tab fab-stack"
+  data-gap="3"
   data-environment-tab="events"
   aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Events.Title', 'Events')}
 >
-  <p class="manager-environment-comp-callout" data-composition-mode={mode}>
-    <i
-      class={mode === 'manual' ? 'fas fa-hand-pointer' : 'fas fa-wand-magic-sparkles'}
-      aria-hidden="true"
-    ></i>
-    <span
-      >{mode === 'manual'
+  <!-- The tab's heading block (issue 1522): one callout documenting the composition mode. -->
+  <div data-tab-heading>
+    <Callout
+      icon={mode === 'manual' ? 'fas fa-hand-pointer' : 'fas fa-wand-magic-sparkles'}
+      text={mode === 'manual'
         ? text(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Events.ManualIntro',
             'Only events you add apply here, whether or not they match this environment.'
@@ -46,9 +48,10 @@
         : text(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Events.AutomaticIntro',
             'All matching enabled library events apply here. Exclude any of them here, or force add a non-matching event.'
-          )}</span
-    >
-  </p>
+          )}
+      data-composition-mode={mode}
+    />
+  </div>
 
   <CompositionList
     kind="event"
@@ -63,5 +66,7 @@
     onRestore={onRestoreRecord}
     onReorder={onReorderRecord}
     onOpenSource={(_, id) => onOpenSourceEvent(id)}
+    {environment}
+    onUpdateEnvironment={onUpdate}
   />
 </section>

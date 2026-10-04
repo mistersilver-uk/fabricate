@@ -4,10 +4,12 @@ import { afterEach, before, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, mount, tick, unmount } from 'svelte';
+import { createClassComponent } from 'svelte/legacy';
 import {
   railCounts as sharedRailCounts,
   tallyMatchingRail as sharedTallyMatchingRail,
 } from '../helpers/validationSurfaceReadings.js';
+import { dispatchDrop } from '../helpers/dropPayloads.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import {
   createManagerQueries,
@@ -81,7 +83,10 @@ function modifierEditorShell(subject, attached = []) {
       gatheringModifierCardHint: (kind, scope) => `${kind}/${scope} hint`,
       rowCharacterModifiers: () => refs,
       characterModifierLabelForRef: (ref) => ref.modifierId,
-      characterModifierLibraryEntry: () => ({ id: 'mod-training', expression: '@skills.nat.total' }),
+      characterModifierLibraryEntry: () => ({
+        id: 'mod-training',
+        expression: '@skills.nat.total',
+      }),
       onPickCharacterModifier: (modifierId) => {
         picked.push(modifierId);
         refs.push({ id: `ref-${modifierId}`, modifierId, operator: '+' });
@@ -199,9 +204,9 @@ export function registerEnvironmentsCases() {
       ],
     });
     const selected = (kind) =>
-      target.querySelector(`.manager-gathering-${kind}-row.is-selected`)?.getAttribute(
-        `data-gathering-${kind}-id`
-      );
+      target
+        .querySelector(`.manager-gathering-${kind}-row.is-selected`)
+        ?.getAttribute(`data-gathering-${kind}-id`);
     const pick = async (kind, id) => {
       target
         .querySelector(`[data-gathering-${kind}-id="${id}"] .manager-gathering-${kind}-identity`)
@@ -213,7 +218,11 @@ export function registerEnvironmentsCases() {
     await pick('task', 'task-cavern');
     await openSection('Events');
     await pick('event', 'event-rockfall');
-    assert.equal(selected('event'), 'event-rockfall', 'pre-condition: the GM picked a second event');
+    assert.equal(
+      selected('event'),
+      'event-rockfall',
+      'pre-condition: the GM picked a second event'
+    );
 
     await setGathering(false);
     await setGathering(true);
@@ -255,7 +264,10 @@ export function registerEnvironmentsCases() {
     assert.ok(row.textContent.includes('Renamed Woods'), 'the row shows the dirty draft');
     assert.ok(row.textContent.includes('Unsaved') && row.textContent.includes('Invalid'));
     const inspector = target.querySelector('.manager-inspector');
-    assert.equal(inspector.querySelector('.manager-inspector-name').textContent.trim(), 'Renamed Woods');
+    assert.equal(
+      inspector.querySelector('.manager-inspector-name').textContent.trim(),
+      'Renamed Woods'
+    );
     assert.ok(inspector.textContent.includes('Blind'), 'the selection mode chip');
     assert.ok(inspector.textContent.includes('Unsaved'), 'the draft-state card');
     assert.ok(inspector.textContent.includes('2 validation issues'));
@@ -282,7 +294,9 @@ export function registerEnvironmentsCases() {
       await tick();
       flushSync();
       target
-        .querySelector('[data-environment-id="env-forest"] .fabricate-icon-button[aria-label^="Edit"]')
+        .querySelector(
+          '[data-environment-id="env-forest"] .fabricate-icon-button[aria-label^="Edit"]'
+        )
         .click();
       await tick();
       flushSync();
@@ -314,7 +328,10 @@ export function registerEnvironmentsCases() {
       await tick();
       flushSync();
       const lock = target.querySelector('[data-party-realm-override-unavailable]');
-      assert.equal(Boolean(target.querySelector('.manager-travel-parties-override-trigger')), enabled);
+      assert.equal(
+        Boolean(target.querySelector('.manager-travel-parties-override-trigger')),
+        enabled
+      );
       assert.equal(
         Boolean(lock?.textContent.includes('Enable Travel & Realms in this system')),
         !enabled,
@@ -404,7 +421,8 @@ export function registerEnvironmentsCases() {
     await tick();
     flushSync();
 
-    const filter = (axis) => `.fabricate-select-trigger[aria-label="Filter environments by ${axis}"]`;
+    const filter = (axis) =>
+      `.fabricate-select-trigger[aria-label="Filter environments by ${axis}"]`;
     const rows = () =>
       [...target.querySelectorAll('.manager-environment-row')].map((row) =>
         row.getAttribute('data-environment-id')
@@ -499,9 +517,10 @@ export function registerEnvironmentsCases() {
 
     chooseSelectOption(target, picker('weather'), 'heavy-rain');
     await tick();
-    assert.deepEqual(calls.filter((call) => call[0] === 'updateGatheringConditions'), [
-      ['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }],
-    ]);
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'updateGatheringConditions'),
+      [['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }]]
+    );
   });
 
   // The gathering task and event toolbars' six filters (issue 1510), each trigger named by its own
@@ -724,10 +743,10 @@ export function registerEnvironmentsCases() {
     // through the shared `Chip` now, whose face is a `tone` or a `tint` rather than an
     // `is-<facet>` class of the retired availability family, so the row's own data hook is what
     // says which dimension each chip states.
-    const tagPills = Array.from(tagsCell.querySelectorAll('.manager-chip[data-gathering-task-tag]'));
-    const tagKinds = new Set(
-      tagPills.map((pill) => pill.getAttribute('data-gathering-task-tag'))
+    const tagPills = Array.from(
+      tagsCell.querySelectorAll('.manager-chip[data-gathering-task-tag]')
     );
+    const tagKinds = new Set(tagPills.map((pill) => pill.getAttribute('data-gathering-task-tag')));
     assert.equal(
       tagKinds.size,
       3,
@@ -805,14 +824,18 @@ export function registerEnvironmentsCases() {
 
     // Prospect Crystal Veins is referenced by no environment, so selecting it flips the same
     // card to its empty state (issue 1707 phase 2 review).
-    target.querySelector('[data-gathering-task-id="task-cavern"] .manager-gathering-task-identity').click();
+    target
+      .querySelector('[data-gathering-task-id="task-cavern"] .manager-gathering-task-identity')
+      .click();
     await tick();
     flushSync();
     assert.ok(
       Boolean(target.querySelector('[data-task-environment-usage-empty]')),
       'Prospect Crystal Veins is unreferenced, so its card renders the empty state'
     );
-    target.querySelector('[data-gathering-task-id="task-herbs"] .manager-gathering-task-identity').click();
+    target
+      .querySelector('[data-gathering-task-id="task-herbs"] .manager-gathering-task-identity')
+      .click();
     await tick();
     flushSync();
 
@@ -1355,17 +1378,14 @@ export function registerEnvironmentsCases() {
       field.querySelector(
         `[data-gathering-task-availability-pill="${kind}"][data-condition-id="${conditionId}"]`
       );
-    const availabilityTrigger = (field) =>
-      field.querySelector('.manager-condition-menu-button');
+    const availabilityTrigger = (field) => field.querySelector('.manager-condition-menu-button');
     const openAvailabilityMenu = async (field) => {
       availabilityTrigger(field).click();
       await tick();
       flushSync();
     };
     const removeAvailabilityPill = async (field, kind, conditionId) => {
-      availabilityPill(field, kind, conditionId)
-        .querySelector('[data-chip-remove]')
-        .click();
+      availabilityPill(field, kind, conditionId).querySelector('[data-chip-remove]').click();
       await tick();
       flushSync();
     };
@@ -1453,10 +1473,7 @@ export function registerEnvironmentsCases() {
         'true',
         'the trigger should announce the menu as expanded'
       );
-      assert.ok(
-        availabilityOptions(kind).length > 0,
-        'picker menu should open on trigger click'
-      );
+      assert.ok(availabilityOptions(kind).length > 0, 'picker menu should open on trigger click');
       document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
       await tick();
       flushSync();
@@ -1939,7 +1956,9 @@ export function registerEnvironmentsCases() {
     assert.equal(environmentTable.querySelectorAll('[role="columnheader"]').length, 0);
     assert.deepEqual(
       Array.from(
-        environmentTable.querySelectorAll('.manager-environment-table-head[aria-hidden="true"] span')
+        environmentTable.querySelectorAll(
+          '.manager-environment-table-head[aria-hidden="true"] span'
+        )
       ).map((header) => header.textContent.trim()),
       ['Environment', 'Selection mode', 'Tasks', 'Status', 'Actions']
     );
@@ -2186,8 +2205,8 @@ export function registerEnvironmentsCases() {
       'locked identity image should show the scene thumbnail'
     );
 
-    // Unlink the scene → the identity image returns to the editable stored value.
-    target.querySelector('[data-environment-summary-scene] .fabricate-icon-button.is-danger').click();
+    // Unlink the scene on the Overview card (issue 1522) → the identity image is editable again.
+    target.querySelector('[data-overview-scene-unlink]').click();
     await tick();
     flushSync();
 
@@ -2273,6 +2292,9 @@ export function registerEnvironmentsCases() {
           compositionMode: 'automatic',
           taskDropRateAdjustments: { 'task-forage': { 'drop-herb': 15, 'drop-root': -10 } },
           taskDropRateAdjustmentsEnabled: {},
+          // A sibling event's overrides, which every event write must carry through.
+          eventDropRateAdjustments: { 'event-other': 9 },
+          eventDropRateAdjustmentsEnabled: { 'event-other': false },
         },
         composition: {
           compositionMode: 'automatic',
@@ -2475,8 +2497,14 @@ export function registerEnvironmentsCases() {
       target.querySelector('[data-evidence-field="danger"]').textContent.includes('Any danger'),
       'task evidence table should keep the danger row as unconstrained'
     );
-    const taskOverrides = target.querySelector('[data-record-inspector-section="overrides"]');
-    assert.ok(taskOverrides, 'task inspector should keep the overrides card');
+    // Issue 1522: the task row opens its overrides in place.
+    assert.ok(!target.querySelector('[data-record-inspector-section="overrides"]'));
+    target.querySelector('[data-sortable-disclosure="task-forage"]').click();
+    flushSync();
+    const taskOverrides = target.querySelector(
+      ':scope [data-record-id="task-forage"] [data-composition-override="adjustments"]'
+    );
+    assert.ok(taskOverrides, 'the task row opens its overrides in place');
     assert.ok(
       taskOverrides.querySelector('[data-task-drop-rate-adjustments-toggle]'),
       'task overrides should render the apply toggle'
@@ -2540,8 +2568,8 @@ export function registerEnvironmentsCases() {
       '.manager-environment-drop-adjustment-clear'
     );
     assert.ok(taskClearButton, 'task drop override should render an icon-only clear button');
-    assert.equal(taskClearButton.getAttribute('aria-label'), 'Clear');
-    assert.equal(taskClearButton.getAttribute('title'), 'Clear');
+    assert.equal(taskClearButton.getAttribute('aria-label'), 'Clear Moon Herb');
+    assert.equal(taskClearButton.getAttribute('title'), 'Clear Moon Herb');
     assert.equal(
       taskClearButton.textContent.trim(),
       '',
@@ -2567,7 +2595,7 @@ export function registerEnvironmentsCases() {
     assert.equal(taskAdjustmentInput.value, '+15');
     assert.equal(
       taskAdjustmentInput.getAttribute('aria-label'),
-      'Drop-rate adjustment (-100% to +100%)'
+      'Moon Herb: Drop-rate adjustment (-100% to +100%)'
     );
     const percentShell = taskAdjustmentRow.querySelector('[data-drop-rate-adjustment-percent]');
     assert.ok(percentShell, 'task drop override should render the percent suffix shell');
@@ -2690,11 +2718,23 @@ export function registerEnvironmentsCases() {
       true,
       'danger mismatch should use danger tone'
     );
-    const eventOverrides = target.querySelector('[data-record-inspector-section="overrides"]');
-    assert.ok(eventOverrides, 'event inspector should keep the overrides card');
+    assert.ok(!target.querySelector('[data-record-inspector-section="overrides"]'));
+    target.querySelector('[data-sortable-disclosure="event-thorns"]').click();
+    flushSync();
+    const eventOverrides = target.querySelector(
+      ':scope [data-record-id="event-thorns"] [data-composition-override="adjustments"]'
+    );
+    assert.ok(eventOverrides, 'the event row opens its overrides in place');
     assert.ok(
-      eventOverrides.textContent.includes('Environment overrides'),
+      eventOverrides.textContent.includes('Drop-rate adjustments'),
       'event overrides card should keep its title'
+    );
+    assert.equal(
+      eventOverrides
+        .querySelector('[data-event-drop-rate-adjustments-toggle]')
+        .getAttribute('aria-label'),
+      'Apply drop-rate adjustments',
+      'the switch is named for what it applies, not its state'
     );
     assert.ok(
       eventOverrides.textContent.includes('Base chance modifier'),
@@ -2762,13 +2802,13 @@ export function registerEnvironmentsCases() {
     eventAdjustmentInput.dispatchEvent(new Event('input', { bubbles: true }));
     assert.deepEqual(
       updateCalls.at(-1),
-      { eventDropRateAdjustments: { 'event-thorns': -5 } },
+      { eventDropRateAdjustments: { 'event-other': 9, 'event-thorns': -5 } },
       'event percent input should update the stored event adjustment'
     );
     eventOverrides.querySelector('[data-event-drop-rate-adjustments-toggle]').click();
     assert.deepEqual(
       updateCalls.at(-1),
-      { eventDropRateAdjustmentsEnabled: { 'event-thorns': false } },
+      { eventDropRateAdjustmentsEnabled: { 'event-other': false, 'event-thorns': false } },
       'turning the event toggle off should preserve stored values and only disable application'
     );
   });
@@ -3129,15 +3169,12 @@ export function registerEnvironmentsCases() {
 
   it('counts an unsatisfied check that raises NO issue, and does not call it all clear', async () => {
     // THE REPRO. Only `hasAvailableTask` pairs with an issue.
-    mountEnvironmentEditor(
-      environmentDraftWith({ description: '', dangerLevel: '' }),
-      {
-        compositionMode: 'automatic',
-        counts: { availableTasks: 1, availableEvents: 0 },
-        tasks: [describedTask('task-moon-herbs', 'Gather Moon Herbs')],
-        events: [],
-      }
-    );
+    mountEnvironmentEditor(environmentDraftWith({ description: '', dangerLevel: '' }), {
+      compositionMode: 'automatic',
+      counts: { availableTasks: 1, availableEvents: 0 },
+      tasks: [describedTask('task-moon-herbs', 'Gather Moon Herbs')],
+      events: [],
+    });
 
     assert.equal(
       target.querySelectorAll('[data-check="hasDescription"].is-warn').length,
@@ -3173,7 +3210,11 @@ export function registerEnvironmentsCases() {
         {
           id: 'event-thorns',
           kind: 'event',
-          record: { name: 'Thorn Snare', description: 'Tangled thorns.', img: 'icons/svg/hazard.svg' },
+          record: {
+            name: 'Thorn Snare',
+            description: 'Tangled thorns.',
+            img: 'icons/svg/hazard.svg',
+          },
           compositionState: 'includedNotMatching',
           runtimeState: 'unavailable',
           evidence: {},
@@ -3203,7 +3244,11 @@ export function registerEnvironmentsCases() {
         {
           id: 'event-thorns',
           kind: 'event',
-          record: { name: 'Thorn Snare', description: 'Tangled thorns.', img: 'icons/svg/hazard.svg' },
+          record: {
+            name: 'Thorn Snare',
+            description: 'Tangled thorns.',
+            img: 'icons/svg/hazard.svg',
+          },
           compositionState: 'includedNotMatching',
           runtimeState: 'unavailable',
           evidence: {},
@@ -3255,15 +3300,12 @@ export function registerEnvironmentsCases() {
     // the same missing task, graded by how loud it needs to be — and it carries `blocks: 'enable'`
     // in both states. Routing the verdict off severity told the GM of a disabled, taskless
     // environment that it "Saves and enables". It does not: it cannot be enabled at all.
-    mountEnvironmentEditor(
-      environmentDraftWith({ enabled: false, dangerLevel: '' }),
-      {
-        compositionMode: 'automatic',
-        counts: { availableTasks: 0, availableEvents: 0 },
-        tasks: [],
-        events: [],
-      }
-    );
+    mountEnvironmentEditor(environmentDraftWith({ enabled: false, dangerLevel: '' }), {
+      compositionMode: 'automatic',
+      counts: { availableTasks: 0, availableEvents: 0 },
+      tasks: [],
+      events: [],
+    });
 
     assert.equal(
       verdict().getAttribute('data-editor-validation-summary'),
@@ -3325,11 +3367,7 @@ export function registerEnvironmentsCases() {
     );
     assert.equal(selectTriggerText(target, danger), 'Extreme');
     assert.deepEqual(selectOptionValues(target, danger), ['extreme', 'safe', 'hazardous']);
-    assert.deepEqual(selectOptionLabels(target, danger), [
-      'Extreme',
-      'Camp safe',
-      'Rough going',
-    ]);
+    assert.deepEqual(selectOptionLabels(target, danger), ['Extreme', 'Camp safe', 'Rough going']);
   });
 
   it('scores inspector danger evidence against the six-level canonical scale', async () => {
@@ -3426,7 +3464,9 @@ export function registerEnvironmentsCases() {
         `the biome condition card must carry the ${subject} prefix`
       );
       assert.ok(
-        Boolean(root.querySelector(`[data-gathering-${subject}-condition-modifier-picker="biome"]`)),
+        Boolean(
+          root.querySelector(`[data-gathering-${subject}-condition-modifier-picker="biome"]`)
+        ),
         `the biome picker must carry the ${subject} prefix`
       );
       assert.ok(
@@ -3481,7 +3521,9 @@ export function registerEnvironmentsCases() {
       assert.equal(suggestion.getAttribute('role'), 'option');
       assert.equal(suggestion.getAttribute('tabindex'), '-1', 'no suggestion is a tab stop');
       assert.ok(
-        !root.querySelector(`[data-gathering-${other}-character-modifier-suggestion="mod-training"]`),
+        !root.querySelector(
+          `[data-gathering-${other}-character-modifier-suggestion="mod-training"]`
+        ),
         `the suggestion must not carry the ${other} prefix`
       );
       suggestion.click();
@@ -3495,7 +3537,9 @@ export function registerEnvironmentsCases() {
       );
       assert.ok(Boolean(ref), `the picked reference row must carry the ${subject} prefix`);
       assert.ok(
-        !rendered.querySelector(`[data-gathering-${other}-character-modifier-ref="ref-mod-training"]`),
+        !rendered.querySelector(
+          `[data-gathering-${other}-character-modifier-ref="ref-mod-training"]`
+        ),
         `the reference row must not carry the ${other} prefix`
       );
       assert.ok(
@@ -3577,7 +3621,9 @@ export function registerEnvironmentsCases() {
   // The coloured box, the signed value input, its `%` adornment and the Arrow stepper moved into
   // the shared panel, so they are asserted where they render rather than re-pinned as root text.
   it('renders an attached condition modifier as one coloured, signed, steppable input', async () => {
-    const attached = [{ id: 'cm-1', kind: 'biome', conditionId: 'forest', sign: 'positive', display: '+15' }];
+    const attached = [
+      { id: 'cm-1', kind: 'biome', conditionId: 'forest', sign: 'positive', display: '+15' },
+    ];
     const shell = modifierEditorShell('drop', attached);
     const root = mountModifierEditor(shell.props);
 
@@ -3764,13 +3810,9 @@ export function registerEnvironmentsCases() {
     });
 
     await openEditorTab('tasks');
-    target
-      .querySelector('[data-record-id="task-in"] [data-quick-action="exclude"]')
-      .click();
+    target.querySelector('[data-record-id="task-in"] [data-quick-action="exclude"]').click();
     await tick();
-    target
-      .querySelector('[data-record-id="task-add"] [data-quick-action="include"]')
-      .click();
+    target.querySelector('[data-record-id="task-add"] [data-quick-action="include"]').click();
     await tick();
 
     assert.deepEqual(excluded, [['task', 'task-in']]);
@@ -3883,13 +3925,8 @@ export function registerEnvironmentsCases() {
       !target.querySelector('[data-action="force-include"]'),
       'and no force add anywhere: manual mode has no filter for one to override'
     );
-    assert.ok(
-      !target.querySelector('.manager-environment-force-include'),
-      'nor the labelled one'
-    );
-    target
-      .querySelector('[data-record-id="event-off"] [data-quick-action="include"]')
-      .click();
+    assert.ok(!target.querySelector('.manager-environment-force-include'), 'nor the labelled one');
+    target.querySelector('[data-record-id="event-off"] [data-quick-action="include"]').click();
     await tick();
     assert.deepEqual(included, [['event', 'event-off']], 'the same row is plainly added instead');
   });
@@ -3921,8 +3958,14 @@ export function registerEnvironmentsCases() {
         chip.textContent.trim()
       );
 
-    assert.equal(rail().querySelector('.manager-kicker').textContent.trim(), 'Selected environment');
-    assert.equal(rail().querySelector('.manager-inspector-name').textContent.trim(), 'Moonlit Forest');
+    assert.equal(
+      rail().querySelector('.manager-kicker').textContent.trim(),
+      'Selected environment'
+    );
+    assert.equal(
+      rail().querySelector('.manager-inspector-name').textContent.trim(),
+      'Moonlit Forest'
+    );
     assert.deepEqual(chips(), ['Active', 'Targeted', 'Linked scene']);
     assert.deepEqual(facts(), [
       ['tasks', '1'],
@@ -3944,7 +3987,10 @@ export function registerEnvironmentsCases() {
     await tick();
     flushSync();
 
-    assert.equal(rail().querySelector('.manager-inspector-name').textContent.trim(), 'Quiet Cavern');
+    assert.equal(
+      rail().querySelector('.manager-inspector-name').textContent.trim(),
+      'Quiet Cavern'
+    );
     assert.deepEqual(chips(), ['Disabled', 'Blind', 'Scene unresolved']);
     assert.deepEqual(facts(), [
       ['tasks', '1'],
@@ -4008,4 +4054,297 @@ export function registerEnvironmentsCases() {
     );
   });
 
+  // ── Issue 1522: the rails are read-only, the overrides open in their rows, and the scene link
+  // is authored on the Overview tab's Linked scene card. ────────────────────────────────────────
+
+  const RAIL_EDITING = [
+    'button[aria-pressed]',
+    '.fabricate-select-trigger',
+    '[data-node-count-inc]',
+    '[data-node-count-dec]',
+    'input',
+    'textarea',
+    '[data-manager-item-drop-zone]',
+    '.manager-environment-scene-dropzone',
+  ].join(', ');
+
+  function overrideTask(id, compositionState) {
+    return {
+      id,
+      record: {
+        name: id,
+        nodes: { enabled: true, max: 4, current: 4, respawn: { policy: 'manual' } },
+      },
+      compositionState,
+      runtimeState: compositionState === 'excluded' ? 'unavailable' : 'available',
+      libraryEnabled: true,
+      matches: true,
+      conditionsMet: true,
+      dropRateAdjustmentsEnabled: true,
+      dropRateAdjustmentRows: ['drop-ore', 'drop-gem'].map((row) => ({
+        id: row,
+        name: row,
+        baseDropRate: 40,
+        adjustment: 0,
+        effectiveDropRate: 40,
+      })),
+    };
+  }
+
+  function overridesEditorProps(updates, draft = {}) {
+    return {
+      environmentDraft: {
+        id: 'env-cavern',
+        craftingSystemId: 'alchemy',
+        name: 'Deep Cavern',
+        enabled: true,
+        selectionMode: 'targeted',
+        compositionMode: 'automatic',
+        sceneUuid: 'Scene.cavern',
+        nodeRuntime: {},
+        ...draft,
+      },
+      composition: {
+        compositionMode: 'automatic',
+        conditions: {},
+        counts: { availableTasks: 1, availableEvents: 1 },
+        tasks: [overrideTask('task-vein', 'includedByMatch'), overrideTask('task-cut', 'excluded')],
+        events: [
+          {
+            id: 'event-squall',
+            record: { name: 'Squall', dropRate: 10 },
+            compositionState: 'includedByMatch',
+            runtimeState: 'available',
+            dropRateAdjustment: 0,
+          },
+        ],
+      },
+      onUpdateEnvironment: (patch) => {
+        updates.push(patch);
+      },
+    };
+  }
+
+  /** Every rail control routes out, none edits, and a Scene dropped anywhere on it writes nothing. */
+  function assertRailReadOnly(updates, tab) {
+    const rail = target.querySelector('aside.manager-environment-inspector');
+    assert.ok(Boolean(rail), `${tab}: the rail renders`);
+    for (const control of rail.querySelectorAll('button, [tabindex]')) {
+      assert.ok(
+        control.hasAttribute('data-rail-route-out'),
+        `${tab}: ${control.outerHTML.slice(0, 90)} is a rail control that does not route out`
+      );
+    }
+    assert.ok(!rail.querySelector(RAIL_EDITING), `${tab}: the rail hosts no editing input`);
+    const before = updates.length;
+    for (const element of [rail, ...rail.querySelectorAll('*')]) {
+      const over = new Event('dragover', { bubbles: true, cancelable: true });
+      element.dispatchEvent(over);
+      // Read before the drop, whose handler would clear the class again.
+      assert.ok(
+        !over.defaultPrevented &&
+          !rail.classList.contains('is-drop-active') &&
+          !rail.querySelector('.is-drop-active'),
+        `${tab}: ${element.tagName} takes a dragover, so a drop target sits on the rail`
+      );
+      dispatchDrop(element, { type: 'Scene', uuid: 'Scene.dropped' });
+    }
+    flushSync();
+    assert.equal(updates.length, before, `${tab}: a Scene dropped on the rail writes nothing`);
+  }
+
+  it('keeps every rail pane read-only, while the same records edit in their rows', async () => {
+    const updates = [];
+    mountEditor(overridesEditorProps(updates));
+    assertRailReadOnly(updates, 'overview');
+    assert.ok(
+      Boolean(target.querySelector(':scope aside [data-rail-route-out]')),
+      'the Overview rail still routes out to the linked scene'
+    );
+
+    await openEditorTab('tasks');
+    assert.ok(
+      Boolean(
+        target.querySelector(
+          ':scope aside [data-record-inspector-section="nodes"] [data-node-count]'
+        )
+      ),
+      'the selected task keeps its node count as a fact'
+    );
+    assertRailReadOnly(updates, 'tasks');
+    target.querySelector('[data-sortable-disclosure="task-vein"]').click();
+    flushSync();
+    const body = target.querySelector(
+      ':scope [data-record-id="task-vein"] [data-composition-override-body]'
+    );
+    for (const control of [
+      '[data-node-count-input="task-vein"]',
+      '[data-task-drop-rate-adjustments-toggle]',
+      '[data-drop-rate-adjustment="drop-ore"] [data-drop-rate-adjustment-input]',
+    ]) {
+      assert.ok(Boolean(body?.querySelector(control)), `the task row body renders ${control}`);
+    }
+
+    await openEditorTab('events');
+    assertRailReadOnly(updates, 'events');
+  });
+
+  it('keeps the rail read-only with no linked scene and with no record selected', async () => {
+    const updates = [];
+    mountEditor(overridesEditorProps(updates, { sceneUuid: '' }));
+    assert.ok(Boolean(target.querySelector(':scope aside [data-environment-summary-scene-empty]')));
+    assertRailReadOnly(updates, 'overview, unlinked');
+    unmount(mounted);
+    mounted = null;
+    const props = overridesEditorProps(updates);
+    mountEditor({ ...props, composition: { ...props.composition, tasks: [] } });
+    await openEditorTab('tasks');
+    assert.ok(
+      !target.querySelector(':scope aside [data-record-inspector]'),
+      'no record is selected'
+    );
+    assertRailReadOnly(updates, 'tasks, nothing selected');
+  });
+
+  it('marks a linked scene that no longer resolves as missing, on the card and the rail', async () => {
+    const previous = globalThis.fromUuid;
+    Object.assign(globalThis, { fromUuid: async () => null });
+    try {
+      mountEditor(overridesEditorProps([]));
+      for (let index = 0; index < 4; index += 1) await tick();
+      flushSync();
+      const zone = target.querySelector(
+        ':scope [data-overview-section="scene"] [data-item-drop-zone]'
+      );
+      assert.equal(zone.dataset.itemDropState, 'missing', 'the card paints the link as missing');
+      assert.ok(zone.textContent.includes('Scene not found'), 'and says so');
+      const route = target.querySelector(':scope aside [data-rail-route-out]');
+      assert.equal(route.textContent.trim(), 'Scene not found', 'the rail says the same');
+      assert.equal(route.getAttribute('aria-label'), 'Open scene: Scene not found');
+      assert.ok(!route.textContent.includes('Scene.cavern'), 'and never prints the address');
+      assert.ok(
+        Boolean(route.querySelector('.fa-up-right-from-square')),
+        'it reads as a route out'
+      );
+    } finally {
+      Object.assign(globalThis, { fromUuid: previous });
+    }
+  });
+
+  it('commits on blur with the row still open and focus still in its body, in any section', async () => {
+    for (const id of ['task-vein', 'task-cut']) {
+      const updates = [];
+      applicationRootTarget();
+      const props = overridesEditorProps(updates);
+      const editor = createClassComponent({
+        component: EnvironmentEditViewComponent,
+        target,
+        props: {
+          ...props,
+          // The store's round trip: each write comes back as a new draft AND a rebuilt composition,
+          // so every record arrives under a new identity.
+          onUpdateEnvironment: (patch) => {
+            updates.push(patch);
+            props.environmentDraft = { ...props.environmentDraft, ...patch };
+            props.composition = structuredClone(props.composition);
+            editor.$set({
+              environmentDraft: props.environmentDraft,
+              composition: props.composition,
+            });
+          },
+        },
+      });
+      flushSync();
+      await openEditorTab('tasks');
+      const chevron = target.querySelector(`:scope [data-record-id="${id}"] .fab-row-disclosure`);
+      chevron.click();
+      flushSync();
+      const body = target.querySelector(`[id="${chevron.getAttribute('aria-controls')}"]`);
+      const [first, second] = body.querySelectorAll('[data-drop-rate-adjustment-input]');
+      first.focus();
+      first.value = '+7';
+      second.focus();
+      first.dispatchEvent(new Event('blur'));
+      flushSync();
+      await tick();
+      flushSync();
+      assert.deepEqual(updates.at(-1), {
+        taskDropRateAdjustments: { [id]: { 'drop-ore': 7 } },
+      });
+      assert.equal(chevron.getAttribute('aria-expanded'), 'true', `${id} stays open`);
+      assert.equal(body.hidden, false, `${id}'s body stays drawn`);
+      assert.ok(body.contains(document.activeElement), `focus stays in ${id}'s body`);
+      editor.$destroy();
+    }
+  });
+
+  it('links a dropped Scene on the Overview card, refuses anything else, and unlinks', async () => {
+    const updates = [];
+    mountEditor(overridesEditorProps(updates, { sceneUuid: '' }));
+    const card = target.querySelector('[data-overview-section="scene"]');
+    assert.equal(card.querySelector('.manager-card-title').textContent.trim(), 'Linked scene');
+    const zone = card.querySelector('[data-manager-item-drop-zone][data-item-drop-zone="scene"]');
+    for (const [payload, expected] of [
+      [{ type: 'Scene', uuid: 'Scene.cavern' }, [{ sceneUuid: 'Scene.cavern' }]],
+      [
+        { type: 'Scene', pack: 'world.maps', id: 'deep' },
+        [{ sceneUuid: 'Compendium.world.maps.deep' }],
+      ],
+      [{ type: 'Actor', uuid: 'Actor.hero' }, []],
+      [{ type: 'Scene' }, []],
+    ]) {
+      updates.length = 0;
+      const event = dispatchDrop(zone, payload);
+      flushSync();
+      assert.deepEqual(
+        updates,
+        expected,
+        `${JSON.stringify(payload)} writes ${JSON.stringify(expected)}`
+      );
+      assert.equal(event.defaultPrevented, true, 'every drop is taken by the zone');
+    }
+
+    unmount(mounted);
+    mounted = null;
+    const previous = globalThis.fromUuid;
+    Object.assign(globalThis, {
+      fromUuid: async () => ({ name: 'Deep Cavern Map', thumb: 'maps/cavern.webp' }),
+    });
+    try {
+      updates.length = 0;
+      mountEditor(overridesEditorProps(updates));
+      for (let index = 0; index < 4; index += 1) await tick();
+      flushSync();
+      const linked = target.querySelector(
+        ':scope [data-overview-section="scene"] [data-overview-scene-linked]'
+      );
+      assert.ok(Boolean(linked), 'a linked scene carries its hook');
+      assert.ok(linked.textContent.includes('Deep Cavern Map'), 'the card names the scene');
+      assert.ok(!linked.textContent.includes('Scene.cavern'), 'and never prints its address');
+      linked.querySelector('[data-overview-scene-unlink]').click();
+      assert.deepEqual(updates, [{ sceneUuid: '' }]);
+    } finally {
+      Object.assign(globalThis, { fromUuid: previous });
+    }
+  });
+
+  it('never writes the scene link from the identity art, linked or not', async () => {
+    for (const sceneUuid of ['Scene.cavern', '']) {
+      const updates = [];
+      mountEditor(overridesEditorProps(updates, { sceneUuid }));
+      const art = target.querySelector(
+        ':scope [data-overview-section="identity"] .manager-task-image-picker'
+      );
+      art.click();
+      art.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+      art.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2 }));
+      flushSync();
+      assert.ok(
+        updates.every((patch) => !Object.hasOwn(patch, 'sceneUuid')),
+        `the ${sceneUuid ? 'locked' : 'editable'} art writes no sceneUuid`
+      );
+      unmount(mounted);
+      mounted = null;
+    }
+  });
 }

@@ -19,18 +19,18 @@ const harness = createMountedComponentHarness({
     // import of the mounted graph; the map is import-free by design, which is why this chip
     // does not grow a `src/systems/` dependency and this single entry closes the edge.
     'src/ui/svelte/apps/manager/environment/compositionStateMeta.js',
+    // The pool merge the rail and a row's Stepper share (issue 1522).
+    'src/ui/svelte/apps/manager/environment/recordNodePool.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',
     'src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte',
     'src/ui/svelte/apps/manager/environment/MatchingEvidenceChips.svelte',
-    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/environment/RecordInspector.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/environment/RecordInspector.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/environment/RecordInspector.svelte',
 });
 
 function makeTaskRecord(overrides = {}) {
@@ -41,9 +41,9 @@ function makeTaskRecord(overrides = {}) {
     nodes: overrides.nodes || {
       max: 10,
       current: 5,
-      respawn: { policy: 'manual' }
+      respawn: { policy: 'manual' },
     },
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -52,7 +52,7 @@ function makeEnvironment(overrides = {}) {
     id: overrides.id || 'env1',
     craftingSystemId: 'dnd5e',
     nodeRuntime: overrides.nodeRuntime || {},
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -64,7 +64,7 @@ function makeEntry(overrides = {}) {
     runtimeState: overrides.runtimeState || 'unavailable',
     evidence: overrides.evidence || {},
     dropRateAdjustmentRows: overrides.dropRateAdjustmentRows || [],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -75,7 +75,7 @@ function getNodeCountDisplay(root) {
   const span = countElement.querySelector('span:not([aria-hidden])');
   return {
     current: strong ? Number(strong.textContent) : null,
-    max: span ? Number(span.textContent) : null
+    max: span ? Number(span.textContent) : null,
   };
 }
 
@@ -90,14 +90,14 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { max: 10, current: 5, respawn: { policy: 'manual' } }
-          })
+            nodes: { max: 10, current: 5, respawn: { policy: 'manual' } },
+          }),
         }),
         environment: makeEnvironment({
           nodeRuntime: {
-            task1: { max: 20, current: 8 } // Runtime has different max
-          }
-        })
+            task1: { max: 20, current: 8 }, // Runtime has different max
+          },
+        }),
       });
 
       const display = getNodeCountDisplay(root);
@@ -109,14 +109,14 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { respawn: { policy: 'manual' } } // No max in config
-          })
+            nodes: { respawn: { policy: 'manual' } }, // No max in config
+          }),
         }),
         environment: makeEnvironment({
           nodeRuntime: {
-            task1: { max: 15, current: 8 }
-          }
-        })
+            task1: { max: 15, current: 8 },
+          },
+        }),
       });
 
       const display = getNodeCountDisplay(root);
@@ -128,10 +128,10 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { respawn: { policy: 'manual' } }
-          })
+            nodes: { respawn: { policy: 'manual' } },
+          }),
         }),
-        environment: makeEnvironment({ nodeRuntime: {} })
+        environment: makeEnvironment({ nodeRuntime: {} }),
       });
 
       const hasNodesSection = root.querySelector('[data-record-inspector-section="nodes"]');
@@ -143,14 +143,14 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { max: 5, respawn: { policy: 'manual' } } // Config max is 5
-          })
+            nodes: { max: 5, respawn: { policy: 'manual' } }, // Config max is 5
+          }),
         }),
         environment: makeEnvironment({
           nodeRuntime: {
-            task1: { max: 20, current: 18 } // Runtime current (18) exceeds config max (5)
-          }
-        })
+            task1: { max: 20, current: 18 }, // Runtime current (18) exceeds config max (5)
+          },
+        }),
       });
 
       const display = getNodeCountDisplay(root);
@@ -163,10 +163,10 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { max: 10, current: 7, respawn: { policy: 'manual' } }
-          })
+            nodes: { max: 10, current: 7, respawn: { policy: 'manual' } },
+          }),
         }),
-        environment: makeEnvironment({ nodeRuntime: {} }) // No runtime entry
+        environment: makeEnvironment({ nodeRuntime: {} }), // No runtime entry
       });
 
       const display = getNodeCountDisplay(root);
@@ -179,10 +179,10 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { max: 8, respawn: { policy: 'manual' } } // No current defined
-          })
+            nodes: { max: 8, respawn: { policy: 'manual' } }, // No current defined
+          }),
         }),
-        environment: makeEnvironment({ nodeRuntime: {} })
+        environment: makeEnvironment({ nodeRuntime: {} }),
       });
 
       const display = getNodeCountDisplay(root);
@@ -197,11 +197,11 @@ describe('RecordInspector (mounted)', () => {
             nodes: {
               max: 5,
               current: 3,
-              respawn: { policy: 'nonRegenerating' }
-            }
-          })
+              respawn: { policy: 'nonRegenerating' },
+            },
+          }),
         }),
-        environment: makeEnvironment()
+        environment: makeEnvironment(),
       });
 
       const readonlySection = root.querySelector(
@@ -223,18 +223,18 @@ describe('RecordInspector (mounted)', () => {
             nodes: {
               max: 5, // Lowered by GM
               current: 8, // Config's own current
-              respawn: { policy: 'manual' }
-            }
-          })
+              respawn: { policy: 'manual' },
+            },
+          }),
         }),
         environment: makeEnvironment({
           nodeRuntime: {
             task1: {
               max: 20, // Old max before lowering
-              current: 12 // Old current, exceeds new max
-            }
-          }
-        })
+              current: 12, // Old current, exceeds new max
+            },
+          },
+        }),
       });
 
       const display = getNodeCountDisplay(root);
@@ -247,14 +247,38 @@ describe('RecordInspector (mounted)', () => {
     });
   });
 
+  // Issue 1522: the count stays as a fact, and the controls live in the composition row.
+  describe('the rail leaf is read-only', () => {
+    it('draws the count and no editing control for a regenerating pool with drop rows', async () => {
+      const root = await harness.mount({
+        kind: 'task',
+        entry: makeEntry({
+          dropRateAdjustmentRows: [
+            { id: 'drop-a', baseDropRate: 40, adjustment: 5, effectiveDropRate: 45 },
+          ],
+        }),
+        environment: makeEnvironment({ nodeRuntime: { task1: { current: 4 } } }),
+      });
+
+      assert.deepEqual(getNodeCountDisplay(root), { current: 4, max: 10 });
+      assert.ok(
+        !root.querySelector(
+          'button, input, textarea, .fab-stepper, [data-node-count-inc], [data-node-count-dec]'
+        ),
+        'the rail leaf renders no control that edits the record'
+      );
+      assert.ok(!root.querySelector('[data-record-inspector-section="overrides"]'));
+    });
+  });
+
   describe('event entries (no nodes)', () => {
     it('does not render nodes section for events', async () => {
       const root = await harness.mount({
         kind: 'event',
         entry: makeEntry({
-          record: { id: 'event1', name: 'Test Event' }
+          record: { id: 'event1', name: 'Test Event' },
         }),
-        environment: makeEnvironment()
+        environment: makeEnvironment(),
       });
 
       const nodesSection = root.querySelector('[data-record-inspector-section="nodes"]');
