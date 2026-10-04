@@ -17,6 +17,7 @@
   | `amount` | `false` \| `{ min, max, unit, inputProps, ariaLabel, … }` | `{}` | `false` draws no amount; the object's keys, which carry the amount slot's localized copy, are stated in `PickerRowAmount.svelte`. |
   | `rollable` / `removable` | booleans | `false` / `true` | The Fixed \| Rolled toggle on a `component` row; and the remove button. |
   | `clearable` / `removeHook` | boolean / string | `true` / `'alternative'` | The named pill's clear; and the remove's `data-recipe-remove` value. The remove is `Remove {name}` and the kind select `Kind of {name}`, `{name}` being the subject's or, unnamed, the kind's. |
+  | `nameProps` / `removeProps` | attribute objects | `{}` | A caller's own hooks on the name field and on the remove, spread before the row's own. |
 
   Snippets:
   - `convert` — the requirement's "or…" control, after the amount and a divider.
@@ -77,6 +78,8 @@
     removable = true,
     clearable = true,
     removeHook = 'alternative',
+    nameProps = {},
+    removeProps = {},
     class: className = '',
     convert = null,
     trailing = null,
@@ -251,6 +254,7 @@
 
 {#snippet remove()}
   <button
+    {...removeProps}
     type="button"
     class="manager-recipe-option-remove"
     data-recipe-remove={removeHook}
@@ -372,6 +376,7 @@
     </span>
   {:else}
     <span
+      {...nameProps}
       class="manager-recipe-option-name-field"
       data-recipe-option-currency={matchType === 'currency' ? '' : undefined}
       data-recipe-option-essence={matchType === 'essence' ? '' : undefined}

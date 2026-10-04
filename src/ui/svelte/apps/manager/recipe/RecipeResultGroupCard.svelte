@@ -9,14 +9,13 @@
   Invariants:
   - Rows are keyed by item id, because a row's Fixed | Rolled state is per instance — pinned by
     `tests/components/recipe-result-card-mounted.test.js`.
-  - A row's amount error is the save path's own floor, `quantityFormulaErrors`.
+  - A row's amount error is the save path's own floor, `quantityFormulaErrors` (`resultRows.js`).
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { normalizeQuantityFormula, quantityFormulaErrors } from '../../../../../models/Result.js';
-  import { diceEngine, maximisedTotal } from '../../../../../utils/rollFormulaRollability.js';
   import PickerRow from './PickerRow.svelte';
   import { fromValue, toValue } from './pickerRowKinds.js';
+  import { componentCatalogue, resultAmountInvalid, withAddedResult } from './resultRows.js';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';
@@ -125,14 +124,7 @@
 
   // A result names a component and nothing else until `Result.kind` lands (issue 1773).
   const RESULT_KINDS = ['component'];
-  const catalogue = $derived({
-    component: (componentOptions || []).map((option) => ({
-      id: option.id,
-      label: option.name,
-      img: option.img,
-      icon: 'fas fa-cube',
-    })),
-  });
+  const catalogue = $derived(componentCatalogue(componentOptions));
 
   function componentFor(item) {
     return (componentOptions || []).find((option) => option.id === item?.componentId) || null;
@@ -150,23 +142,6 @@
       '{name}',
       componentNameFor(item)
     );
-
-  function amountInvalid(item) {
-    const formula = normalizeQuantityFormula(item?.quantityFormula);
-    if (quantityFormulaErrors(formula, diceEngine()).length === 0) return {};
-    return {
-      amount:
-        maximisedTotal(formula) === null
-          ? text(
-              'FABRICATE.Admin.Manager.Recipe.AmountUnrollable',
-              'This expression cannot be rolled.'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Recipe.AmountNeverPositive',
-              'This expression can never award a positive amount.'
-            ),
-    };
-  }
 
   const componentPickerOptions = $derived(
     (componentOptions || []).map((option) => ({
@@ -194,8 +169,6 @@
     onChange({ ...group, results: results.filter((_, i) => i !== index) });
   }
 
-  // Adding a component the group already produces bumps that item's quantity rather than
-  // appending a duplicate, unless that item's amount is rolled, which a bump would not change.
   // Progressive always appends: its award loop ignores `quantity` entirely, so repeating a
   // component IS how the GM asks for more of it.
   function addItem(id) {
@@ -203,24 +176,7 @@
       onChange({ ...group, results: [...results, { id: newId(), componentId: id }] });
       return;
     }
-    const existingIndex = results.findIndex(
-      (item) => item?.componentId === id && !normalizeQuantityFormula(item?.quantityFormula)
-    );
-    if (existingIndex !== -1) {
-      const existing = results[existingIndex];
-      const nextQuantity = Math.min(
-        9999,
-        (Number(existing.quantity) > 0 ? Number(existing.quantity) : 1) + 1
-      );
-      onChange({
-        ...group,
-        results: results.map((item, i) =>
-          i === existingIndex ? { ...existing, quantity: nextQuantity } : item
-        ),
-      });
-      return;
-    }
-    onChange({ ...group, results: [...results, { id: newId(), componentId: id, quantity: 1 }] });
+    onChange({ ...group, results: withAddedResult(results, id, newId()) });
   }
 
   // THE THREE-WAY EMPTY HINT, a guard chain rather than nested ternaries, and its ORDER is the
@@ -406,7 +362,7 @@
             rollable
             clearable={false}
             removeHook="result-item"
-            invalid={amountInvalid(item)}
+            invalid={resultAmountInvalid(item, text)}
             class="is-result"
             data-recipe-result-item=""
             onChange={(value) => updateItem(index, fromValue(item, value))}

@@ -126,6 +126,7 @@ import {
 } from './normalize/tools.js';
 import { RevisionBookkeeping } from './revisionBookkeeping.js';
 import { corpusDelta, patchCorpusInPlace, REVISION_SCOPES } from './revisionTokens.js';
+import { assertSalvageAmounts } from './rolledAmountResolver.js';
 import { resolveScopedEntityRead } from './scopedEntityReads.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -296,7 +297,8 @@ export class CraftingSystemManager {
 
   /** The Valid Id Basis for one system's world-scope pruning (issue 1359) plus the icon-map
    * vocabularies, `null` for each basis not known complete. No caller may default one to
-   * `new Set()`: `validEssenceIds` is `Set|null` and the `instanceof Set` test depends on it. */
+   * `new Set()`: `validEssenceIds` is `Set|null` and the `instanceof Set` test depends on it.
+   * `createItem` and `updateItem` bypass `_normalizeSystem` and read the same basis here. */
   _scopeBasis(system) {
     return {
       componentIds: _scopeEntityBasis(
@@ -1320,8 +1322,6 @@ export class CraftingSystemManager {
     this._assertGM('create component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    // The Valid Id Basis `_normalizeSystem` uses (issue 1359); this site bypasses it, and a
-    // real-but-empty Set on an unreplicated client cannot be refused downstream. `Set|null`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const item = this._normalizeComponent(data, {
       validEssenceIds,
@@ -1555,12 +1555,12 @@ export class CraftingSystemManager {
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
     const idx = system.components.findIndex((i) => i.id === itemId); // ratchet-exempt(world-scope): writer
     if (idx === -1) throw new Error(`Component not found: ${itemId}`);
-    // A `_normalizeSystem` bypass site (issue 1359): same basis, `Set|null`; see `_scopeBasis`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const updatedItem = this._normalizeComponent(
       { ...system.components[idx], ...updates, id: itemId }, // ratchet-exempt(world-scope): writer
       { validEssenceIds, ...this._salvageNormalizationContext(system) }
     );
+    if (updates.salvage) assertSalvageAmounts(updatedItem.salvage, system);
     // ratchet-exempt(world-scope): writer
     if (!this._sameSourceReferenceSet(system.components[idx], updatedItem)) {
       this._assertUniqueComponentSources(system, updatedItem, itemId);

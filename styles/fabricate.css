@@ -8116,8 +8116,8 @@
   min-height: 34px;
 }
 
-/* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome (48px wide, 22px tall, transparent) from its component-scoped \3c style> (issue 883). */
-.fabricate-field.fabricate-field input:not(.fab-stepper-input):not([type='radio'], [type='checkbox']):not([type='range']),
+/* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome (48px wide, 22px tall, transparent) from its component-scoped \3c style> (issue 883), and the requirement row's rolled amount is sized to that stepper by its own rule (issue 1516). */
+.fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox']):not([type='range']),
 .fabricate-field.fabricate-field select,
 .fabricate-field.fabricate-field textarea {
   width: 100%;
@@ -8129,7 +8129,7 @@
 }
 
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood 36px tall with 8px of side padding instead of the 28px/0 the control asks for (issue 1523). */
-.fabricate-field.fabricate-field input:not(.fab-stepper-input):not([type='radio'], [type='checkbox']):not([type='range']),
+.fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox']):not([type='range']),
 .fabricate-field.fabricate-field select {
   height: 36px;
   padding: 0 var(--fab-space-2);
@@ -8769,7 +8769,7 @@
   gap: var(--fab-space-2);
 }
 
-/* Per-component salvage authoring (component editor). A result group reuses the ingredient-set-item shell; its rows lay a component picker, a fixed-width quantity, and a remove button onto one line, and the outcome-routing rows pair an outcome name with its target-group select. */
+/* Per-component salvage authoring (component editor). A result group's rows are the requirement row (issue 1516), and the outcome-routing rows pair an outcome name with its target-group select. */
 .fabricate-manager .manager-salvage-group-header {
   display: flex;
   align-items: center;
@@ -8781,42 +8781,13 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-salvage-result-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.fabricate-manager .manager-salvage-result-row {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-salvage-result-row .manager-input {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-/* ── The yield picker ── Both salvage result rows pick their component through a portaled SearchablePopover whose trigger carries the image AND the name, replacing a native <select> that could never show the art (issue 676). */
-.fabricate-manager .manager-salvage-component-field {
-  display: flex;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 /* THE NAME-LENGTH CAP LIVES HERE, once, for every component picker in the studio. */
-.fabricate-manager .manager-salvage-component-picker,
 .fabricate-manager .manager-recipe-component-picker {
   min-width: 0;
   max-width: 360px;
 }
 
-/* The one component-picker trigger, for the component pickers that are not a requirement row: both salvage yield rows and the tool replacement (issue 676). */
-.fabricate-button.fabricate-button.manager-salvage-component-trigger,
+/* The one component-picker trigger for a picker that is not a requirement row: the tool replacement (issue 676). */
 .fabricate-button.fabricate-button.manager-tool-replacement-component-trigger {
   justify-content: flex-start;
   width: max-content;
@@ -8828,14 +8799,12 @@
   font-size: 0.82rem;
 }
 
-.fabricate-manager .manager-salvage-component-trigger .manager-travel-portrait,
 .fabricate-manager .manager-tool-replacement-component-trigger .manager-travel-portrait {
   width: 24px;
   height: 24px;
 }
 
 /* The name INSIDE the trigger. It grows with the (max-content) trigger and ellipsizes once the trigger hits its cap, so a long name degrades to a truncation rather than to a row-wide button. */
-.fabricate-manager .manager-salvage-component-name,
 .fabricate-manager .manager-tool-replacement-component-name {
   flex: 1 1 auto;
   min-width: 0;
@@ -8847,17 +8816,6 @@
 
 /* The two progressive stage rows are the same surface — an ordered, quantity-less list of single results whose position is the authored data — and `fabricate-sortable-list-row` draws that surface for both as of issue 1512, so the box they shared here is retired rather than restated behind two caller classes. */
 
-/* THE PICKER IS CONTENT-SIZED ON A STAGE ROW, NOT GREEDY. The shared field is `flex: 1 1 auto`, which is right on the simple/routed row (a picker, a stepper and an ×) but wrong here: a stage row carries four more controls, so a greedy field took ~85% of the row and crushed DC/Edit/× into the last scraps. */
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-component-field {
-  flex: 0 1 auto;
-  min-width: 0;
-}
-
-/* Right-align the trailing cluster now the picker no longer grows into it, so the row keeps the familiar `target … controls` shape of the Recipe Studio's sibling row rather than packing everything left against a dead right margin. */
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-result-difficulty {
-  margin-left: auto;
-}
-
 /* Extra separation between the trailing controls, on top of the row's 12px gap: a read-only fact, a deep link and a delete packed at 8px read as one undifferentiated clump (issue 1286). The reorder rocker left both rows at issue 1512, so its two selectors went with it. */
 .fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-edit,
 .fabricate-manager .manager-salvage-stage-row > .fabricate-icon-button,
@@ -8865,16 +8823,15 @@
   margin-left: var(--fab-space-1);
 }
 
-/* The recipe row nests its trailing controls in `.manager-recipe-option-controls` (the shape every non-progressive result row uses), where salvage puts them straight on the row. `margin-left: auto` is stated here rather than in the joined rule beside the salvage difficulty, so this selector is written once (issue 1512). */
-.fabricate-manager .manager-recipe-stage-row .manager-recipe-option-controls {
+/* A stage row's trailing controls sit in the requirement row's `.manager-recipe-option-controls`, right-aligned, on a recipe and a salvage stage alike (issue 1516). */
+.fabricate-manager .manager-recipe-stage-row .manager-recipe-option-controls,
+.fabricate-manager .manager-salvage-stage-row .manager-recipe-option-controls {
   display: flex;
   align-items: center;
   gap: var(--fab-space-3);
   flex: 0 0 auto;
   margin-left: auto;
 }
-
-/* `.manager-salvage-stage-component` is retired: the row picks its component through `.manager-salvage-component-field`, which both salvage rows share — see the yield-picker block above. */
 
 /* The "Edit ↗" deep link to the yield component's own editor. It is the ONLY way to change the DC shown beside it (the DC belongs to the yield component, whose own editor owns its save lifecycle), so it has to read as a legible link rather than a 0.56rem speck — it was smaller than the caption text next to it. */
 .fabricate-manager .manager-salvage-stage-edit,
@@ -9136,10 +9093,11 @@
 }
 
 
-/* A progressive stage IS the shared list's row, so the item row inside it drops its own border / fill / padding — no double box — and hugs one compact line (issues 643, 676). */
-.fabricate-manager .manager-recipe-stage-row .manager-recipe-ingredient-option-row {
+/* A progressive stage IS the shared list's row, so the item row inside it drops its own border / fill / padding — no double box (issues 643, 676). It wraps where the name would fall under its minimum: the DC and Edit first, then the name (issue 1516). */
+.fabricate-manager .manager-recipe-stage-row .manager-recipe-ingredient-option-row,
+.fabricate-manager .manager-salvage-stage-row .manager-recipe-ingredient-option-row {
   flex: 1 1 auto;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 
   /* 12px, not the ingredient row's 8px: a stage row runs on the salvage row's 12px rhythm end to end, and the 8px here was the one place the two spacings met. */
   gap: var(--fab-space-3);
@@ -9622,6 +9580,43 @@
   min-width: 140px;
 }
 
+/* A flat result row's list is the container its row wraps against (issue 1516). */
+.fabricate-manager .manager-recipe-ingredient-set-groups:has(> .manager-recipe-ingredient-option-row.is-result) {
+  container: fabricate-result-rows / inline-size;
+}
+
+/* Under the width one line needs, the row takes two: the plate, kind and name with the remove at the end, then the toggle and the amount, with any error across the row below. The controls box steps aside so `order` places its children, and `::after` is the line break. */
+@container fabricate-result-rows (max-width: 600px) {
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .manager-recipe-ingredient-option-row.is-result {
+    align-items: center;
+    row-gap: var(--fab-space-1);
+  }
+
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .manager-recipe-ingredient-option-row.is-result::after {
+    content: '';
+    flex-basis: 100%;
+    order: 2;
+  }
+
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .is-result > .manager-recipe-option-controls {
+    /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+    display: contents;
+  }
+
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .is-result > .manager-recipe-option-controls > * {
+    order: 3;
+  }
+
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .is-result > .manager-recipe-option-controls > .manager-recipe-option-remove {
+    order: 1;
+  }
+
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .is-result > .manager-recipe-option-controls > .manager-recipe-option-invalid {
+    order: 4;
+    margin-inline-end: 0;
+  }
+}
+
 /* Vertical divider between the stepper and the inline "or…". */
 .fabricate-manager .manager-recipe-option-divider {
   flex: 0 0 auto;
@@ -9703,8 +9698,7 @@
 }
 
 /* §B1: the quantity is the shared horizontal Stepper; its input carries this class alongside `.fab-stepper-input`, so only mono alignment is added here — the stepper supplies the borderless chrome (issue 676). */
-.fabricate-manager .manager-recipe-option-quantity,
-.fabricate-manager .manager-component-stepper-quantity {
+.fabricate-manager .manager-recipe-option-quantity {
   font-family: var(--fab-font-mono);
 }
 

@@ -705,6 +705,8 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-recipe-edit-results-progressive',
   'manager-recipe-edit-results-narrow',
   'manager-gathering-task-editor-straight-rolled',
+  'manager-component-edit-salvage-rolled-narrow',
+  'manager-component-edit-salvage-narrow',
 ];
 const LAYOUT_CASE_IDS = [
   ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
@@ -733,7 +735,11 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     }
     if (ROW_GEOMETRY_LAYOUT_CASE_IDS.includes(viewCase.id)) {
       assert.equal(viewCase.expectLayout.gridSelector, undefined, 'row geometry needs no grid');
-      assert.equal(typeof viewCase.expectLayout.oneLineRows, 'string');
+      const { oneLineRows, wrappedRows } = viewCase.expectLayout;
+      assert.ok(
+        typeof oneLineRows === 'string' || typeof wrappedRows?.rows === 'string',
+        `${viewCase.id} states its rows as one line or as wrapped lines`
+      );
       continue;
     }
     // THE WINDOW IS PER GROUP, because the breakpoint each group asserts is a different one and a
@@ -1030,6 +1036,8 @@ test('layout expectation selectors name UI that still exists', () => {
       gridSelector,
       fillSelector,
       rows.oneLineRows,
+      rows.wrappedRows?.rows,
+      ...(rows.wrappedRows?.lines.flat() ?? []),
       rows.alignedRight,
       rows.alignedLeft,
       minInlineSize?.selector,
@@ -2546,6 +2554,8 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-books-scrolls-cap-filter-list',
   'manager-checks-trigger-operator-list',
   'manager-component-edit-category-list',
+  'manager-component-edit-salvage-kind-list',
+  'manager-component-edit-salvage-suggestions',
   'manager-components-essence-filter-list',
   'manager-environment-danger-level-list',
   'manager-environment-edit-automatic-force-add',

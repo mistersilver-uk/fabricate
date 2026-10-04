@@ -672,14 +672,9 @@ const REVIEWED = [
       'string, so it never gains `fab-manager-button`.',
   },
   {
-    id: globalRule('.fabricate-button.fabricate-button.manager-salvage-component-trigger'),
-    disposition: 'EXCLUDE',
-    why: 'Salvage component popover trigger, population B.',
-  },
-  {
     id: globalRule('.fabricate-button.fabricate-button.manager-tool-replacement-component-trigger'),
     disposition: 'EXCLUDE',
-    why: 'The second selector of that same group, likewise population B only.',
+    why: 'Tool replacement component popover trigger, population B only.',
   },
   {
     id: globalRule(
@@ -1147,10 +1142,12 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // plain dashed `<Button>`s that create an empty row. The sixth is `+ Tag`, which the
   // design draws as a dashed tag-tinted PILL (`proto:2256`) and which is a `triggerChip` now,
   // writing no `fabricate-button` class at all.
+  // AND ONE LEFT AT ISSUE 1516, taking the count to 10: the salvage yield picker's trigger, both
+  // salvage rows now naming their component through the requirement row.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    11,
-    'plus the 11 SearchablePopover triggerClass sites still named as debt'
+    10,
+    'plus the 10 SearchablePopover triggerClass sites still named as debt'
   );
   // ...AND THE ONE THAT LEFT LEFT BY CONVERSION AND THEN BY RULING.
   const retiredSite = readFileSync(resolve(repoRoot, POPULATION_B_RETIRED_SITE_FILE), 'utf8');

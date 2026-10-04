@@ -278,7 +278,7 @@ Rows contain Tool identity and removal only: Recipe data exposes no breakage, co
 
 #### The requirement row
 
-ONE row shape authors every requirement and every result, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set and the world Tool entry's copy of that same set, and, on the result side, a recipe's result sets and a gathering task's result sets.
+ONE row shape authors every requirement and every result, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set and the world Tool entry's copy of that same set, and, on the result side, a recipe's result sets, a gathering task's result sets and a component's salvage result sets.
 Its anatomy is the kind FIRST and the value second:
 
 ```text
@@ -295,6 +295,9 @@ An expression that cannot be rolled, or can never award a positive amount, is ma
 - **A flat result row names its component and cannot clear it.**
 Its name field has no clear: a flat result is re-pointed by removing it and adding another, while a progressive stage swaps its component in place so that it keeps its position in the order.
 Adding a component the set already produces raises that row's quantity, unless that row's amount is rolled, in which case a second row is added.
+- **A result row too narrow for one line wraps by rule, never by overflow.**
+Where its list is narrower than one line needs, a flat row puts its plate, kind and name on the first line with the remove at its end, the toggle and amount on the second at the stepper's width, and any error across the row below.
+A stage row moves its DC and Edit below rather than squeeze its name under the name's minimum, and moves the name below the kind where even that does not fit.
 
 - **Each kind carries its own tint, on every glyph the row draws for its subject.**
 The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence and currency are four distinct hues — so a mixed list reads as one list with four marks in it.
@@ -598,7 +601,5 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
   The badge is read-only because the difficulty belongs to the **result** component, whose own editor owns its save lifecycle.
 - A progressive result row — recipe or salvage — renders **no quantity control**, because `resolution-modes` normalizes every awarded progressive entry to a single item; the GM expresses "more of X" by listing X again and ordering the list.
   The `simple` and `routed` salvage rows KEEP their quantity, which those modes award as authored.
-- A salvage result row picks its component through a **searchable popover whose trigger carries the component's image and its name**, not a native `<select>`.
-  The image is required: a `<select>` can only present a text list, on a surface where every other component is shown with its art.
-  The trigger is ONE control over both facts, and an art-less component falls back to a glyph rather than emitting an image element with no source.
-  The popover is portaled to the manager host so it escapes the editor panel's `overflow: hidden`.
+- A salvage result row is **the requirement row**: it names its component through the row's name field, whose named pill carries the component's image and its name, never a native `<select>`.
+  An art-less component falls back to a glyph rather than emitting an image element with no source.
