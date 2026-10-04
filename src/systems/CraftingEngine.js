@@ -36,6 +36,7 @@ import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { diceEngine } from '../utils/rollFormulaRollability.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
+import { AWARD_CHOICE_PENDING, AwardChoiceSettler } from './awardChoiceSettle.js';
 import { evaluatePrerequisite } from './characterPrerequisites.js';
 import { advantageOfferFields, authoredOfferOptions } from './checkAdvantage.js';
 import {
@@ -66,6 +67,7 @@ import {
   checkTargetRefusal,
   refusalMessage,
 } from './checkTarget.js';
+import { awardRoutedResults, memberResultRow } from './choiceGroupAward.js';
 import { fireComplications } from './complicationRuntime.js';
 import { createOrStackComponentItem } from './componentStacking.js';
 import {
@@ -152,6 +154,7 @@ import {
 import {
   resolveRolledAmount,
   rolledAwardRecord,
+  stageResultRefusal,
   validateCraft,
   validateSalvage,
 } from './rolledAmountResolver.js';
@@ -208,6 +211,11 @@ import {
   evaluateToolCheckContribution,
   ToolCheckEvidenceError,
 } from './toolCheckBonus.js';
+import {
+  authorityUnavailableResult,
+  versionedFailure,
+  versionedTransitionResult,
+} from './versionedCommandResults.js';
 
 /** The contributions and the evaluation that placed them come from one prepared collection; the
  * check config supplies its situational-bonus offer and advantage rule, and the executed roll mode
@@ -369,6 +377,7 @@ export class CraftingEngine {
     // for why, and `_complicationWriter` for the ambient fallback.
     this.complicationDeliveryWriter = null;
     this.versionedRunAuthority = null;
+    this.awardPlayerChoices = false;
   }
 
   installVersionedRunAuthority(authority = null) {
@@ -379,7 +388,8 @@ export class CraftingEngine {
   async processVersionedWorldTime({ worldTime = Number(game.time?.worldTime || 0) } = {}) {
     const requestExecute = this.versionedRunAuthority?.requestExecute;
     if (typeof requestExecute !== 'function') return [];
-    const candidates = this._craftingRunManager()?.listDueVersionedRuns?.(worldTime) ?? [];
+    const owes = (run, actor) => this._awardChoices().blocks(run, actor);
+    const candidates = this._craftingRunManager()?.listDueVersionedRuns?.(worldTime, owes) ?? [];
     const results = [];
     for (const candidate of candidates) {
       let expectedRevision = candidate.expectedRevision;
@@ -970,7 +980,7 @@ export class CraftingEngine {
       trusted,
       requestId,
     });
-    if (!committed.success) return versionedFailure(committed.message);
+    if (!committed.success) return versionedFailure(committed.message, committed.blocker);
     return {
       ...versionedTransitionResult(committed.run, { success: true, disposition: 'started' }),
       started: true,
@@ -1015,7 +1025,7 @@ export class CraftingEngine {
       trusted,
       requestId,
     });
-    if (!committed.success) return versionedFailure(committed.message);
+    if (!committed.success) return versionedFailure(committed.message, committed.blocker);
     return {
       ...versionedTransitionResult(committed.run, { success: true, disposition: 'time-armed' }),
       started: true,
@@ -1152,7 +1162,7 @@ export class CraftingEngine {
       selectionPlan: persistedSelection,
       journal,
     });
-    if (!prepared.valid) return versionedFailure(prepared.message);
+    if (!prepared.valid) return versionedFailure(prepared.message, prepared.blocker);
     const executor = new CraftingLifecycleExecutor({
       runManager,
       consumeExecutionGrant: (...args) =>
@@ -1540,19 +1550,19 @@ export class CraftingEngine {
    * journal, a started stage from its START snapshot, an unstarted one from live inventory. */
   _versionedStagePreparation({ resuming = false, started = false, journal = null, ...stage }) {
     if (resuming) return this._reconstructVersionedStagePreparation({ ...stage, journal });
-    if (started) return this._reconstructStartedVersionedStage(stage);
-    return this._prepareFreshVersionedStage(stage);
+    if (!started) return this._prepareFreshVersionedStage(stage);
+    // A started stage has spent its inputs; it re-runs only the formula and chooser refusals.
+    const refusals = { ...this._refusals(), refuseRewards: null };
+    const refused = stageResultRefusal(stage, this.resolutionModeService, refusals);
+    return refused ?? this._reconstructStartedVersionedStage(stage);
   }
 
-  /** An unstarted stage's preparation after its reward pre-flight re-runs against the world as it
-   *  is now (issue 1773), so a GM change since run start refuses before anything is consumed. */
+  /** An unstarted stage's preparation, refused while an earlier stage's claimable choice is owed
+   *  or by its own result pre-flight. */
   async _prepareFreshVersionedStage(stage) {
-    const { actor, recipe, step } = stage;
-    const progressive = this.resolutionModeService?.getMode?.(recipe) === 'progressive';
-    const refusals = this._refusals()(step?.resultGroups, { actor, recipe, progressive });
-    if (refusals.length > 0)
-      return { valid: false, message: `Invalid recipe: ${refusals.join(', ')}` };
-    return this._prepareVersionedStage(stage);
+    if (this._awardChoices().blocks(stage.run, stage.actor)) return AWARD_CHOICE_PENDING;
+    const refused = stageResultRefusal(stage, this.resolutionModeService, this._refusals());
+    return refused ?? this._prepareVersionedStage(stage);
   }
 
   /** Prepare a stage and, in one journalled operation, consume its inputs, lock its selection and
@@ -1580,7 +1590,7 @@ export class CraftingEngine {
       selectedSet,
       selectionPlan,
     });
-    if (!prepared.valid) return { success: false, message: prepared.message };
+    if (!prepared.valid) return { ...prepared, success: false };
     const executor = new CraftingLifecycleExecutor({
       runManager: this._craftingRunManager(),
       consumeExecutionGrant: () => trusted,
@@ -2805,9 +2815,30 @@ export class CraftingEngine {
     });
   }
 
-  /** The reward pre-flight `validateCraft` runs before anything is consumed (issue 1773). */
+  /** The reward pre-flight and the player-chooser gate every craft entrance runs (issue 1773). */
   _refusals() {
-    return rewardRefusals(this._rewardSeams());
+    const { awardPlayerChoices } = this;
+    return { refuseRewards: rewardRefusals(this._rewardSeams()), awardPlayerChoices };
+  }
+
+  /** Settle a pending award choice on an active or terminal run under a `chooseAward` grant. */
+  settleAwardChoice(request) {
+    return this._awardChoices().settle(request);
+  }
+
+  _awardChoices() {
+    return new AwardChoiceSettler({
+      runManager: this._craftingRunManager(),
+      consumeExecutionGrant: (...args) =>
+        this.versionedRunAuthority?.consumeExecutionGrant?.(...args),
+      getRecipe: (id) => this.recipeManager?.getRecipe?.(id) ?? null,
+      seams: this._rewardSeams(),
+      resolveComponent: (recipe, id) =>
+        findById(getDefinitionIndex(resolvedComponentsFor(this._getRecipeSystem(recipe))), id),
+      awardComponent: (actor, row, recipe, options) =>
+        this._createSingleResult(actor, row, [], [], recipe, null, options),
+      postChat: (card) => this._postCraftChatMessage(card),
+    });
   }
 
   /** This craft's component resolver (issue 578): only an alchemy attempt supplies the tier-4-aware
@@ -4978,41 +5009,37 @@ export class CraftingEngine {
     const rewards = [];
     const seams = this._rewardSeams();
     const receiptCollector = createItemReceiptCollector();
-    try {
-      for (const group of groupsToCreate) {
-        for (const result of group.results || []) {
-          if (isRewardResult(result)) {
-            rewards.push(
-              await planReward(result, craftingActor, recipe, { Roll: diceEngine(), seams })
-            );
-            continue;
-          }
-          const resultItem = await this._createSingleResult(
-            craftingActor,
-            result,
-            consumedItems,
-            toolItems,
-            recipe,
-            {
-              ...checkResult,
-              resolutionMeta: resolved?.meta || {},
-            },
-            {
-              step,
-              precomputedEssences,
-              essenceEnabled,
-              resolveComponent,
-              receiptCollector,
-              rolledAwards,
-            }
-          );
-
-          // Return each physical Item once; the collector retains every row's delta.
-          if (resultItem && !createdItems.includes(resultItem)) {
-            createdItems.push(resultItem);
-          }
-        }
+    // A choice group's member awards through its own kind's path, keyed to its carrier.
+    const awardOne = async (result, carrier) => {
+      if (isRewardResult(result)) {
+        const Roll = diceEngine();
+        rewards.push(await planReward(result, craftingActor, recipe, { Roll, seams, carrier }));
+        return;
       }
+      const row = carrier ? memberResultRow(result, carrier) : result;
+      const resultItem = await this._createSingleResult(
+        craftingActor,
+        row,
+        consumedItems,
+        toolItems,
+        recipe,
+        { ...checkResult, resolutionMeta: resolved?.meta || {} },
+        {
+          step,
+          precomputedEssences,
+          essenceEnabled,
+          resolveComponent,
+          receiptCollector,
+          rolledAwards,
+        }
+      );
+      // Return each physical Item once; the collector retains every row's delta.
+      if (resultItem && !createdItems.includes(resultItem)) createdItems.push(resultItem);
+    };
+    const award = { actor: craftingActor, Roll: diceEngine(), awardOne };
+    let groups;
+    try {
+      groups = await awardRoutedResults(groupsToCreate, award);
     } catch (error) {
       throw receiptCollector.failure(error);
     }
@@ -5023,7 +5050,8 @@ export class CraftingEngine {
         rolledAwards
       ),
       rewards.map((reward) => reward.entry),
-      rewards.map((reward) => reward.roll)
+      [...rewards.map((reward) => reward.roll), ...groups.rolls],
+      groups
     );
     return {
       items: deferRewards
@@ -7195,31 +7223,6 @@ function findItemByUuid(actors, itemUuid) {
   return null;
 }
 
-function versionedTransitionResult(run, outcome = {}) {
-  return {
-    success: outcome?.success === true,
-    runId: run?.id ?? null,
-    status: run?.status ?? null,
-    runRevision: Number(run?.runRevision) || 0,
-    waiting: run?.status === 'waitingTime',
-    terminal: run?.currentStepIndex === null,
-    disposition: outcome?.disposition ?? null,
-    createdResultUuids: Array.isArray(outcome?.createdResultUuids)
-      ? [...outcome.createdResultUuids]
-      : [],
-    ...(Object.hasOwn(outcome || {}, 'consumed') && { consumed: outcome.consumed === true }),
-  };
-}
-
-function authorityUnavailableResult() {
-  return {
-    success: false,
-    authorityUnavailable: true,
-    results: null,
-    message: 'Versioned crafting authority is unavailable.',
-  };
-}
-
 /**
  * The prepared check's private routing policy. `dc` stays fixed-only and `target` is the resolved
  * pre-modifier target after any macro, so a later actor or config edit cannot move either; a
@@ -7255,10 +7258,6 @@ function promptTargetBasis(config, recipe, actor, target, dc) {
     label: tier?.name ?? '',
     readRollData: () => actorRollData(actor),
   });
-}
-
-function versionedFailure(message) {
-  return { success: false, results: null, message };
 }
 
 function capturePreparedModifierContext(context, actor) {

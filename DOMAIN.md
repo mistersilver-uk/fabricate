@@ -438,6 +438,27 @@ Who picks the alternative a RESULT-side **Choice Group** awards: the PLAYER, or 
 
 [Notes](docs/domain/terms.md#chooser)
 
+#### Pending Award Choice
+
+A choice group whose chooser is the player that has been awarded but awaits settlement.
+The player must pick one or more alternatives according to the **Award Strategy**, settling the choice exactly once.
+
+[Notes](docs/domain/terms.md#pending-award-choice)
+
+#### Claimable
+
+An alternative in a pending award choice that remains available for selection at settle time.
+An alternative is claimable if its component or source item still exists, its reward would be accepted by the world, or (for knowledge results) its recipe is available, observable, and not already known.
+
+[Notes](docs/domain/terms.md#claimable)
+
+#### Forfeited
+
+A pending award choice that settles with no picks, because no alternative remains claimable or because a clean-up would otherwise drop its run.
+The settled choice records the forfeit and remains in history until the next clean-up.
+
+[Notes](docs/domain/terms.md#forfeited)
+
 #### Rolled Amount
 
 A RESULT amount authored as a roll expression instead of a fixed integer, resolved ONCE per result per award against the acting character — the crafter at award time, the gatherer in `plan()`, whose planned integer `create()` then awards without rolling again.

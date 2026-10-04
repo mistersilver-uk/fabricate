@@ -1,5 +1,8 @@
 import { cloneJson } from '../utils/scalars.js';
 
+import { persistAwardChoiceSettlement } from './awardChoiceSettle.js';
+import { forfeitOwedChoices, groupEvidenceFields, trimRunHistory } from './choiceGroupAward.js';
+import { craftingStepHistoryEvidence } from './craftingStepHistoryEvidence.js';
 import { stringOrNull } from './gatheringEngineInternals.js';
 import { RunContainerManagerBase } from './runContainerStore.js';
 import {
@@ -8,7 +11,6 @@ import {
   transitionExecutionJournal,
 } from './runExecutionJournal.js';
 import {
-  checkResolutionEvidence,
   historyEvidenceFields,
   itemReceipt,
   retainUncertainReceipt,
@@ -25,7 +27,12 @@ import {
 } from './runLifecycleState.js';
 import { selectWritableActors } from './writableActors.js';
 
+export { craftingStepHistoryEvidence } from './craftingStepHistoryEvidence.js';
+
 const HISTORY_LIMIT = 50;
+
+/** A versioned run's two journals: its stages', and its award choices' (issue 1773). */
+const RUN_JOURNAL_KEYS = Object.freeze(['executionJournal', 'awardChoiceJournal']);
 
 /**
  * Manages actor-scoped crafting runs (active + history). The per-actor cache, baseline
@@ -349,9 +356,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       );
     } else {
       container.history.unshift(run);
-      if (container.history.length > HISTORY_LIMIT) {
-        container.history = container.history.slice(0, HISTORY_LIMIT);
-      }
+      container.history = trimRunHistory(container.history, HISTORY_LIMIT);
     }
     await this._persist(actor, container);
     return run;
@@ -430,9 +435,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       }),
     };
     container.history.unshift(entry);
-    if (container.history.length > HISTORY_LIMIT) {
-      container.history = container.history.slice(0, HISTORY_LIMIT);
-    }
+    container.history = trimRunHistory(container.history, HISTORY_LIMIT);
     await this._persist(actor, container);
     return entry;
   }
@@ -487,7 +490,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       },
     });
     container.history.unshift(entry);
-    if (container.history.length > HISTORY_LIMIT) container.history.length = HISTORY_LIMIT;
+    container.history = trimRunHistory(container.history, HISTORY_LIMIT);
     await this._persist(actor, container);
     return entry;
   }
@@ -532,13 +535,14 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return step;
   }
 
-  listDueVersionedRuns(worldTime = this._nowWorldTime()) {
+  /** `awardChoiceBlocks(run, actor)` is the stage start's own owed-choice predicate (issue 1773). */
+  listDueVersionedRuns(worldTime = this._nowWorldTime(), awardChoiceBlocks = () => false) {
     const due = [];
     for (const actor of game.actors || []) {
       this.invalidateCache(actor.id);
       const container = this._getContainer(actor);
       for (const run of Object.values(container.active || {})) {
-        if (!this._dueVersionedStep(run, worldTime)) continue;
+        if (!this._dueVersionedStep(run, worldTime) || awardChoiceBlocks(run, actor)) continue;
         const currentStepIndex = Number(run.currentStepIndex);
         due.push({
           actor,
@@ -557,7 +561,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     if (run.status !== 'waitingTime' || run.completionMode !== 'worldTime' || run.pauseState) {
       return null;
     }
-    if (run.executionJournal && run.executionJournal.status !== 'committed') return null;
+    if (RUN_JOURNAL_KEYS.some((key) => run[key] && run[key].status !== 'committed')) return null;
     const index = Number(run.currentStepIndex);
     if (!Number.isSafeInteger(index)) return null;
     const step = run.steps?.[index];
@@ -632,12 +636,19 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return run;
   }
 
-  async updateExecutionJournal(actor, runId, transition, { expectedRevision } = {}) {
+  /** `journal` names the run key the transition lands on: the stage's, or the award choice's. */
+  async updateExecutionJournal(actor, runId, transition, { expectedRevision, journal } = {}) {
     return persistExecutionJournalTransition(
       this._locateRunPersistence(actor, runId, { activeOnly: false }),
       transition,
-      { expectedRevision }
+      { expectedRevision, journal }
     );
+  }
+
+  /** Settle a step's pending award choice, active or terminal run alike (issue 1773). */
+  async settleAwardChoice(actor, runId, settlement, options) {
+    const location = this._locateRunPersistence(actor, runId, { activeOnly: false });
+    return persistAwardChoiceSettlement(location, settlement, options);
   }
 
   async retainUncertainReceipt(actor, runId, effectId, receipts, options) {
@@ -668,16 +679,9 @@ export class CraftingRunManager extends RunContainerManagerBase {
         ...(Array.isArray(container.history) ? container.history : []),
       ];
       for (const run of runs) {
-        if (getRunLifecycleContract(run) !== 'current' || !run?.executionJournal) continue;
-        const journal = observeExecutionJournal(run.executionJournal);
-        if (operationScope && journal.operationId !== normalizedOperationId) continue;
-        if (
-          journal.status !== 'planned' ||
-          journal.effects.every((effect) => effect.phase !== 'applying')
-        ) {
-          continue;
+        for (const key of interruptedJournals(run, normalizedOperationId)) {
+          candidates.push({ actor, runId: run.id, expectedRevision: run.runRevision, key });
         }
-        candidates.push({ actor, runId: run.id, expectedRevision: run.runRevision });
       }
     }
 
@@ -687,7 +691,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
         candidate.actor,
         candidate.runId,
         { type: 'reconstructAfterReload' },
-        { expectedRevision: candidate.expectedRevision }
+        { expectedRevision: candidate.expectedRevision, journal: candidate.key }
       );
       if (!reconstructed) {
         throw new RunLifecycleError(
@@ -700,7 +704,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
         runId: reconstructed.id,
         status: reconstructed.status,
         runRevision: reconstructed.runRevision,
-        journalStatus: reconstructed.executionJournal.status,
+        journalStatus: reconstructed[candidate.key].status,
       });
     }
 
@@ -766,26 +770,11 @@ export class CraftingRunManager extends RunContainerManagerBase {
   async removeRunsForSystem(systemId) {
     if (!systemId) return;
     const target = String(systemId);
+    const named = (run) => run?.craftingSystemId === target;
+    const prune = { dropActiveRun: named, keepHistoryEntry: (run) => !named(run) };
     for (const actor of game.actors || []) {
       const container = this._getContainer(actor);
-      let dirty = false;
-
-      for (const [runId, run] of Object.entries(container.active || {})) {
-        if (getRunLifecycleContract(run) === 'unsupported') continue;
-        if (run?.craftingSystemId !== target) continue;
-        delete container.active[runId];
-        dirty = true;
-      }
-
-      const nextHistory = (container.history || []).filter(
-        (run) => getRunLifecycleContract(run) === 'unsupported' || run?.craftingSystemId !== target
-      );
-      if (nextHistory.length !== (container.history || []).length) {
-        container.history = nextHistory;
-        dirty = true;
-      }
-
-      if (dirty) {
+      if (pruneContainer(container, prune, this._nowWorldTime())) {
         await this._persist(actor, container);
       }
     }
@@ -797,27 +786,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * may write (issue 970): `cleanupInvalidRuns` runs on every client at `initialize()`, and one
    * stale entry on another player's character would otherwise reject the whole startup.
    */
-  async _pruneRunsAcrossWritableActors({ dropActiveRun, keepHistoryEntry }) {
+  async _pruneRunsAcrossWritableActors(prune) {
     for (const actor of selectWritableActors(game.actors)) {
       const container = this._getContainer(actor);
-      let dirty = false;
-
-      for (const [runId, run] of Object.entries(container.active || {})) {
-        if (getRunLifecycleContract(run) === 'unsupported') continue;
-        if (!dropActiveRun(run)) continue;
-        delete container.active[runId];
-        dirty = true;
-      }
-
-      const nextHistory = (container.history || []).filter(
-        (run) => getRunLifecycleContract(run) === 'unsupported' || keepHistoryEntry(run)
-      );
-      if (nextHistory.length !== (container.history || []).length) {
-        container.history = nextHistory;
-        dirty = true;
-      }
-
-      if (dirty) {
+      if (pruneContainer(container, prune, this._nowWorldTime())) {
         await this._persist(actor, container);
       }
     }
@@ -962,91 +934,12 @@ function buildSelectionPlan(selection) {
   };
 }
 
-/**
- * Allowlist optional historical stage evidence before it enters an actor flag or an execution
- * receipt. Callers own initiating-viewer disclosure; absent evidence stays absent, and a captured
- * empty array stays an explicit zero.
- */
-export function craftingStepHistoryEvidence(input = {}, options = {}) {
-  const source = input ?? {};
-  const evidence = {};
-  const resolution = source.resolutionSnapshot;
-  if (
-    ['check', 'ingredients', 'none'].includes(resolution?.kind) &&
-    typeof resolution.mode === 'string'
-  ) {
-    evidence.resolutionSnapshot = {
-      kind: resolution.kind,
-      mode: resolution.mode,
-      ...checkResolutionEvidence(source, options),
-    };
-  }
-  const presentation = source.presentationSnapshot;
-  if (typeof presentation?.name === 'string' && typeof presentation.description === 'string') {
-    evidence.presentationSnapshot = {
-      name: presentation.name,
-      description: presentation.description,
-    };
-  }
-  if (Array.isArray(source.currencySpends) && source.currencySpends.every(validHistoricalSpend)) {
-    evidence.currencySpends = source.currencySpends.map(({ unit, amount }) => ({ unit, amount }));
-  }
-  if (
-    Array.isArray(source.essenceSpend?.carriers) &&
-    source.essenceSpend.carriers.every(validHistoricalCarrier)
-  ) {
-    evidence.essenceSpend = {
-      labels: Object.fromEntries(
-        Object.entries(source.essenceSpend.labels ?? {}).filter(
-          ([, label]) => typeof label === 'string'
-        )
-      ),
-      carriers: source.essenceSpend.carriers.map(historicalCarrier),
-    };
-  }
-  return evidence;
-}
-
-function validHistoricalCarrier(carrier) {
-  return (
-    typeof carrier?.itemUuid === 'string' &&
-    carrier.itemUuid.length > 0 &&
-    Number.isFinite(carrier.quantity) &&
-    carrier.quantity > 0 &&
-    Array.isArray(carrier.contributions) &&
-    carrier.contributions.every(validHistoricalContribution)
-  );
-}
-
-function validHistoricalSpend(entry) {
-  return typeof entry?.unit === 'string' && Number.isFinite(entry.amount) && entry.amount >= 0;
-}
-
-function validHistoricalContribution(entry) {
-  return typeof entry?.essenceId === 'string' && Number.isFinite(entry.amount) && entry.amount > 0;
-}
-
-function historicalCarrier(carrier) {
-  return {
-    actorUuid: historyText(carrier.actorUuid),
-    itemUuid: carrier.itemUuid,
-    quantity: carrier.quantity,
-    name: historyText(carrier.name),
-    img: historyText(carrier.img),
-    contributions: carrier.contributions.map(({ essenceId, amount }) => ({ essenceId, amount })),
-  };
-}
-
-function historyText(value) {
-  return typeof value === 'string' ? value.trim() || null : null;
-}
-
 function applyStepHistoryEvidence(step, payload, run) {
   const options = { executed: getRunLifecycleContract(run) === 'current' };
   const evidence = craftingStepHistoryEvidence(payload, options);
   if (step.presentationSnapshot) delete evidence.presentationSnapshot;
   Object.assign(step, evidence);
-  Object.assign(step, historyEvidenceFields(payload, options));
+  Object.assign(step, historyEvidenceFields(payload, options), groupEvidenceFields(payload));
   for (const field of ['consumedIngredients', 'createdResults']) {
     if (Array.isArray(step[field])) step[field] = step[field].map(itemReceipt);
   }
@@ -1056,6 +949,45 @@ function applyStepHistoryEvidence(step, payload, run) {
       awards: payload.historySettlement?.awards ?? 'complete',
     };
   }
+}
+
+/** The journals of `run` an interrupted effect left applying, of `operationId` when one is named. */
+function interruptedJournals(run, operationId) {
+  if (getRunLifecycleContract(run) !== 'current') return [];
+  return RUN_JOURNAL_KEYS.filter((key) => {
+    const journal = run[key] ? observeExecutionJournal(run[key]) : null;
+    if (journal?.status !== 'planned') return false;
+    if (operationId && journal.operationId !== operationId) return false;
+    return journal.effects.some((effect) => effect.phase === 'applying');
+  });
+}
+
+/**
+ * What a prune does to a run it may reject: an unsupported run is never touched, and a rejected
+ * run still owing an award choice is kept once more, that choice settled `forfeited` (issue 1773).
+ */
+function pruneAction(run, rejected, now) {
+  if (!rejected || getRunLifecycleContract(run) === 'unsupported') return 'keep';
+  if (!forfeitOwedChoices(run, now)) return 'drop';
+  incrementRunRevision(run);
+  return 'forfeit';
+}
+
+/** Apply a prune to one container's runs; answers whether it dropped or forfeited anything. */
+function pruneContainer(container, { dropActiveRun, keepHistoryEntry }, now) {
+  let dirty = false;
+  const dropped = (run, rejected) => {
+    const action = pruneAction(run, rejected, now);
+    dirty ||= action !== 'keep';
+    return action === 'drop';
+  };
+  for (const [runId, run] of Object.entries(container.active || {})) {
+    if (dropped(run, dropActiveRun(run))) delete container.active[runId];
+  }
+  const history = container.history || [];
+  const kept = history.filter((run) => !dropped(run, !keepHistoryEntry(run)));
+  if (kept.length !== history.length) container.history = kept;
+  return dirty;
 }
 
 function cloneObject(value) {

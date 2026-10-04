@@ -80,21 +80,26 @@ export function transitionExecutionJournal(journal, transition = {}) {
  * An identical journal is a no-op. A new plan must match the run's current revision.
  * @param {object|null} location Supplies `run`, `assertMutation` and async `persist`.
  * @param {object} transition See {@link transitionExecutionJournal}.
- * @param {{expectedRevision?: number}} [options]
+ * @param {{expectedRevision?: number, journal?: string}} [options] `journal` is the run key the
+ *   transition lands on: `executionJournal`, or the award choice's `awardChoiceJournal`.
  * @returns {Promise<object|null>} The run, or null when its location is absent.
  */
-export async function persistExecutionJournalTransition(location, transition, options = {}) {
+export async function persistExecutionJournalTransition(
+  location,
+  transition,
+  { journal = 'executionJournal', ...options } = {}
+) {
   if (!location) return null;
   location.assertMutation({ ...options, currentOnly: true, allowExecutionJournal: true });
   assertPlanRevision(location.run, transition);
-  const nextJournal = transitionExecutionJournal(location.run.executionJournal, transition);
+  const nextJournal = transitionExecutionJournal(location.run[journal], transition);
   if (
     nextJournal !== null &&
-    JSON.stringify(nextJournal) === JSON.stringify(location.run.executionJournal)
+    JSON.stringify(nextJournal) === JSON.stringify(location.run[journal])
   ) {
     return location.run;
   }
-  location.run.executionJournal = nextJournal;
+  location.run[journal] = nextJournal;
   incrementRunRevision(location.run);
   return location.persist();
 }
