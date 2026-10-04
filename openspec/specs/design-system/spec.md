@@ -940,6 +940,9 @@ A record's ART is an icon chip, and an ACTOR's art — a person, a party, a vehi
 The two are separate entries rather than one tile taking a `kind` prop, because they differ in the corner and in what they draw with no artwork: a record's tile falls back to a GLYPH and an actor's to INITIALS.
 
 A choice between two to four named things is a segmented control, or option cards when each choice needs a sentence.
+An on/off property of the record in its own editor, drawn as a card, is the toggle card — the settings-row toggle at card scale.
+Option cards are the two-to-four-way choice above, used when each side needs its own sentence.
+Neither is a mode of the other.
 Independent criteria that narrow a list are filter toggles, because any combination is valid.
 A one-of-N SCOPE the list is always in — rather than a filter that can be cleared — is a segmented control in the same bar; a segmented whose value could be "none" is a toggle in disguise.
 The journal's kind filter is therefore four independent toggles, because any combination of kinds is a valid view, while its active-status filter stays a segmented control, because its four values are mutually exclusive.
@@ -2010,7 +2013,7 @@ A part that would need a specimen of its own is not a part; it is a candidate, a
 
 Candidates reviewed and declined MUST be recorded with the reasoning that declined them, so that the absence of a primitive is legible as a decision.
 
-The following are recorded as compositions and MUST NOT be reintroduced as components: a member row, which is a list row with a leading slot; an actor picker, which is a trigger plus the search popover; an add button, whose dashed treatment is a role on the button primitive; a rail card, which is a well, a kicker and a button; a feature card, which is option cards rendered non-interactive; a bounds input, which is two steppers; and a currency input, which is a stepper and a select.
+The following are recorded as compositions and MUST NOT be reintroduced as components: a member row, which is a list row with a leading slot; an actor picker, which is a trigger plus the search popover; an add button, whose dashed treatment is a role on the button primitive; a rail card, which is a well, a kicker and a button; a feature card, which is option cards rendered non-interactive; a bounds input, which is two steppers, and whose last component form was inlined at issue 1521; and a currency input, which is a stepper and a select.
 
 A premium panel is recorded as out of scope rather than as a composition: its only original content is marketing copy, which is a product decision, and binding copy to a component makes the offer untranslatable against a codebase where every primitive takes pre-localized strings.
 A toast and a bespoke destructive-confirmation panel are recorded as surfaces Foundry already owns.

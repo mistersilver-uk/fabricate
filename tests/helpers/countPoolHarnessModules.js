@@ -1,5 +1,8 @@
+import { LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
+
 /** The counting pool's closure (issue 2006), for a suite mounting the Formula card on its own. */
 export const COUNT_POOL_RAW_MODULES = Object.freeze([
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/components/stepperLabels.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/listboxNavigation.js',

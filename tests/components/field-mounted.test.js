@@ -3,7 +3,10 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -41,7 +44,7 @@ const vocabularyHarness = createMountedComponentHarness({
 const radioHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-field-radio-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',

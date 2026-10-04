@@ -8,7 +8,7 @@ import { createClassComponent } from 'svelte/legacy';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from './svelte-dom.js';
 import { rewriteClientImports } from './rewriteClientImports.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
 
 const STATIC_IMPORT_PATTERN = /(?:^|[;\n])\s*(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
 
@@ -223,6 +223,8 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
 // The result card's rows beyond `<Select>` (issue 1516): the requirement row, its amount slot and
 // the amount floor the card reads. A tree rendering `RecipeResultGroupCard` spreads both lists.
 export const RESULT_ROW_RAW_MODULES = Object.freeze([
+  // Issue 1521: the card and the requirement row localize through `localizeOr`.
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
   'src/systems/characterModifierPrerequisiteCopy.js',
   'src/systems/characterPrerequisites.js',
@@ -322,6 +324,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`, spread
   // from the roster above rather than copied so the two cannot drift.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
+  // Issue 1521: `Pagination` localizes through `localizeOr`.
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/craftingImageDefaults.js',
   // The art decision the retired `CraftingThumb` owned (issue 1506), now a pure leaf every
   // converted tile reads.

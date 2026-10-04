@@ -1,20 +1,22 @@
 /** The recipe browser's BULK EDIT panel (issue 1010). */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
+
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import {
-  createMountedComponentHarness,
-  SEARCHABLE_POPOVER_RAW_MODULES,
-  SELECT_COMPILED_MODULES
-} from '../helpers/svelte-component-harness.js';
 import { createRecipeBulkDraft } from '../../src/ui/model/recipeBulkEditModel.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   chooseSelectOption,
   openSelectPanel,
   selectOptionLabels,
   selectTriggerText,
 } from '../helpers/select-control.js';
+import {
+  createMountedComponentHarness,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -24,6 +26,7 @@ const panel = createMountedComponentHarness({
   rawModules: [
     // The book axis is a `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/utils/recipeCategories.js',

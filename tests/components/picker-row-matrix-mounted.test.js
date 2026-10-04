@@ -14,6 +14,7 @@ import {
   fromValue,
   toValue,
 } from '../../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   chooseSelectOption,
   selectOptionValues,
@@ -31,6 +32,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-picker-row-',
   rawModules: [
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
     // The roll-expression field's display helpers, and what they import.
     'src/systems/characterModifierPrerequisiteCopy.js',

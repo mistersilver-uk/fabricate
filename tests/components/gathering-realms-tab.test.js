@@ -12,7 +12,7 @@ import {
   createSvelteCompiler,
   installComponentTestGlobals,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -74,6 +74,7 @@ describe('GatheringRealmsTab mounted behavior', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) writeRawModule(modulePath);
+    for (const modulePath of LOCALIZE_OR_RAW_MODULES) writeRawModule(modulePath);
     // The lifted browse view-state (issue 1438), imported by BOTH components below.
     writeRawModule('src/ui/model/managerBrowserViewState.js');
     writeRawModule('src/ui/svelte/util/disclosurePhrase.js');

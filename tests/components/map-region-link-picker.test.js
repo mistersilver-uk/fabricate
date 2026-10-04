@@ -14,7 +14,7 @@ const REGIONS = [
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-map-link-picker-',
-  rawModules: SEARCHABLE_POPOVER_RAW_MODULES,
+  rawModules: [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/apps/manager/recordPickerOptions.js'],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
