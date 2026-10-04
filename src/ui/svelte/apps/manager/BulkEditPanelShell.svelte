@@ -8,6 +8,8 @@
   | --- | --- | --- | --- |
   | `heading` / `applyLabel` / `clearLabel` / `hint` | string | `''` | the hero's count sentence and Apply's label, already localized and pluralized — Apply's names the blast radius; the last two are already-localized overrides, and `''` keeps `BulkEdit.ClearSelection` / `BulkEdit.SelectedHint`. The noun stays with the studio: this panel's own copy is noun-free under `Admin.Manager.BulkEdit.*`, a namespace written without its `FABRICATE` root on purpose, since `tests/ui-lang-keys-resolve.test.js` scans every dotted literal in `src/`. |
   | `canApply` | boolean | `false` | Apply is genuinely inert until an axis is staged, so a no-op write cannot read as success |
+  | `subjectCount` | number | `0` | the records the selection names; Apply writes to it less `blocked`, is inert when that is zero, and names that count when `applyLabel` is `''` |
+  | `blocked` / `report` | `{ id, reason }[]` / `{ changed, skipped? }` \| `null` | `[]`, `null` | the rows Apply will skip, listed with their already-localized reasons BEFORE the write; and what the last write changed, which replaces that forecast. Neither renders unset. |
   | `dockBleed` | `''` \| `'space-4'` | `''` | the spacing token the dock bleeds by; it must equal the containing rail's padding |
   | `panelAttr` / `clearAttr` / `countAttr` / `applyAttr` | string | the Component Studio's | test, smoke and view-lab hook names |
   | `onClearSelection()` / `onApply()` | | | the two callbacks |
@@ -24,12 +26,16 @@
 -->
 <script>
   import Button from '../../components/Button.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { localizeOr } from '../../util/localizeOr.js';
 
   let {
     heading = '',
     applyLabel = '',
     canApply = false,
+    subjectCount = 0,
+    blocked = [],
+    report = null,
     onClearSelection = () => {},
     onApply = () => {},
     // Already localized; `''` keeps the shipped `Clear selection`.
@@ -51,7 +57,33 @@
   const clearHook = $derived({ [clearAttr]: '' });
   const countHook = $derived({ [countAttr]: '' });
   const applyHook = $derived({ [applyAttr]: '' });
+
+  const blockedRows = $derived(Array.isArray(blocked) ? blocked : []);
+  const subjectTotal = $derived(Math.max(Number(subjectCount) || 0, blockedRows.length));
+  const writable = $derived(subjectTotal - blockedRows.length);
+  // Only a caller that names its subject can have every record blocked.
+  const allBlocked = $derived(subjectTotal > 0 && writable === 0);
+  const resolvedApplyLabel = $derived(
+    applyLabel ||
+      (subjectTotal > 0
+        ? localizeOr('FABRICATE.Admin.Manager.BulkEdit.ApplyTo', 'Apply to {count}', {
+            count: writable,
+          })
+        : '')
+  );
+  const skippedRows = $derived(Array.isArray(report?.skipped) ? report.skipped : []);
+  const reportTotal = $derived(
+    Math.max(subjectTotal, (Number(report?.changed) || 0) + skippedRows.length)
+  );
 </script>
+
+{#snippet reasonList(rows)}
+  <ul class="fab-bulk-edit-reasons">
+    {#each rows as row (row.id)}
+      <li data-bulk-blocked-row={row.id}>{row.reason}</li>
+    {/each}
+  </ul>
+{/snippet}
 
 <section class="fab-bulk-edit-panel" {...panelHook}>
   <header class="fab-bulk-edit-header">
@@ -90,6 +122,35 @@
 
   {@render children?.()}
 
+  {#if report}
+    <div class="fab-bulk-edit-outcome" data-bulk-report>
+      <Notice
+        tone={skippedRows.length > 0 ? 'warning' : 'success'}
+        title={localizeOr(
+          'FABRICATE.Admin.Manager.BulkEdit.ReportTitle',
+          'Changed {count} of {total}',
+          {
+            count: Number(report.changed) || 0,
+            total: reportTotal,
+          }
+        )}
+      />
+      {#if skippedRows.length > 0}{@render reasonList(skippedRows)}{/if}
+    </div>
+  {:else if blockedRows.length > 0}
+    <div class="fab-bulk-edit-outcome" data-bulk-blocked>
+      <Notice
+        tone="warning"
+        title={localizeOr(
+          'FABRICATE.Admin.Manager.BulkEdit.BlockedTitle',
+          '{count} of {total} cannot be changed',
+          { count: blockedRows.length, total: subjectTotal }
+        )}
+      />
+      {@render reasonList(blockedRows)}
+    </div>
+  {/if}
+
   <div
     class="fab-bulk-edit-dock"
     class:has-foot={Boolean(dockFoot)}
@@ -98,11 +159,11 @@
     <Button
       class="fab-bulk-edit-apply"
       {...applyHook}
-      disabled={!canApply}
+      disabled={!canApply || allBlocked}
       onclick={() => onApply()}
     >
       <i class="fas fa-check-double" aria-hidden="true"></i>
-      <span>{applyLabel}</span>
+      <span>{resolvedApplyLabel}</span>
     </Button>
     {@render dockFoot?.()}
   </div>
@@ -212,6 +273,25 @@
   }
 
   .fab-bulk-edit-hero-hint {
+    color: var(--fab-text-muted);
+    font-size: 0.62rem;
+    line-height: 1.35;
+  }
+
+  /* The blocked forecast or the write's report: a notice over the rows it names. */
+  .fab-bulk-edit-outcome {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+    min-width: 0;
+  }
+
+  .fab-bulk-edit-reasons {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2xs);
+    margin: 0;
+    padding: 0 var(--fab-space-3) 0 var(--fab-space-5);
     color: var(--fab-text-muted);
     font-size: 0.62rem;
     line-height: 1.35;

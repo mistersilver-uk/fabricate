@@ -1098,6 +1098,7 @@ The inset a GM stages a multi-record edit through renders a search well, a FIXED
 An unchecked two-state box cannot distinguish "remove this from every selected record" from "do not touch this one", so the two-state form silently strips membership from records the GM never intended to change.
 The PANEL THAT COMMITS the inset's staging names the number of records it writes to.
 The commit action belongs to the bulk panel, not to the inset, which stages and does not write.
+`BulkEditPanelShell` carries that number as `subjectCount`, lists the records Apply will skip with their reasons before the write, and reports what the write changed after it.
 
 The third state is drawn as ONE CYCLING CONTROL rather than as a three-way segmented control, which is a decision taken on the reference and not a free choice: the row is a list entry inside a scrolling window, and a segmented control per row spends the row's whole width on a control the GM reads rather than operates.
 

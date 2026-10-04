@@ -15,7 +15,11 @@ const shell = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-edit-panel-shell-',
   rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
-  compiledModules: [SHELL_PATH, 'src/ui/svelte/components/Button.svelte'],
+  compiledModules: [
+    SHELL_PATH,
+    'src/ui/svelte/components/Button.svelte',
+    'src/ui/svelte/components/Notice.svelte',
+  ],
   componentPath: SHELL_PATH
 });
 
@@ -66,6 +70,93 @@ describe('BulkEditPanelShell renders the shipped chrome when it is asked for not
       1,
       'the shipped dock holds Apply and nothing else'
     );
+    assert.ok(
+      !root.querySelector('[data-bulk-blocked], [data-bulk-report], .fab-notice'),
+      'a panel given no blocked rows and no report drew a notice, so every bulk screen moved'
+    );
+    assert.equal(
+      root.querySelector('[data-component-bulk-apply]').textContent.trim(),
+      BASE.applyLabel,
+      'the caller’s Apply label lost to a derived one'
+    );
+  });
+});
+
+/** Two rows Apply will skip, each with its already-localized reason. */
+const BLOCKED = Object.freeze([
+  { id: 'moonsilver', reason: 'Moonsilver is referenced by a locked compendium.' },
+  { id: 'starmetal', reason: 'Starmetal is in use by a running craft.' },
+]);
+
+describe('BulkEditPanelShell lists blocked rows and reports the write (issue 1782)', () => {
+  it('lists every blocked row with its reason BEFORE Apply', async () => {
+    const root = await shell.mount({ ...BASE, subjectCount: 4, blocked: BLOCKED });
+
+    const region = root.querySelector('[data-bulk-blocked]');
+    assert.ok(Boolean(region), 'the blocked rows rendered nothing');
+    assert.equal(
+      region.querySelector('.fab-notice-title')?.textContent.trim(),
+      '2 of 4 cannot be changed',
+      'the notice does not state how many of the subject are skipped'
+    );
+    const rows = [...region.querySelectorAll('[data-bulk-blocked-row]')];
+    assert.deepEqual(
+      rows.map((row) => [row.getAttribute('data-bulk-blocked-row'), row.textContent.trim()]),
+      BLOCKED.map(({ id, reason }) => [id, reason]),
+      'each blocked row is listed once, in order, with its own reason'
+    );
+    const apply = root.querySelector('[data-component-bulk-apply]');
+    assert.ok(
+      Boolean(region.compareDocumentPosition(apply) & Node.DOCUMENT_POSITION_FOLLOWING),
+      'the blocked rows render after Apply, so the GM reads them only once the write is done'
+    );
+  });
+
+  it('names Apply by the records it writes to when the caller passes no label', async () => {
+    const root = await shell.mount({
+      ...BASE,
+      applyLabel: '',
+      subjectCount: 4,
+      blocked: BLOCKED.slice(0, 1),
+    });
+    const apply = root.querySelector('[data-component-bulk-apply]');
+    assert.equal(apply.textContent.trim(), 'Apply to 3', 'Apply counts the blocked row it skips');
+    assert.ok(!apply.disabled, 'Apply is inert while three records still take the write');
+  });
+
+  it('keeps Apply inert when every record in the subject is blocked', async () => {
+    const root = await shell.mount({ ...BASE, subjectCount: 2, blocked: BLOCKED });
+    assert.ok(
+      root.querySelector('[data-component-bulk-apply]').disabled,
+      'Apply is live over a selection it cannot write to, so a no-op reads as success'
+    );
+  });
+
+  it('reports what the write changed in place of the forecast', async () => {
+    const report = { changed: 3, skipped: BLOCKED.slice(1) };
+    const root = await shell.mount({ ...BASE, subjectCount: 4, blocked: BLOCKED, report });
+
+    const region = root.querySelector('[data-bulk-report]');
+    assert.ok(Boolean(region), 'the report rendered nothing');
+    assert.ok(!root.querySelector('[data-bulk-blocked]'), 'the stale forecast outlived the write');
+    assert.equal(region.querySelector('.fab-notice-title')?.textContent.trim(), 'Changed 3 of 4');
+    assert.equal(
+      region.querySelector('.fab-notice').getAttribute('data-notice-tone'),
+      'warning',
+      'a write that skipped a record reads as a clean success'
+    );
+    assert.deepEqual(
+      [...region.querySelectorAll('[data-bulk-blocked-row]')].map((row) => row.textContent.trim()),
+      [BLOCKED[1].reason],
+      'the report lists the record the write skipped, with its reason'
+    );
+  });
+
+  it('reports a clean write in the success tone', async () => {
+    const root = await shell.mount({ ...BASE, subjectCount: 3, report: { changed: 3 } });
+    const region = root.querySelector('[data-bulk-report]');
+    assert.equal(region.querySelector('.fab-notice').getAttribute('data-notice-tone'), 'success');
+    assert.ok(!region.querySelector('[data-bulk-blocked-row]'), 'a clean write listed a skip');
   });
 });
 

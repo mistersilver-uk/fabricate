@@ -70,7 +70,11 @@ const shell = createMountedComponentHarness({
   // NOT covered by `mounted-harness-primitive-allowlist.test.js`, which gates the
   // hand-rolled harnesses only — `createMountedComponentHarness` carries its own closure
   // validator, and that is what named this omission rather than hanging on it.
-  compiledModules: ['src/ui/svelte/components/Button.svelte', SHELL_PATH],
+  compiledModules: [
+    'src/ui/svelte/components/Button.svelte',
+    'src/ui/svelte/components/Notice.svelte',
+    SHELL_PATH,
+  ],
   componentPath: SHELL_PATH,
 });
 
