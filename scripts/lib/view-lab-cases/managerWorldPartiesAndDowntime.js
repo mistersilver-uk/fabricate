@@ -9,6 +9,41 @@ import {
 } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
+/** A Core Downtime frame whose last step clicks one strip tab, so the pointer leaves that tab's description showing (issue 1779). */
+function downtimeStripPointerCase({ tabId, tooltip, attributes = [], ...entry }) {
+  const tab = `[data-downtime-tab="${tabId}"]`;
+  return managerCase({
+    smokeLabels: [],
+    reaches: 'beyond',
+    steps: [{ selector: '#manager-world-nav-downtime', press: 'Enter' }, { selector: tab }],
+    expectView: 'world-downtime',
+    expectSelector: `[data-downtime-panel="${tabId}"]`,
+    expectAttributes: [
+      { selector: tab, name: 'aria-selected', value: 'true' },
+      ...attributes,
+      { selector: tab, name: 'aria-describedby', value: `world-downtime-tooltip-${tabId}` },
+      ...['tracking', 'activities', 'factions', 'settings'].map((id) => ({
+        selector: `[data-downtime-tab="${id}"]`,
+        name: 'aria-controls',
+        value: `world-downtime-panel-${id}`,
+      })),
+    ],
+    expectVisible: `[data-downtime-tooltip="${tabId}"]:has-text("${tooltip}")`,
+    expectContained: [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+    ],
+    expectCenterHit: tab,
+    expectOverflowY: '.downtime-preview-scroll',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+    ],
+    ...entry,
+  });
+}
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-world-travel-default-collapsed',
@@ -730,5 +765,39 @@ export const CASES = Object.freeze([
       /^src\/ui\/managerExtensions\.js$/,
       /^styles\/fabricate\.css$/,
     ],
+  }),
+  // The wrapped strip's last tab, reached by a pointer, so the frame shows its description at the card's end (issue 1779).
+  downtimeStripPointerCase({
+    id: 'manager-world-downtime-narrow-settings',
+    label: 'Manager — World Downtime narrow strip, Settings by pointer',
+    tabId: 'settings',
+    tooltip: 'Preview campaign calendar, permissions and resolution settings in Fabricate Premium',
+    attributes: [
+      {
+        selector: '[data-downtime-tab="settings"]',
+        name: 'aria-label',
+        value: 'Open campaign calendar, permissions and resolution settings',
+      },
+    ],
+    query: { system: 'lab-smithing', longDowntimeLabels: '1' },
+    expectNoHorizontalOverflow: [
+      '[data-world-downtime-host]',
+      '.manager-main',
+      '.manager-body',
+      '.fabricate-manager',
+    ],
+    position: { width: 960, height: 900 },
+    kinds: ['manager', 'world', 'downtime', 'responsive'],
+  }),
+  // The wide strip's first tab under the pointer, with no CTA step to take focus, so the frame shows its description (issue 1779).
+  downtimeStripPointerCase({
+    id: 'manager-world-downtime-tracking-described',
+    label: 'Manager — World Downtime Tracking described by pointer',
+    tabId: 'tracking',
+    tooltip: 'Preview Downtime Tracking · Fabricate Premium',
+    query: { system: 'lab-smithing' },
+    expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world', 'downtime'],
   }),
 ]);

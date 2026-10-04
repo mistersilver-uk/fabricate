@@ -160,6 +160,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-section-badged-and-dotted',
     'manager-environment-edit-events',
     'manager-knowledge-learned-lost-copy',
+    'interactables-browser-tasks',
+    // The padlocked strip with its first tab's description, wide (`-tracking-described`) and wrapped with its last tab's (`-narrow-settings`) (issue 1779).
+    'manager-world-downtime-tracking-described',
+    'manager-world-downtime-narrow-settings',
   ]),
   // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([

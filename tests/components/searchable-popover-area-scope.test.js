@@ -424,7 +424,7 @@ const PRIMITIVES = Object.freeze([
       'manager-editor-tab-dot',
     ]),
     classMaps: Object.freeze(['DEFAULT_CLASSES']),
-    // Measured at this commit: 5 written, 12 family selectors, 7 owned.
+    // Measured at this commit: 6 written, 14 family selectors, 9 owned.
     writtenFloor: 4,
     familyFloor: 10,
     ownedFloor: 6,
@@ -1345,7 +1345,7 @@ test('the class-map reader is also what puts a PROP DEFAULT in the family, and i
       'credits it and the control below proves nothing'
   );
 
-  // POSITIVE CONTROL 2: dropping the field really costs the family five of its seven owned rules,
+  // POSITIVE CONTROL 2: dropping the field really costs the family six of its nine owned rules,
   // stated as a measured DIFFERENCE over a copy of the entry with `classMaps` removed — the exact
   // state this component was in before the defaults were frozen into a map. The figure is the one
   // the GATE emits (`owned.length`), not the eight rules the change re-roots, because a control
@@ -1355,14 +1355,14 @@ test('the class-map reader is also what puts a PROP DEFAULT in the family, and i
   const without = classesWrittenBy(withoutMap);
   assert.equal(
     withMap.size,
-    5,
-    'the map must credit all five family classes: the container, the button and the badge from ' +
-      'the defaults, the count and the dot from the markup'
+    6,
+    'the map must credit all six family classes: the container, the button and the badge from ' +
+      'the defaults, the count, the dot and the padlock from the markup'
   );
   assert.equal(
     without.size,
-    2,
-    'without the map only the count and the dot are literals in the markup; a different number ' +
+    3,
+    'without the map only the count, the dot and the padlock are literals in the markup; a different number ' +
       'means the family reaches this gate some other way and the control below measures nothing'
   );
 
@@ -1370,14 +1370,15 @@ test('the class-map reader is also what puts a PROP DEFAULT in the family, and i
     pickerSelectors(written, entry).filter((selector) => isPrimitiveOwned(selector, written, entry));
   assert.equal(
     ownedIn(tabs, withMap).length,
-    7,
-    'the strip owns seven of the twelve selectors that name a class it writes'
+    9,
+    'the strip owns nine of the fourteen selectors that name a class it writes'
   );
   assert.equal(
     ownedIn(withoutMap, without).length,
-    2,
-    'dropping the class map must take the gate-owned count from 7 to 2 — only the count rule and ' +
-      'the dot rule survive, and the strip`s own container, button, hover, active, active-count ' +
+    3,
+    'dropping the class map must take the gate-owned count from 9 to 3 — only the count, dot and ' +
+      'padlock rules survive, and the strip`s own container, button, hover, active, active-count, ' +
+      'active-padlock ' +
       'and badge rules all read CALLER-owned, gate-inert, and would have been left rooted at ' +
       '`.fabricate-manager` with this file reporting the family clean'
   );
@@ -2056,7 +2057,7 @@ test('each primitive’s own scoped styles name no application root either', () 
       '`SearchablePopoverPanel` its compact presentation moved to (issue 1719), ' +
       '`TintPicker` and ' +
       '— since issue 1509 put entries on them — `EditorTabs`, whose block is the two ' +
-      '`:global(.manager-editor-tab-button.is-danger)` rules that tint a failing validation ' +
+      'scoped `.manager-editor-tab-button.is-danger` rules that tint a failing validation ' +
       'tab, `RadioCardGroup`, whose block is the one `.manager-resolution-option-meta` ' +
       'rule that types the inline second datum on an option`s name line, `ItemDropZone`, ' +
       'whose block is the two-rule MISSING treatment for a link whose document has been deleted ' +

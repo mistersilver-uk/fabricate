@@ -505,7 +505,7 @@ export function registerDowntimeCases() {
       target.querySelector('[data-downtime-extension-panel]').textContent,
       /Mounted tracking/
     );
-    // `[data-world-downtime-lock]` on the RAIL, not `.downtime-tab-lock` on the strip.
+    // `[data-world-downtime-lock]` on the rail, not `.manager-editor-tab-lock` on the strip.
     assert.ok(
       !target.querySelector('[data-world-downtime-lock]'),
       'an installed companion never inherits the Core fallback lock treatment'
