@@ -384,14 +384,16 @@ describe('1516 ActionMenu trigger snippet, heading and item tone', () => {
         hostTrigger(target).click();
         await flushRender();
         const panelRoot = doc.querySelector('.fabricate-action-menu-panel');
-        const escaped = [];
-        const listen = () => escaped.push(heading);
+        let escaped = 0;
+        const listen = () => {
+          escaped += 1;
+        };
         doc.body.addEventListener('click', listen);
         for (const node of [panelRoot, panelRoot.querySelector('.manager-action-menu-heading')]) {
           node?.dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
         }
         doc.body.removeEventListener('click', listen);
-        assert.deepEqual(escaped, [], `no click escapes the panel (heading "${heading}")`);
+        assert.equal(escaped, 0, `no click escapes the panel (heading "${heading}")`);
       });
     }
   });
