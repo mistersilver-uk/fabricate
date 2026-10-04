@@ -26,7 +26,7 @@ Each environment belongs to one crafting system and stores:
 | **Selection Mode** | **Targeted** shows visible task rows, or **Blind** shows one generic opaque action resolved from one or more hidden tasks |
 | **Biomes**         | Optional biome tags used to match Gathering Tasks and events                                                              |
 | **Danger Level**   | Optional single danger ceiling used to match reusable events                                                              |
-| **Scene**          | Optional scene gate for environments tied to a specific scene                                                             |
+| **Scene**          | Optional scene gate for environments tied to a specific scene, linked from the Linked scene card on the Overview tab      |
 
 {: .note }
 
@@ -37,13 +37,15 @@ Each environment belongs to one crafting system and stores:
 > Realm membership and the optional include/exclude rules for realms and biomes drive location-aware availability only.
 > See [Gathering Realms & Travel]({% link world/travel/index.md %}).
 
-If a saved scene reference no longer points at a scene in your world, the Environments tab keeps the reference visible and preserves it on save until the GM clears or replaces it.
+If a saved scene reference no longer points at a scene in your world, the Linked scene card reads **Scene not found**, keeps the reference and preserves it on save until the GM unlinks or replaces it.
 Players remain blocked by an unresolved scene gate until the reference is repaired.
 
 Deleting an environment also clears active and past gathering runs that reference it.
 
-The Scene field offers a picker populated from your world's scenes, and you can also paste a reference by hand for an external scene.
-If the saved scene is no longer in the list, the editor keeps showing the saved value until the GM changes it.
+The scene link is a **Linked scene** card at the foot of the Overview tab.
+Drop a Scene onto the card, from the sidebar or from a compendium, to link it.
+Use the visible **Unlink** button to remove the link.
+The card shows the scene's thumbnail and name.
 
 ## Global Conditions And Tags
 
@@ -81,6 +83,20 @@ Manual mode cannot create a force list — it has no Force add — and the upgra
 One case is worth knowing: if you force-add in automatic mode, switch that environment to manual, and later switch it back, the force list is still there and those records become available again.
 Switching modes does not clear your lists — that is what lets you switch back and forth without losing your work — so check the Non-matching list after switching if you are not sure what an environment carries.
 Automatic mode still honors records you explicitly excluded.
+
+Every composition row, whether included, available to add, excluded or not matching, has a disclosure chevron.
+It opens that row's overrides in place:
+
+- the node count, as a stepper shown as "/ max"
+- the **Apply drop-rate adjustments** switch
+- the per-component **Drop-rate adjustment (-100% to +100%)** inputs, each with a **Clear** button
+
+Only one row is open at a time, and opening a row selects it.
+
+The right-hand inspector for an environment is read-only.
+For a selected record it shows the hero, a read-only node count and the evidence, with no step buttons, drop-rate switch, drop-rate inputs or Clear buttons.
+For the environment itself it shows the linked scene's thumbnail and name as an **Open scene** link.
+You cannot drop to replace or unlink the scene from the inspector; use the Linked scene card on the Overview tab.
 
 {% include screenshot.html case="manager-environment-edit-automatic-force-add" caption="An automatic environment's Tasks tab, with the row menu open on Force add for a non-matching task." %}
 
