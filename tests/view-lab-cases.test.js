@@ -52,6 +52,7 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
+import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
@@ -665,6 +666,7 @@ function caseSelectors(viewCase) {
   if (typeof viewCase.expectLayout?.fillSelector === 'string') {
     selectors.push(viewCase.expectLayout.fillSelector);
   }
+  for (const control of viewCase.expectLayout?.controls ?? []) selectors.push(control.selector);
   return selectors;
 }
 
@@ -708,9 +710,14 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-component-edit-salvage-rolled-narrow',
   'manager-component-edit-salvage-narrow',
 ];
+// And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
+// 1521): every `Button` verb the retired rail button drew, by the case that renders it.
+const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) => caseId);
+const CONTROL_LAYOUT_CASE_IDS = Object.keys(CONTROL_LAYOUT_CASES);
 const LAYOUT_CASE_IDS = [
   ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
   ...RESPONSIVE_LAYOUT_CASE_IDS,
+  ...CONTROL_LAYOUT_CASE_IDS,
   ...FULL_WIDTH_LAYOUT_CASE_IDS,
   ...FRAME_STACK_LAYOUT_CASE_IDS,
   ...RAIL_FILL_LAYOUT_CASE_IDS,
@@ -723,6 +730,7 @@ test('exactly the declared layout cases carry complete layout expectations', () 
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
   assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
+    if (CONTROL_LAYOUT_CASE_IDS.includes(viewCase.id)) continue;
     if (
       viewCase.query?.journalCaseState === 'wide' ||
       viewCase.query?.journalCaseState === 'narrow'
@@ -735,6 +743,7 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     }
     if (ROW_GEOMETRY_LAYOUT_CASE_IDS.includes(viewCase.id)) {
       assert.equal(viewCase.expectLayout.gridSelector, undefined, 'row geometry needs no grid');
+      assert.equal(typeof viewCase.expectLayout.containerSelector, 'string', 'but a container');
       const { oneLineRows, wrappedRows } = viewCase.expectLayout;
       assert.ok(
         typeof oneLineRows === 'string' || typeof wrappedRows?.rows === 'string',
@@ -794,6 +803,38 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     assert.equal(viewCase.expectLayout.expectedTracks, RAIL_FILL_LAYOUT_CASES[viewCase.id].tracks);
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
     assert.equal(viewCase.expectLayout.absentSelector, undefined);
+  }
+});
+
+test('the inspector-rail cases measure every verb on the manager rung, one primary in success', () => {
+  const byText = (left, right) => left.localeCompare(right);
+  const measured = VIEW_LAB_CASES.flatMap((viewCase) => viewCase.expectLayout?.controls ?? []);
+  assert.deepEqual(
+    measured.map((control) => control.selector).sort(byText),
+    INSPECTOR_VERB_SITES.map((site) => site.selector).sort(byText),
+    'the cases measure exactly the eight rail verbs'
+  );
+  for (const [id, sites] of Object.entries(CONTROL_LAYOUT_CASES)) {
+    const { expectLayout } = getCaseById(id);
+    assert.equal(expectLayout.gridSelector, undefined, `${id} measures controls, not a grid`);
+    assert.deepEqual(
+      expectLayout.controls.map((control) => control.selector),
+      sites.map((site) => site.selector),
+      `${id} measures each verb it renders`
+    );
+    const success = expectLayout.controls
+      .filter((control) => control.styles.includes('background-color: var(--fab-success)'))
+      .map((control) => control.selector);
+    assert.deepEqual(
+      success,
+      sites.filter((site) => site.role === 'primary').map((site) => site.selector),
+      `${id} measures its primary, and only it, in the success family`
+    );
+    for (const { selector, styles } of expectLayout.controls) {
+      for (const declaration of ['min-height: 34px', 'border-radius: 9px', 'font-size: 0.72rem']) {
+        assert.ok(styles.includes(declaration), `${id} ${selector} measures ${declaration}`);
+      }
+    }
   }
 });
 
@@ -1029,8 +1070,14 @@ test('layout expectation selectors name UI that still exists', () => {
   const haystack = [...sources.values()].join('\n');
   const missing = [];
   for (const viewCase of VIEW_LAB_CASES.filter((entry) => entry.expectLayout)) {
-    const { containerSelector, gridSelector, fillSelector, minInlineSize, ...rows } =
-      viewCase.expectLayout;
+    const {
+      containerSelector,
+      gridSelector,
+      fillSelector,
+      minInlineSize,
+      controls = [],
+      ...rows
+    } = viewCase.expectLayout;
     for (const selector of [
       containerSelector,
       gridSelector,
@@ -1041,6 +1088,7 @@ test('layout expectation selectors name UI that still exists', () => {
       rows.alignedRight,
       rows.alignedLeft,
       minInlineSize?.selector,
+      ...controls.map((control) => control.selector),
     ]) {
       if (selector) collectSelectorHookFailures(viewCase, selector, sources, haystack, missing);
     }

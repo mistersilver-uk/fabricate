@@ -1,6 +1,7 @@
 manager-essences-normal
 manager-essences-stacked
 manager-essences-disabled-in-use
+manager-essences-inspector-verbs
 manager-essences-source-picker
 manager-essences-grid
 manager-essences-bulk-edit

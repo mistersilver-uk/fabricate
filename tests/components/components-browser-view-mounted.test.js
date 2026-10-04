@@ -15,6 +15,7 @@ import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLib
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 // Issue 1504: the page-size control is a shared `<Select>`.
 import {
   assertSelectHasResolvedName,
@@ -799,7 +800,6 @@ const inspector = createComponentScopeHarness({
   compiledExtras: [
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/ActionMenu.svelte',
-    'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   ],
 });
 
@@ -1024,6 +1024,8 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     foot.querySelector('[data-component-edit-system-rules]').click();
     flushSync();
     assert.deepEqual(opened, [['coal']]);
+    // The pinned verb is a full-width primary `Button` (issue 1521).
+    assertInspectorVerbs(foot.closest('section'), [['[data-component-edit-system-rules]', 'primary']]);
 
     assert.ok(
       Boolean(root.querySelector('[data-component-inspector-menu]')),

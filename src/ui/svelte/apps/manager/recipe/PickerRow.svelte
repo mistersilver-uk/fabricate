@@ -48,7 +48,7 @@
 
 <script>
   import Chip from '../../../components/Chip.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import Select from '../../../components/Select.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
@@ -91,11 +91,6 @@
     ...rest
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   // What the GM has typed into this row's name field. It is local to the instance and never part
   // of the requirement: a query reaching the persisted shape would be a half-typed name saved.
   let query = $state('');
@@ -124,7 +119,7 @@
   );
 
   const kindWord = (kind) =>
-    isKnownKind(kind) ? text(kindMeta(kind).labelKey, kindMeta(kind).label) : String(kind);
+    isKnownKind(kind) ? localizeOr(kindMeta(kind).labelKey, kindMeta(kind).label) : String(kind);
   // The caller's kinds in table order, plus this row's own kind always.
   const kindOptions = $derived(
     [...KIND_ORDER, ...(misconfigured ? [matchType] : [])]
@@ -132,23 +127,26 @@
       .map((kind) => ({ value: kind, label: kindWord(kind) }))
   );
 
-  const searchPlaceholder = $derived.by(() => {
-    if (matchType === 'essence')
-      return text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...');
-    if (matchType === 'currency')
-      return text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency');
-    return text(
-      'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-      'Search components...'
-    );
-  });
-  const emptyCatalogueHint = $derived.by(() => {
-    if (matchType === 'essence')
-      return text('FABRICATE.Admin.Manager.Recipe.NoEssencesDefined', 'No essences defined');
-    if (matchType === 'currency')
-      return text('FABRICATE.Admin.Manager.Recipe.NoCurrencyDefined', 'No currencies defined');
-    return text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined');
-  });
+  // The name field's placeholder and empty hint per kind; any other kind reads the component pair.
+  const SEARCH_COPY = {
+    essence: [
+      ['FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...'],
+      ['FABRICATE.Admin.Manager.Recipe.NoEssencesDefined', 'No essences defined'],
+    ],
+    currency: [
+      ['FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency'],
+      ['FABRICATE.Admin.Manager.Recipe.NoCurrencyDefined', 'No currencies defined'],
+    ],
+    component: [
+      ['FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...'],
+      ['FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined'],
+    ],
+  };
+  const searchCopy = $derived(
+    Object.hasOwn(SEARCH_COPY, matchType) ? SEARCH_COPY[matchType] : SEARCH_COPY.component
+  );
+  const searchPlaceholder = $derived(localizeOr(...searchCopy[0]));
+  const emptyCatalogueHint = $derived(localizeOr(...searchCopy[1]));
 
   const normalizedQuery = $derived(query.trim().toLowerCase());
   const suggestions = $derived(
@@ -220,7 +218,7 @@
   );
   const extraClass = $derived(className ? ` ${className}` : '');
 
-  const forSubject = (key, fallback) => text(key, fallback).replace('{name}', subjectName);
+  const forSubject = (key, fallback) => localizeOr(key, fallback, { name: subjectName });
   const removeName = $derived(
     forSubject('FABRICATE.Admin.Manager.Recipe.RemoveNamed', 'Remove {name}')
   );
@@ -228,18 +226,23 @@
     forSubject('FABRICATE.Admin.Manager.Recipe.ClearNamed', 'Clear {name}')
   );
   const unknownHint = $derived(
-    text(
+    localizeOr(
       'FABRICATE.Admin.Manager.Recipe.UnknownKindHint',
-      'Fabricate does not recognise the kind "{kind}". Remove this row or correct the data.'
-    ).replace('{kind}', matchType)
+      'Fabricate does not recognise the kind "{kind}". Remove this row or correct the data.',
+      { kind: matchType }
+    )
   );
   const tagPolicyWord = $derived(
     tagMatch === 'all'
-      ? text('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All of')
-      : text('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any of')
+      ? localizeOr('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All of')
+      : localizeOr('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any of')
   );
   const kindLabel = $derived(
     forSubject('FABRICATE.Admin.Manager.Recipe.KindFor', 'Kind of {name}')
+  );
+  const searchTagsWord = localizeOr(
+    'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
+    'Search tags...'
   );
 
   // The SAME two strings the policy word above reads, so the control and the sentence it writes
@@ -308,8 +311,8 @@
             type="button"
             class="manager-recipe-tag-remove"
             data-recipe-remove="tag"
-            aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
-            title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+            aria-label={localizeOr('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+            title={localizeOr('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
             {disabled}
             onclick={() => removeTag(tag)}><i class="fas fa-times" aria-hidden="true"></i></button
           >
@@ -320,17 +323,14 @@
         pickerClass="manager-recipe-tag-picker"
         triggerClass="manager-recipe-tag-trigger"
         triggerIcon="fa-solid fa-plus"
-        triggerLabel={text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}
+        triggerLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}
         triggerProps={{ 'data-recipe-add-tag': '' }}
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-        triggerTitle={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-        panelLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-        searchPlaceholder={text(
-          'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
-          'Search tags...'
-        )}
-        searchLabel={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
-        emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
+        ariaLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+        triggerTitle={localizeOr('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+        panelLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+        searchPlaceholder={searchTagsWord}
+        searchLabel={searchTagsWord}
+        emptyHint={localizeOr('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
         showChevron={false}
         {disabled}
         onSelect={(tag) => addTag(tag)}
@@ -344,7 +344,7 @@
       value={tagMatch}
       tone="tag"
       groupName={`tag-match-${tagMatchGroupId}`}
-      ariaLabel={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}
+      ariaLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}
       optionDataAttr="data-recipe-tag-match"
       onChange={(mode) => emit({ tagMatch: mode === 'all' ? 'all' : 'any' })}
     />
@@ -352,7 +352,7 @@
     <!-- A kind the table does not name: stated, never drawn as a component. -->
     <span class="manager-recipe-option-name-field" data-recipe-option-misconfigured={matchType}>
       <span class="manager-recipe-req-tag is-disabled" title={unknownHint}
-        >{text('FABRICATE.Admin.Manager.Recipe.UnknownKind', 'Unknown kind')}</span
+        >{localizeOr('FABRICATE.Admin.Manager.Recipe.UnknownKind', 'Unknown kind')}</span
       >
       <span id={`picker-row-unknown-${tagMatchGroupId}`} hidden>{unknownHint}</span>
     </span>
@@ -366,15 +366,18 @@
         data-recipe-currency-readonly
         >{chosen?.label ||
           value?.id ||
-          text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledUnitFallback', 'Currency')}</span
+          localizeOr(
+            'FABRICATE.Admin.Manager.Recipe.CurrencyDisabledUnitFallback',
+            'Currency'
+          )}</span
       >
       <span
         class="manager-recipe-req-tag is-disabled"
         data-recipe-currency-disabled
-        title={text(
+        title={localizeOr(
           'FABRICATE.Admin.Manager.Recipe.CurrencyDisabledHint',
           'Currency is disabled for this system; this cost is inactive until it is re-enabled.'
-        )}>{text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledTag', 'Currency off')}</span
+        )}>{localizeOr('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledTag', 'Currency off')}</span
       >
     </span>
   {:else}
@@ -400,7 +403,10 @@
               class="manager-recipe-option-clear"
               data-recipe-option-clear
               aria-label={clearName}
-              title={text('FABRICATE.Admin.Manager.Recipe.ClearChoice', 'Clear and search again')}
+              title={localizeOr(
+                'FABRICATE.Admin.Manager.Recipe.ClearChoice',
+                'Clear and search again'
+              )}
               {disabled}
               onclick={() => choose('')}
               ><i class="fa-solid fa-xmark" aria-hidden="true"></i></button
@@ -461,7 +467,7 @@
             use:typeaheadPanel={combo.panel}
           >
             <span class="manager-recipe-option-no-matches" data-recipe-option-no-matches
-              >{text('FABRICATE.Admin.Manager.Recipe.NoMatches', 'No matches')}</span
+              >{localizeOr('FABRICATE.Admin.Manager.Recipe.NoMatches', 'No matches')}</span
             >
           </span>
         {/if}

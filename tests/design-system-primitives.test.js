@@ -238,6 +238,8 @@ test('the inputs every property below quantifies over are alive', () => {
   // 72 as of issue 2008: the Formula card's option well, and the `<Well>` on its second caller.
   // 73 as of issue 1518: the slot tile, on the requirement chooser as its second importer.
   // 74 as of issue 1516: `PickerRow` on its second importer, the result card.
+  // 75 as of issue 1521, whose `InlineRenameField` replaced the party and realm name fields; 74
+  // once the inspector action button became the button primitive at full width.
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 74, 'the shipped primitive set changed size');
   // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
   // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;

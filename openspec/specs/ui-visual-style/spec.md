@@ -119,14 +119,12 @@ Eight bullets follow: the `CollapsibleGroupHeader` one states which primitive ow
   The Tool Studio’s `.manager-tool-edit-actions` cluster is the AUTHORITY for what a manager button looks like, and `tests/components/manager-layout.test.js` compares a converted card button against it in a real browser on `font-size`, `font-weight`, `padding`, `height` and `border-radius`, so drift fails a gate rather than shipping.
   Each role names a VERB and not a colour, because a colour is something a call site can pick by eye and a verb is not.
   `neutral` is the SECONDARY verb, and it is the EMPTY MODIFIER rather than a missing one: a bare `.fabricate-button` is a real and correct treatment, which is why `neutral` is the default and why an unrecognised `role` renders as neutral instead of emitting an unstyled `is-*`.
-  `primary` is the CREATE-OR-COMMIT verb of the chrome cluster it sits in, and a cluster carries at most one.
-  `ghost` is the quiet NAVIGATIONAL verb — Back, Open, View — which moves the GM and changes no record.
+  `primary` is the LEADING verb of its cluster — create or commit in a chrome cluster, and in an inspector rail the verb that opens the selected record — and a cluster carries at most one.
+  `ghost` is the QUIET verb that changes no record — Back, Open, View, Copy — and is never its cluster's leading verb.
   `dashed` is the APPEND verb at the foot of the list it adds to, because a dashed outline reads as an empty slot waiting to be filled and a solid button does not.
-  `danger` is the DESTRUCTIVE verb: the action removes or unlinks a record, and it is the role `ArmedDangerButton` fixes as an invariant.
-  `warning` is the OVERRIDE verb: the action proceeds against a rule the system has already flagged, and destroys nothing.
-  A control that both destroys and overrides is `danger`.
-  That `warning` is NOT the `warning` of the Right-inspector-actions primitive below, which is "amber, for a verb that BREAKS A LINK" — same word, deliberately different meanings, two different primitives, and neither vocabulary may be read across into the other.
-  The two are stated together here because the words are close enough to be picked by feel, and a call site that reasons "unlink is a warning" from the wrong primitive's requirement paints a destructive verb amber.
+  `danger` is the DESTRUCTIVE verb: the action removes a record, or breaks a reference together with data that re-making it would not restore, and it is the role `ArmedDangerButton` fixes as an invariant.
+  `warning` is the CAUTION verb, and it destroys nothing: the action proceeds against a rule the system has already flagged, or it breaks a reference the GM can re-make exactly as it was — unlinking a source item is the worked case.
+  A control that both destroys and cautions is `danger`.
   The set is CLOSED, and a per-site visual tweak travels as a PASS-THROUGH class through the appending `class` prop rather than as a new role.
   `is-subtle` is the worked example of a legitimate tint: six sites, four of them arriving through a popover's `triggerClass`, carrying three unrelated verbs and differing by a single property, which is a tint and not a meaning.
   `is-warning` is the worked FAILURE: `environment/CompositionList.svelte` renders ONE verb from two places under the same handler, the same `data-action` and the same localization key, and one of those places spelled the modifier `is-warning`, which the sheet declares nowhere — so that site shipped with no treatment at all while the sheet's `.fabricate-button.is-warning-action` shipped with no call site.
@@ -192,7 +190,7 @@ Eight bullets follow: the `CollapsibleGroupHeader` one states which primitive ow
 - THE manager's labelled form field exists at `src/ui/svelte/components/Field.svelte`, taking its HOST element from a CLOSED `as` set of three: `label`, `div` and `fieldset`.
   It replaces the same kind of CSS CONVENTION the shared `Button` replaced — write `manager-field`, a class issue 1507 retired, then remember which element the field is supposed to be — and it was on 88 elements across 24 components, which is the largest single convention in the manager after the button.
   The host is not a styling variant and that is the whole reason the set is a prop rather than a remembered element: those 88 sites used 56 `<label>`, 31 `<div>` and one `<fieldset>`, and a `<label>` field WRAPS its control and gives it its accessible name while a `<div>` field does not.
-  Thirty-one sites depend on not doing it, because they hold two controls, or none, or one that is already named by something else — `environment/CharacterModifierBoundsRow.svelte` and `checks/CraftingModifierCatalogueCard.svelte` both state that reason in their own markup — so flattening a `<div>` field into a `<label>` renders identically and changes what a screen reader announces.
+  Thirty-one sites depend on not doing it, because they hold two controls, or none, or one that is already named by something else — `environment/GatheringModifierEditor.svelte` and `checks/CraftingModifierCatalogueCard.svelte` both state that reason in their own markup — so flattening a `<div>` field into a `<label>` renders identically and changes what a screen reader announces.
   `as` therefore has NO default: a missing or unrecognised value renders the inert `<div>` and warns, because `label` and `fieldset` both carry behaviour that must never be reached by omission, and `tests/components/field-source-contract.test.js` requires a LITERAL `as` at every call site so the fallback is unreachable from the product.
   The `fieldset` member has ONE caller, `RadioCardGroup.svelte`, and it is a member rather than an allowlisted exception because that site is a genuine grouped control on three counts a `<div>` drops silently: it renders a `<legend>`, it holds a radio group sharing one `name`, and it forwards `disabled`, which on a fieldset disables every descendant control.
   Like `Button` it deliberately has NO scoped `<style>` and claims the section's layout-context exception to say so: `styles/fabricate.css` owns `.fabricate-field` and roughly thirty rules that reach through it to the controls inside, and a scoped block here would be a second source of truth for the same box.
@@ -274,22 +272,19 @@ Click handlers on bare non-interactive elements are forbidden, and a `role="butt
 #### Right-inspector actions
 
 Every GM studio's right-hand inspector ends in a stack of verbs for the selected entity — Duplicate, Edit, Delete, Copy source UUID, Unlink.
-That is one meaning, so those controls render through one shared primitive, and it is the POINT OF ARRIVAL: a new studio's inspector MUST import it rather than declaring a fourth treatment.
+That is one meaning, so a new studio's inspector MUST render its verbs through the button primitive's roles, at full width, rather than declaring a treatment of its own.
+Each verb takes the button's shipped manager rung — the compact control height, the band's corner and the header label size — so a rail verb and a header verb are one control.
 
-The primitive takes the Tool Studio's editor-header buttons as its base, because that is the refined treatment: a label a notch below body text, the compact control height, a 6px radius, and an icon before the label.
-It is not a variant of the manager's general-purpose button class, since that class's tone modifiers are declared in the global sheet at a specificity a scoped primitive block cannot beat, which would leave the primitive's own tones losing to it.
-It therefore carries the Foundry `<button>` reset itself and states its appearance in its own scoped block.
+Each verb takes the role its verb names:
 
-Tone is a fixed vocabulary and each member has a meaning:
+- `primary` is the success family (section 16 of the design-system library), and there is at most one per rail — the verb that opens the selected record.
+- Duplicate, which makes a new record from the selected one, is `neutral`.
+- Delete is `danger`.
+- Unlink is `warning`: it breaks a reference the GM can re-make exactly and destroys nothing.
+- The quiet verb that changes no record, such as Copy source UUID, is `ghost`.
 
-- `primary` is the ACCENT, never the success family, and there is at most one per rail — it is the rail's loudest control.
-  A studio that paints its primary in success has coloured "edit" as "confirm".
-- `danger` is danger text on the panel surface: destructive, and never louder than the primary.
-- `warning` is amber, for a verb that BREAKS A LINK rather than destroying a record — unlinking a source is not deleting one.
-- the default is the quiet panel-surface treatment.
-
-Recorded non-conformance: the recipe, component and Tool Studio inspectors still render their own treatments and are the declared conversion backlog; the Tags & Categories inspector left that backlog by being retired rather than converted (issue 1915), so the count is three.
-The essence inspector is converted; a primitive that coexists with unconverted duplicates has added a variant rather than removed one, so the remainder is a debt with an owner rather than an accepted state.
+Recorded non-conformance: the recipe, component and Tool Studio inspectors are the declared conversion backlog, and each converts onto the button primitive's roles rather than keeping a treatment of its own; the Tags & Categories inspector left that backlog by being retired rather than converted (issue 1915), so the count is three — for the component inspector, its Copy source UUID, Unlink and Delete commands, which sit in the kebab menu rather than in the rail's verb stack.
+The essence inspector and the three world catalogue inspectors render every verb through the button primitive, and the component inspector's pinned primary does too; a rail that coexists with unconverted treatments has added a variant rather than removed one, so the remainder is a debt with an owner rather than an accepted state.
 
 #### No-state messages
 
