@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
+import { INSPECTOR_VERB_SITES } from '../helpers/inspectorVerbRoles.js';
 import { importedModules, literalStrings, walkNodes } from '../helpers/moduleAst.js';
 import { componentAstOf, sourceAstEntriesUnder } from '../helpers/parsedSource.js';
 import { renderedNodes } from '../helpers/structureShapes.js';
@@ -332,23 +333,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
 
 describe('M12a — an inspector rail’s verbs take the manager button’s rung (issue 1521)', () => {
   const MANAGER = 'src/ui/svelte/apps/manager';
-  /** The eight verbs the retired rail button drew: file, hook, hook value and role. */
-  const SITES = [
-    [`${MANAGER}/essences/EssenceBrowserInspector.svelte`, 'data-essence-action', 'edit', 'primary'],
-    [`${MANAGER}/essences/EssenceBrowserInspector.svelte`, 'data-essence-action', 'delete', 'danger'],
-    [`${MANAGER}/essences/EssenceBrowserInspector.svelte`, 'data-essence-action', 'copy-source', 'ghost'],
-    [
-      `${MANAGER}/essences/EssenceBrowserInspector.svelte`,
-      'data-essence-action',
-      'unlink-source',
-      'warning'
-    ],
-    [`${MANAGER}/components/ComponentBrowserInspector.svelte`, 'data-component-edit-system-rules', '', 'primary'],
-    [`${MANAGER}/scoped/WorldComponentCataloguePage.svelte`, 'data-scoped-component-open-entry', true, 'primary'],
-    [`${MANAGER}/scoped/WorldEssenceCataloguePage.svelte`, 'data-scoped-essence-open-entry', true, 'primary'],
-    [`${MANAGER}/scoped/WorldToolCataloguePage.svelte`, 'data-scoped-tool-open-entry', true, 'primary']
-  ];
-  const FILES = [...new Set(SITES.map(([file]) => file))];
+  const FILES = [...new Set(INSPECTOR_VERB_SITES.map(({ file }) => file))];
   const GEOMETRY = new Set(['min-height', 'height', 'border-radius', 'font-size', 'padding']);
   const BUTTON_CLASSES = new Set(['fabricate-button', 'fab-manager-button', 'is-full-width']);
 
@@ -360,21 +345,20 @@ describe('M12a — an inspector rail’s verbs take the manager button’s rung 
   }
 
   it('renders each of the eight verbs as a full-width Button in the role its verb names', () => {
-    for (const [file, hook, value, role] of SITES) {
-      const matches = renderedNodes(componentAstOf(file), 'Button').filter(
-        (node) => hookValue(node, hook) === value
+    for (const { file, hook, value, role } of INSPECTOR_VERB_SITES) {
+      const hooked = renderedNodes(componentAstOf(file), 'Button').filter(
+        (node) => hookValue(node, hook) !== undefined
       );
+      const sites = INSPECTOR_VERB_SITES.filter((site) => site.file === file && site.hook === hook);
+      assert.equal(hooked.length, sites.length, `${file} renders no ${hook} Button the table omits`);
+      const matches = hooked.filter((node) => hookValue(node, hook) === value);
       assert.equal(matches.length, 1, `${file} renders one Button carrying ${hook}`);
       assert.equal(attributeValue(matches[0], 'role'), role, `${file} ${hook}=${value} is ${role}`);
       assert.ok(declaresAttribute(matches[0], 'fullWidth'), `${file} ${hook} spans its rail`);
     }
   });
 
-  it('keeps the primary on the 34px rung and the band’s 9px corner, with no rung of its own', () => {
-    const [primitive] = bodiesOf('.fabricate-button.fabricate-button.fab-manager-button');
-    assert.equal(pixels(valueOf(primitive, 'min-height')), 34);
-    assert.equal(pixels(valueOf(primitive, 'border-radius')), 9);
-    assert.equal(valueOf(primitive, 'font-size'), '0.72rem');
+  it('states no rung or corner of its own on the primary', () => {
     // The retired 36px primary is gone; `control-height-ladder.test.js` reports it as shrunk.
     for (const body of bodiesOf('.fabricate-button.fabricate-button.fab-manager-button.is-primary')) {
       assert.equal(valueOf(body, 'min-height'), null, 'the primary states no height of its own');

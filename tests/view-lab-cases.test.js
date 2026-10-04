@@ -53,6 +53,7 @@ import {
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
+import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
@@ -711,18 +712,7 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
 ];
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
-const CONTROL_LAYOUT_CASES = {
-  'manager-essences-inspector-verbs': [
-    '[data-essence-action="edit"]',
-    '[data-essence-action="delete"]',
-    '[data-essence-action="copy-source"]',
-    '[data-essence-action="unlink-source"]',
-  ],
-  'manager-components-normal': ['[data-component-edit-system-rules]'],
-  'world-component-catalogue': ['[data-scoped-component-open-entry]'],
-  'world-essence-catalogue': ['[data-scoped-essence-open-entry]'],
-  'world-tool-catalogue': ['[data-scoped-tool-open-entry]'],
-};
+const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) => caseId);
 const CONTROL_LAYOUT_CASE_IDS = Object.keys(CONTROL_LAYOUT_CASES);
 const LAYOUT_CASE_IDS = [
   ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
@@ -817,18 +807,28 @@ test('exactly the declared layout cases carry complete layout expectations', () 
 });
 
 test('the inspector-rail cases measure every verb on the manager rung, one primary in success', () => {
-  for (const [id, selectors] of Object.entries(CONTROL_LAYOUT_CASES)) {
+  const measured = VIEW_LAB_CASES.flatMap((viewCase) => viewCase.expectLayout?.controls ?? []);
+  assert.deepEqual(
+    measured.map((control) => control.selector).sort(),
+    INSPECTOR_VERB_SITES.map((site) => site.selector).sort(),
+    'the cases measure exactly the eight rail verbs'
+  );
+  for (const [id, sites] of Object.entries(CONTROL_LAYOUT_CASES)) {
     const { expectLayout } = getCaseById(id);
     assert.equal(expectLayout.gridSelector, undefined, `${id} measures controls, not a grid`);
     assert.deepEqual(
       expectLayout.controls.map((control) => control.selector),
-      selectors,
+      sites.map((site) => site.selector),
       `${id} measures each verb it renders`
     );
-    const primaries = expectLayout.controls.filter((control) =>
-      control.styles.includes('background-color: var(--fab-success)')
+    const success = expectLayout.controls
+      .filter((control) => control.styles.includes('background-color: var(--fab-success)'))
+      .map((control) => control.selector);
+    assert.deepEqual(
+      success,
+      sites.filter((site) => site.role === 'primary').map((site) => site.selector),
+      `${id} measures its primary, and only it, in the success family`
     );
-    assert.equal(primaries.length, 1, `${id} measures its one primary in the success family`);
     for (const { selector, styles } of expectLayout.controls) {
       for (const declaration of ['min-height: 34px', 'border-radius: 9px', 'font-size: 0.72rem']) {
         assert.ok(styles.includes(declaration), `${id} ${selector} measures ${declaration}`);
