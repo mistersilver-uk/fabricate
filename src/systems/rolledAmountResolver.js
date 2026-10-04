@@ -69,7 +69,8 @@ export function rolledAmountRefusals(resultGroups, Roll, rollData) {
 /**
  * `recipe.validate({ Roll })`, then `rolledAmountRefusals` and the injected `refuseRewards` over
  * every result group the recipe and its steps author, against `actor`. A progressive award drops
- * every formula (`ResolutionModeService`), so neither reads one there.
+ * every formula (`ResolutionModeService`), so the amount refusals skip it there; `refuseRewards`
+ * still runs and refuses any currency or knowledge result.
  */
 export function validateCraft(recipe, actor, modeService, refuseRewards = null) {
   const Roll = diceEngine();
