@@ -29,6 +29,7 @@
   import ConsumptionPlanPanel from './ConsumptionPlanPanel.svelte';
   import { essenceOvershoots } from './essenceOvershoot.js';
   import Kicker from '../../../components/Kicker.svelte';
+  import AwardPill from './AwardPill.svelte';
 
   let {
     craftability = null,
@@ -184,12 +185,7 @@
       <Kicker as="p">{localize('FABRICATE.App.Crafting.Io.Output')}</Kicker>
       <ul class="crafting-io-outputs">
         {#each outputs as item, index (item.name + index)}
-          <!-- A currency or knowledge reward draws its kind's glyph and states its own amount. -->
-          <li class="crafting-io-output" data-io-output={item.kind ?? 'component'}>
-            <Medallion {...resolveCraftingArt(item.img, item.glyph)} alt="" size={32} />
-            <span class="crafting-io-output-name">{item.name}</span>
-            <span class="crafting-io-output-qty">{item.amountText ?? `×${item.qty}`}</span>
-          </li>
+          <AwardPill {item} variant="output" />
         {/each}
       </ul>
     </div>
@@ -274,27 +270,5 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-  }
-
-  /* Rounded rectangle matching the tier award pills + the rounded-square item image
-     it wraps (not a full capsule). */
-  .crafting-io-output {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 10px 4px 4px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-  }
-
-  .crafting-io-output-name {
-    font-size: 13px;
-  }
-
-  .crafting-io-output-qty {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    color: var(--fab-text-muted);
   }
 </style>

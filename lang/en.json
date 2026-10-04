@@ -978,6 +978,7 @@
           "CurrencyCost": "{amount} {unit}",
           "CurrencyUnaffordable": "Not enough {unit}",
           "RecipeKnowledge": "Recipe knowledge",
+          "CurrencyReward": "Currency",
           "UnknownRecipe": "Unknown recipe"
         },
         "Slots": {
@@ -1180,7 +1181,7 @@
           "UnknownMaterial": "Unknown material",
           "CurrencyAwarded": "Currency awarded",
           "RecipeLearned": "Recipe learned",
-          "RecipeAlreadyKnown": "Already known",
+          "RecipeAlreadyKnown": "Recipe already known",
           "NotRecorded": "Not recorded",
           "NoCheck": "No check — it simply completes",
           "NoRoll": "No roll — collecting takes it all",
@@ -1248,6 +1249,7 @@
           "OutcomeLog": "How the check landed",
           "Outcome": "Recorded outcome",
           "ClosedSuccess": "A closed run. Its results are already in your inventory; the entry stays here as a record.",
+          "ClosedSuccessRewards": "A closed run. Its results are already yours; the entry stays here as a record.",
           "ClosedFailedCheck": "This run failed its final check. Failed runs are kept so you can see what was attempted and when.",
           "ClosedFailedEmpty": "This run could not meet what it needed, so nothing was produced. Failed runs are kept so you can see what was attempted and when.",
           "ClosedFailureAwards": "This run failed, but the results recorded above were awarded. Failed runs are kept so you can see what was attempted and when.",

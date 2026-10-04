@@ -4,6 +4,8 @@
  */
 
 import { isFixedSumOver } from '../../systems/checkTarget.js';
+import { currencyUnitDisplayName, findCurrencyUnit } from '../../systems/currencyProfile.js';
+import { RESULT_KIND_GLYPHS } from '../presenters/resultKindGlyphs.js';
 
 import {
   buildEntityBrowserModel,
@@ -442,19 +444,29 @@ function amountLabelOf(result) {
   return String(Number(result?.quantity) > 0 ? Number(result.quantity) : 1);
 }
 
-/** A non-component result's own fields (issue 1773): its kind, what names it and its glyph. */
+/**
+ * A non-component result's own fields (issue 1773): its kind, what names it and its glyph. A
+ * currency row states its amount with its unit's display name, never a generated unit id, and a
+ * knowledge row names the recipe it teaches from `recipeOptions` (the GM reads every name).
+ */
 function rewardProduceFields(result, rosters) {
   if (result?.kind === 'currency') {
-    const name = result.label || result.unit || '';
-    return { kind: 'currency', unit: result.unit || '', name, icon: 'fa-solid fa-coins' };
+    const unit = findCurrencyUnit(rosters.currencyUnits, result.unit);
+    const unitName = currencyUnitDisplayName(unit) || result.unit || '';
+    return {
+      kind: 'currency',
+      unit: result.unit || '',
+      name: result.label || '',
+      icon: RESULT_KIND_GLYPHS.currency,
+      amountLabel: `${amountLabelOf(result)} ${unitName}`.trim(),
+    };
   }
   const taught = findById(rosters.recipeOptions, result?.recipeId);
-  const name = taught?.name || result?.recipeId || '';
   return {
     kind: 'knowledge',
     recipeId: result?.recipeId || '',
-    name,
-    icon: 'fa-solid fa-book-open',
+    name: taught?.name || '',
+    icon: RESULT_KIND_GLYPHS.knowledge,
   };
 }
 

@@ -1,21 +1,19 @@
 /**
  * A recipe's expected outputs as display rows, one per routed result of every kind (issue 1773):
- * a component by its library entry, a currency reward by its label or unit, and a knowledge reward
- * by the recipe it teaches. Shared by the crafting detail's output list and its outcome tiers.
+ * a component by its library entry, a currency reward by its label, and a knowledge reward by the
+ * recipe it teaches when the viewer may see that recipe. Shared by the crafting detail's output
+ * list and its outcome tiers.
  */
+import { currencyUnitDisplayName, findCurrencyUnit } from '../../systems/currencyProfile.js';
 import { resolvedComponentsFor } from '../../systems/scopedEntityReads.js';
 import {
   untrimmedStringOrEmpty as stringOrEmpty,
   untrimmedStringOrNull as stringOrNull,
 } from '../../utils/scalars.js';
 
-const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
+import { RESULT_KIND_GLYPHS } from './resultKindGlyphs.js';
 
-/** The glyph each non-component result kind draws in place of an item image. */
-export const RESULT_KIND_GLYPHS = Object.freeze({
-  currency: 'fa-solid fa-coins',
-  knowledge: 'fa-solid fa-book-open',
-});
+const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
 
 const list = (value) => (Array.isArray(value) ? value : []);
 const kindOf = (result) => result?.kind ?? 'component';
@@ -41,25 +39,49 @@ export function resultSignature(groups) {
   return pairs.sort((a, b) => a.localeCompare(b)).join(',');
 }
 
-function rewardRow(result, { units, recipeManager, localize }) {
+/**
+ * A knowledge reward's taught recipe name as this viewer may read it, or `null`, which renders
+ * `FABRICATE.App.Crafting.Io.UnknownRecipe`: the GM reads every name, a player only an enabled
+ * recipe `evaluateRecipeAccess` finds visible and not a teaser (`recipe-visibility`).
+ */
+export function taughtNameReader(
+  { recipeManager, recipeVisibility },
+  { isGM, viewer, craftingActor, knowledgeSources }
+) {
+  return (recipeId) => {
+    const taught = recipeManager?.getRecipe?.(recipeId) ?? null;
+    if (!taught || isGM) return taught?.name ?? null;
+    if (taught.enabled === false) return null;
+    const access = recipeVisibility?.evaluateRecipeAccess?.({
+      recipe: taught,
+      viewer,
+      craftingActor,
+      componentSourceActors: knowledgeSources,
+    });
+    return access?.visible === true && access.reason !== 'teaser' ? taught.name : null;
+  };
+}
+
+function rewardRow(result, { units, taughtName, localize }) {
   const kind = kindOf(result);
   if (kind === 'currency') {
-    const unit = list(units).find((entry) => entry?.id === result.unit) ?? null;
-    const unitName = stringOrEmpty(unit?.label) || stringOrEmpty(result.unit);
+    const unitName =
+      currencyUnitDisplayName(findCurrencyUnit(units, result.unit)) || stringOrEmpty(result.unit);
     return {
       kind,
-      name: stringOrEmpty(result.label) || unitName,
+      name: stringOrEmpty(result.label) || localize('FABRICATE.App.Crafting.Io.CurrencyReward'),
       img: null,
       glyph: RESULT_KIND_GLYPHS.currency,
       qty: Number(result.quantity || 1),
-      amountText: `${authoredAmount(result)} ${unit?.abbreviation || unitName}`.trim(),
+      amountText: `${authoredAmount(result)} ${unitName}`.trim(),
       reason: stringOrNull(result.reason),
     };
   }
-  const taught = recipeManager?.getRecipe?.(result?.recipeId) ?? null;
   return {
     kind,
-    name: stringOrEmpty(taught?.name) || localize('FABRICATE.App.Crafting.Io.UnknownRecipe'),
+    name:
+      stringOrEmpty(taughtName?.(result?.recipeId)) ||
+      localize('FABRICATE.App.Crafting.Io.UnknownRecipe'),
     img: null,
     glyph: RESULT_KIND_GLYPHS.knowledge,
     qty: 1,
@@ -71,14 +93,15 @@ function rewardRow(result, { units, recipeManager, localize }) {
 /**
  * Flatten resolved result groups into `{ name, img, qty }` rows; a non-component row adds `kind`,
  * `glyph`, `amountText` and `reason`, so a component row is exactly the row it always was.
- * `currencyUnits()` answers the world's normalized units, read only when a currency row needs them.
+ * `currencyUnits()` answers the world's normalized units, read only when a currency row needs them,
+ * and `taughtName(recipeId)` a taught recipe's name only where the viewer may read it.
  */
-export function resultOutputRows(groups, { system, currencyUnits, recipeManager, localize }) {
+export function resultOutputRows(groups, { system, currencyUnits, taughtName, localize }) {
   const byId = new Map(resolvedComponentsFor(system).map((component) => [component.id, component]));
   return list(groups).flatMap((group) =>
     list(group?.results).map((result) => {
       if (kindOf(result) !== 'component') {
-        return rewardRow(result, { units: currencyUnits?.() ?? [], recipeManager, localize });
+        return rewardRow(result, { units: currencyUnits?.() ?? [], taughtName, localize });
       }
       const component = result?.componentId ? byId.get(result.componentId) : null;
       return {

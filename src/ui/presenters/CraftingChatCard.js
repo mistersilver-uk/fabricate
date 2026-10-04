@@ -30,7 +30,7 @@ import {
   statesCountEvidence,
 } from './countEvidenceRows.js';
 import { esc } from './htmlEscape.js';
-import { RESULT_KIND_GLYPHS } from './resultOutputRows.js';
+import { RESULT_KIND_GLYPHS } from './resultKindGlyphs.js';
 
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
 
@@ -145,8 +145,9 @@ const KNOWLEDGE_GRANT_KEYS = Object.freeze({
 });
 
 /**
- * One currency credit or knowledge grant as a result row (issue 1773): the kind's glyph in place of
- * an image, a credit's label beside its amount and its roll, and the reason it was given.
+ * One currency credit or knowledge grant as a full-width result row (issue 1773): the kind's glyph
+ * in place of an image, then a stack of the credit's label and amount or the grant's sentence, the
+ * roll, and the reason it was given, so a recipe name is never ellipsized away at chat width.
  */
 function renderReward(entry, localize) {
   const currency = entry.kind === 'currency';
@@ -161,14 +162,14 @@ function renderReward(entry, localize) {
   return [
     `<li class="fabricate-craft-chat__item fabricate-craft-chat__item--reward" data-reward-kind="${currency ? 'currency' : 'knowledge'}">`,
     `<i class="fabricate-craft-chat__icon ${RESULT_KIND_GLYPHS[entry.kind]}" aria-hidden="true"></i>`,
-    `<span class="fabricate-craft-chat__label">${esc(text)}</span>`,
+    `<span class="fabricate-craft-chat__label"><span>${esc(text)}</span>`,
     note
       ? `<span class="fabricate-craft-chat__roll fabricate-craft-chat__item-roll">${esc(note)}</span>`
       : '',
     entry.reason
       ? `<span class="fabricate-craft-chat__reward-reason">${esc(entry.reason)}</span>`
       : '',
-    '</li>',
+    '</span></li>',
   ].join('');
 }
 

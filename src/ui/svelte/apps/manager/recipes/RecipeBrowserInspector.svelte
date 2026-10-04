@@ -34,6 +34,7 @@
   } from '../../../../model/recipeBrowserModel.js';
   import IconButton from '../../../components/IconButton.svelte';
   import Select from '../../../components/Select.svelte';
+  import RecipeProduceRow from './RecipeProduceRow.svelte';
 
   let {
     selectedRecipe = null,
@@ -50,6 +51,10 @@
     // of the ids the recipe references. The inspector reads; it never authors.
     componentOptions = [],
     essenceOptions = [],
+    // The system's recipes ({id, name}) and the world's currency units, read only to name a
+    // knowledge or currency result (issue 1773).
+    recipeOptions = [],
+    currencyUnits = [],
     showRecipeCategories = false,
     showVisibilitySummary = false,
     onEdit = () => {},
@@ -119,8 +124,10 @@
       ? buildRecipeRequirementRows(selectedRecipe, { componentOptions, essenceOptions })
       : []
   );
+  // A reward row names its taught recipe and its unit's display name from these rosters.
+  const produceRosters = $derived({ componentOptions, recipeOptions, currencyUnits });
   const produceRows = $derived(
-    selectedRecipe ? buildRecipeProduceRows(selectedRecipe, { componentOptions }) : []
+    selectedRecipe ? buildRecipeProduceRows(selectedRecipe, produceRosters) : []
   );
   // Every produced row is listed, TONED BY ROLE. A `role: 'failure'` group is the reserved
   // alchemy-Simple group and exists ONLY there, so no failure row is invented for a routed mode.
@@ -236,7 +243,9 @@
   // Multi-step recipes paginate one step at a time: each step's own Requires / Produces,
   // stepped through with prev/next and an (x / y) position hint (issue 643).
   const stepModel = $derived(
-    selectedRecipe ? buildRecipeStepModel(selectedRecipe, { componentOptions, essenceOptions }) : []
+    selectedRecipe
+      ? buildRecipeStepModel(selectedRecipe, { ...produceRosters, essenceOptions })
+      : []
   );
   const isMultiStep = $derived(stepModel.length > 1);
 
@@ -367,10 +376,6 @@
   function requirementQuantity(row) {
     if (row.kind === 'currency') return '';
     return `×${row.quantity}`;
-  }
-
-  function produceName(row) {
-    return row.name || text(UNNAMED_COMPONENT, 'Unknown component');
   }
 </script>
 
@@ -575,39 +580,12 @@
     <!-- One produced row, TONED BY ROLE. `showGroupPill` is false wherever the group is already
          identified, so the pill is never doubled up. -->
     {#snippet produceRow(row, showGroupPill)}
-      <div
-        class={`manager-recipe-flow-row ${row.failure ? 'is-failure' : 'is-produced'}`}
-        data-recipe-produces={row.failure ? 'failure' : 'success'}
-      >
-        <span class="manager-recipe-flow-icon" aria-hidden="true">
-          {#if row.img}
-            <img src={row.img} alt="" />
-          {:else}
-            <i class="fas fa-cube"></i>
-          {/if}
-        </span>
-        <span class="manager-recipe-flow-name">{produceName(row)}</span>
-        {#if isProgressive}
-          <!-- Progressive: the component's DC (its ordered "cost"), not a redundant
-               single-group pill. -->
-          <span
-            class="manager-recipe-flow-group manager-recipe-flow-dc"
-            data-recipe-produces-dc={row.difficulty === null ? '' : String(row.difficulty)}
-            >{progressiveDcLabel(row)}</span
-          >
-        {:else if showGroupPill && row.groupName && !routedPairing}
-          <!-- The GM-authored group name, toned by the role it plays. Fabricate's outcome
-               tiers are authored, so the NAME is the recipe's; the tone is not. -->
-          <span class={`manager-recipe-flow-group ${row.failure ? 'is-failure' : 'is-success'}`}
-            >{row.groupName}</span
-          >
-        {/if}
-        {#if !isProgressive}
-          <!-- Progressive ignores quantity (each entry is awarded once), so a "×1" there
-               would read as if all results are produced together — omitted. -->
-          <span class="manager-recipe-flow-qty">×{row.quantity}</span>
-        {/if}
-      </div>
+      <RecipeProduceRow
+        {row}
+        unknownName={text(UNNAMED_COMPONENT, 'Unknown component')}
+        dcLabel={isProgressive ? progressiveDcLabel(row) : null}
+        groupPill={showGroupPill && !routedPairing ? row.groupName : ''}
+      />
     {/snippet}
     <div class="manager-recipe-flow-list">
       {#if isTwoOutcome && !isMultiStep}

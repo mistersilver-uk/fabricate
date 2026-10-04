@@ -47,6 +47,11 @@ const RECIPE_RAW_MODULES = [
   // The lifted browse state's default page size, which the browse-list composable reads.
   'src/ui/model/managerBrowserViewState.js',
   'src/ui/model/recipeBrowserModel.js',
+  // ... which names a reward row by its glyph and its unit's display name (issue 1773).
+  'src/ui/presenters/resultKindGlyphs.js',
+  'src/systems/currencyProfile.js',
+  'src/config/currencyPresets.js',
+  'src/utils/objectPath.js',
   // ... which names its check sort key from the system's evaluation (issue 2005) ...
   ...CHECK_TARGET_RAW_MODULES,
   // ... which since issue 1688 runs on the shared adapter-driven pipeline.
@@ -117,6 +122,7 @@ const inspector = createMountedComponentHarness({
   compiledModules: [
     ...RECIPE_PRIMITIVES,
     ...SELECT_COMPILED_MODULES,
+    'src/ui/svelte/apps/manager/recipes/RecipeProduceRow.svelte',
     'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
@@ -1298,6 +1304,43 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.ok(pill.classList.contains('is-success'));
     assert.match(rows[0].querySelector('.manager-recipe-flow-qty').textContent, /×3/);
     assert.equal(root.querySelector('[data-recipe-produces-empty]'), null);
+  });
+
+  // Issue 1773: a reward row names itself from the rosters the inspector is handed, with its
+  // kind's glyph, never a raw recipe or unit id under a cube.
+  it('names a currency and a knowledge reward by their own rosters and glyphs', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeAuthoredRecipe({
+        id: 'r1',
+        resultGroups: [
+          {
+            id: 'g1',
+            name: 'On success',
+            results: [
+              { id: 'coin', kind: 'currency', unit: 'gp', quantity: 1, quantityFormula: '2d6', label: 'Guild bounty' },
+              { id: 'purse', kind: 'currency', unit: 'gp', quantity: 4 },
+              { id: 'lore', kind: 'knowledge', recipeId: 'r-sword', quantity: 1 }
+            ]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS,
+      recipeOptions: [{ id: 'r-sword', name: 'Forge Longsword' }],
+      currencyUnits: [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }]
+    });
+
+    const rows = [...root.querySelectorAll('[data-recipe-produces]')].map((row) => [
+      row.dataset.recipeProducesKind,
+      row.querySelector(':scope .manager-recipe-flow-icon i')?.className ?? '',
+      row.querySelector('.manager-recipe-flow-name').textContent.trim(),
+      row.querySelector('.manager-recipe-flow-qty').textContent.trim()
+    ]);
+    assert.deepEqual(rows, [
+      ['currency', 'fa-solid fa-coins', 'Guild bounty', '2d6 gp'],
+      ['currency', 'fa-solid fa-coins', 'FABRICATE.App.Crafting.Io.CurrencyReward', '4 gp'],
+      ['knowledge', 'fa-solid fa-book-open', 'Forge Longsword', 'FABRICATE.App.Crafting.Io.RecipeKnowledge']
+    ]);
   });
 
   it('says outright that a recipe with no results makes nothing on a successful craft', async () => {

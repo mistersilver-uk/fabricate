@@ -65,7 +65,8 @@
       },
       ...(stage.route ? [{ id: 'route', label: text('ChosenRoute'), value: stage.route }] : []),
       ...presentCurrencySpends(stage.currencySpends, localize),
-      ...stage.rewards,
+      // A stage card states one string per fact, so a reward's wrap segments join back into one.
+      ...stage.rewards.map((reward) => ({ ...reward, value: [reward.value].flat().join('') })),
     ];
   }
   // The transient banner's evidence rows, and WHETHER THERE ARE ANY (issue 1648, M22).
@@ -124,7 +125,15 @@
     {#if account.summary}<span>{account.summary.value}</span>{/if}
     {@render items(text('Consumed'), single?.consumed ?? [], 'transient-consumed')}
     {@render items(resultHeading, account.results, 'transient-produced')}
+    {@render rewardFacts()}
   {/if}
+{/snippet}
+
+<!-- Each credit and grant as its own fact row, in the history and in the just-finished banner. -->
+{#snippet rewardFacts()}
+  {#each account.rewards as reward (reward.id)}
+    <JournalFactRow icon={reward.icon} label={reward.label} value={reward.value} />
+  {/each}
 {/snippet}
 
 {#snippet essenceRecaps()}
@@ -199,9 +208,7 @@
       {/each}
       {@render essenceRecaps()}
       {@render items(resultHeading, account.results, 'produced')}
-      {#each account.rewards as reward (reward.id)}
-        <JournalFactRow icon={reward.icon} label={reward.label} value={reward.value} />
-      {/each}
+      {@render rewardFacts()}
       {#if (single?.historySettlement ?? run.historySettlement)?.consumption === 'notApplicable'}
         <JournalFactRow label={text('MaterialsUsed')} value={text('NotApplicable')} />
       {/if}
