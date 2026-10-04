@@ -278,6 +278,7 @@ Each verb takes the button's shipped manager rung — the compact control height
 Each verb takes the role its verb names:
 
 - `primary` is the success family (section 16 of the design-system library), and there is at most one per rail — the verb that opens the selected record.
+- Duplicate, which makes a new record from the selected one, is `neutral`.
 - Delete is `danger`.
 - Unlink is `warning`: it breaks a reference the GM can re-make exactly and destroys nothing.
 - The quiet verb that changes no record, such as Copy source UUID, is `ghost`.
