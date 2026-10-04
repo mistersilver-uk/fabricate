@@ -33,6 +33,11 @@ manager-recipe-edit-results-rolled
 manager-recipe-edit-results-rolled-hearth-herb
 manager-recipe-edit-results-rolled-narrow
 manager-recipe-edit-results-suggestions
+manager-recipe-edit-results-kinds
+manager-recipe-edit-results-kinds-narrow
+manager-recipe-edit-results-currency-body-empty
+manager-recipe-edit-results-currency-body-filled
+manager-recipe-edit-results-adder-menu
 manager-multistep-disable-confirm
 manager-recipe-edit-collapsed
 manager-recipe-edit-results-progressive

@@ -314,6 +314,22 @@ test('rejects a name field under its minimum', async () => {
   );
 });
 
+test('accepts a label whose text fits its box, and rejects one cut to an ellipsis', async () => {
+  const label = (scrollWidth, clientWidth) => ({ scrollWidth, clientWidth });
+  const UNCLIPPED = { containerSelector: '.rows', unclipped: '.kind' };
+  const fits = rowsFrame({ '.kind': [label(104, 104), label(60, 104)] });
+  await assert.doesNotReject(assertViewLabLayout(fits, UNCLIPPED, 'fits'));
+  const cut = rowsFrame({ '.kind': [label(60, 104), label(118, 104)] });
+  await assert.rejects(
+    assertViewLabLayout(cut, UNCLIPPED, 'cut'),
+    /.kind #2 is clipped by 14px of its text/
+  );
+  await assert.rejects(
+    assertViewLabLayout(rowsFrame({ '.kind': [] }), UNCLIPPED, 'none'),
+    /".kind" matched 0, fewer than the 1 it measures/
+  );
+});
+
 test('rejects a geometry selector too thin to measure anything', async () => {
   await assert.rejects(
     assertViewLabLayout(rowsFrame({ '.remove': [box({ left: 770 })] }), ROWS, 'one'),
