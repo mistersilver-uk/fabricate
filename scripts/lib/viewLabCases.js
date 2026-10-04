@@ -31,6 +31,7 @@ import { CASES as managerGatheringCases } from './view-lab-cases/managerGatherin
 import { CASES as managerKnowledgeCases } from './view-lab-cases/managerKnowledge.js';
 import { CASES as managerRecipeEditorCases } from './view-lab-cases/managerRecipeEditor.js';
 import { CASES as managerRecipesCases } from './view-lab-cases/managerRecipes.js';
+import { CASES as managerSpecimensCases } from './view-lab-cases/managerSpecimens.js';
 import { CASES as managerSystemsCases } from './view-lab-cases/managerSystems.js';
 import { CASES as managerSystemToolsCases } from './view-lab-cases/managerSystemTools.js';
 import { CASES as managerWorldPartiesAndDowntimeCases } from './view-lab-cases/managerWorldPartiesAndDowntime.js';
@@ -108,6 +109,7 @@ export const VIEW_LAB_CASE_FILES = Object.freeze([
   caseFile('managerWorldTravel', managerWorldTravelCases),
   caseFile('managerSystemTools', managerSystemToolsCases),
   caseFile('managerKnowledge', managerKnowledgeCases),
+  caseFile('managerSpecimens', managerSpecimensCases),
   caseFile('playerInventory', playerInventoryCases),
   caseFile('playerGatheringAndCrafting', playerGatheringAndCraftingCases),
   caseFile('playerJournal', playerJournalCases),
