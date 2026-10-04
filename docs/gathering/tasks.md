@@ -134,11 +134,11 @@ They are resolved by the system's gathering check, which you configure once for 
 When a routed task is attempted, the gathering check rolls and produces a named outcome.
 That outcome name is matched to a result set by name, and the matching set is awarded.
 
-A few outcome names are reserved and take the failure path instead of awarding a set.
+A few outcome names are reserved and take the failure path instead of awarding a result set.
 Because the match is by name, give each result set a name that lines up with one of your gathering check's outcomes.
 Names are matched ignoring upper and lower case and surrounding spaces, so each result set needs a name that is unique once case is ignored.
 
-If the outcome is a success but matches none of your result sets, the attempt fails and no set is awarded.
+If the outcome is a success but matches none of your result sets, the attempt fails and no result set is awarded.
 A routed task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
 
 A routed task can override the gathering check's own difficulty for that task alone, with a single field and a **System default** placeholder.
