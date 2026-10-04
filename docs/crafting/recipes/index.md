@@ -73,6 +73,14 @@ Adding a component that a result set already produces raises that row's quantity
 If that row is rolled, a second row is added instead.
 A progressive recipe always adds a new stage, so repeat a component there to produce it again.
 
+### Moving a World Back to an Older Version
+
+{: .warning }
+> Currency results, recipe-knowledge results and result choice groups need this version of Fabricate or a later one.
+> An older version expects every result to name a component, so a recipe carrying any of them fails its validation there and cannot be crafted until you remove that result.
+> An older version also ignores a craft's record of a reward still waiting for the player's choice, so that reward can no longer be claimed.
+> Back up your world before moving it to an older version, and settle any waiting rewards first.
+
 ## Enabling and Disabling Recipes
 
 Whether a recipe is enabled controls whether it can be crafted.

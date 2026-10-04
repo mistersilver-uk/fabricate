@@ -3152,6 +3152,9 @@ This section states only what is persisted.
     A repeated draw is not a third strategy — it is `"upTo"` under `"rolled"` with `withReplacement` true — so there is no combination left to forbid.
 13. `selectionRange` is read only on a member of a group whose `chooser` is `"rolled"`, and `from` and `to` are inclusive.
     The ranges of a group's members are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest member and a roll above the highest selects the highest, so no authored group can produce nothing.
+    A roll selects the member with the highest `from` at or below it, and a roll below every `from` selects the lowest.
+    Ranges MUST NOT overlap and `from` MUST NOT exceed `to`.
+    Without repeats, each later roll is read against the members not yet awarded.
     Where a roll awards more than one alternative, the `selectionFormula` is rolled once per award rather than once for the group.
 14. A choice group is NOT valid inside a `progressive` result group.
     Progressive awards every ordered entry whose difficulty the roll affords and normalizes a result's quantity to 1, so neither a chooser nor an award strategy has anything to mean there.
@@ -3191,6 +3194,7 @@ RunLifecycle = {
     }>,
     outcome?: object | null,
   },
+  awardChoiceJournal?: object, // the `executionJournal` shape, holding the latest award-choice settle
 }
 ```
 
@@ -3216,6 +3220,10 @@ It does not delay terminal history until effects finish.
 8. Intent, effect plans, receipts and outcomes retain existing secret and blind-run redaction.
 Authority request deduplication and safe prepare-token metadata live in the GM-owned authority ledger; the run record retains effect evidence.
 9. Stage browsing is transient UI state and never changes the persisted executable stage index.
+10. A terminal run accepts exactly one mutation, settling its pending award choice, which advances `runRevision` and journals into `awardChoiceJournal`, never replacing `executionJournal`.
+An active run's settle journals there too, so the stage's committed journal, its `award-results` receipt and its committed replay are untouched.
+The settle runs under a grant issued for `chooseAward`, a grant issued for another operation is refused, and a new request for a settled choice awards nothing.
+Its effects are `award-choice` (kind `awardChoice`, planned `{ choiceId, picks }`, every pick's amount resolved before the first write), `settle-choice` (kind `settleAwardChoice`) and `post-chat` (kind `postCraftChat`).
 
 ### Authority Ledger and Recovery Boundary
 
@@ -3471,6 +3479,21 @@ CraftingRunStepState = {
     outcome: "granted" | "alreadyKnown", recipeName?: string,
   }>,
 
+  // What a result-side choice group awarded, and the pick a player-chooser group still owes (issue
+  // 1773); absent on a step written before it and on a step whose routed set held no group.
+  // `choiceId` is the carrier's `Result.id`, `count` the resolved N rather than the authored count.
+  groupAwards?: Array<{
+    choiceId: string, chooser: "playerChooses" | "rolled", awardStrategy: "anyOne" | "upTo",
+    count: number, countRoll?: { formula: string, total: number },
+    selections: Array<{ alternativeId: string, roll?: { formula: string, total: number } }>,
+  }>,
+  pendingAwardChoices?: Array<{
+    choiceId: string, resultGroupId: string | null, awardStrategy: "anyOne" | "upTo",
+    count: number, countRoll?: { formula: string, total: number },
+    alternatives: Array<object>, // the members as awarded at award time, without their ranges
+    picks?: string[], settledAt?: number, outcome?: "awarded" | "forfeited",
+  }>,
+
   failureReason?: string,
 }
 ```
@@ -3520,6 +3543,13 @@ CraftingRunStepState = {
    `runId` is the run's id on every path that holds a run, and `index` is the credit's position in the step's reward plan.
    A craft refuses a reward its world cannot honour before anything is consumed, at the run's start and again when a later stage starts: an unconfigured unit, currency off, a credit the writer would refuse without writing (a synthetic-token crafter, `creditNotConfigured`, `currencySourceMissing`, `balanceUnreadable`), a taught recipe outside the system, and `knowledgeNotObservable`.
    An interrupted reward step is recovery-required and never replayed; on the unversioned paths the credits and grants it confirmed stay in `currencyCredits` and `knowledgeGrants`, never as `createdResults` rows.
+10. `groupAwards` and `pendingAwardChoices` are each absent on a step written before issue 1773, and an older build ignores them, so an unsettled choice is stranded there.
+   `award-results` writes them into its receipt, and the step persists them when it finalizes; `award-rewards` is planned whenever the routed set holds a choice group, because a group's draw is rolled after the plan is persisted.
+   A rolled group's draws award through each member's own kind, so a drawn credit or grant names the carrier as `resultId` and the member as `alternativeId`.
+   An N of 0 records an empty `groupAwards` entry and leaves no pending choice.
+   A pending choice is settled exactly once, writing `picks`, `settledAt` and `outcome` onto its entry and appending the award's receipts and a `groupAwards` entry to the same step.
+   A choice with no claimable member settles `forfeited`; claimability is judged at settle time, and a member whose component or taught recipe is gone or unobservable, whose currency is off or unit gone, or whose recipe is already known is not claimable.
+   A run holding an unsettled choice survives the history limit and every prune, is skipped by the world-time sweep, refuses a later stage's start until the choice is settled while any member is claimable, and its step does not record `historySettlement.awards: 'complete'` before the settle.
 
 #### Optional historical evidence
 
