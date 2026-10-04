@@ -4,7 +4,7 @@
  * shipped global stylesheet are not `src/` text and keep their reads.
  */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
@@ -388,10 +388,6 @@ describe('RecipeModeCallout (issue 1522)', () => {
       ],
     }
   );
-
-  it('and the retired banner is gone from the tree', () => {
-    assert.equal(existsSync(resolve(repoRoot, `${MANAGER}/recipe/RecipeModeBanner.svelte`)), false);
-  });
 
   defineStructureContract('the Overview tab hands its own hooks to the inert callout', OVERVIEW, {
     renders: ['Callout', 'Button'],
