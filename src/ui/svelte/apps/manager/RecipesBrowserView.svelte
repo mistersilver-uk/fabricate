@@ -316,7 +316,7 @@
   // tier- or set-keyed mode has no single outputs number, so it reports the RESULT-GROUP count
   // with a routing glyph instead.
   function groupsText(count) {
-    // "1 groups" is not a sentence. The singular is its own key.
+    // "1 sets" is not a sentence. The singular is its own key.
     return count === 1
       ? text('FABRICATE.Admin.Manager.Recipe.CountResultGroupsOne', '1 set')
       : format('FABRICATE.Admin.Manager.Recipe.CountResultGroups', '{count} sets', { count });

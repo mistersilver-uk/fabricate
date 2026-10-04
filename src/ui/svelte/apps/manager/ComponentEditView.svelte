@@ -1931,7 +1931,7 @@
                 </span>
                 {#if salvageSimpleMode}
                   <!-- REQUIRED visible hint (issue 764), never a `title`: a tooltip on an absent
-                 control never fires. It explains why Add group is gone at the one-group cap. -->
+                 control never fires. It explains why Add result set is gone at the one-set cap. -->
                   <p class="manager-muted" data-salvage-simple-hint>
                     {text(
                       'FABRICATE.Admin.Manager.Component.SalvageEditor.SimpleSingleGroupHint',
@@ -2088,7 +2088,7 @@
                     <span
                       >{text(
                         'FABRICATE.Admin.Manager.Component.SalvageEditor.AddGroup',
-                        'Add set'
+                        'Add result set'
                       )}</span
                     >
                   </Button>
