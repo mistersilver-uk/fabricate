@@ -130,5 +130,6 @@ player-journal-award-choice
 player-journal-award-choice-hearth-herb
 player-journal-award-choice-ceiling
 player-journal-award-choice-narrow
+player-journal-award-choice-forfeit
 player-journal-list-award-pending
 player-journal-award-choice-history

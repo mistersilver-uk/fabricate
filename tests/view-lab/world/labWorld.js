@@ -110,6 +110,43 @@ function seedRewardGroup(content) {
   });
 }
 
+/** A rolled group's member, drawn when its selection roll lands in `from`–`to`. */
+const drawn = (id, componentId, quantity, from, to) => ({
+  id,
+  componentId,
+  quantity,
+  selectionRange: { from, to },
+});
+
+/** `reward-group-rolled` (issue 1773): Bend Horseshoe's outputs also draw by roll — one of two on
+ *  a d6 ladder, and up to two of three — so its preview states both rolled captions. */
+function seedRewardGroupRolled(content) {
+  const { recipe } = recipeAndSystem(content, 'sm-r-horseshoe', 'reward-group-rolled');
+  recipe.resultGroups[0].results.push(
+    {
+      id: 'sm-r-horseshoe-draw',
+      chooser: 'rolled',
+      selectionFormula: '1d6',
+      alternatives: [
+        drawn('scrap', 'sm-iron-ingot', 1, 1, 3),
+        drawn('bar', 'sm-iron-ingot', 2, 4, 6),
+      ],
+    },
+    {
+      id: 'sm-r-horseshoe-draws',
+      chooser: 'rolled',
+      awardStrategy: 'upTo',
+      awardCount: 2,
+      selectionFormula: '1d6',
+      alternatives: [
+        drawn('coal', 'sm-coal', 1, 1, 2),
+        drawn('more-coal', 'sm-coal', 2, 3, 4),
+        drawn('ingot', 'sm-iron-ingot', 1, 5, 6),
+      ],
+    }
+  );
+}
+
 /** `reward-tiers`: the Runeblade's masterwork tier also pays a labelled commission. */
 function seedRewardTiers(content) {
   const { recipe, system } = recipeAndSystem(content, 'rw-r-blade', 'reward-tiers');
@@ -153,6 +190,7 @@ const RESULT_ROW_STATES = Object.freeze({
   'reward-craft': seedRewardCraft,
   'reward-missing': seedRewardMissing,
   'reward-group': seedRewardGroup,
+  'reward-group-rolled': seedRewardGroupRolled,
   'reward-tiers': seedRewardTiers,
 });
 
@@ -601,8 +639,8 @@ function stripAuthoredWorldComponents(content) {
  * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component,
  *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result, `reward-craft`
  *   for that award crafted, `reward-missing` for it also teaching a recipe its system no longer
- *   holds, `reward-group` for it leaving a pick of up to two (issue 1773), or `reward-tiers` for a
- *   Runeblade tier paying a commission.
+ *   holds, `reward-group` for it leaving a pick of up to two (issue 1773), `reward-group-rolled`
+ *   for two groups drawn by roll, or `reward-tiers` for a Runeblade tier paying a commission.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.

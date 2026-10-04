@@ -1,7 +1,7 @@
 /**
  * The Journal's award face (issue 1773): a finished craft that owes the player a pick of up to two
  * rewards, one already known and so disabled with its reason, at both widths, at the ceiling, under
- * another palette, on the Active list, and once settled.
+ * another palette, with nothing claimable, on the Active list, and once settled.
  */
 
 import { JOURNAL_SOURCES } from './caseConstants.js';
@@ -73,6 +73,16 @@ export function journalAwardChoiceCases() {
       steps: [{ selector: '[data-award-face]', scroll: true }],
       expectSelector: OPEN_FACE,
       kinds: ['player', 'journal', 'responsive'],
+    }),
+    owedCase({
+      id: 'player-journal-award-choice-forfeit',
+      label: 'Player Journal — an owed reward none of whose rewards can be claimed',
+      query: { ...OWED, journalCaseState: 'award-choice-forfeit' },
+      expectSelector:
+        FACE +
+        `:has(${TILE('retired')}:disabled):has(${TILE('marks')}:disabled)` +
+        `:has(${TILE('known')}:disabled):has([data-award-confirm]:not(:disabled))`,
+      expectCenterHit: '[data-award-confirm]',
     }),
     owedCase({
       id: 'player-journal-list-award-pending',
