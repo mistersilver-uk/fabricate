@@ -22,6 +22,7 @@ import {
 import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 // The frame's own lifted view-state factory.
 import { createScopedListBrowserState } from '../../src/ui/model/managerBrowserViewState.js';
+import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { buildLabContent } from '../view-lab/world/labContent.js';
 // Issue 1504: this toolbar's lane filters and its sort key are shared `<Select>`s.
 import {
@@ -758,6 +759,9 @@ describe('world Component Catalogue (issue 1371)', () => {
         target.querySelector('[data-scoped-component-open-entry]').textContent.trim(),
         'Open catalogue entry'
       );
+      assertInspectorVerbs(target.querySelector('[data-scoped-list-inspector]'), [
+        ['[data-scoped-component-open-entry]', 'primary'],
+      ]);
       assert.equal(
         target.querySelector('[data-scoped-list-inspector-kicker]').textContent.trim(),
         'Catalogue entry'

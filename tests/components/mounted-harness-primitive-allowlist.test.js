@@ -40,8 +40,6 @@ const SHARED_PRIMITIVES = [
   // pulls `SearchablePopover` in behind it, which is exactly the silent fan-out this list
   // exists to turn into a named failure.
   'src/ui/svelte/components/Select.svelte',
-  // THE right-inspector action button (issue 1036, maintainer round 2).
-  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   // The product's ONE horizontal fill bar, ONE row disclosure and ONE ordered list (issue 1512).
   // The list reaches five manager surfaces at once, and it renders the disclosure and the icon
   // button behind it, so a tree holding any converted list pulls three primitives in.
