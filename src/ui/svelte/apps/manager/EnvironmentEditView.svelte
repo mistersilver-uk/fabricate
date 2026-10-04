@@ -12,6 +12,7 @@
   import EnvironmentEventsTab from './environment/EnvironmentEventsTab.svelte';
   import EnvironmentValidationTab from './environment/EnvironmentValidationTab.svelte';
   import EnvironmentRightInspector from './environment/EnvironmentRightInspector.svelte';
+  import EnvironmentSceneLinkCard from './environment/EnvironmentSceneLinkCard.svelte';
   import {
     countReadiness,
     evaluateEnvironmentReadiness,
@@ -206,17 +207,26 @@
       bind:this={tabPanel}
     >
       {#if activeTab === 'overview'}
-        <EnvironmentOverviewTab
-          environment={environmentDraft}
-          {realmRecords}
-          {realmsEnabled}
-          {biomeOptions}
-          {dangerOptions}
-          {linkedSceneImage}
-          {onPickImagePath}
-          onUpdate={onUpdateEnvironment}
-          {onSetCompositionMode}
-        />
+        <div class="fab-stack" data-gap="3">
+          <EnvironmentOverviewTab
+            environment={environmentDraft}
+            {realmRecords}
+            {realmsEnabled}
+            {biomeOptions}
+            {dangerOptions}
+            {linkedSceneImage}
+            {onPickImagePath}
+            onUpdate={onUpdateEnvironment}
+            {onSetCompositionMode}
+          />
+          {#if environmentDraft}
+            <EnvironmentSceneLinkCard
+              environment={environmentDraft}
+              {text}
+              onUpdate={onUpdateEnvironment}
+            />
+          {/if}
+        </div>
       {:else if activeTab === 'tasks'}
         <EnvironmentTasksTab
           environment={environmentDraft}
@@ -234,11 +244,13 @@
         />
       {:else if activeTab === 'events'}
         <EnvironmentEventsTab
+          environment={environmentDraft}
           {composition}
           {eventSelectionMode}
           {selectedKind}
           {selectedId}
           onSelectRecord={selectRecord}
+          onUpdate={onUpdateEnvironment}
           {onIncludeRecord}
           {onForceIncludeRecord}
           {onExcludeRecord}
@@ -262,7 +274,6 @@
         {composition}
         {selectedKind}
         {selectedId}
-        {onUpdateEnvironment}
       />
     {/if}
   </div>

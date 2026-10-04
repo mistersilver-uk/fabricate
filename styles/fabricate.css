@@ -15336,21 +15336,6 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-environment-scene-dropzone {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px dashed var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text-muted);
-}
-
-.fabricate-manager .manager-environment-scene-dropzone.is-drop-active {
-  border-color: var(--fab-accent);
-  color: var(--fab-text);
-}
-
 /* Recipe-item inspector: the list of books teaching this recipe (issue 511 many-to-many). */
 .fabricate-manager .manager-recipe-item-links {
   list-style: none;
@@ -15359,11 +15344,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-chip);
-}
-
-.fabricate-manager .manager-environment-scene-dropzone.is-compact {
-  padding: var(--fab-space-2) var(--fab-space-3);
-  font-size: 0.8rem;
 }
 
 .fabricate-manager .manager-environment-scene-linked {
@@ -15376,6 +15356,10 @@
 
   /* Allow the linked card to shrink below its content width inside the flex inspector column so the name child can truncate instead of overflowing. */
   min-width: 0;
+}
+
+.fabricate-manager .manager-environment-scene-linked.is-readonly {
+  border-style: solid;
 }
 
 .fabricate-manager .manager-environment-scene-linked.is-drop-active {
@@ -15510,9 +15494,9 @@
 .fabricate-manager .manager-environment-comp {
   --fab-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;
 
-  /* The column strip's lead track is the shared list's own cluster (issue 1512): the 22px ordinal badge, and with reorder on the 24px grip and the line's 12px gap before it. The strip's gap supplies the 12px after the badge, so neither figure is repeated. */
-  --fab-env-comp-lead: 22px;
-  --fab-env-comp-lead-ranked: 58px;
+  /* The column strip's lead track is the shared list's own cluster (issue 1512): the 22px ordinal badge, the line's 12px gap and the 24px disclosure every row opens its overrides through (issue 1522), and with reorder the 24px grip and another 12px gap before them. The strip's gap supplies the 12px after the cluster, so no figure is repeated. */
+  --fab-env-comp-lead: 58px;
+  --fab-env-comp-lead-ranked: 94px;
 
   display: flex;
   flex-direction: column;
@@ -15573,7 +15557,7 @@
 
 .fabricate-manager .manager-environment-comp-row {
   display: grid;
-  grid-template-columns: var(--fab-env-comp-grid);
+  grid-template-columns: 24px var(--fab-env-comp-grid);
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-2) var(--fab-space-2);
@@ -15595,6 +15579,44 @@
   gap: var(--fab-space-3);
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* A row's overrides open beneath its line, across every track (issue 1522). The collapsed body stays in the DOM, so `display: none` is declared: Foundry's reset beats the UA `[hidden]` rule. */
+.fabricate-manager .manager-environment-comp-body {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-environment-comp-body[hidden] {
+  display: none;
+}
+
+.fabricate-manager .manager-environment-override-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-environment-override-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-environment-override-section.is-nodes {
+  align-items: flex-start;
+}
+
+.fabricate-manager .manager-environment-override-body .manager-environment-drop-adjustment-heading {
+  margin: 0;
+}
+
+/* A row is wider than the rail these cards came from, so they tile rather than stack. */
+.fabricate-manager .manager-environment-override-body .manager-environment-drop-adjustment-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
 }
 
 .fabricate-manager .manager-environment-comp-row.is-selected {

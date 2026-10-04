@@ -699,6 +699,85 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
     ],
   }),
+  // Issue 1522: a composition row's overrides open in place in that row, and the scene link is
+  // authored on the Overview tab's own card, so the rail beside both is read-only.
+  ...[
+    { suffix: 'normal', width: 1280, height: 820 },
+    { suffix: 'narrow', width: 1000, height: 720 },
+  ].flatMap(({ suffix, width, height }) =>
+    [
+      ['task', 'lab-smithing', 'sm-env-mine', 'tasks', 'sm-task-prospect'],
+      ['event', 'lab-herbalism', 'hb-env-grove', 'events', 'hb-event-storm'],
+    ].map(([kind, system, environment, tab, record]) => {
+      const row = `[data-environment-tab="${tab}"] .fabricate-sortable-list-row.is-expanded[data-record-id="${record}"]`;
+      const input = `${row} [data-drop-rate-adjustment-input]`;
+      return managerCase({
+        id: `manager-environment-edit-${kind}-row-open-${suffix}`,
+        label: `Manager — Environment edit ${kind} row overrides open ${suffix}`,
+        reaches: 'beyond',
+        smokeLabels: [],
+        query: { system },
+        position: { width, height },
+        steps: [
+          'Gathering',
+          {
+            selector: `.manager-environment-row[data-environment-id="${environment}"] .fabricate-icon-button[aria-label^="Edit"]`,
+          },
+          { selector: `#environment-tab-${tab}` },
+          { selector: `[data-sortable-disclosure="${record}"]` },
+          { selector: input, scroll: true },
+        ],
+        expectView: 'environment-edit',
+        expectSelector: `.fabricate-manager ${row} [data-composition-override-body="${kind}"]`,
+        expectNoHorizontalOverflow: `[data-environment-tab="${tab}"]`,
+        expectCenterHit: input,
+        kinds: ['manager', 'environments', ...(suffix === 'narrow' ? ['responsive'] : [])],
+        sourceMatches: [
+          GATHERING_ROUTE_MODEL_PATTERN,
+          ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+          /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+        ],
+      });
+    })
+  ),
+  ...[
+    ['linked', 'hb-env-grove', { width: 1280, height: 820 }, '[data-overview-scene-unlink]'],
+    [
+      'unlinked-narrow',
+      'hb-env-ridge',
+      { width: 1000, height: 720 },
+      '[data-overview-section="scene"] [data-manager-item-drop-zone]',
+    ],
+  ].map(([state, environment, position, hit]) =>
+    managerCase({
+      id: `manager-environment-edit-scene-${state}`,
+      label: `Manager — Environment edit Linked scene card, ${state}`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-herbalism' },
+      position,
+      steps: [
+        'Gathering',
+        {
+          selector: `.manager-environment-row[data-environment-id="${environment}"] .fabricate-icon-button[aria-label^="Edit"]`,
+        },
+        { selector: '[data-overview-section="scene"]', scroll: true },
+      ],
+      expectView: 'environment-edit',
+      expectSelector:
+        state === 'linked'
+          ? '.fabricate-manager [data-overview-section="scene"] [data-overview-scene-linked]'
+          : '.fabricate-manager [data-overview-section="scene"] [data-item-drop-zone="scene"]:not([data-overview-scene-linked])',
+      expectNoHorizontalOverflow: '[data-overview-section="scene"]',
+      expectCenterHit: hit,
+      kinds: ['manager', 'environments', ...(state === 'linked' ? [] : ['responsive'])],
+      sourceMatches: [
+        GATHERING_ROUTE_MODEL_PATTERN,
+        ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+        /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+      ],
+    })
+  ),
   managerCase({
     id: 'manager-gathering-events-normal',
     label: 'Manager — Gathering events normal',

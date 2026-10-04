@@ -1379,7 +1379,11 @@ Current GM editor behavior:
   Removing an included manual task or event clears `enabled*Ids`, ignores stale `disabled*Ids` and `forced*Ids`, and returns the record to Available to add according to its candidate, non-matching, or library-disabled state.
 - Manual Available to add rows present Add for matching AND for enabled non-matching records — manual composition has no match filter, so it has no force add — and a disabled library note for library-disabled records.
 - When the Manager Gathering `Environments` browser has no environments, its empty state keeps `Environments` selected, keeps `Create environment` available, and guides GMs to prepare Gathering Tasks plus encounter/event options before composing environments.
+- The environment editor's record and summary panes are read-only: they show the selected record's hero, node count and matching evidence, and the environment's summary, linked scene and counts, and host no editing input or drop target.
 - Gathering Task and event row overrides stay inside expandable rows so the default environment workspace remains scannable.
+  Every composition row opens them in place through its own disclosure, whatever its section — Included, Available to add, Excluded or Non-matching — so an override on an excluded record stays editable and clearable; opening a row also selects it.
+  The overrides are the task's node count (a `Stepper` from 0 to its capacity, read-only for a non-regenerating pool), the drop-rate adjustment switch, and the drop-rate adjustments.
+- The scene link is authored on the Overview tab's Linked scene card: a Scene drop links or replaces it, and a visible Unlink clears it.
   Collapsed rows show default-vs-override chips, enabled state, matching evidence, dirty/validation markers, and an explicit expand/collapse control.
 - Expanded override panels contain per-environment override fields only; Gathering Task fields remain edited in their library surface.
 - Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager widths.

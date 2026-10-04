@@ -1912,6 +1912,7 @@ The Checks Studio's activation card is a declared exception, because its switch 
 The environments screen's inspector rail is a declared repurposing of that third track: its gathering task, gathering event and gathering rules leaves all edit in place, and issue 1707 gave that departure file names in `environment/GatheringTaskInspector.svelte`, `environment/GatheringEventInspector.svelte`, `environment/GatheringRulesInspector.svelte` and the `environment/GatheringModifierEditor.svelte` the first two share.
 The maintainer ruled on 2026-09-19 that this departure is a declared exception to the read-only convention rather than an open row in the library's planned-migrations table.
 The departure predates the extraction and is neither widened nor narrowed by it, and the read-only convention stands as the default for every other rail.
+The 2026-09-19 exception is the three leaves named above and no other environment pane: the environment editor's record and summary panes are read-only, a composition row's overrides open in place in that row whatever its section, and the scene link is authored on the Overview tab's Linked scene card.
 
 A PLAYER screen orders the app rail, a browse column carrying search and filters, and a detail pane that leads with its identity header, then progress, then requirements.
 The identity header carries at most one primary action: zero is correct, and two never is.

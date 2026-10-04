@@ -28,6 +28,12 @@ manager-environment-empty-membership-normal
 manager-environment-empty-membership-narrow
 manager-environment-danger-level-list
 manager-environment-edit-events
+manager-environment-edit-task-row-open-normal
+manager-environment-edit-event-row-open-normal
+manager-environment-edit-task-row-open-narrow
+manager-environment-edit-event-row-open-narrow
+manager-environment-edit-scene-linked
+manager-environment-edit-scene-unlinked-narrow
 manager-gathering-events-normal
 manager-gathering-event-editor-normal
 manager-gathering-task-drop-modifiers-normal
