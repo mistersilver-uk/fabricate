@@ -26,6 +26,8 @@ const MANAGER = 'src/ui/svelte/apps/manager';
 const EXEMPT = Object.freeze({
   [`${MANAGER}/knowledge/KnowledgeTabs.svelte`]: 'a browse route, not an editor',
   [`${MANAGER}/EnvironmentEditView.svelte`]: 'its rails convert in issue 1522 P2',
+  [`${MANAGER}/downtime/WorldDowntimeTabs.svelte`]:
+    'the World > Downtime route`s strip, over a companion preview rather than a record editor',
 });
 
 let Component;
