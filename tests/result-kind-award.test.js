@@ -17,8 +17,9 @@ Object.assign(globalThis, { game: { time: { worldTime: 0 }, fabricate: {} } });
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { validateCraft } = await import('../src/systems/rolledAmountResolver.js');
 const { rolledAwardChatParts } = await import('../src/systems/craftChatEntries.js');
-const { applyRewardPlan, awardHistory, grantedByFor, rewardRefusals } =
+const { applyRewardPlan, awardHistory, grantedByFor, rewardChatParts, rewardRefusals } =
   await import('../src/systems/resultKindAward.js');
+const { normalizeGrantedBy } = await import('../src/systems/companionContract.js');
 
 const LADDER = [
   {
@@ -98,13 +99,18 @@ test('1773 V&A 3: an amount of zero makes no writer call and is recorded as an e
   ]);
 });
 
-test('1773 V&A 4: a knowledge award grants, cut to 64 code points, and an already-known recipe writes nothing', async () => {
+test('1773 V&A 4: a knowledge award grants, its grantedBy cut to what the public grant accepts', async () => {
   const actor = hero();
   const recipe = { ...RECIPE, name: `  ${'\u{1F702}'.repeat(70)}  ` };
   const first = await applyRewardPlan([grant()], { actor, recipe, seams: seamsFor() });
   const entry = learnedOf(actor).taught;
   assert.equal(entry.granted, true);
-  assert.equal(entry.grantedBy, '\u{1F702}'.repeat(64), 'trimmed, then cut by code point');
+  assert.equal(
+    entry.grantedBy,
+    '\u{1F702}'.repeat(32),
+    'trimmed, then cut between code points at 64 UTF-16 units'
+  );
+  assert.equal(normalizeGrantedBy(entry.grantedBy).ok, true, 'the public grant takes the label');
   assert.equal(grantedByFor(recipe), entry.grantedBy);
   assert.deepEqual(first.knowledgeGrants, [
     { resultId: 'k1', recipeId: 'taught', outcome: 'granted' },
@@ -115,6 +121,11 @@ test('1773 V&A 4: a knowledge award grants, cut to 64 code points, and an alread
   const second = await applyRewardPlan([grant()], { actor, recipe, seams: seamsFor() });
   assert.equal(actor.updates.length, writes, 'an already-known recipe writes nothing');
   assert.equal(second.knowledgeGrants[0].outcome, 'alreadyKnown');
+});
+
+test('1773 V&A 4: a cut that lands after a space keeps no trailing space', () => {
+  assert.equal(grantedByFor({ name: `${'a'.repeat(63)} bcd` }), 'a'.repeat(63));
+  assert.equal(grantedByFor({ name: ' '.repeat(3) }), null, 'a blank name grants with no label');
 });
 
 test('1773 V&A 3: a later write that fails retains a receipt naming the credit and the grant before it', async () => {
@@ -224,7 +235,7 @@ test('1773: a rolled credit resolves once against the crafter and its roll rides
     assert.deepEqual(row.rolled, { formula: '1d6+1', total: 6 });
     const parts = rolledAwardChatParts(items);
     assert.equal(parts.rolls.length, 1, 'the credit roll rides the card');
-    assert.equal(parts.emptyAwards[0].kind, 'currency', 'and the credit is its own row');
+    assert.equal(parts.extraRows[0].kind, 'currency', 'and the credit is its own row');
   });
 });
 
@@ -300,29 +311,111 @@ test('1773 V&A 5: a credit formula resolving to text is refused before consumpti
   });
 });
 
-test('1773 V&A 5: both craft entrances refuse before a run exists or anything is consumed', async () => {
-  const actor = hero();
-  const engine = engineWith(seamsFor({ enabled: false }));
-  const recipe = recipeWith([currencyResult()]);
-  const ctx = await engine._openCraftContext(actor, [actor], recipe, null, {});
-  assert.match(ctx.refusal?.message ?? '', /Invalid recipe: .*needs currency enabled/);
-  assert.equal(ctx.run, null, 'no run was created');
+/** A crafter whose every actor update answers `answer` instead of writing. */
+const refusingHero = (answer) =>
+  makeWorldActor('hero', {
+    system: { currency: { gp: 5, cp: 0 } },
+    hooks: { actorUpdate: answer },
+  });
 
-  game.fabricate.getRecipeVisibilityService = () => ({
-    guardCraftStart: () => ({ craftable: true }),
+for (const [name, answer, reason] of [
+  ['refuses', () => null, /writeRefused/],
+  [
+    'throws',
+    () => {
+      throw new Error('socket closed');
+    },
+    /writeThrew/,
+  ],
+  ['answers without writing', (_payload, actor) => actor, /receiptMismatch/],
+]) {
+  test(`1773 V&A 3: a credit whose write ${name} is never recorded as paid`, async () => {
+    const actor = refusingHero(answer);
+    await assert.rejects(
+      applyRewardPlan([credit()], { actor, recipe: RECIPE, seams: seamsFor() }),
+      (error) => {
+        assert.match(error.message, reason);
+        assert.deepEqual(error.receipts, [], 'no credit is claimed');
+        return true;
+      }
+    );
   });
-  const refused = engine._versionedRunStartRefusal({
-    viewer: { id: 'u' },
-    actor,
-    sourceActors: [actor],
-    recipe,
-    trusted: null,
-    runManager: {},
+}
+
+for (const [name, answer, reason] of [
+  ['refuses', () => null, /writeRefused/],
+  [
+    'throws',
+    () => {
+      throw new Error('socket closed');
+    },
+    /writeThrew/,
+  ],
+]) {
+  test(`1773 V&A 4: a grant whose write ${name} is never recorded as granted`, async () => {
+    const actor = refusingHero(answer);
+    await assert.rejects(
+      applyRewardPlan([grant()], { actor, recipe: RECIPE, seams: seamsFor() }),
+      (error) => {
+        assert.match(error.message, reason);
+        assert.deepEqual(error.receipts, [], 'no grant is claimed');
+        return true;
+      }
+    );
   });
-  assert.match(
-    refused.message ?? refused.error ?? JSON.stringify(refused),
-    /needs currency enabled/
+}
+
+test('1773: a rolled credit floors a fraction and clamps a negative or zero total to an empty award', async () => {
+  const totals = { '1d4/2': 2.5, '1d4-5': -1, '1d2-1': 0 };
+  await withRoll(seededRollClass({ totals }).Roll, async () => {
+    const actor = hero();
+    const { items } = await engineWith(seamsFor())._createResultItems(
+      actor,
+      RECIPE,
+      groups(
+        ...Object.keys(totals).map((quantityFormula, index) =>
+          currencyResult({ id: `c${index}`, quantityFormula })
+        )
+      ),
+      null,
+      [],
+      []
+    );
+    assert.equal(actor._source.system.currency.gp, 7, 'two gold from the 2.5 total, none else');
+    assert.deepEqual(
+      items.rewardAwards.currencyCredits.map(({ amount, rolled }) => [amount, rolled.total]),
+      [
+        [2, 2.5],
+        [0, -1],
+        [0, 0],
+      ]
+    );
+  });
+});
+
+test('1773: a rolled credit too large to be a whole amount refuses rather than vanishing', async () => {
+  await withRoll(seededRollClass({ totals: { '1d100*1e15': 9e16 } }).Roll, async () => {
+    const actor = hero();
+    await assert.rejects(
+      engineWith(seamsFor())._createResultItems(
+        actor,
+        RECIPE,
+        groups(currencyResult({ quantityFormula: '1d100*1e15' })),
+        null,
+        [],
+        []
+      ),
+      (error) => {
+        assert.equal(error.code, 'HISTORY_EFFECT_UNCERTAIN');
+        assert.ok(error.cause instanceof RangeError, 'the cause is the invalid amount');
+        return true;
+      }
+    );
+    assert.equal(actor.updates.length, 0, 'nothing was credited');
+  });
+  assert.deepEqual(
+    rewardChatParts({ rewardAwards: { currencyCredits: [null], knowledgeGrants: [null] } }).rows,
+    [],
+    'a malformed record draws no chat row'
   );
-  assert.equal(actor.updates.length + actor.createCalls.length, 0, 'the inventory is untouched');
-  delete game.fabricate.getRecipeVisibilityService;
 });

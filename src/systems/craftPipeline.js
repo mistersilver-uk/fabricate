@@ -409,6 +409,7 @@ export async function resolveCheckFailure(engine, ctx, craftInputs) {
     toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     checkResult,
     resultGroupId: options?.resultGroupId || null,
+    runId: run?.id ?? null,
   });
   return publishCheckFailure(engine, ctx, craftInputs, {
     consumedOnFail,
@@ -680,7 +681,7 @@ export async function commitCraft(engine, ctx, craftInputs) {
     toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     checkResult,
     options?.resultGroupId || null,
-    { resolveComponent }
+    { resolveComponent, runId: run?.id ?? null }
   );
 
   if (runManager && run) {

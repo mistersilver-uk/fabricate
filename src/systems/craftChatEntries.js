@@ -23,7 +23,7 @@ export function rolledAwardChatParts(awarded) {
   const rewards = rewardChatParts(awarded);
   return {
     rolls: [...awards.map((award) => award.roll).filter(Boolean), ...rewards.rolls],
-    emptyAwards: [...awards.filter((award) => award.quantity === 0), ...rewards.rows],
+    extraRows: [...awards.filter((award) => award.quantity === 0), ...rewards.rows],
   };
 }
 

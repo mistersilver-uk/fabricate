@@ -43,10 +43,16 @@ export function craftRewardSeams({ currencySeams = {}, recipeManager = null } = 
   };
 }
 
-/** The recipe's name as `grantedBy`: trimmed, then cut to the limit in code points. */
+/** The recipe's name as `grantedBy`: trimmed, then cut between code points to the UTF-16 length
+ *  `normalizeGrantedBy` accepts, so the public grant would take the same label. */
 export function grantedByFor(recipe) {
   const name = typeof recipe?.name === 'string' ? recipe.name.trim() : '';
-  return [...name].slice(0, GRANTED_BY_MAX_LENGTH).join('') || null;
+  let cut = '';
+  for (const point of name) {
+    if (cut.length + point.length > GRANTED_BY_MAX_LENGTH) break;
+    cut += point;
+  }
+  return cut.trimEnd() || null;
 }
 
 const worldUnits = (recipe, seams) => getCurrencyRequirementConfig(recipe, seams)?.units ?? [];
@@ -73,11 +79,10 @@ export async function planReward(result, actor, recipe, { Roll, seams = {} } = {
   const unitName = currencyUnitDisplayName(
     findCurrencyUnit(worldUnits(recipe, seams), result.unit)
   );
-  const entry = {
-    kind: 'currency',
-    ...currencyCreditRecord({ ...result, resultId: result.id, amount, rolled, unitName }),
-  };
-  return { entry, roll };
+  const record = currencyCreditRecord({ ...result, resultId: result.id, amount, rolled, unitName });
+  // A total too large to be a safe integer is refused, as a non-finite one is.
+  if (!record) throw new RangeError(`Fabricate | The currency reward amount ${amount} is invalid`);
+  return { entry: { kind: 'currency', ...record }, roll };
 }
 
 /** A non-`applied` writer answer as the error the run's recovery evidence reads. */
@@ -160,12 +165,12 @@ export async function settleRewardPlan(items, context) {
   }
 }
 
+/** The step record's credit and grant fields, absent when nothing was rewarded. */
+export const rewardHistory = (items) => historyEvidenceFields({ ...items?.rewardAwards });
+
 /** The step record's award fields: the Item receipts, then any credits and grants. */
 export function awardHistory(items) {
-  return {
-    createdResults: awardReceipts(items),
-    ...historyEvidenceFields({ ...items?.rewardAwards }),
-  };
+  return { createdResults: awardReceipts(items), ...rewardHistory(items) };
 }
 
 /** What a card states about rewards: one row per credit and grant, and the credit rolls. */
@@ -174,8 +179,12 @@ export function rewardChatParts(items) {
   return {
     rolls: list(items?.rewardRolls).filter(Boolean),
     rows: [
-      ...list(awards?.currencyCredits).map((credit) => ({ kind: 'currency', ...credit })),
-      ...list(awards?.knowledgeGrants).map((grant) => ({ kind: 'knowledge', ...grant })),
+      ...list(awards?.currencyCredits)
+        .filter(Boolean)
+        .map((credit) => ({ kind: 'currency', ...credit })),
+      ...list(awards?.knowledgeGrants)
+        .filter(Boolean)
+        .map((grant) => ({ kind: 'knowledge', ...grant })),
     ],
   };
 }
@@ -277,9 +286,8 @@ function currencyRefusals(result, { actor, recipe, seams }) {
     recipients: [{ actorId: actor?.id ?? '', amount: 1 }],
     unitId: result.unit,
   });
-  return planned.failure
-    ? [`Currency reward cannot be credited to this character (${planned.failure.reason})`]
-    : [];
+  const reason = planned.failure?.reason ?? planned.units[0].preconditions().reason;
+  return reason ? [`Currency reward cannot be credited to this character (${reason})`] : [];
 }
 
 function knowledgeRefusals(result, { recipe, seams }) {

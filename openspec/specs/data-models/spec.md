@@ -3515,7 +3515,11 @@ CraftingRunStepState = {
    A collapsed multi-step chain has no such snapshot at all, because it consumes nothing when its single gate is armed and executes every step live at maturity; it therefore evaluates enabled-ness at maturity, consistent with its already-live essence resolution.
 9. `currencyCredits` and `knowledgeGrants` are each absent on a step written before issue 1773, and an older build ignores them.
    They are written by the versioned `award-rewards` effect, which follows `award-results` and is planned only when the routed set holds a currency or knowledge result, and by the unversioned award paths right after their items.
-   A credit is written through the world strategy's own writer with the marker `{ runId, effectId: 'award-rewards', resultId, index }`, and an interrupted reward step is recovery-required and never replayed.
+   A credit is written through the world strategy's own writer.
+   Under `actorProperty` the credit and the marker `{ runId, effectId: 'award-rewards', resultId, index }` ride one `actor.update`; an `actorInventory` credit is proven by the balance delta and a `macro` credit by nothing, and neither writes a marker.
+   `runId` is the run's id on every path that holds a run, and `index` is the credit's position in the step's reward plan.
+   A craft refuses a reward its world cannot honour before anything is consumed, at the run's start and again when a later stage starts: an unconfigured unit, currency off, a credit the writer would refuse without writing (a synthetic-token crafter, `creditNotConfigured`, `currencySourceMissing`, `balanceUnreadable`), a taught recipe outside the system, and `knowledgeNotObservable`.
+   An interrupted reward step is recovery-required and never replayed; on the unversioned paths the credits and grants it confirmed stay in `currencyCredits` and `knowledgeGrants`, never as `createdResults` rows.
 
 #### Optional historical evidence
 
@@ -3614,7 +3618,7 @@ Requirements:
    It is an actor-owned item uuid, so it dangles permanently once that copy is deleted, and it is written as `null` by BOTH of the paths that learn without a book: the craft-time auto-learn (alchemy `learnOnCraft`) and the knowledge grant of requirement 4.
    Two such writers rather than one is exactly what makes a null uuid insufficient on its own as a display discriminant, and is why a granted entry carries a flag of its own.
 4. `granted` and `grantedBy` are written by the knowledge grant and by a `knowledge` result's award (see `companion-api` and `recipe-visibility`).
-   The award's `grantedBy` is the awarding recipe's name, cut to 64 code points, because it names a record rather than a module and a cut name still names it.
+   The award's `grantedBy` is the awarding recipe's name, trimmed, cut between code points to at most 64 UTF-16 units, the length the grant accepts, and then trimmed at its end, because it names a record rather than a module and a cut name still names it.
    `granted` is written as `true` and is NEVER written `false`: an entry that was not granted OMITS the field, so its presence is the whole fact and no reader has to tell `false` from absent.
    `grantedBy` is the caller-supplied label for what did the granting — trimmed, at most 64 characters, and absent when the caller supplied none.
    The grant REFUSES a non-string, an over-long, or an object- or array-valued label rather than coercing or truncating it, and writes nothing in that case, because a truncated module id names a DIFFERENT module.

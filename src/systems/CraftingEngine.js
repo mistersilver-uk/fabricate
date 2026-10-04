@@ -143,6 +143,7 @@ import {
   hydrateRewardState,
   isRewardResult,
   planReward,
+  rewardHistory,
   rewardRefusals,
   settleRewardPlan,
   stageAwardHistory,
@@ -165,6 +166,7 @@ import {
   sourceItemQuantity,
   receiptQuantity,
   requireDocumentAcknowledgment,
+  splitHistoryReceipts,
   unconfirmedHistoryError,
   linkResultGroups,
   assertNativeEffectsUninvoked,
@@ -1345,7 +1347,14 @@ export class CraftingEngine {
       error.receipts?.length > 0
         ? error.receipts
         : run.steps?.[saved.currentStepIndex]?.[receiptKey];
-    if (Array.isArray(prefix)) stage[receiptKey] = prefix.map(itemReceipt);
+    if (Array.isArray(prefix)) {
+      // A retained credit or grant keeps its own field; only Item receipts are Item rows.
+      const { items, ...rewards } = splitHistoryReceipts(prefix);
+      stage[receiptKey] = items.map(itemReceipt);
+      for (const [key, records] of Object.entries(rewards)) {
+        if (records.length > 0) stage[key] = records;
+      }
+    }
     await runManager.updateRun(actor, saved);
   }
 
@@ -1532,6 +1541,17 @@ export class CraftingEngine {
   _versionedStagePreparation({ resuming = false, started = false, journal = null, ...stage }) {
     if (resuming) return this._reconstructVersionedStagePreparation({ ...stage, journal });
     if (started) return this._reconstructStartedVersionedStage(stage);
+    return this._prepareFreshVersionedStage(stage);
+  }
+
+  /** An unstarted stage's preparation after its reward pre-flight re-runs against the world as it
+   *  is now (issue 1773), so a GM change since run start refuses before anything is consumed. */
+  async _prepareFreshVersionedStage(stage) {
+    const { actor, recipe, step } = stage;
+    const progressive = this.resolutionModeService?.getMode?.(recipe) === 'progressive';
+    const refusals = this._refusals()(step?.resultGroups, { actor, recipe, progressive });
+    if (refusals.length > 0)
+      return { valid: false, message: `Invalid recipe: ${refusals.join(', ')}` };
     return this._prepareVersionedStage(stage);
   }
 
@@ -1551,7 +1571,7 @@ export class CraftingEngine {
     trusted,
     requestId,
   }) {
-    const prepared = await this._prepareVersionedStage({
+    const prepared = await this._prepareFreshVersionedStage({
       run,
       actor,
       componentSourceActors,
@@ -3322,8 +3342,7 @@ export class CraftingEngine {
       } catch (breakageError) {
         console.error('Fabricate | Error during timed-step failure tool breakage:', breakageError);
       }
-      // The failure award, timed twin (issue 1098): the delay is scheduling, so a timed failure
-      // produces what an immediate one would, from the START snapshot.
+      // The timed failure award awards what an immediate one would, from the START (issue 1098).
       const failureResults = await this._produceCraftingFailureResults({
         craftingActor,
         executionRecipe,
@@ -3333,6 +3352,7 @@ export class CraftingEngine {
         toolItems,
         checkResult,
         precomputedEssences: resolvedEssences,
+        runId: run?.id ?? null,
       });
       await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
         selectedIngredientSetId: ingredientSet?.id,
@@ -3425,7 +3445,7 @@ export class CraftingEngine {
       toolItems,
       checkResult,
       options?.resultGroupId || null,
-      { precomputedEssences: resolvedEssences, essenceEnabled }
+      { precomputedEssences: resolvedEssences, essenceEnabled, runId: run?.id ?? null }
     );
 
     // Timed misconfiguration (issue 85): inputs went at START, so this records a failure with no
@@ -3550,6 +3570,7 @@ export class CraftingEngine {
     resultGroupId = null,
     precomputedEssences = null,
     essenceEnabled = null,
+    runId = null,
   }) {
     if (!activityPermitsFailureResults(this._getRecipeSystem(executionRecipe), 'crafting')) {
       return [];
@@ -3578,7 +3599,7 @@ export class CraftingEngine {
         toolItems,
         checkResult,
         resultGroupId,
-        { precomputedEssences, essenceEnabled }
+        { precomputedEssences, essenceEnabled, runId }
       );
       return Array.isArray(items) ? items : [];
     } catch (error) {
@@ -3635,8 +3656,7 @@ export class CraftingEngine {
       }
     }
 
-    // Route to + produce the reserved failure group (the failed checkResult routes
-    // `_resolveAlchemyResultGroups` there); empty/absent yields no items.
+    // The failed check routes to the reserved failure group, and an empty one yields nothing.
     const { items: resultItems } = await this._createResultItems(
       craftingActor,
       executionRecipe,
@@ -3646,7 +3666,7 @@ export class CraftingEngine {
       toolItems,
       checkResult,
       resultGroupId,
-      { precomputedEssences: resolvedEssences }
+      { precomputedEssences: resolvedEssences, runId: run?.id ?? null }
     );
 
     if (runManager && run) {
@@ -3666,6 +3686,7 @@ export class CraftingEngine {
           },
           consumedIngredients: consumedRunRefs,
           usedTools: appliedTools,
+          ...rewardHistory(resultItems),
         },
         mutationOptions
       );
@@ -4930,6 +4951,7 @@ export class CraftingEngine {
       essenceEnabled = null,
       resolveComponent = findMatchingComponent,
       deferRewards = false,
+      runId = null,
     } = {}
   ) {
     const step = { ...sourceStep, resultGroups: linkResultGroups(sourceStep?.resultGroups) };
@@ -5006,7 +5028,7 @@ export class CraftingEngine {
     return {
       items: deferRewards
         ? items
-        : await settleRewardPlan(items, { actor: craftingActor, recipe, seams }),
+        : await settleRewardPlan(items, { actor: craftingActor, recipe, seams, runId }),
       resolutionMeta: resolved?.meta || null,
     };
   }
@@ -6039,7 +6061,7 @@ export class CraftingEngine {
     const localize = (key) => game.i18n?.localize?.(key) ?? key;
 
     const toolEntries = toolChatEntries(tools, system);
-    const { rolls, emptyAwards } = rolledAwardChatParts(createdResults);
+    const { rolls, extraRows } = rolledAwardChatParts(createdResults);
 
     // A plain, Foundry-free model: names and images resolve here, formatting happens there.
     const content = buildCraftingChatContent(
@@ -6047,7 +6069,7 @@ export class CraftingEngine {
         status: success ? 'succeeded' : 'failed',
         actorName: craftingActor?.name || '',
         recipeName: recipe?.name || '',
-        results: [...awardReceipts(createdResults), ...emptyAwards],
+        results: [...awardReceipts(createdResults), ...extraRows],
         consumed: (consumedIngredients || []).map(({ item, quantity }) => ({
           name: item?.name || '',
           img: item?.img || '',
@@ -6094,7 +6116,7 @@ export class CraftingEngine {
     if (suppressed || !system || system.features?.chatOutput !== true) return;
 
     const localize = (key) => game.i18n?.localize?.(key) ?? key;
-    const { rolls, emptyAwards } = rolledAwardChatParts(results);
+    const { rolls, extraRows } = rolledAwardChatParts(results);
     const consumed =
       Number(consumedQuantity) > 0
         ? [
@@ -6111,7 +6133,7 @@ export class CraftingEngine {
         status: success ? 'succeeded' : 'failed',
         actorName: actor?.name || '',
         componentName: component?.name || '',
-        results: [...awardReceipts(results), ...emptyAwards],
+        results: [...awardReceipts(results), ...extraRows],
         consumed,
         tools: brokenToolChatEntries(usedTools, system),
         rollValue: Number.isFinite(rollValue) ? rollValue : null,

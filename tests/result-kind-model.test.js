@@ -191,3 +191,9 @@ test('1773 V&A 8: a progressive result group refuses a non-component kind', () =
     assert.deepEqual(result.errors, ['Progressive result 2 must award a component']);
   }
 });
+
+test('1773 V&A 1: a blank currency label or reason is trimmed away rather than written empty', () => {
+  const json = new Result(currency({ label: '  ', reason: '' })).toJSON();
+  assert.ok(!('label' in json), 'a whitespace label is absent');
+  assert.ok(!('reason' in json), 'an empty reason is absent');
+});

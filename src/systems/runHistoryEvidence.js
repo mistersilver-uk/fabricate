@@ -103,6 +103,19 @@ function historyReceipt(entry) {
   return itemReceipt(entry);
 }
 
+/** A retained receipt list by shape: Item receipts, currency credits and knowledge grants. */
+export function splitHistoryReceipts(receipts) {
+  const split = { items: [], currencyCredits: [], knowledgeGrants: [] };
+  for (const entry of list(receipts)) {
+    const credit = currencyCreditRecord(entry);
+    const grant = credit ? null : knowledgeGrantRecord(entry);
+    if (credit) split.currencyCredits.push(credit);
+    else if (grant) split.knowledgeGrants.push(grant);
+    else split.items.push(entry);
+  }
+  return split;
+}
+
 /** Map one `_consumeIngredients` entry to the persisted run-record shape, capturing the item's
  * `name`/`img` at consume time (issue 738) — a consumed item is DELETED immediately. */
 export function mapConsumedIngredientRef({ item, quantity, receipt }) {
