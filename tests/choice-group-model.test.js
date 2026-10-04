@@ -118,6 +118,16 @@ test('1773 V&A 11: switching rolled, up to and repeats to the player chooser wri
   assert.equal(new Result(CELLS.rolledUpToRepeats).toJSON().withReplacement, true);
 });
 
+test('1773 V&A 11: each setting persists only in the cell that reads it', () => {
+  const stale = { awardCount: 2, awardCountFormula: '@gone', selectionFormula: '@gone' };
+  const anyOne = new Result({ ...CELLS.rolledAnyOne, ...stale }).toJSON();
+  assert.ok(!('awardCount' in anyOne) && !('awardCountFormula' in anyOne), 'no count off up to');
+  assert.equal(anyOne.selectionFormula, '@gone', 'a rolled group keeps its selection');
+  const player = new Result({ ...CELLS.playerUpTo, ...stale, awardCountFormula: null }).toJSON();
+  assert.ok(!('selectionFormula' in player), 'no selection under the player chooser');
+  assert.equal(player.awardCount, 2, 'an up-to group keeps its count');
+});
+
 test('1773: a group unwrapped to a plain result keeps none of its settings', () => {
   const { alternatives: _members, ...settings } = CELLS.rolledUpToRepeats;
   const json = new Result({ ...settings, componentId: 'ore' }).toJSON();

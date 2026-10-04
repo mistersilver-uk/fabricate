@@ -174,18 +174,18 @@ export class Result {
 
     this.propertyMacroUuid = data.propertyMacroUuid || null;
 
-    // Present makes this result a choice group; its settings exist only on a group, so a group
-    // unwrapped to a plain result drops them (issue 1773).
+    // Present makes this result a choice group; each setting is kept only in the cell that reads
+    // it, so a group unwrapped or switched to another cell drops it (Result requirement 11).
     const group = isChoiceGroup(data);
     this.alternatives = group ? data.alternatives.map((member) => new Result(member)) : null;
     this.chooser = group ? (data.chooser ?? GROUP_CHOOSERS[0]) : null;
     this.awardStrategy = group ? (data.awardStrategy ?? GROUP_AWARD_STRATEGIES[0]) : null;
-    this.awardCount = group ? (data.awardCount ?? null) : null;
-    this.awardCountFormula = group ? normalizeQuantityFormula(data.awardCountFormula) : null;
-    this.selectionFormula = group ? normalizeQuantityFormula(data.selectionFormula) : null;
-    // Written only where it means something: `upTo` under a rolled chooser (Result requirement 11).
-    const repeatable = this.chooser === 'rolled' && this.awardStrategy === 'upTo';
-    this.withReplacement = repeatable && data.withReplacement === true ? true : null;
+    const upTo = this.awardStrategy === 'upTo';
+    const rolled = this.chooser === 'rolled';
+    this.awardCount = upTo ? (data.awardCount ?? null) : null;
+    this.awardCountFormula = upTo ? normalizeQuantityFormula(data.awardCountFormula) : null;
+    this.selectionFormula = rolled ? normalizeQuantityFormula(data.selectionFormula) : null;
+    this.withReplacement = rolled && upTo && data.withReplacement === true ? true : null;
 
     this.selectionRange = rangeOrNull(data.selectionRange);
   }
