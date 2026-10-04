@@ -232,8 +232,8 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
   });
 
   it('renders every inspector action through the Button primitive at full width (issue 1521)', () => {
-    // Each verb takes the role its verb names; the old rail button painted the primary in the
-    // accent where every other manager primary is the success family (`library.html` section 16).
+    // Each verb takes the role its verb names; a manager primary is the success family
+    // (library.html section 16).
     const inspector = componentAstOf(INSPECTOR);
     assert.ok(
       importsModule(inspector, '../../../components/Button.svelte'),
@@ -269,7 +269,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       /\.fabricate-button\.fabricate-button\.is-primary:not\(:disabled\) \{[^}]*background: var\(--fab-success\);/,
       'with the primary in the SUCCESS family'
     );
-    // THE QUIET VERB STAYS UNFILLED (issue 1372, maintainer parity round 6): Copy is `ghost`,
+    // The quiet verb stays unfilled (issue 1372, maintainer parity round 6): Copy is `ghost`,
     // whose manager rule sits on the pane. Delete is `danger`, whose rule states only its ink and
     // edge, so it wears the family's resting fill like every other manager danger verb.
     assert.match(

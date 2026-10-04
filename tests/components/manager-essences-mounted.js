@@ -399,7 +399,7 @@ export function registerEssencesCases() {
       '[data-essence-action="unlink-source"]'
     );
     // Every verb on the rail is a full-width `Button` in the role its verb names (issue 1521).
-    // Unlinking breaks a reference the GM can re-make and destroys nothing, so it is the CAUTION
+    // Unlinking breaks a reference the GM can re-make and destroys nothing, so it is the caution
     // verb, `is-warning-action`, and never `is-danger`.
     assertInspectorVerbs(
       target.querySelector('[data-essence-browser-inspector]').closest('.manager-inspector'),
