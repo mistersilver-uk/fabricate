@@ -1,28 +1,28 @@
 /**
- * Settling a pending award choice (issue 1773): which members are claimable now, whether an owed
- * choice blocks the next stage, and the `award-choice`, `settle-choice` and `post-chat` operation
- * the executor's award-choice lane runs on an active or terminal run.
+ * Settling a pending award choice (issue 1773): which alternatives are claimable now, whether an
+ * owed choice blocks the next stage, and the `award-choice`, `settle-choice` and `post-chat`
+ * operation the executor's award-choice lane runs on an active or terminal run.
  */
 import { diceEngine } from '../utils/rollFormulaRollability.js';
 
 import {
   awardPickRefusal,
   groupEvidenceFields,
-  holdsUnsettledAwardChoice,
   isUnsettledChoice,
   memberResultRow,
+  pickedGroupAward,
 } from './choiceGroupAward.js';
 import { isRecipeKnown } from './companionKnowledgeGrant.js';
 import { CraftingLifecycleExecutor } from './CraftingLifecycleExecutor.js';
-import { getCurrencyRequirementConfig } from './currencyAffordance.js';
-import { findCurrencyUnit } from './currencyProfile.js';
 import {
   applyRewardPlan,
   attachRewardAwards,
+  currencyCreditBlocker,
   isRewardResult,
   planReward,
+  rewardRefusals,
 } from './resultKindAward.js';
-import { resolveRolledAmount } from './rolledAmountResolver.js';
+import { resolveRolledAmount, rolledAmountRefusals } from './rolledAmountResolver.js';
 import {
   attachAwardReceipts,
   awardReceipts,
@@ -56,6 +56,15 @@ function refusal(message) {
   return error;
 }
 
+/** A bare `itemUuid` resolved without loading it; a compendium uuid answers its index entry. */
+function resolveItemSync(uuid) {
+  try {
+    return globalThis.fromUuidSync?.(uuid, { strict: false }) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function knowledgeUnclaimableReason(member, { actor, recipe, seams }) {
   const taught = seams.resolveRecipe?.(member.recipeId) ?? null;
   if (!taught || taught.craftingSystemId !== recipe?.craftingSystemId) return 'recipeMissing';
@@ -65,29 +74,32 @@ function knowledgeUnclaimableReason(member, { actor, recipe, seams }) {
 }
 
 /**
- * Why a member cannot be claimed now, or `null`, judged against the live world at settle time: a
- * component gone, currency off or its unit gone, or a taught recipe gone, unobservable or already
- * known, because picking that would write nothing.
+ * Why an alternative cannot be claimed now, or `null`, judged against the live world at settle
+ * time: its component or Item gone, a credit the world writer would refuse, or a taught recipe
+ * gone, unobservable or already known, because picking that would write nothing.
  */
 export function memberUnclaimableReason(member, context) {
   const kind = member?.kind ?? 'component';
   if (kind === 'knowledge') return knowledgeUnclaimableReason(member, context);
-  if (kind === 'currency') {
-    const config = getCurrencyRequirementConfig(context.recipe, context.seams);
-    if (config?.enabled !== true) return 'currencyDisabled';
-    return findCurrencyUnit(config.units, member.unit) ? null : 'unitMissing';
-  }
-  if (!member?.componentId) return member?.itemUuid ? null : 'componentMissing';
-  return context.resolveComponent(member.componentId) ? null : 'componentMissing';
+  if (kind === 'currency') return currencyCreditBlocker(member.unit, context);
+  const found = member?.componentId
+    ? context.resolveComponent(member.componentId)
+    : member?.itemUuid && context.resolveItem(member.itemUuid);
+  return found ? null : 'componentMissing';
 }
 
-/** The run's step and pending choice for `choiceId`, or `null`. */
-function locateChoice(run, choiceId) {
-  for (const [stepIndex, step] of list(run?.steps).entries()) {
-    const choice = list(step?.pendingAwardChoices).find((entry) => entry?.choiceId === choiceId);
-    if (choice) return { stepIndex, choice };
-  }
-  return null;
+/**
+ * The step and pending choice `choiceId` names: on `stepIndex` when a persisted plan fixed it,
+ * else the first still owed, else the first settled, so a repeat is refused as settled.
+ */
+function locateChoice(run, choiceId, stepIndex = null) {
+  const located = list(run?.steps).flatMap((step, index) =>
+    list(step?.pendingAwardChoices)
+      .filter((entry) => entry?.choiceId === choiceId)
+      .map((choice) => ({ stepIndex: index, choice }))
+  );
+  if (stepIndex !== null) return located.find((entry) => entry.stepIndex === stepIndex) ?? null;
+  return located.find((entry) => isUnsettledChoice(entry.choice)) ?? located[0] ?? null;
 }
 
 /**
@@ -130,9 +142,6 @@ export async function persistAwardChoiceSettlement(location, settlement, options
   for (const [key, entries] of Object.entries(evidence)) {
     if (entries.length > 0) step[key] = [...list(step[key]), ...entries];
   }
-  if (step.historySettlement && !holdsUnsettledAwardChoice(step)) {
-    step.historySettlement = { ...step.historySettlement, awards: 'complete' };
-  }
   incrementRunRevision(run);
   return location.persist();
 }
@@ -144,20 +153,10 @@ const receiptItems = (receipt) =>
     knowledgeGrants: list(receipt?.knowledgeGrants),
   });
 
-/** The `groupAwards` entry a settle appends: the player's picks as the group's selections. */
-const pickedGroupAward = (choice, picks) => ({
-  choiceId: choice.choiceId,
-  chooser: 'playerChooses',
-  awardStrategy: choice.awardStrategy,
-  count: choice.count,
-  ...(choice.countRoll && { countRoll: choice.countRoll }),
-  selections: picks.map((alternativeId) => ({ alternativeId })),
-});
-
 /**
  * Settles pending award choices through the executor's award-choice lane. Its collaborators are
  * each a specific seam: the run manager and grant consumer, the recipe lookup, the reward seams, a
- * component lookup in a recipe's system, the Item award and the result card.
+ * component lookup in a recipe's system, a synchronous Item lookup, the Item award and the card.
  */
 export class AwardChoiceSettler {
   constructor({
@@ -166,6 +165,7 @@ export class AwardChoiceSettler {
     getRecipe,
     seams,
     resolveComponent,
+    resolveItem = resolveItemSync,
     awardComponent,
     postChat,
   }) {
@@ -174,20 +174,20 @@ export class AwardChoiceSettler {
     this.getRecipe = getRecipe;
     this.seams = seams;
     this.resolveComponent = resolveComponent;
+    this.resolveItem = resolveItem;
     this.awardComponent = awardComponent;
     this.postChat = postChat;
   }
 
-  /** Whether `run` owes a choice with a claimable member, which its next stage waits on. */
+  /**
+   * Whether `run` owes a choice with a claimable alternative: the one predicate both the next
+   * stage's start and the world-time sweep wait on.
+   */
   blocks(run, actor) {
-    const context = this._claimContext(actor, this._recipeOf(run));
+    const claimable = this._claimable(actor, this._recipeOf(run));
     return list(run?.steps)
       .flatMap((step) => list(step?.pendingAwardChoices).filter(isUnsettledChoice))
-      .some((choice) =>
-        list(choice.alternatives).some(
-          (member) => memberUnclaimableReason(member, context) === null
-        )
-      );
+      .some((choice) => list(choice.alternatives).some(claimable));
   }
 
   /** Settle `choiceId` with `picks` (alternative ids) under a `chooseAward` grant. */
@@ -222,26 +222,33 @@ export class AwardChoiceSettler {
     );
   }
 
-  _claimContext(actor, recipe) {
+  _claimable(actor, recipe) {
     const resolveComponent = (componentId) => this.resolveComponent(recipe, componentId);
-    return { actor, recipe, seams: this.seams, resolveComponent };
+    const { seams, resolveItem } = this;
+    const context = { actor, recipe, seams, resolveComponent, resolveItem };
+    return (member) => memberUnclaimableReason(member, context) === null;
   }
 
-  /** A resumed settle runs the plan it persisted; claimability is judged once, before the plan. */
-  _operation({ actor, run, requestId, choiceId, picks }) {
-    const located = locateChoice(run, choiceId);
+  /**
+   * A fresh settle is refused before any plan exists; a resume runs the plan it persisted, with no
+   * claim check. Until `award-choice` has started, every pick is resolved here, so it only writes.
+   */
+  async _operation({ actor, run, requestId, choiceId, picks }) {
+    const journal = run.awardChoiceJournal;
+    const resuming =
+      journal?.status === 'planned' && journal.requestId === String(requestId ?? '').trim();
+    const located = locateChoice(run, choiceId, resuming ? journal.intent?.stepIndex : null);
     if (!located) throw refusal('There is no such award choice on this run');
     const { stepIndex, choice } = located;
     const recipe = this._recipeOf(run);
-    const journal = run.awardChoiceJournal;
-    if (journal?.status !== 'planned' || journal.requestId !== String(requestId ?? '').trim()) {
-      const context = this._claimContext(actor, recipe);
-      const claimable = (member) => memberUnclaimableReason(member, context) === null;
-      const reason = awardPickRefusal(choice, picks, claimable);
-      if (reason) throw refusal(reason);
-    }
+    const members = picks.map((id) => list(choice.alternatives).find((entry) => entry.id === id));
     const outcome = picks.length > 0 ? 'awarded' : 'forfeited';
-    const settle = { actor, run, recipe, stepIndex, choice, picks, outcome, state: {} };
+    const settle = { actor, run, recipe, stepIndex, choice, picks, members, outcome, state: {} };
+    if (!resuming) this._refuseUnpreparedPicks(settle);
+    const award = journal?.effects?.find((effect) => effect.effectId === AWARD_CHOICE_EFFECT_ID);
+    if (!resuming || award?.phase === 'planned') {
+      settle.state.resolved = await this._resolve(settle);
+    }
     return {
       intent: { choiceId, stepIndex },
       effects: this._effects(settle),
@@ -258,6 +265,39 @@ export class AwardChoiceSettler {
     };
   }
 
+  /** The pick rules, then the craft-time pre-flight over the picks: either refuses the settle. */
+  _refuseUnpreparedPicks({ actor, recipe, choice, picks, members }) {
+    const reason = awardPickRefusal(choice, picks, this._claimable(actor, recipe));
+    if (reason) throw refusal(reason);
+    const groups = [{ results: members }];
+    const errors = [
+      ...rewardRefusals(this.seams)(groups, { actor, recipe }),
+      ...rolledAmountRefusals(groups, diceEngine(), actor?.getRollData?.() ?? {}),
+    ];
+    if (errors.length > 0) throw refusal(errors.join(', '));
+  }
+
+  /** Every pick's amount and reward plan, resolved once; a roll that cannot total refuses. */
+  async _resolve({ actor, recipe, choice, members }) {
+    const Roll = diceEngine();
+    const carrier = { id: choice.choiceId, resultRowId: choice.resultRowId };
+    const resolved = { rows: [], plan: [] };
+    try {
+      for (const member of members) {
+        if (isRewardResult(member)) {
+          const options = { Roll, seams: this.seams, carrier };
+          resolved.plan.push((await planReward(member, actor, recipe, options)).entry);
+        } else {
+          const amount = await resolveRolledAmount(member, actor, { Roll });
+          resolved.rows.push({ ...memberResultRow(member, carrier), resolvedAmount: amount });
+        }
+      }
+    } catch (error) {
+      throw refusal(error?.message ?? String(error));
+    }
+    return resolved;
+  }
+
   /** `award-choice` writes the picks, `settle-choice` records them on the step, `post-chat` posts. */
   _effects({ actor, run, recipe, stepIndex, choice, picks, state, outcome }) {
     const { choiceId } = choice;
@@ -267,8 +307,7 @@ export class AwardChoiceSettler {
         kind: 'awardChoice',
         planned: { choiceId, picks },
         apply: async () => {
-          const members = picks.map((id) => choice.alternatives.find((entry) => entry.id === id));
-          state.items = await this._awardPicks(members, { actor, recipe, run, choiceId });
+          state.items = await this._awardPicks(state.resolved, { actor, recipe, run });
           state.receipt = {
             createdResults: awardReceipts(state.items),
             ...historyEvidenceFields(state.items.rewardAwards),
@@ -307,28 +346,13 @@ export class AwardChoiceSettler {
     ];
   }
 
-  /** Every pick's amount resolved before the first write, then the Items, then the rewards. */
-  async _awardPicks(members, { actor, recipe, run, choiceId }) {
-    const Roll = diceEngine();
-    const carrier = { id: choiceId };
-    const components = [];
-    const plan = [];
-    for (const member of members) {
-      if (isRewardResult(member)) {
-        const options = { Roll, seams: this.seams, carrier };
-        plan.push((await planReward(member, actor, recipe, options)).entry);
-      } else {
-        components.push({ member, amount: await resolveRolledAmount(member, actor, { Roll }) });
-      }
-    }
+  /** The resolved picks written: their Items, then their credits and grants. */
+  async _awardPicks({ rows, plan }, { actor, recipe, run }) {
     const receiptCollector = createItemReceiptCollector();
-    const rolledAwards = [];
     const items = [];
     try {
-      for (const { member, amount } of components) {
-        const row = { ...memberResultRow(member, carrier), resolvedAmount: amount };
-        const options = { receiptCollector, rolledAwards };
-        const item = await this.awardComponent(actor, row, recipe, options);
+      for (const row of rows) {
+        const item = await this.awardComponent(actor, row, recipe, { receiptCollector });
         if (item && !items.includes(item)) items.push(item);
       }
     } catch (error) {

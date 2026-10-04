@@ -1,14 +1,17 @@
 /**
- * Issue 1773 PR3, V&A 15: a run that still owes an award choice survives the history trim and the
- * prunes, is skipped by the world-time sweep, and is not settled history until the choice is; the
- * settle write admits only its own operation, once, and claimability is judged against the world.
+ * Issue 1773 PR3, V&A 15: a run that still owes an award choice survives the history trim, and a
+ * prune forfeits that choice before it would drop the run; the world-time sweep waits on the stage's
+ * own predicate and on a settle in flight; the settle write admits only its own operation, once;
+ * and claimability is judged against the world, a credit through its writer.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { memberUnclaimableReason } from '../src/systems/awardChoiceSettle.js';
+import { AwardChoiceSettler, memberUnclaimableReason } from '../src/systems/awardChoiceSettle.js';
+import { ActorPropertyCoinSpender } from '../src/systems/CoinSpenders.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 
+import { makeWorldCurrencyConfig } from './helpers/currency-spend-fixtures.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 const FLAG = 'fabricate.craftingRuns';
@@ -85,46 +88,70 @@ test('1773 V&A 15: a 51st history run never evicts a run that owes a choice', as
   assert.ok(!ids.includes(settled), 'a settled run is trimmed as before');
 });
 
-test('1773 V&A 15: the prunes keep a run that owes a choice', async () => {
-  const { actor, manager } = setup();
-  const owed = await archived(actor, manager, owedChoice());
-  const plain = await archived(actor, manager, owedChoice({ settledAt: 1, outcome: 'forfeited' }));
-  await manager.removeRunsForRecipes([recipe.id]);
-  assert.deepEqual(historyIds(manager, actor), [owed], 'the recipe prune');
-  await manager.removeRunsForSystem('system');
-  assert.deepEqual(historyIds(manager, actor), [owed], 'the system prune');
-  await manager.cleanupInvalidRuns(new Set(), new Set());
-  assert.deepEqual(historyIds(manager, actor), [owed], 'the corpus prune');
-  assert.ok(plain);
+const PRUNES = Object.freeze({
+  recipe: (manager) => manager.removeRunsForRecipes([recipe.id]),
+  system: (manager) => manager.removeRunsForSystem('system'),
+  corpus: (manager) => manager.cleanupInvalidRuns(new Set(), new Set()),
 });
 
-test('1773 V&A 15: the world-time sweep skips a run that owes a choice', async () => {
+for (const [name, prune] of Object.entries(PRUNES)) {
+  test(`1773 V&A 15: the ${name} prune forfeits an owed choice where it would drop the run`, async () => {
+    const { actor, manager } = setup();
+    const owed = await archived(actor, manager, owedChoice());
+    await archived(actor, manager, owedChoice({ picks: [], settledAt: 1, outcome: 'forfeited' }));
+    manager.invalidateCache(actor.id);
+    const revision = manager.getRun(actor, owed).runRevision;
+    await prune(manager);
+    assert.deepEqual(historyIds(manager, actor), [owed], 'the settled run is dropped');
+    const [step] = manager.getRun(actor, owed).steps;
+    const { picks, settledAt, outcome } = step.pendingAwardChoices[0];
+    assert.deepEqual(
+      { picks, settledAt, outcome },
+      { picks: [], settledAt: 1000, outcome: 'forfeited' }
+    );
+    assert.deepEqual(step.groupAwards, [
+      {
+        choiceId: 'pick',
+        chooser: 'playerChooses',
+        awardStrategy: 'anyOne',
+        count: 1,
+        selections: [],
+      },
+    ]);
+    assert.ok(manager.getRun(actor, owed).runRevision > revision, 'the forfeit is a revision');
+    await prune(manager);
+    assert.deepEqual(historyIds(manager, actor), [], 'and the next prune drops it as any other');
+  });
+}
+
+test('1773 V&A 15: the world-time sweep asks the stage predicate and waits on a planned settle', async () => {
   const { actor, manager } = setup();
   const run = await manager.createRun(actor, recipe, [actor], 'user-1', { lifecycleVersion: 1 });
   await manager.setCompletionMode(actor, run.id, 'worldTime', { expectedRevision: 0 });
   await manager.markStepWaitingForTime(actor, manager.getActiveRun(actor, run.id), 0, {
     minutes: 1,
   });
-  assert.equal(manager.listDueVersionedRuns(2000).length, 1, 'the control is due');
-  actor.flags.fabricate[FLAG].active[run.id].steps[0].pendingAwardChoices = [owedChoice()];
+  const active = actor.flags.fabricate[FLAG].active[run.id];
+  active.steps[0].pendingAwardChoices = [owedChoice()];
   manager.invalidateCache(actor.id);
-  assert.deepEqual(manager.listDueVersionedRuns(2000), []);
-});
-
-test('1773 V&A 15: a step owing a choice is not settled history until the settle', async () => {
-  for (const [choices, expected] of [
-    [[owedChoice()], 'pending'],
-    [[], 'complete'],
-  ]) {
-    const { actor, manager } = setup();
-    const run = await manager.createRun(actor, recipe, [actor]);
-    run.steps[0].historySettlement = { consumption: 'complete' };
-    const completed = await manager.completeStepSuccess(actor, run, 0, {
-      createdResults: [],
-      pendingAwardChoices: choices,
-    });
-    assert.equal(completed.steps[0].historySettlement.awards, expected);
-  }
+  assert.equal(manager.listDueVersionedRuns(2000).length, 1, 'an owed choice alone holds nothing');
+  const asked = [];
+  const blocks = (candidate, owner) => {
+    asked.push([candidate.id, owner]);
+    return true;
+  };
+  assert.deepEqual(manager.listDueVersionedRuns(2000, blocks), [], 'a blocking choice is skipped');
+  assert.deepEqual(asked, [[run.id, actor]]);
+  active.awardChoiceJournal = {
+    operationId: 'op-settle',
+    requestId: 'choose',
+    baseRunRevision: active.runRevision,
+    status: 'planned',
+    intent: null,
+    effects: [],
+  };
+  manager.invalidateCache(actor.id);
+  assert.deepEqual(manager.listDueVersionedRuns(2000), [], 'a settle in flight holds the sweep');
 });
 
 test('1773: the settle write admits only its own planned operation, and only once', async () => {
@@ -170,30 +197,56 @@ test('1773: the settle write admits only its own planned operation, and only onc
   await assert.rejects(write('op-settle'), { code: 'AWARD_CHOICE_SETTLED' });
 });
 
-test('1773 Escalation 12: claimability names why a member cannot be picked now', () => {
-  const units = [{ id: 'gp' }];
+const TAUGHT = Object.freeze({ taught: 'sys', foreign: 'other' });
+
+/** A world whose `gp` credit the real actor-property writer can plan for `actor`. */
+function claimWorld(overrides = {}) {
   const system = { requirements: { currency: { enabled: true } } };
-  const context = (overrides = {}) => ({
-    actor: { flags: {} },
+  const actor = {
+    id: 'crafter',
+    uuid: 'Actor.crafter',
+    flags: {},
+    _source: { system: { currency: { gp: 1, sp: 0 } } },
+    get system() {
+      return this._source.system;
+    },
+  };
+  const context = {
+    actor,
     recipe: { craftingSystemId: 'sys' },
     resolveComponent: (id) => (id === 'ore' ? { id } : null),
+    resolveItem: (uuid) => (uuid === 'Item.kept' ? { uuid } : null),
     seams: {
       getCraftingSystemManager: () => ({ getSystem: () => system }),
-      getCurrencyConfig: () => ({ units }),
-      resolveRecipe: (id) => (id === 'taught' ? { id, craftingSystemId: 'sys' } : null),
+      getCurrencyConfig: () => makeWorldCurrencyConfig(),
+      actorPropertyCoinSpender: new ActorPropertyCoinSpender(),
+      resolveRecipe: (id) => (TAUGHT[id] ? { id, craftingSystemId: TAUGHT[id] } : null),
       resolveSystem: () => system,
       isKnowledgeObservable: () => true,
       readFlag: () => ({}),
       ...overrides,
     },
-  });
-  const reason = (member, overrides = {}) => memberUnclaimableReason(member, context(overrides));
+  };
+  return { system, actor, context };
+}
+
+test('1773 Escalation 12: claimability names why an alternative cannot be picked now', () => {
+  const { system, actor, context } = claimWorld();
+  const reason = (member, overrides = {}) =>
+    memberUnclaimableReason(member, { ...context, seams: { ...context.seams, ...overrides } });
   assert.equal(reason({ componentId: 'ore' }), null);
   assert.equal(reason({ componentId: 'gone' }), 'componentMissing');
+  assert.equal(reason({ itemUuid: 'Item.kept' }), null, 'a bare Item that still resolves');
+  assert.equal(reason({ itemUuid: 'Item.gone' }), 'componentMissing', 'and one that does not');
   assert.equal(reason({ kind: 'currency', unit: 'gp' }), null);
   assert.equal(reason({ kind: 'currency', unit: 'mark' }), 'unitMissing');
   assert.equal(reason({ kind: 'knowledge', recipeId: 'taught' }), null);
   assert.equal(reason({ kind: 'knowledge', recipeId: 'gone' }), 'recipeMissing');
+  assert.equal(
+    reason({ kind: 'knowledge', recipeId: 'foreign' }),
+    'recipeMissing',
+    'another system'
+  );
   assert.equal(
     reason({ kind: 'knowledge', recipeId: 'taught' }, { isKnowledgeObservable: () => false }),
     'knowledgeNotObservable'
@@ -205,6 +258,40 @@ test('1773 Escalation 12: claimability names why a member cannot be picked now',
     ),
     'alreadyKnown'
   );
+  delete actor._source.system.currency.gp;
+  assert.equal(
+    reason({ kind: 'currency', unit: 'gp' }),
+    'currencySourceMissing',
+    'the world writer refuses a credit it cannot write'
+  );
   system.requirements.currency.enabled = false;
   assert.equal(reason({ kind: 'currency', unit: 'gp' }), 'currencyDisabled');
+});
+
+test('1773: a bare Item alternative is judged through fromUuidSync without loading it', () => {
+  const asked = [];
+  const saved = globalThis.fromUuidSync;
+  const fromUuidSync = (uuid, options) => {
+    asked.push([uuid, options]);
+    return uuid === 'Compendium.pack.Item.kept' ? { uuid } : null;
+  };
+  Object.assign(globalThis, { fromUuidSync });
+  try {
+    const settler = new AwardChoiceSettler({
+      getRecipe: () => null,
+      seams: {},
+      resolveComponent: () => null,
+    });
+    const run = (itemUuid) => ({
+      steps: [{ pendingAwardChoices: [owedChoice({ alternatives: [{ id: 'a', itemUuid }] })] }],
+    });
+    assert.equal(settler.blocks(run('Compendium.pack.Item.kept'), {}), true);
+    assert.equal(settler.blocks(run('Item.gone'), {}), false);
+    assert.deepEqual(asked, [
+      ['Compendium.pack.Item.kept', { strict: false }],
+      ['Item.gone', { strict: false }],
+    ]);
+  } finally {
+    Object.assign(globalThis, { fromUuidSync: saved });
+  }
 });

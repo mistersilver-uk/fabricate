@@ -15,6 +15,7 @@ export class CraftingLifecycleExecutionError extends Error {
 const STAGE_LANE = Object.freeze({
   operation: 'execute',
   journal: 'executionJournal',
+  otherJournal: 'awardChoiceJournal',
   terminalAdmitted: false,
 });
 
@@ -23,6 +24,7 @@ const STAGE_LANE = Object.freeze({
 const AWARD_CHOICE_LANE = Object.freeze({
   operation: 'chooseAward',
   journal: 'awardChoiceJournal',
+  otherJournal: 'executionJournal',
   terminalAdmitted: true,
 });
 
@@ -34,7 +36,6 @@ export class CraftingLifecycleExecutor {
   constructor({ runManager, consumeExecutionGrant }) {
     this.runManager = runManager;
     this.consumeExecutionGrant = consumeExecutionGrant;
-    this._lane = STAGE_LANE;
   }
 
   /** Settle a pending award choice: the `chooseAward` grant, journalled in `awardChoiceJournal`. */
@@ -52,8 +53,7 @@ export class CraftingLifecycleExecutor {
     operation,
     lane = STAGE_LANE,
   }) {
-    this._lane = lane;
-    const trusted = await this._consumeGrant({
+    const trusted = await this._consumeGrant(lane, {
       actor,
       runId,
       expectedRevision,
@@ -67,7 +67,7 @@ export class CraftingLifecycleExecutor {
     const existingJournal = journal ? observeExecutionJournal(journal) : null;
     const resuming = existingJournal?.status === 'planned';
     const run = resuming || lane.terminalAdmitted ? persisted : this._currentRun(actor, runId);
-    this._assertExecutable(run, expectedRevision, { resuming: resuming || lane.terminalAdmitted });
+    this._assertExecutable(lane, run, expectedRevision, resuming || lane.terminalAdmitted);
 
     const resolvedOperation =
       typeof operation === 'function' ? await operation({ actor, run, trusted }) : operation;
@@ -78,7 +78,7 @@ export class CraftingLifecycleExecutor {
     if (existingJournal?.status === 'planned') {
       assertResumableOperation(existingJournal, executable, trusted.operationId, requestId);
       if (existingJournal.effects.some((effect) => effect.phase === 'applying')) {
-        await this._markRecoveryRequired(actor, current);
+        await this._markRecoveryRequired(lane, actor, current);
         throw executionError('The crafting stage requires recovery', 'RECOVERY_REQUIRED');
       }
       receipts = Object.fromEntries(
@@ -97,7 +97,7 @@ export class CraftingLifecycleExecutor {
         );
       }
 
-      current = await this._transition(actor, current, {
+      current = await this._transition(lane, actor, current, {
         type: 'plan',
         plan: {
           operationId: trusted.operationId,
@@ -119,7 +119,7 @@ export class CraftingLifecycleExecutor {
         (entry) => entry.effectId === effect.effectId
       );
       if (persisted?.phase === 'applied') continue;
-      current = await this._transition(actor, current, {
+      current = await this._transition(lane, actor, current, {
         type: 'effectApplying',
         effectId: effect.effectId,
       });
@@ -127,18 +127,18 @@ export class CraftingLifecycleExecutor {
       try {
         receipt = await effect.apply({ actor, run: current, trusted, receipts: { ...receipts } });
       } catch (error) {
-        throw await this._effectFailure(actor, current, effect.effectId, error);
+        throw await this._effectFailure(lane, actor, current, effect.effectId, error);
       }
       receipts[effect.effectId] = receipt ?? null;
       current = this._currentRunAnyStatus(actor, runId);
       try {
-        current = await this._transition(actor, current, {
+        current = await this._transition(lane, actor, current, {
           type: 'effectApplied',
           effectId: effect.effectId,
           receipt: receipts[effect.effectId],
         });
       } catch (error) {
-        await this._markRecoveryRequired(actor, current);
+        await this._markRecoveryRequired(lane, actor, current);
         throw new CraftingLifecycleExecutionError(
           `Crafting effect "${effect.effectId}" receipt could not be persisted`,
           'RECOVERY_REQUIRED',
@@ -151,16 +151,16 @@ export class CraftingLifecycleExecutor {
       typeof executable.outcome === 'function'
         ? await executable.outcome({ actor, run: current, trusted, receipts: { ...receipts } })
         : executable.outcome;
-    current = await this._transition(actor, current, { type: 'commit', outcome });
+    current = await this._transition(lane, actor, current, { type: 'commit', outcome });
     return { run: current, outcome, receipts };
   }
 
-  async _consumeGrant({ actor, runId, expectedRevision, requestId, executionGrant }) {
+  async _consumeGrant(lane, { actor, runId, expectedRevision, requestId, executionGrant }) {
     if (typeof this.consumeExecutionGrant !== 'function') {
       throw executionError('Versioned crafting authority is unavailable', 'AUTHORITY_UNAVAILABLE');
     }
     const trusted = await this.consumeExecutionGrant(executionGrant, {
-      operation: this._lane.operation,
+      operation: lane.operation,
       actor,
       runId,
       expectedRevision,
@@ -187,7 +187,7 @@ export class CraftingLifecycleExecutor {
     return run;
   }
 
-  _assertExecutable(run, expectedRevision, { resuming = false } = {}) {
+  _assertExecutable(lane, run, expectedRevision, resuming = false) {
     const contract = getRunLifecycleContract(run);
     if (contract !== 'current') {
       throw executionError(
@@ -200,9 +200,13 @@ export class CraftingLifecycleExecutor {
     if (run.pauseState) throw executionError('The crafting run is paused', 'RUN_PAUSED');
     if (
       run.executionJournal?.status === 'recoveryRequired' ||
-      run[this._lane.journal]?.status === 'recoveryRequired'
+      run[lane.journal]?.status === 'recoveryRequired'
     ) {
       throw executionError('The crafting run requires recovery', 'RECOVERY_REQUIRED');
+    }
+    // The two lanes exclude each other: neither plans while the other's plan is unfinished.
+    if (run[lane.journal]?.status !== 'planned' && run[lane.otherJournal]?.status === 'planned') {
+      throw executionError('The run already has an execution in progress', 'EXECUTION_IN_PROGRESS');
     }
     if (Number(expectedRevision) !== Number(run.runRevision)) {
       throw executionError('The crafting run revision is stale', 'STALE_RUN_REVISION');
@@ -212,10 +216,10 @@ export class CraftingLifecycleExecutor {
     }
   }
 
-  _transition(actor, run, transition) {
+  _transition(lane, actor, run, transition) {
     return this.runManager.updateExecutionJournal(actor, run.id, transition, {
       expectedRevision: run.runRevision,
-      journal: this._lane.journal,
+      journal: lane.journal,
     });
   }
 
@@ -224,15 +228,15 @@ export class CraftingLifecycleExecutor {
    * instead of demanding recovery, so a run no effect touched stays ordinary and retryable rather
    * than becoming permanently unclearable (issue 1648, F1).
    */
-  async _effectFailure(actor, run, effectId, error) {
-    const applied = observeExecutionJournal(run[this._lane.journal]).effects.some(
+  async _effectFailure(lane, actor, run, effectId, error) {
+    const applied = observeExecutionJournal(run[lane.journal]).effects.some(
       (entry) => entry.phase === 'applied'
     );
     if (!applied && isDefiniteRefusal(error)) {
-      await this._abandonPlan(actor, run);
+      await this._abandonPlan(lane, actor, run);
       return error;
     }
-    await this._markRecoveryRequired(actor, run);
+    await this._markRecoveryRequired(lane, actor, run);
     return new CraftingLifecycleExecutionError(
       `Crafting effect "${effectId}" requires recovery`,
       'RECOVERY_REQUIRED',
@@ -240,20 +244,20 @@ export class CraftingLifecycleExecutor {
     );
   }
 
-  async _abandonPlan(actor, run) {
+  async _abandonPlan(lane, actor, run) {
     try {
       const current = this._currentRunAnyStatus(actor, run.id);
-      await this._transition(actor, current, { type: 'abandonPlan' });
+      await this._transition(lane, actor, current, { type: 'abandonPlan' });
     } catch {
       // The plan is evidence of an operation that changed nothing; failing to discard it leaves
       // a stale plan, which the next attempt reports rather than silently replaying.
     }
   }
 
-  async _markRecoveryRequired(actor, run) {
+  async _markRecoveryRequired(lane, actor, run) {
     try {
       const current = this._currentRunAnyStatus(actor, run.id);
-      await this._transition(actor, current, { type: 'recoveryRequired' });
+      await this._transition(lane, actor, current, { type: 'recoveryRequired' });
     } catch {
       // The applying record already makes replay unsafe. A second persistence failure
       // cannot be repaired here and must not obscure the original ambiguous effect.

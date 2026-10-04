@@ -54,6 +54,7 @@ export function selectFromLadder(ladder, total) {
 export async function drawRolledAwards(group, actor, { Roll, count }) {
   const repeats = group.withReplacement === true;
   let ladder = selectionLadder(group.alternatives);
+  if (ladder.length === 0) return [];
   const awards = repeats ? count : Math.min(count, ladder.length);
   const draws = [];
   for (let index = 0; index < awards; index += 1) {
@@ -109,6 +110,7 @@ async function awardGroup(carrier, group, context) {
     context.pendingAwardChoices.push({
       choiceId: carrier.id,
       resultGroupId: group?.id ?? null,
+      ...(trimStringOrNull(carrier.resultRowId) && { resultRowId: carrier.resultRowId }),
       ...counted,
       alternatives: list(carrier.alternatives).map(memberSnapshot),
     });
@@ -182,9 +184,11 @@ export function pendingAwardChoiceRecord(entry) {
   }
   const countRoll = rollRecord(entry.countRoll);
   const settled = Number.isFinite(entry.settledAt) && SETTLED_OUTCOMES.includes(entry.outcome);
+  const resultRowId = trimStringOrNull(entry.resultRowId);
   return {
     choiceId,
     resultGroupId: trimStringOrNull(entry.resultGroupId),
+    ...(resultRowId && { resultRowId }),
     awardStrategy: groupStrategy(entry),
     count: entry.count,
     ...(countRoll && { countRoll }),
@@ -220,9 +224,43 @@ export function holdsUnsettledAwardChoice(record) {
   return steps.some((step) => list(step?.pendingAwardChoices).some(isUnsettledChoice));
 }
 
-/** A history past `limit` drops its oldest runs, keeping any that still owes an award choice. */
-export const trimRunHistory = (history, limit) =>
-  list(history).filter((run, index) => index < limit || holdsUnsettledAwardChoice(run));
+/** The `groupAwards` entry a settle appends: the player's picks as the group's selections. */
+export const pickedGroupAward = (choice, picks) => ({
+  choiceId: choice.choiceId,
+  chooser: 'playerChooses',
+  awardStrategy: choice.awardStrategy,
+  count: choice.count,
+  ...(choice.countRoll && { countRoll: choice.countRoll }),
+  selections: picks.map((alternativeId) => ({ alternativeId })),
+});
+
+/**
+ * Settle every choice `run` still owes as `forfeited` at `now`, picking nothing, as a prune does
+ * before it would drop the run (issue 1773). Answers whether any choice was owed.
+ */
+export function forfeitOwedChoices(run, now) {
+  const owed = list(run?.steps).flatMap((step) =>
+    list(step?.pendingAwardChoices)
+      .filter(isUnsettledChoice)
+      .map((choice) => ({ step, choice }))
+  );
+  for (const { step, choice } of owed) {
+    Object.assign(choice, { picks: [], settledAt: now, outcome: 'forfeited' });
+    step.groupAwards = [...list(step.groupAwards), pickedGroupAward(choice, [])];
+  }
+  return owed.length > 0;
+}
+
+/** A history keeps its newest `limit` runs and every run still owing an award choice, which the
+ *  cap does not count. */
+export function trimRunHistory(history, limit) {
+  let counted = 0;
+  return list(history).filter((run) => {
+    if (holdsUnsettledAwardChoice(run)) return true;
+    counted += 1;
+    return counted <= limit;
+  });
+}
 
 /** The most a player may pick: one under `anyOne`, else min(N, member count). */
 export const choiceCeiling = (choice) =>

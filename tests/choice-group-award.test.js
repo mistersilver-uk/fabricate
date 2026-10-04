@@ -205,6 +205,13 @@ test('1773 V&A 8: a draw without a selection formula refuses rather than awardin
   );
 });
 
+test('1773: a group with no alternatives left draws nothing, even with repeats', async () => {
+  const roll = scriptedFormulaRoll({ '1d20': [5] });
+  const empty = rolledGroup({ alternatives: [], withReplacement: true });
+  assert.deepEqual(await drawRolledAwards(empty, crafter, { Roll: roll.Roll, count: 2 }), []);
+  assert.deepEqual(roll.counts, {}, 'and rolls nothing');
+});
+
 const choice = (extra = {}) => ({
   choiceId: 'carrier',
   awardStrategy: 'upTo',
@@ -256,6 +263,12 @@ test('1773 V&A 15: history trimming keeps a run that still owes an award choice'
     trimRunHistory(history, 50).map((run) => run.id),
     [...history.slice(0, 50).map((run) => run.id), 'owed']
   );
+  const newest = [owed, ...history.slice(0, 50), { id: 'run-50' }];
+  assert.deepEqual(
+    trimRunHistory(newest, 50).map((run) => run.id),
+    ['owed', ...history.slice(0, 50).map((run) => run.id)],
+    'an owed run does not take a place under the cap'
+  );
   assert.equal(holdsUnsettledAwardChoice(owed), true);
   assert.equal(holdsUnsettledAwardChoice(settled), false);
   assert.equal(holdsUnsettledAwardChoice(owed.steps[0]), true, 'a step answers for itself');
@@ -291,4 +304,7 @@ test('1773: the group records persist their shape and drop what is malformed', (
   assert.equal(pending.outcome, 'awarded');
   const unsettled = pendingAwardChoiceRecord({ ...choice(), resultGroupId: 'set', picks: ['a'] });
   assert.ok(!('picks' in unsettled), 'picks are written only with the settle');
+  assert.ok(!('resultRowId' in unsettled), 'no row id is written for a choice without one');
+  const linked = pendingAwardChoiceRecord({ ...choice(), resultRowId: 'set:carrier:0' });
+  assert.equal(linked.resultRowId, 'set:carrier:0', "the carrier's row id is kept for the settle");
 });

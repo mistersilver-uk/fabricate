@@ -79,7 +79,7 @@ export function rolledAmountRefusals(resultGroups, Roll, rollData) {
     .map((formula) => `Result amount "${formula}" cannot be rolled for this character`);
 }
 
-/** A player-chooser group cannot award until its pick can be settled (issue 1773). */
+/** A group whose chooser is the player cannot award until its pick can be settled (issue 1773). */
 const playerChooserRefusals = (groups) =>
   groups
     .flatMap((group) => group?.results ?? [])
@@ -87,12 +87,40 @@ const playerChooserRefusals = (groups) =>
     .map(() => 'A reward the player chooses cannot be awarded yet');
 
 /**
- * `recipe.validate({ Roll })`, then `rolledAmountRefusals`, the injected `refuseRewards` and the
- * player-chooser refusal over every result group the recipe and its steps author, against `actor`.
- * A progressive award drops every formula (`ResolutionModeService`), so the amount refusals skip it
- * there; `refuseRewards` still runs and refuses any currency, knowledge or group result.
+ * Every refusal `groups` raise for `actor` before anything is consumed or awarded: a formula that
+ * cannot total (none under progressive), the injected `refuseRewards`, and a group whose chooser is
+ * the player unless `awardPlayerChoices` lifts that gate, which only the settle command may do.
  */
-export function validateCraft(recipe, actor, modeService, refuseRewards = null) {
+export function resultGroupRefusals(groups, options = {}) {
+  const { actor, recipe, progressive = false, refuseRewards = null } = options;
+  const sets = groups ?? [];
+  return [
+    ...(progressive ? [] : rolledAmountRefusals(sets, diceEngine(), actorData(actor))),
+    ...(refuseRewards?.(sets, { actor, recipe, progressive }) ?? []),
+    ...(options.awardPlayerChoices === true ? [] : playerChooserRefusals(sets)),
+  ];
+}
+
+/**
+ * A stage's own `resultGroupRefusals` against the world as it is now, as its preparation's refusal,
+ * or `null`: a GM change since run start refuses before the stage consumes or awards (issue 1773).
+ */
+export function stageResultRefusal({ actor, recipe, step }, modeService, refusals = {}) {
+  const progressive = modeService?.getMode?.(recipe) === 'progressive';
+  const context = { actor, recipe, progressive, ...refusals };
+  const errors = resultGroupRefusals(step?.resultGroups, context);
+  return errors.length > 0
+    ? { valid: false, message: `Invalid recipe: ${errors.join(', ')}` }
+    : null;
+}
+
+/**
+ * `recipe.validate({ Roll })`, then `resultGroupRefusals` over every result group the recipe and
+ * its steps author, against `actor`; `refusals` carries its `refuseRewards` and
+ * `awardPlayerChoices`. A progressive award drops every formula (`ResolutionModeService`), so the
+ * amount refusals skip it there; `refuseRewards` still refuses any currency, knowledge or group.
+ */
+export function validateCraft(recipe, actor, modeService, refusals = {}) {
   const Roll = diceEngine();
   const modes = modeService ?? globalThis.game?.fabricate?.getResolutionModeService?.();
   const progressive = modes?.getMode?.(recipe) === 'progressive';
@@ -104,11 +132,7 @@ export function validateCraft(recipe, actor, modeService, refuseRewards = null) 
       ...(recipe.steps ?? []).flatMap((step) => step?.resultGroups ?? []),
     ]),
   ];
-  const errors = [
-    ...(progressive ? [] : rolledAmountRefusals(groups, Roll, actorData(actor))),
-    ...(refuseRewards?.(groups, { actor, recipe, progressive }) ?? []),
-    ...playerChooserRefusals(groups),
-  ];
+  const errors = resultGroupRefusals(groups, { actor, recipe, progressive, ...refusals });
   if (progressive && errors.length === 0) return validation;
   return { valid: errors.length === 0, errors };
 }

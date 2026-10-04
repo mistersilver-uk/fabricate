@@ -162,6 +162,8 @@ export async function createPersistedCraftingHistory({
   failLast = false, cancelAfter = null, armNext = false, opaque = false,
   resumePrefix = false, stageCount = 2, mode = 'simple', checked = true, awardQuantity = undefined, previewOnly = false, transformBeforeResume = null,
   legacy = false, timed = true, refuseConsumeAt = null, refuseSettlement = false, drive = null,
+  // Sets the world up before the run starts, as `drive` acts on it after (issue 1773).
+  beforeStart = null,
   // The 99gp plan and the canned 2gp settlement below exist so a history-capture fixture has
   // currency EVIDENCE to project (issue 1648).
   stubCurrencySettlement = drive === null,
@@ -297,6 +299,7 @@ export async function createPersistedCraftingHistory({
         .buildListing({ actor, viewer: gm });
       return { record, model: listing.history[0] ?? listing.activeRuns[0], error, retryErrors, awardedCount: actor.items.length, sourceItemsRemaining: sources.map((source) => source.items.length) };
     }
+    await beforeStart?.({ engine, actor, steps });
     const started = await engine.startVersionedRun({ viewer, actor, sourceActors: sources,
       recipeId: recipe.id, selectionPlan: { selectedIngredientSetId: set.id,
         ingredientEssenceAllocation: { stepId: steps[0].id, ingredientSetId: set.id,

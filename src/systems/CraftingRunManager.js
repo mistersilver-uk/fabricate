@@ -1,11 +1,7 @@
 import { cloneJson } from '../utils/scalars.js';
 
 import { persistAwardChoiceSettlement } from './awardChoiceSettle.js';
-import {
-  groupEvidenceFields,
-  holdsUnsettledAwardChoice,
-  trimRunHistory,
-} from './choiceGroupAward.js';
+import { forfeitOwedChoices, groupEvidenceFields, trimRunHistory } from './choiceGroupAward.js';
 import { craftingStepHistoryEvidence } from './craftingStepHistoryEvidence.js';
 import { stringOrNull } from './gatheringEngineInternals.js';
 import { RunContainerManagerBase } from './runContainerStore.js';
@@ -34,6 +30,9 @@ import { selectWritableActors } from './writableActors.js';
 export { craftingStepHistoryEvidence } from './craftingStepHistoryEvidence.js';
 
 const HISTORY_LIMIT = 50;
+
+/** A versioned run's two journals: its stages', and its award choices' (issue 1773). */
+const RUN_JOURNAL_KEYS = Object.freeze(['executionJournal', 'awardChoiceJournal']);
 
 /**
  * Manages actor-scoped crafting runs (active + history). The per-actor cache, baseline
@@ -536,13 +535,14 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return step;
   }
 
-  listDueVersionedRuns(worldTime = this._nowWorldTime()) {
+  /** `awardChoiceBlocks(run, actor)` is the stage start's own owed-choice predicate (issue 1773). */
+  listDueVersionedRuns(worldTime = this._nowWorldTime(), awardChoiceBlocks = () => false) {
     const due = [];
     for (const actor of game.actors || []) {
       this.invalidateCache(actor.id);
       const container = this._getContainer(actor);
       for (const run of Object.values(container.active || {})) {
-        if (!this._dueVersionedStep(run, worldTime)) continue;
+        if (!this._dueVersionedStep(run, worldTime) || awardChoiceBlocks(run, actor)) continue;
         const currentStepIndex = Number(run.currentStepIndex);
         due.push({
           actor,
@@ -561,8 +561,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     if (run.status !== 'waitingTime' || run.completionMode !== 'worldTime' || run.pauseState) {
       return null;
     }
-    if (run.executionJournal && run.executionJournal.status !== 'committed') return null;
-    if (holdsUnsettledAwardChoice(run)) return null;
+    if (RUN_JOURNAL_KEYS.some((key) => run[key] && run[key].status !== 'committed')) return null;
     const index = Number(run.currentStepIndex);
     if (!Number.isSafeInteger(index)) return null;
     const step = run.steps?.[index];
@@ -680,16 +679,9 @@ export class CraftingRunManager extends RunContainerManagerBase {
         ...(Array.isArray(container.history) ? container.history : []),
       ];
       for (const run of runs) {
-        if (getRunLifecycleContract(run) !== 'current' || !run?.executionJournal) continue;
-        const journal = observeExecutionJournal(run.executionJournal);
-        if (operationScope && journal.operationId !== normalizedOperationId) continue;
-        if (
-          journal.status !== 'planned' ||
-          journal.effects.every((effect) => effect.phase !== 'applying')
-        ) {
-          continue;
+        for (const key of interruptedJournals(run, normalizedOperationId)) {
+          candidates.push({ actor, runId: run.id, expectedRevision: run.runRevision, key });
         }
-        candidates.push({ actor, runId: run.id, expectedRevision: run.runRevision });
       }
     }
 
@@ -699,7 +691,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
         candidate.actor,
         candidate.runId,
         { type: 'reconstructAfterReload' },
-        { expectedRevision: candidate.expectedRevision }
+        { expectedRevision: candidate.expectedRevision, journal: candidate.key }
       );
       if (!reconstructed) {
         throw new RunLifecycleError(
@@ -712,7 +704,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
         runId: reconstructed.id,
         status: reconstructed.status,
         runRevision: reconstructed.runRevision,
-        journalStatus: reconstructed.executionJournal.status,
+        journalStatus: reconstructed[candidate.key].status,
       });
     }
 
@@ -778,25 +770,11 @@ export class CraftingRunManager extends RunContainerManagerBase {
   async removeRunsForSystem(systemId) {
     if (!systemId) return;
     const target = String(systemId);
+    const named = (run) => run?.craftingSystemId === target;
+    const prune = { dropActiveRun: named, keepHistoryEntry: (run) => !named(run) };
     for (const actor of game.actors || []) {
       const container = this._getContainer(actor);
-      let dirty = false;
-
-      for (const [runId, run] of Object.entries(container.active || {})) {
-        if (retainedByPrune(run) || run?.craftingSystemId !== target) continue;
-        delete container.active[runId];
-        dirty = true;
-      }
-
-      const nextHistory = (container.history || []).filter(
-        (run) => retainedByPrune(run) || run?.craftingSystemId !== target
-      );
-      if (nextHistory.length !== (container.history || []).length) {
-        container.history = nextHistory;
-        dirty = true;
-      }
-
-      if (dirty) {
+      if (pruneContainer(container, prune, this._nowWorldTime())) {
         await this._persist(actor, container);
       }
     }
@@ -808,26 +786,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * may write (issue 970): `cleanupInvalidRuns` runs on every client at `initialize()`, and one
    * stale entry on another player's character would otherwise reject the whole startup.
    */
-  async _pruneRunsAcrossWritableActors({ dropActiveRun, keepHistoryEntry }) {
+  async _pruneRunsAcrossWritableActors(prune) {
     for (const actor of selectWritableActors(game.actors)) {
       const container = this._getContainer(actor);
-      let dirty = false;
-
-      for (const [runId, run] of Object.entries(container.active || {})) {
-        if (retainedByPrune(run) || !dropActiveRun(run)) continue;
-        delete container.active[runId];
-        dirty = true;
-      }
-
-      const nextHistory = (container.history || []).filter(
-        (run) => retainedByPrune(run) || keepHistoryEntry(run)
-      );
-      if (nextHistory.length !== (container.history || []).length) {
-        container.history = nextHistory;
-        dirty = true;
-      }
-
-      if (dirty) {
+      if (pruneContainer(container, prune, this._nowWorldTime())) {
         await this._persist(actor, container);
       }
     }
@@ -982,17 +944,50 @@ function applyStepHistoryEvidence(step, payload, run) {
     if (Array.isArray(step[field])) step[field] = step[field].map(itemReceipt);
   }
   if (step.historySettlement && ['succeeded', 'failed'].includes(step.status)) {
-    const owed = holdsUnsettledAwardChoice(step) ? 'pending' : 'complete';
     step.historySettlement = {
       ...step.historySettlement,
-      awards: payload.historySettlement?.awards ?? owed,
+      awards: payload.historySettlement?.awards ?? 'complete',
     };
   }
 }
 
-/** A prune never drops an unsupported run, nor one that still owes an award choice. */
-function retainedByPrune(run) {
-  return getRunLifecycleContract(run) === 'unsupported' || holdsUnsettledAwardChoice(run);
+/** The journals of `run` an interrupted effect left applying, of `operationId` when one is named. */
+function interruptedJournals(run, operationId) {
+  if (getRunLifecycleContract(run) !== 'current') return [];
+  return RUN_JOURNAL_KEYS.filter((key) => {
+    const journal = run[key] ? observeExecutionJournal(run[key]) : null;
+    if (journal?.status !== 'planned') return false;
+    if (operationId && journal.operationId !== operationId) return false;
+    return journal.effects.some((effect) => effect.phase === 'applying');
+  });
+}
+
+/**
+ * What a prune does to a run it may reject: an unsupported run is never touched, and a rejected
+ * run still owing an award choice is kept once more, that choice settled `forfeited` (issue 1773).
+ */
+function pruneAction(run, rejected, now) {
+  if (!rejected || getRunLifecycleContract(run) === 'unsupported') return 'keep';
+  if (!forfeitOwedChoices(run, now)) return 'drop';
+  incrementRunRevision(run);
+  return 'forfeit';
+}
+
+/** Apply a prune to one container's runs; answers whether it dropped or forfeited anything. */
+function pruneContainer(container, { dropActiveRun, keepHistoryEntry }, now) {
+  let dirty = false;
+  const dropped = (run, rejected) => {
+    const action = pruneAction(run, rejected, now);
+    dirty ||= action !== 'keep';
+    return action === 'drop';
+  };
+  for (const [runId, run] of Object.entries(container.active || {})) {
+    if (dropped(run, dropActiveRun(run))) delete container.active[runId];
+  }
+  const history = container.history || [];
+  const kept = history.filter((run) => !dropped(run, !keepHistoryEntry(run)));
+  if (kept.length !== history.length) container.history = kept;
+  return dirty;
 }
 
 function cloneObject(value) {

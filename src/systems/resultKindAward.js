@@ -306,22 +306,30 @@ export const stageAwardHistory = (state) => ({
   }),
 });
 
-function currencyRefusals(result, { actor, recipe, seams }) {
+/**
+ * Why `unit` cannot be credited to `actor` now, or `null`: currency off, the unit not configured,
+ * or the world writer's own refusal, judged through its `plan()` and `preconditions()` unwritten.
+ */
+export function currencyCreditBlocker(unit, { actor, recipe, seams }) {
   const config = getCurrencyRequirementConfig(recipe, seams);
-  if (config?.enabled !== true) {
+  if (config?.enabled !== true) return 'currencyDisabled';
+  if (!findCurrencyUnit(config.units, unit)) return 'unitMissing';
+  const planned = createCurrencyCreditKind({ ...seams, resolveActor: () => actor }).plan({
+    recipients: [{ actorId: actor?.id ?? '', amount: 1 }],
+    unitId: unit,
+  });
+  return planned.failure?.reason ?? planned.units[0].preconditions().reason ?? null;
+}
+
+function currencyRefusals(result, context) {
+  const reason = currencyCreditBlocker(result.unit, context);
+  if (reason === 'currencyDisabled') {
     return [`Currency reward "${result.unit}" needs currency enabled for this crafting system`];
   }
-  if (!findCurrencyUnit(config.units, result.unit)) {
-    return [`Currency reward unit "${result.unit}" is not configured`];
-  }
+  if (reason === 'unitMissing') return [`Currency reward unit "${result.unit}" is not configured`];
   if (!result.quantityFormula && !Number.isSafeInteger(result.quantity)) {
     return [`Currency reward "${result.unit}" must be a whole amount`];
   }
-  const planned = createCurrencyCreditKind({ ...seams, resolveActor: () => actor }).plan({
-    recipients: [{ actorId: actor?.id ?? '', amount: 1 }],
-    unitId: result.unit,
-  });
-  const reason = planned.failure?.reason ?? planned.units[0].preconditions().reason;
   return reason ? [`Currency reward cannot be credited to this character (${reason})`] : [];
 }
 

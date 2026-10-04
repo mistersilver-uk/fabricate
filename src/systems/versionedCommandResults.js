@@ -25,6 +25,7 @@ export function authorityUnavailableResult() {
   };
 }
 
-export function versionedFailure(message) {
-  return { success: false, results: null, message };
+/** A refusal; `blocker` is the machine-readable code a stage preparation names, if any. */
+export function versionedFailure(message, blocker = null) {
+  return { success: false, results: null, message, ...(blocker && { blocker }) };
 }
