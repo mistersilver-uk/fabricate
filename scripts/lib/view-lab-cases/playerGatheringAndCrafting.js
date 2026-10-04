@@ -863,7 +863,10 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: 'crafting', resultRowState: 'reward-group-rolled' },
-    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' }],
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-io-output="group"] + [data-io-output="group"]', scroll: true },
+    ],
     position: { width: 1100, height: 860 },
     expectTab: 'crafting',
     expectSelector:
