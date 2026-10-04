@@ -127,32 +127,26 @@
       .map((kind) => ({ value: kind, label: kindWord(kind) }))
   );
 
-  const searchPlaceholder = $derived.by(() => {
-    if (matchType === 'essence')
-      return localizeOr(
-        'FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder',
-        'Search essences...'
-      );
-    if (matchType === 'currency')
-      return localizeOr('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency');
-    return localizeOr(
-      'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-      'Search components...'
-    );
-  });
-  const emptyCatalogueHint = $derived.by(() => {
-    if (matchType === 'essence')
-      return localizeOr('FABRICATE.Admin.Manager.Recipe.NoEssencesDefined', 'No essences defined');
-    if (matchType === 'currency')
-      return localizeOr(
-        'FABRICATE.Admin.Manager.Recipe.NoCurrencyDefined',
-        'No currencies defined'
-      );
-    return localizeOr(
-      'FABRICATE.Admin.Manager.Recipe.NoComponentsDefined',
-      'No components defined'
-    );
-  });
+  // The name field's placeholder and empty hint per kind; any other kind reads the component pair.
+  const SEARCH_COPY = {
+    essence: [
+      ['FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...'],
+      ['FABRICATE.Admin.Manager.Recipe.NoEssencesDefined', 'No essences defined'],
+    ],
+    currency: [
+      ['FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency'],
+      ['FABRICATE.Admin.Manager.Recipe.NoCurrencyDefined', 'No currencies defined'],
+    ],
+    component: [
+      ['FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...'],
+      ['FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined'],
+    ],
+  };
+  const searchCopy = $derived(
+    Object.hasOwn(SEARCH_COPY, matchType) ? SEARCH_COPY[matchType] : SEARCH_COPY.component
+  );
+  const searchPlaceholder = $derived(localizeOr(...searchCopy[0]));
+  const emptyCatalogueHint = $derived(localizeOr(...searchCopy[1]));
 
   const normalizedQuery = $derived(query.trim().toLowerCase());
   const suggestions = $derived(
