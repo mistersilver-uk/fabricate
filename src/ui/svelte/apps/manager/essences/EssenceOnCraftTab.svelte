@@ -23,10 +23,10 @@
   `evaluateMacroDrop`; the WARNING is this surface's.
 -->
 <script>
+  import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
-  import ExplainerCard from '../ExplainerCard.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import InheritRow from '../scoped/InheritRow.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -190,14 +190,14 @@
   {#if !scoped}
     <!-- THE CREATE DRAFT'S PRIMER, dropped on the rules screen where each card explains itself
          and the shared-definition callout says which layer is which. -->
-    <ExplainerCard
+    <Callout
       icon="fas fa-circle-question"
       title={text(
         'FABRICATE.Admin.Manager.Essence.OnCraft.ExplainerTitle',
         'What an essence carries'
       )}
       items={explainerItems}
-      dataAttr="data-essence-on-craft-explainer"
+      data-essence-on-craft-explainer
     />
   {/if}
 

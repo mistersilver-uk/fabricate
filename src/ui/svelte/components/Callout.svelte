@@ -11,7 +11,8 @@
   meant to make the hazard stand out. At `accent` the ink is `--fab-accent-text`, not `--fab-accent`,
   which measures 4.48:1 in `ironblood-forge` and fails AA. `title`, `text`, `icon`, an `actions`
   snippet drawn inside the strip so a note and the control answering it are one object, and an
-  extra `class` are the rest.
+  extra `class` are the rest. `items` (`[{ icon, lead, text }]`) lists glyph-led points under the
+  body, each glyph inked as the leading one; an item's `text` renders only when non-empty.
 
   Rest spread:
   - `{...rest}` lands on the root, written after `class`, and carries a caller's `data-*` hook.
@@ -28,6 +29,7 @@
     text = '',
     icon = '',
     actions = undefined,
+    items = [],
     class: extraClass = '',
     ...rest
   } = $props();
@@ -46,8 +48,11 @@
   const resolvedTone = $derived(TONES.has(tone) ? tone : 'neutral');
   const resolvedIcon = $derived(icon || DEFAULT_ICONS[resolvedTone]);
 
-  // A `<p>` cannot legally contain a heading-shaped child or a button, so the root follows content.
-  const structured = $derived(Boolean(title) || Boolean(actions));
+  const points = $derived(Array.isArray(items) ? items : []);
+
+  // A `<p>` cannot legally contain a heading-shaped child, a button or a list, so the root follows
+  // content.
+  const structured = $derived(Boolean(title) || Boolean(actions) || points.length > 0);
 </script>
 
 <svelte:element
@@ -66,6 +71,20 @@
   <span class="manager-callout-body">
     {#if title}<span class="manager-callout-title">{title}</span>{/if}
     <span class="manager-callout-text">{text}</span>
+    {#if points.length > 0}
+      <!-- Spans with list roles: the body is a `<span>`, which cannot hold a `<ul>`. -->
+      <span class="manager-callout-items" role="list">
+        {#each points as point, index (index)}
+          <span class="manager-callout-item" role="listitem">
+            <i class={point.icon} aria-hidden="true"></i>
+            <span
+              ><span class="manager-callout-item-lead">{point.lead}</span>
+              {#if point.text}<span class="manager-callout-item-text">{point.text}</span>{/if}</span
+            >
+          </span>
+        {/each}
+      </span>
+    {/if}
   </span>
   {#if actions}<span class="manager-callout-actions">{@render actions()}</span>{/if}
 </svelte:element>
@@ -93,7 +112,8 @@
   }
 
   /* `.k-callout .i`'s fixed 13px box, so a wide glyph cannot widen the leading column. */
-  .manager-callout > i {
+  .manager-callout > i,
+  .manager-callout-item > i {
     flex: none;
     width: 13px;
     margin-top: var(--fab-space-2xs);
@@ -125,6 +145,29 @@
     margin-top: var(--fab-space-2xs);
   }
 
+  .manager-callout-items {
+    display: grid;
+    gap: var(--fab-space-2);
+    margin-top: var(--fab-space-2);
+  }
+
+  .manager-callout-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
+  .manager-callout-item > span {
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  .manager-callout-item-lead {
+    color: var(--fab-text);
+    font-weight: 600;
+  }
+
   .manager-callout-actions {
     flex: none;
     display: inline-flex;
@@ -139,6 +182,7 @@
   }
 
   .manager-callout.is-info > i,
+  .manager-callout.is-info .manager-callout-item > i,
   .manager-callout.is-info .manager-callout-title {
     color: var(--fab-info-text);
   }
@@ -150,6 +194,7 @@
   }
 
   .manager-callout.is-accent > i,
+  .manager-callout.is-accent .manager-callout-item > i,
   .manager-callout.is-accent .manager-callout-title {
     color: var(--fab-accent-text);
   }
@@ -160,6 +205,7 @@
   }
 
   .manager-callout.is-warning > i,
+  .manager-callout.is-warning .manager-callout-item > i,
   .manager-callout.is-warning .manager-callout-title {
     color: var(--fab-warning-text);
   }
@@ -170,6 +216,7 @@
   }
 
   .manager-callout.is-success > i,
+  .manager-callout.is-success .manager-callout-item > i,
   .manager-callout.is-success .manager-callout-title {
     color: var(--fab-success-text);
   }
@@ -180,6 +227,7 @@
   }
 
   .manager-callout.is-danger > i,
+  .manager-callout.is-danger .manager-callout-item > i,
   .manager-callout.is-danger .manager-callout-title {
     color: var(--fab-danger-text);
   }

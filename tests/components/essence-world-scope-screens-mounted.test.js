@@ -77,6 +77,8 @@ const SHELL_MODULES = [
   // The extracted `SYSTEM RULES n / m` panel (issue 1372). A rendered child missing from this
   // list does not fail — it HANGS, and `node --test` reports the blocked tests as `# cancelled`.
   'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
+  // The world-default cards render through the fact row (issue 1521).
+  'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
 ];
 
@@ -126,7 +128,6 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',

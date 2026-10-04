@@ -16,6 +16,9 @@
   Snippets:
   - `children` — the expanded editor body, rendered inside the row's card when open.
 
+  Rest spread:
+  - `{...rest}` lands on the root after `class`, and carries the caller's `data-*` hook.
+
   Invariants:
   - ONE SCAFFOLD, not a copy per variant: there are six call sites, and three `{#if}` branches each
     restating the shell is intra-file duplication SonarCloud's detector reads in `.svelte`.
@@ -53,9 +56,9 @@
     onDelete = null,
     deleteLabel = '',
     disabled = false,
-    dataAttr = '',
-    dataValue = '',
     children = undefined,
+    class: extraClass = '',
+    ...rest
   } = $props();
 
   // A NARRATIVE gravity axis, never shared with `systemValidation.js` or the notice channel.
@@ -76,7 +79,6 @@
   const clampLines = $derived(
     Number.isFinite(Number(bodyClamp)) && Number(bodyClamp) > 0 ? Math.floor(Number(bodyClamp)) : 0
   );
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 </script>
 
 <!-- ONE chip run in one of two places. The TENSE chip leads the severity chip, so a positional
@@ -96,10 +98,10 @@
 {/snippet}
 
 <div
-  class="fab-complication-row is-{variant} is-gravity-{gravity.tone}"
+  class={['fab-complication-row', `is-${variant}`, `is-gravity-${gravity.tone}`, extraClass]}
   class:is-expanded={expanded}
   data-complication-row={variant}
-  {...hookAttributes}
+  {...rest}
 >
   <div class="fab-complication-row-line">
     <span class="fab-complication-severity is-{gravity.tone}" aria-hidden="true"

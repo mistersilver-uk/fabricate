@@ -873,10 +873,26 @@ const RENAMED = [
       'A dialog mounted unconditionally at `CraftingSystemManagerRoot.svelte` with `open` passed as a prop is never unmounted: `Modal.svelte` gates only its chrome behind `{#if open}`, so the caller component instance, and every `$state` it declares, lives for the whole manager session.',
     identifiers: [['`Modal.svelte`', '`ManagerModal.svelte`']],
   },
+  // Issue 1521 folded `ExplainerCard.svelte` onto the callout, so the fenced-separator example
+  // names a component that still carries one.
+  {
+    before:
+      "A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.",
+    after:
+      "A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `GatheringTaskInspector.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.",
+    identifiers: [['`GatheringTaskInspector.svelte`', '`ExplainerCard.svelte`']],
+  },
+  {
+    before:
+      "The `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.",
+    after:
+      "The `{' '}` separators in `GatheringTaskInspector.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.",
+    identifiers: [['`GatheringTaskInspector.svelte`', '`ExplainerCard.svelte`']],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 31;
+const RENAMED_COUNT = 33;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {

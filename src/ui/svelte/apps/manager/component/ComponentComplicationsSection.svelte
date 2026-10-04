@@ -545,8 +545,7 @@
               'FABRICATE.Admin.Manager.Component.Complications.Remove',
               'Remove complication'
             )}
-            dataAttr="data-complication"
-            dataValue={complication.id}
+            data-complication={complication.id || true}
             onToggle={() => toggleOpen(complication.id)}
             onDelete={() => removeComplication(complication.id)}
           >

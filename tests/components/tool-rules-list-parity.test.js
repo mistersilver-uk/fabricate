@@ -839,11 +839,13 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
       '--fab-bg-0',
       '--fab-bg-1',
       '--fab-text-subtle',
+      '--fab-text-muted',
     ]);
     const resolved = {
       bg0: tokens['--fab-bg-0'],
       bg1: tokens['--fab-bg-1'],
       subtle: tokens['--fab-text-subtle'],
+      muted: tokens['--fab-text-muted'],
     };
 
     // `proto:2548` — the aside is `--bg2` over a `--bg1` pane. On our ramp that is
@@ -867,7 +869,8 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
     assert.equal(measured['rule-title'].fontSize, '11.5px', 'proto:2561 title size');
     assert.equal(measured['rule-title'].fontWeight, '600', 'proto:2561 title weight');
     assert.equal(measured['rule-subtitle'].fontSize, '9.5px', 'proto:2561 subtitle size');
-    assert.equal(measured['rule-subtitle'].color, resolved.subtle, 'proto:2561 subtitle ink');
+    // Muted, not the prototype's subtle: issue 1521's correction, as `Kicker` and `EmptyState` ink.
+    assert.equal(measured['rule-subtitle'].color, resolved.muted, 'the subtitle inks muted');
 
     // `proto:2569-2571` — the inheritance row LEFT-PACKS its pill beside the label. It was
     // `space-between`, which threw the pill to the far edge of the column.

@@ -90,15 +90,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/ToggleCard.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/components/Field.svelte',
-    // THE manager's labelled push-button (issue 1118). `ExplainerCard`'s docs link and
-    // `EditorValidationSurface`'s View action both render through the primitive, so it is a
-    // STATIC import of this tree; omitting it HANGS this suite as `# cancelled`.
+    // THE manager's labelled push-button (issue 1118). `EditorValidationSurface`'s View action
+    // renders through the primitive, so it is a STATIC import of this tree; omitting it HANGS
+    // this suite as `# cancelled`.
     'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
@@ -273,6 +272,26 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
       'state',
       'the same configuration on an ENABLED essence is not suppressed'
     );
+    harness.remount();
+  });
+
+  // Issue 1521 folded the explainer card onto `Callout`'s `items`.
+  it('draws the create draft primer as a callout note with three glyph-led points', async () => {
+    const root = await harness.mount(props());
+    openTab(root, 'oncraft');
+
+    const primer = root.querySelector('[data-essence-on-craft-explainer]');
+    assert.ok(Boolean(primer), 'the create draft keeps its primer');
+    assert.equal(primer.getAttribute('data-essence-on-craft-explainer'), 'true');
+    assert.ok(primer.matches('div.manager-callout[role="note"]'), 'and it is the callout note');
+    assert.match(primer.querySelector('.manager-callout-title').textContent, /What an essence/);
+    const points = [...primer.querySelectorAll('.manager-callout-item')];
+    assert.equal(points.length, 3, 'one point per thing an essence carries');
+    for (const point of points) {
+      assert.ok(Boolean(point.querySelector(':scope > i')), 'each point leads with its glyph');
+      assert.ok(point.querySelector('.manager-callout-item-lead').textContent.trim().length > 0);
+      assert.ok(point.querySelector('.manager-callout-item-text').textContent.trim().length > 0);
+    }
     harness.remount();
   });
 

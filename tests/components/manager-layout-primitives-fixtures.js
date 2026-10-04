@@ -15,20 +15,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // be read out of `styles/fabricate.css` are read out of the component source instead.
 const emptyStatePath = resolve(__dirname, '../../src/ui/svelte/components/EmptyState.svelte');
 export const calloutPath = resolve(__dirname, '../../src/ui/svelte/components/Callout.svelte');
-// The shared side-panel explainer card and icon fact row (issue 881) follow the same rule:
-const explainerCardPath = resolve(
-  __dirname,
-  '../../src/ui/svelte/apps/manager/ExplainerCard.svelte'
-);
+// The shared side-panel icon fact row (issue 881) follows the same rule:
 const iconFactRowPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/IconFactRow.svelte');
 const emptyStateSource = readFileSync(emptyStatePath, 'utf8');
 const calloutSource = readFileSync(calloutPath, 'utf8');
-export const explainerCardSource = readFileSync(explainerCardPath, 'utf8');
 const iconFactRowSource = readFileSync(iconFactRowPath, 'utf8');
 
 export const emptyStateStyles = scopedStyles(emptyStateSource);
 export const calloutStyles = scopedStyles(calloutSource);
-export const explainerCardStyles = scopedStyles(explainerCardSource);
 export const iconFactRowStyles = scopedStyles(iconFactRowSource);
 
 // The stacked body rule, read out of the 1120px container query rather than off the base

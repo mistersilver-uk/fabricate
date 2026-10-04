@@ -33,7 +33,6 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     previewPath,
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/Button.svelte',
@@ -137,5 +136,12 @@ describe('ScopedEntityPreview fact groups (mounted)', () => {
       2,
       'the descendant form is the one to write'
     );
+  });
+
+  it('renders no explainer, the prop no caller passed having gone (issue 1521)', async () => {
+    const explainer = { title: 'How this works', items: [{ icon: 'fas fa-cube', lead: 'Lead' }] };
+    const root = await harness.mount({ kicker: 'PLAYER PREVIEW', explainer });
+    assert.ok(!root.textContent.includes('How this works'), 'the old prop draws nothing');
+    assert.equal(root.querySelector('aside').childElementCount, 1, 'only the kicker renders');
   });
 });

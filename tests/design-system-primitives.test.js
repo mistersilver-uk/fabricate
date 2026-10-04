@@ -73,7 +73,7 @@ const PUBLISHING_CASE_IDS = new Set(
 );
 
 /** The V8-escaped source of `BROAD_SIGNAL_PATTERN`, verbatim. */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ExplainerCard|IconFactRow)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(IconFactRow)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -218,7 +218,6 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * RE-KEY between the two primitive directories, which holds the length (issue 1710).
  */
 const PRIMITIVES_WITH_NO_FRAME = [
-  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
@@ -248,8 +247,8 @@ test('the inputs every property below quantifies over are alive', () => {
   // 75 as of issue 1521, whose `InlineRenameField` replaced the party and realm name fields; 74
   // once the inspector action button became the button primitive at full width.
   // 76 as of issue 1782: `Meter` and `BandedBar`, each on three and two importers; 77 with
-  // `RuleRow` on its two.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 77, 'the shipped primitive set changed size');
+  // `RuleRow` on its two; 76 once issue 1521 folded the explainer card onto the callout's `items`.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 76, 'the shipped primitive set changed size');
   // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
   // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;
   // 17 when `ChoiceGroup` joined at one caller (issue 1516).
@@ -271,7 +270,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 131);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 117);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {

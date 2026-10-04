@@ -713,6 +713,13 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
 // And the inspector-rail cases that measure each verb's computed rung rather than a grid (issue
 // 1521): every `Button` verb the retired rail button drew, by the case that renders it.
 const CONTROL_LAYOUT_CASES = Object.groupBy(INSPECTOR_VERB_SITES, ({ caseId }) => caseId);
+// One measured control is not a verb: the `rule` fact row's subtitle ink (issue 1521).
+const RULE_SUBTITLE_INK = Object.freeze({
+  caseId: 'world-essence-catalogue',
+  selector: '[data-scoped-list-inherit-note="effectSource"]',
+  styles: 'color: var(--fab-text-muted)',
+});
+const isVerbControl = (control) => control.selector !== RULE_SUBTITLE_INK.selector;
 const CONTROL_LAYOUT_CASE_IDS = Object.keys(CONTROL_LAYOUT_CASES);
 const LAYOUT_CASE_IDS = [
   ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
@@ -810,19 +817,23 @@ test('the inspector-rail cases measure every verb on the manager rung, one prima
   const byText = (left, right) => left.localeCompare(right);
   const measured = VIEW_LAB_CASES.flatMap((viewCase) => viewCase.expectLayout?.controls ?? []);
   assert.deepEqual(
-    measured.map((control) => control.selector).sort(byText),
+    measured
+      .filter(isVerbControl)
+      .map((control) => control.selector)
+      .sort(byText),
     INSPECTOR_VERB_SITES.map((site) => site.selector).sort(byText),
     'the cases measure exactly the eight rail verbs'
   );
   for (const [id, sites] of Object.entries(CONTROL_LAYOUT_CASES)) {
     const { expectLayout } = getCaseById(id);
+    const verbs = expectLayout.controls.filter(isVerbControl);
     assert.equal(expectLayout.gridSelector, undefined, `${id} measures controls, not a grid`);
     assert.deepEqual(
-      expectLayout.controls.map((control) => control.selector),
+      verbs.map((control) => control.selector),
       sites.map((site) => site.selector),
       `${id} measures each verb it renders`
     );
-    const success = expectLayout.controls
+    const success = verbs
       .filter((control) => control.styles.includes('background-color: var(--fab-success)'))
       .map((control) => control.selector);
     assert.deepEqual(
@@ -830,12 +841,22 @@ test('the inspector-rail cases measure every verb on the manager rung, one prima
       sites.filter((site) => site.role === 'primary').map((site) => site.selector),
       `${id} measures its primary, and only it, in the success family`
     );
-    for (const { selector, styles } of expectLayout.controls) {
+    for (const { selector, styles } of verbs) {
       for (const declaration of ['min-height: 34px', 'border-radius: 9px', 'font-size: 0.72rem']) {
         assert.ok(styles.includes(declaration), `${id} ${selector} measures ${declaration}`);
       }
     }
   }
+});
+
+test('the essence catalogue case measures the rule subtitle in the muted ink', () => {
+  const { caseId, ...control } = RULE_SUBTITLE_INK;
+  const controls = getCaseById(caseId).expectLayout.controls;
+  assert.deepEqual(
+    controls.filter((candidate) => !isVerbControl(candidate)),
+    [control],
+    `${caseId} reads the world-default card's subtitle ink`
+  );
 });
 
 // The side-rail routes' own scrollers below the 1120px rung (issue 1976): the two editors whose

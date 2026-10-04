@@ -133,6 +133,7 @@ export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
   const compiledExtras = [
     'src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
+    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',

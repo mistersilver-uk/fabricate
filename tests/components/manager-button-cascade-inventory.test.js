@@ -106,7 +106,9 @@ const CONVERTED_BATCHES = Object.freeze([
         file: 'src/ui/svelte/components/EditorValidationSurface.svelte',
         sites: 1,
       }),
-      Object.freeze({ file: 'src/ui/svelte/apps/manager/ExplainerCard.svelte', sites: 1 }),
+      // REMOVED at issue 1521, recorded rather than performed silently: `ExplainerCard.svelte`
+      // was booked for its one docs-link `Button`, and the card folded onto `Callout`'s `items`,
+      // which renders no link — no caller had ever passed one.
     ]),
   }),
   Object.freeze({
@@ -784,14 +786,9 @@ const REVIEWED = [
         container: 'manager-setup-links',
         buttons: 3,
       },
-      {
-        file: 'src/ui/svelte/apps/manager/ExplainerCard.svelte',
-        container: 'manager-setup-links',
-        buttons: 1,
-      },
     ],
     why:
-      'The setup card`s docs-link row, and the explainer card`s. It declares `flex`, ' +
+      'The setup card`s docs-link row. It declares `flex`, ' +
       '`justify-content` and `text-decoration`; the primitive declares none of the three — ' +
       'the base control states the same `justify-content: center` at (0,2,0) and loses to ' +
       'this rule anyway — so every site it reaches is untouched by the conversion.',
@@ -1097,16 +1094,17 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    120,
-    'the conversion is 120 sites, whether or not a given one has been converted yet'
+    119,
+    // 119, not 120, since issue 1521: the explainer card's one converted site left the product.
+    'the conversion is 119 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    48,
+    47,
     // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), and one for the
-    // salvage DC card's move into `CheckOverrideField` (issue 2005); the 120-site total above is
-    // unchanged, because nothing converted.
-    'across 48 components'
+    // salvage DC card's move into `CheckOverrideField` (issue 2005); the site total above is
+    // unchanged by those, because nothing converted. One fewer with the explainer card (1521).
+    'across 47 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the

@@ -693,7 +693,6 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-  'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   // Issue 1521's one rename field for the party card and the realm inspector.
   'src/ui/svelte/apps/manager/InlineRenameField.svelte',

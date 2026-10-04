@@ -56,8 +56,7 @@
           'Shown to the player when it fires.'
         )}
         triggerSentence={stripSummary(complication)}
-        dataAttr="data-recipe-result-complication"
-        dataValue={complication.id}
+        data-recipe-result-complication={complication.id || true}
       />
     {/each}
   </div>

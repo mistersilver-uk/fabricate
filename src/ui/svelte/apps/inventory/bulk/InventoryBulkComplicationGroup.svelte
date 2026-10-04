@@ -180,8 +180,7 @@
           statusLabel={localize('FABRICATE.App.Complications.Forecast')}
           statusTone="neutral"
           bodyClamp={3}
-          dataAttr="data-inventory-bulk-complication"
-          dataValue={row.id}
+          data-inventory-bulk-complication={row.id || true}
         />
       </li>
     {/each}

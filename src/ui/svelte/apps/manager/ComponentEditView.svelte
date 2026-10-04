@@ -1892,8 +1892,7 @@
                                 'Shown to the player when it fires.'
                               )}
                               triggerSentence={complicationStripSummary(complication)}
-                              dataAttr="data-salvage-stage-complication"
-                              dataValue={complication.id}
+                              data-salvage-stage-complication={complication.id || true}
                             />
                           {/each}
                         </div>
