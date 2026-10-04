@@ -5683,7 +5683,7 @@
         onPickImagePath={services?.pickImagePath}
         currencyUnits={selectedCurrencyUnits}
         currencyEnabled={selectedCurrencyEnabled}
-        recipeOptions={$viewState.recipes || []}
+        recipeOptions={$viewState.recipeRoster || []}
         knowledgeObservable={isLearnedKnowledgeObservable(selectedSystem)}
         timeRequirementsEnabled={selectedTimeRequirementsEnabled}
         toolsLibrary={recipeToolsLibrary}
@@ -6324,7 +6324,7 @@
               componentCount={selectedCounts.components}
               componentOptions={selectedSystem?.managedItemOptions || []}
               {essenceOptions}
-              recipeOptions={$viewState.recipes || []}
+              recipeOptions={$viewState.recipeRoster || []}
               currencyUnits={selectedCurrencyUnits}
               {showRecipeCategories}
               showVisibilitySummary={$viewState.showVisibilitySummary}

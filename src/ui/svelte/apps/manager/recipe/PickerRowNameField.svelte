@@ -13,6 +13,7 @@
   | `clearable` / `disabled` | booleans | `true` / `false` | The named pill's clear; and every control off. |
   | `clearName` | string | `''` | The clear's accessible name. |
   | `nameProps` | attribute object | `{}` | The caller's hooks on the field, spread before its own. |
+  | `describedBy` | element id | `''` | The search input's description, a help line the row draws. |
 
   Callbacks:
   - `onChoose(id)` — a suggestion was committed, or `''` when the pill is cleared.
@@ -40,6 +41,7 @@
     disabled = false,
     clearName = '',
     nameProps = {},
+    describedBy = '',
     onChoose = () => {},
   } = $props();
 
@@ -58,7 +60,7 @@
       ['FABRICATE.Admin.Manager.Recipe.NoCurrencyDefined', 'No currencies defined'],
     ],
     knowledge: [
-      ['FABRICATE.Admin.Manager.Recipe.RecipeSearchPlaceholder', 'Search recipes…'],
+      ['FABRICATE.Admin.Manager.Recipe.RecipeSearchPlaceholder', 'Search recipes...'],
       ['FABRICATE.Admin.Manager.Recipe.NoRecipesToTeach', 'No recipes to teach'],
     ],
     component: [
@@ -153,6 +155,7 @@
         value={query}
         placeholder={offered.length === 0 ? emptyCatalogueHint : searchPlaceholder}
         aria-label={searchPlaceholder}
+        aria-describedby={describedBy || undefined}
         {disabled}
         {...combo.field}
       />

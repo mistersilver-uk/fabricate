@@ -205,6 +205,7 @@
             resultGroups={stepResultGroups(step)}
             {alchemySimple}
             {componentOptions}
+            surface="recipe"
             {resultKinds}
             {routingProvider}
             {progressive}
@@ -226,6 +227,7 @@
       {resultGroups}
       alchemySimple={alchemySimple || simpleFailureSlot}
       {componentOptions}
+      surface="recipe"
       {resultKinds}
       {routingProvider}
       {progressive}

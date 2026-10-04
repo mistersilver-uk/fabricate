@@ -28,6 +28,8 @@
     routedOutcomeTierOptions = [],
     alchemy = null,
     signatureConflicts = [],
+    // The system's unfiltered recipes, which a knowledge result's taught recipe resolves against.
+    systemRecipes = [],
     onSelectIssue = () => {},
   } = $props();
 
@@ -39,6 +41,7 @@
   const readiness = $derived(
     evaluateRecipeReadiness(recipe || {}, {
       systemComponents: componentTagOptions,
+      systemRecipes,
       routingProvider,
       routedOutcomeTierOptions,
       alchemy,
@@ -60,6 +63,10 @@
     routedOutcomeTiersProduced: [
       'CheckRoutedOutcomeTiersProduced',
       'Every check success outcome produces a result set',
+    ],
+    taughtRecipesResolve: [
+      'CheckTaughtRecipesResolve',
+      'Every recipe it teaches is in this system',
     ],
     alchemyResultSelection: ['CheckAlchemyResultSelection', 'Resolves to exactly one result set'],
     noSignatureCollision: [
@@ -95,6 +102,10 @@
       'IssueUnproducedOutcomeTier',
       'A check outcome is not assigned to any result set, so it produces nothing.',
     ],
+    missingTaughtRecipe: [
+      'IssueMissingTaughtRecipe',
+      'A result teaches a recipe that is no longer in this system, so every craft is refused.',
+    ],
     alchemyResultSelection: [
       'IssueAlchemyResultSelection',
       'An alchemy recipe must resolve to exactly one result set before it can be enabled.',
@@ -109,6 +120,7 @@
     hasResultGroup: 'results',
     routedResultGroupsRouted: 'results',
     routedOutcomeTiersProduced: 'results',
+    taughtRecipesResolve: 'results',
     alchemyResultSelection: 'resolution',
     hasName: 'requirements',
     stepsNamed: 'requirements',

@@ -23,7 +23,8 @@ export const componentCatalogue = (componentOptions) => ({
 /**
  * What a recipe's result rows offer and name (issue 1773): `component` always, `currency` while
  * the system takes part in currency and the world has units, and `knowledge` while learned
- * knowledge is observable. `readonlyKinds` draws an authored currency inert once currency is off.
+ * knowledge is observable. `readonlyKinds` draws an authored row of either kind inert while its
+ * kind is not offered for that reason: currency off, or learning not observable.
  */
 export function recipeResultKinds({
   componentOptions = [],
@@ -39,7 +40,10 @@ export function recipeResultKinds({
       ...(currencyEnabled && units.length > 0 ? ['currency'] : []),
       ...(knowledgeObservable ? ['knowledge'] : []),
     ],
-    readonlyKinds: currencyEnabled ? [] : ['currency'],
+    readonlyKinds: [
+      ...(currencyEnabled ? [] : ['currency']),
+      ...(knowledgeObservable ? [] : ['knowledge']),
+    ],
     catalogue: {
       ...componentCatalogue(componentOptions),
       currency: units.map((unit) => ({
@@ -57,9 +61,20 @@ export function recipeResultKinds({
   };
 }
 
-/** `PickerRow`'s `invalid` for `result`: its amount's floor error in `text`'s words, else none. */
+/**
+ * `PickerRow`'s `invalid` for `result`: its amount's floor error in `text`'s words, a fixed
+ * currency amount that is not whole, which every craft would refuse, else none.
+ */
 export function resultAmountInvalid(result, text) {
   const formula = normalizeQuantityFormula(result?.quantityFormula);
+  if (result?.kind === 'currency' && !formula && !Number.isInteger(shownAmount(result.quantity))) {
+    return {
+      amount: text(
+        'FABRICATE.Admin.Manager.Recipe.AmountNotWhole',
+        'A currency amount must be a whole number.'
+      ),
+    };
+  }
   if (quantityFormulaErrors(formula, diceEngine()).length === 0) return {};
   return {
     amount:

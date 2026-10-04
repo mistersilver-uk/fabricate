@@ -11,12 +11,12 @@
   | `value` | `{ kind, id, tags, tagMatch, quantity, quantityFormula, label, reason }` | `{}` | `toValue(entry)` from `pickerRowKinds.js`. A `kind` the kind table does not name draws the misconfigured face. |
   | `kinds` | kinds | the four match types | What the kind select offers; the row's own kind is always listed too. |
   | `catalogue` | `{ [kind]: [{ id, label, icon, img, offered }] }` | `{}` | Suggestions list the entries whose `offered` is not `false`; the named pill resolves `value.id` against all of them. `catalogue.tags` is the tag picker's vocabulary. |
-  | `readonlyKinds` | kinds | `[]` | Kinds drawn on the read-only face. Only `currency` has one, for a system whose currency feature is off. |
+  | `readonlyKinds` | kinds | `[]` | Kinds drawn on the read-only face, `READONLY_FACES` in `pickerRowKinds.js`: a `currency` row while currency is off, and a `knowledge` row while learning is not observable. |
   | `disabled` | boolean | `false` | Forwarded to every control the row draws. The `trailing` snippet is the caller's own. |
   | `invalid` | `{ amount?: string }` | `{}` | Marks the amount control invalid and describes it with the message. |
   | `amount` | `false` \| `{ min, max, unit, inputProps, ariaLabel, … }` | `{}` | `false` draws no amount, and a `knowledge` row never draws one; the object's keys, which carry the amount slot's localized copy, are stated in `PickerRowAmount.svelte`. |
   | `rollable` / `removable` | booleans | `false` / `true` | The Fixed \| Rolled toggle on a `component` or `currency` row; and the remove button. |
-  | `reward` | boolean | `false` | A result surface's row: a named currency row opens its naming body and a knowledge row its help line, `PickerRowRewardBody.svelte`, beneath it. |
+  | `reward` | boolean | `false` | A result surface's row: a named currency row opens its naming body and a knowledge row its help line, `PickerRowRewardBody.svelte`, beneath it. A knowledge row naming a recipe absent from `catalogue` draws the missing face. |
   | `allowAny` | boolean | `false` | The `or…` kind menu, `PickerRowKindMenu.svelte`, after the amount and a divider, offering `kinds`. |
   | `clearable` / `removeHook` | boolean / string | `true` / `'alternative'` | The named pill's clear; and the remove's `data-recipe-remove` value. The remove is `Remove {name}` and the kind select `Kind of {name}`, `{name}` being the subject's or, unnamed, the kind's. |
   | `nameProps` / `removeProps` | attribute objects | `{}` | A caller's own hooks on the name field and on the remove, spread before the row's own. |
@@ -39,7 +39,8 @@
   - The typed query is local to `PickerRowNameField.svelte` and never reaches `value`. Pinned by
     `tests/components/picker-row-matrix-mounted.test.js`.
   - The Fixed | Rolled state is per component instance, so a `rollable` caller keys its rows by
-    stable entry identity.
+    stable entry identity, and a retype remounts it.
+  - A pick on a row with no clear moves focus to the row's next control, never the document.
 -->
 <script module>
   // Alternatives carry no id, so the tag-match radio group's `name` is minted per INSTANCE here:
@@ -59,7 +60,13 @@
   import PickerRowRewardBody from './PickerRowRewardBody.svelte';
   // The ONE kind table: the plate's glyph and tint and the kind select's words are read from it
   // rather than restated here.
-  import { INGREDIENT_KINDS, KIND_ORDER, isKnownKind, kindMeta } from './pickerRowKinds.js';
+  import {
+    INGREDIENT_KINDS,
+    KIND_ORDER,
+    READONLY_FACES,
+    isKnownKind,
+    kindMeta,
+  } from './pickerRowKinds.js';
 
   tagMatchGroupSeq += 1;
   const tagMatchGroupId = tagMatchGroupSeq;
@@ -92,7 +99,12 @@
   const misconfigured = $derived(!isKnownKind(matchType));
   const tags = $derived(Array.isArray(value?.tags) ? value.tags : []);
   const tagMatch = $derived(value?.tagMatch === 'all' ? 'all' : 'any');
-  const readonly = $derived(matchType === 'currency' && readonlyKinds.includes('currency'));
+  const readonly = $derived(
+    Object.hasOwn(READONLY_FACES, matchType) && readonlyKinds.includes(matchType)
+  );
+  const face = $derived(readonly ? READONLY_FACES[matchType] : null);
+  const faceWord = (pair) => localizeOr(...pair);
+  const hintId = `picker-row-hint-${tagMatchGroupId}`;
 
   // Every entry of this row's kind, and the ones a GM may newly choose. `chosen` resolves against
   // all of them, so a requirement on a since-withheld subject still reads back by name.
@@ -101,6 +113,8 @@
     value?.id ? entries.find((entry) => entry.id === value.id) || null : null
   );
   const subjectName = $derived(chosen?.label || kindWord(matchType));
+  // A taught recipe its system no longer holds: named as missing rather than drawn unnamed.
+  const missing = $derived(!readonly && matchType === 'knowledge' && Boolean(value?.id) && !chosen);
 
   // The tag picker offers system tags not already on this option.
   const tagPickerOptions = $derived(
@@ -126,6 +140,24 @@
   function setKind(kind) {
     if (kind === matchType) return;
     emit({ kind, id: '', tags: [], tagMatch: 'any' });
+  }
+
+  let rowRoot = $state(null);
+  const NEXT_AFTER_PICK = [
+    '[data-recipe-option-amount-mode] input:checked',
+    '[data-recipe-reward-label]',
+    '.manager-recipe-option-controls :is(input, button):not([disabled])',
+  ];
+
+  // Naming a row with no clear swaps its search for a pill holding nothing focusable, so focus moves
+  // on to the toggle, else the naming body, else the row's next control, once the pill renders.
+  function choose(id) {
+    emit({ id });
+    if (clearable || !id) return;
+    setTimeout(() => {
+      const next = NEXT_AFTER_PICK.map((selector) => rowRoot?.querySelector(selector));
+      next.find(Boolean)?.focus();
+    }, 0);
   }
 
   function addTag(tag) {
@@ -158,6 +190,12 @@
       'FABRICATE.Admin.Manager.Recipe.UnknownKindHint',
       'Fabricate does not recognise the kind "{kind}". Remove this row or correct the data.',
       { kind: matchType }
+    )
+  );
+  const missingHint = $derived(
+    localizeOr(
+      'FABRICATE.Admin.Manager.Recipe.MissingRecipeHint',
+      'The recipe this row teaches is no longer in this system, so no craft can award it. Remove this row.'
     )
   );
   const tagPolicyWord = $derived(
@@ -205,6 +243,7 @@
   data-recipe-option=""
   class={`manager-recipe-ingredient-option-row is-${leadTone}${extraClass}`}
   {...rest}
+  bind:this={rowRoot}
 >
   <span class={`manager-recipe-option-lead is-${leadTone}`} aria-hidden="true">
     <i class={leadIcon}></i>
@@ -222,7 +261,7 @@
     triggerProps={{ 'data-recipe-option-kind': '' }}
     onChange={setKind}
     readonly={misconfigured}
-    ariaDescribedBy={misconfigured ? `picker-row-unknown-${tagMatchGroupId}` : ''}
+    ariaDescribedBy={misconfigured || missing ? `picker-row-unknown-${tagMatchGroupId}` : ''}
     {disabled}
   />
 
@@ -284,29 +323,27 @@
       >
       <span id={`picker-row-unknown-${tagMatchGroupId}`} hidden>{unknownHint}</span>
     </span>
-  {:else if readonly}
-    <!-- Currency feature disabled: a static label rather than a searchable field, flagged inert,
-         with the value still visible so nothing the recipe requires is hidden. -->
-    <span class="manager-recipe-option-name-field" data-recipe-option-currency>
-      <span
-        class="manager-recipe-currency-unit is-readonly"
-        data-recipe-currency-unit
-        data-recipe-currency-readonly
-        >{chosen?.label ||
-          value?.id ||
-          localizeOr(
-            'FABRICATE.Admin.Manager.Recipe.CurrencyDisabledUnitFallback',
-            'Currency'
-          )}</span
+  {:else if face}
+    <!-- A kind its system cannot honour: a static label rather than a searchable field, flagged
+         inert, with the value still visible so nothing the recipe holds is hidden. -->
+    <span class="manager-recipe-option-name-field" {...face.field}>
+      <span class="manager-recipe-currency-unit is-readonly" {...face.subject}
+        >{chosen?.label || value?.id || faceWord(face.fallback)}</span
       >
-      <span
-        class="manager-recipe-req-tag is-disabled"
-        data-recipe-currency-disabled
-        title={localizeOr(
-          'FABRICATE.Admin.Manager.Recipe.CurrencyDisabledHint',
-          'Currency is disabled for this system; this row is inactive until it is re-enabled.'
-        )}>{localizeOr('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledTag', 'Currency off')}</span
+      <span class="manager-recipe-req-tag is-disabled" {...face.marker} title={faceWord(face.hint)}
+        >{faceWord(face.tag)}</span
       >
+    </span>
+  {:else if missing}
+    <span
+      class="manager-recipe-option-name-field"
+      data-recipe-option-knowledge
+      data-recipe-option-missing={value.id}
+    >
+      <span class="manager-recipe-req-tag is-disabled" title={missingHint}
+        >{localizeOr('FABRICATE.Admin.Manager.Recipe.MissingRecipe', 'Missing recipe')}</span
+      >
+      <span id={`picker-row-unknown-${tagMatchGroupId}`} hidden>{missingHint}</span>
     </span>
   {:else}
     {#key matchType}
@@ -319,23 +356,26 @@
         {disabled}
         {clearName}
         {nameProps}
-        onChoose={(id) => emit({ id })}
+        describedBy={reward && matchType === 'knowledge' ? hintId : ''}
+        onChoose={choose}
       />
     {/key}
   {/if}
 
   <div class="manager-recipe-option-controls">
     {#if amount !== false && !misconfigured && matchType !== 'knowledge'}
-      <PickerRowAmount
-        {value}
-        {amount}
-        name={subjectName}
-        {rollable}
-        {readonly}
-        {disabled}
-        invalid={invalid?.amount || ''}
-        onChange={emit}
-      />
+      {#key matchType}
+        <PickerRowAmount
+          {value}
+          {amount}
+          name={subjectName}
+          {rollable}
+          {readonly}
+          {disabled}
+          invalid={invalid?.amount || ''}
+          onChange={emit}
+        />
+      {/key}
     {/if}
 
     {#if allowAny}
@@ -354,6 +394,8 @@
       reason={value?.reason}
       unitName={chosen?.label}
       disabled={disabled || readonly}
+      {hintId}
+      offHint={readonly && matchType === 'knowledge' ? faceWord(face.hint) : ''}
       onChange={emit}
     />
   {/if}

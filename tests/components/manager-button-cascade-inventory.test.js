@@ -1145,12 +1145,10 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // writing no `fabricate-button` class at all.
   // AND ONE LEFT AT ISSUE 1516, taking the count to 10: the salvage yield picker's trigger, both
   // salvage rows now naming their component through the requirement row.
-  // AND ONE LEFT AT ISSUE 1773, taking the count to 9: a recipe result set's adder, now a dashed
-  // `Result` button over the kind menu that appends an empty row.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    9,
-    'plus the 9 SearchablePopover triggerClass sites still named as debt'
+    10,
+    'plus the 10 SearchablePopover triggerClass sites still named as debt'
   );
   // ...AND THE ONE THAT LEFT LEFT BY CONVERSION AND THEN BY RULING.
   const retiredSite = readFileSync(resolve(repoRoot, POPULATION_B_RETIRED_SITE_FILE), 'utf8');

@@ -5849,6 +5849,59 @@ describe('RecipeEditView (mounted)', () => {
     ]);
   });
 
+  // Every path the kinds reach a result set through, one each (issue 1773): a forward dropped on
+  // one path leaves its sets offering component alone and its currency rows inert.
+  it('threads the result kinds to a multi-step step, a routed set and the failure slot', async () => {
+    const GOLD = { id: 'res-gold', kind: 'currency', unit: 'gp', quantity: 5 };
+    const AWARDS = {
+      currencyUnits: [{ id: 'gp', label: 'Gold' }],
+      currencyEnabled: true,
+      recipeOptions: [{ id: 'r-sword', name: 'Forge Sword' }],
+      knowledgeObservable: true,
+    };
+    const PATHS = {
+      'multi-step': {
+        groups: [],
+        recipe: {
+          steps: [
+            { id: 'st-1', name: 'Smelt', ingredientSets: [], resultGroups: [{ id: 'grp-gold', results: [GOLD] }] },
+          ],
+        },
+        props: { multiStepEnabled: true },
+      },
+      routed: {
+        groups: [
+          { id: 'grp-gold', name: 'Rich', checkOutcomeIds: [], results: [GOLD] },
+          { id: 'grp-poor', name: 'Poor', checkOutcomeIds: [], results: [] },
+        ],
+        props: { routingProvider: 'check' },
+      },
+      'failure slot': {
+        groups: [
+          { id: 'grp-ok', name: '', results: [] },
+          { id: 'grp-gold', role: 'failure', name: '', results: [GOLD] },
+        ],
+        props: { simpleFailureSlot: true },
+      },
+    };
+    for (const [path, { groups, recipe = {}, props }] of Object.entries(PATHS)) {
+      const { target } = await mountResultGroups(groups, { recipe, props: { ...AWARDS, ...props } });
+      const set = target.querySelector('[data-recipe-result-set-id="grp-gold"]');
+      assert.ok(set, `${path}: PRE-CONDITION, the set renders`);
+      assert.ok(
+        set.querySelector(':scope [data-recipe-result-item] [data-recipe-reward-body]'),
+        `${path}: the currency row opens its naming body`
+      );
+      set.querySelector('[data-recipe-add="result-item"]').click();
+      await flushRender();
+      const kinds = [...document.querySelectorAll(':scope .manager-recipe-result-menu [role="menuitem"]')].map(
+        (entry) => entry.getAttribute('data-recipe-add')
+      );
+      assert.deepEqual(kinds, ['result-component', 'result-currency', 'result-knowledge'], path);
+      editHarness.remount();
+    }
+  });
+
   it('names a result in a pill with its image and no clear, and names an unnamed one from the search', async () => {
     const { target, patches } = await mountResultGroups([
       {

@@ -244,6 +244,15 @@ test('a result reads its kind, and is never retyped to or from a kind a result c
   assert.deepEqual(fromValue(unknown, payload), unknown);
 });
 
+test('an ingredient never reads as a result-only kind, so it never writes a result’s subject', () => {
+  const lore = { id: 'opt-9', quantity: 1, match: { type: 'knowledge', recipeId: 'r-sword' } };
+  assert.equal(toValue(lore).kind, 'component', 'knowledge is not an ingredient match type');
+  assert.equal(toValue(lore).id, '');
+  const named = fromValue(lore, { ...toValue(lore), id: 'c-iron' });
+  assert.deepEqual(named.match, { type: 'component', componentId: 'c-iron' });
+  assert.ok(!Object.hasOwn(named.match, 'undefined'), 'no subject key is written as undefined');
+});
+
 /** One persisted result per reward kind, each carrying the fields its kind keeps. */
 const KINDS = Object.freeze({
   currency: {
@@ -288,6 +297,7 @@ test('retyping a result clears the old kind’s value and seeds the new kind emp
     kind: 'currency',
     unit: '',
     quantity: 2,
+    quantityFormula: '1d4+1',
   });
   assert.deepEqual(retype(KINDS.currency, 'knowledge'), {
     id: 'res-3',
@@ -295,11 +305,13 @@ test('retyping a result clears the old kind’s value and seeds the new kind emp
     recipeId: '',
     quantity: 1,
   });
-  // Back to component: the kind key goes, since an absent kind is component.
+  // Back to component: the kind key goes, since an absent kind is component, and the roll stays,
+  // since both kinds roll.
   assert.deepEqual(retype(KINDS.currency, 'component'), {
     id: 'res-3',
     componentId: null,
     quantity: 5,
+    quantityFormula: '2d6',
   });
 });
 

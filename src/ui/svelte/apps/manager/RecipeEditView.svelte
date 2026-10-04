@@ -45,10 +45,9 @@
     saveFailed = false,
     onPickImagePath = null,
     currencyUnits = [],
-    // Whether the currency feature is ENABLED, not merely seeded with units; true keeps a caller
-    // passing only units on the pre-gate behaviour.
+    // Whether currency is ENABLED, not merely seeded with units; true keeps a units-only caller.
     currencyEnabled = true,
-    // The system's recipes a knowledge result may teach, offered while learning is observable.
+    // The system's unfiltered recipes, which a knowledge result teaches and readiness resolves.
     recipeOptions = [],
     knowledgeObservable = false,
     // Whether time requirements are ENABLED (issue 714); true keeps an omitting caller authoring.
@@ -262,13 +261,13 @@
   let activeTab = $state('overview');
   let lastRecipeId = $state(null);
 
-  // Validation badges: critical and warning issue counts. The draft is the single source of truth,
-  // so the readiness evaluator reads it directly.
+  // Validation badges, read straight off the draft, which is the single source of truth.
   const readiness = $derived(
     evaluateRecipeReadiness(
       { ...(recipe || {}) },
       {
         systemComponents: componentTagOptions,
+        systemRecipes: recipeOptions,
         routingProvider,
         routedOutcomeTierOptions,
         alchemy,
@@ -587,6 +586,7 @@
             {routedOutcomeTierOptions}
             {alchemy}
             {signatureConflicts}
+            systemRecipes={recipeOptions}
             onSelectIssue={selectIssue}
           />
         {/if}

@@ -8,7 +8,10 @@ import test from 'node:test';
 
 import { isLearnedKnowledgeObservable } from '../src/systems/learnedKnowledgeObservability.js';
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
-import { recipeResultKinds } from '../src/ui/svelte/apps/manager/recipe/resultRows.js';
+import {
+  recipeResultKinds,
+  resultAmountInvalid,
+} from '../src/ui/svelte/apps/manager/recipe/resultRows.js';
 
 const UNITS = Object.freeze([
   { id: 'gp', label: 'Gold', icon: 'fa-solid fa-sun' },
@@ -32,9 +35,25 @@ test('a recipe result set offers each kind only where the system can award it', 
   assert.deepEqual(recipeResultKinds().kinds, ['component'], 'a caller passing nothing');
 });
 
-test('an authored currency result reads back inert once its system’s currency is off', () => {
-  assert.deepEqual(recipeResultKinds({ currencyEnabled: false }).readonlyKinds, ['currency']);
-  assert.deepEqual(recipeResultKinds({ currencyEnabled: true }).readonlyKinds, []);
+test('an authored reward reads back inert where its system cannot award its kind', () => {
+  const inert = (overrides) => recipeResultKinds(overrides).readonlyKinds;
+  assert.deepEqual(inert({ currencyEnabled: false, knowledgeObservable: true }), ['currency']);
+  assert.deepEqual(inert({ currencyEnabled: true, knowledgeObservable: false }), ['knowledge']);
+  assert.deepEqual(inert({ currencyEnabled: true, knowledgeObservable: true }), []);
+});
+
+test('a fixed currency amount is a whole number, which the row marks invalid otherwise', () => {
+  const text = (_key, fallback) => fallback;
+  const coin = (fields) => ({ id: 'c', kind: 'currency', unit: 'gp', ...fields });
+  const NOT_WHOLE = { amount: 'A currency amount must be a whole number.' };
+  assert.deepEqual(resultAmountInvalid(coin({ quantity: 2.5 }), text), NOT_WHOLE);
+  assert.deepEqual(resultAmountInvalid(coin({ quantity: 3 }), text), {});
+  assert.deepEqual(resultAmountInvalid(coin({}), text), {}, 'an absent amount reads as 1');
+  assert.deepEqual(
+    resultAmountInvalid({ id: 'r', componentId: 'ore', quantity: 2.5 }, text),
+    {},
+    'a component amount is not a currency’s'
+  );
 });
 
 test('the catalogue names units by label, else abbreviation, and recipes by name', () => {

@@ -297,12 +297,19 @@ Its name field has no clear: a flat result is re-pointed by removing it and addi
 On a gathering task's or a salvage set's results, adding a component the set already produces raises that row's quantity, unless that row's amount is rolled, in which case a second row is added.
 - **A recipe result set adds through one `Result` adder.**
 It is a dashed button over the kind menu, headed **"Add a result"** and offering the set's kinds, and it appends directly when the set offers one kind.
-The row it appends carries its kind and no value, so it never raises another row's quantity, and focus moves to that row's name field.
+A progressive set's adder keeps the label "Add result stage" and appends an unnamed stage.
+The button shows "Result" and is named "Add a result", and its menu opens from the button's start edge, so the menu stays over the list it adds to.
+The row it appends carries its kind and no value, so it never raises another row's quantity, and focus moves to that row's name field, even where the add moves the adder itself, as a progressive set's first stage does.
+Naming a flat result row moves focus to its amount toggle, else to its naming body's first field, else to its next control, and never to the document.
 A non-progressive set offers `component`, `currency` where the system takes part in currency and the world has units, and `knowledge` where learned knowledge is observable; a progressive set offers `component` alone.
 - **A currency result opens its naming body; a knowledge result states what it teaches.**
 Once a currency result names its unit, a body beneath the row offers **"Call it"** and **"Why they get it"**, both optional, and a closing line states what the player sees, or "No description — the player just sees" the unit when both are empty.
 No other kind opens it, and an ingredient row never does.
-A knowledge result draws one help line beneath it saying that crafting teaches the recipe and that a player who cannot already see the taught recipe reads "Unknown recipe" in its place.
+A knowledge result draws one help line beneath it saying that crafting teaches the recipe and that a player who cannot already see the taught recipe reads "Unknown recipe" in its place, and the help line describes the row's name field.
+The naming body's fields are described by its closing line, so each field's description is the sentence the player will read.
+A knowledge result on a system where learned knowledge is not observable is drawn read-only, saying why: its tag reads "Learning off" and its help line gives way to the reason.
+A knowledge result whose taught recipe is no longer in its system draws a "Missing recipe" face with the row's remove, and the Validation tab flags the set, because every craft of it would be refused.
+A fixed currency amount is a whole number, and a fraction is marked invalid on the row with its reason.
 - **A result row too narrow for one line wraps by rule, never by overflow.**
 Where its list is narrower than one line needs, a flat row puts its plate, kind and name on the first line with the remove at its end, the toggle and amount on the second at the stepper's width, and any error across the row below.
 A stage row moves its DC and Edit below rather than squeeze its name under the name's minimum, and moves the name below the kind where even that does not fit.
@@ -360,8 +367,8 @@ Essence is a first-class ingredient match type, so "component OR essence" is a g
 
 The menu is a COMPACT PANEL OF KINDS rather than a picker of records, and its scale says so: a fixed 150px panel inset on its own frame, headed by an uppercase eyebrow, over entries that read from their own left edge.
 The eyebrow is the caller's: **"Accept instead"** on ingredients, and **"Add an alternative"** or **"Add a result"** on results.
-The header is what lets each entry be one word.
-The verb belongs to the panel, so an entry states only the kind it appends — `Component`, `Tag`, `Essence`, `Currency` — and never repeats "Add", "alternative" or a synonym for the row's own vocabulary.
+The header is what lets each entry be the kind's own label alone.
+The verb belongs to the panel, so an entry states only the kind it appends — `Component`, `Tag`, `Essence`, `Currency`, or on a result `Recipe knowledge` — and never repeats "Add", "alternative" or a synonym for the row's own vocabulary.
 It is the shared action menu, a `role="menu"` of commands named by that eyebrow, and never the shared picker, whose listbox would announce four kinds as values to select.
 The width is stated by the caller and not left to the shared menu's own floor, which is sized for a row's overflow commands rather than four one-word kinds.
 

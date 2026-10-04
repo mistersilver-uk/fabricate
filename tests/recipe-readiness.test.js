@@ -674,3 +674,50 @@ describe('recipeValidationRowStates', () => {
     assert.equal(row.status, 'warn');
   });
 });
+
+// Issue 1773: a knowledge result naming a recipe its system does not hold is refused by every
+// craft's pre-flight, so the Validation tab flags its set rather than leaving the GM to find out.
+describe('evaluateRecipeReadiness: taught recipes', () => {
+  const ROSTER = [{ id: 'r-self' }, { id: 'r-sword' }];
+  const teaching = (...recipeIds) => ({
+    name: 'Teacher',
+    enabled: true,
+    ingredientSets: [{ id: 's1' }],
+    resultGroups: [
+      {
+        id: 'g1',
+        results: recipeIds.map((recipeId, index) => ({ id: `k${index}`, kind: 'knowledge', recipeId }))
+      }
+    ]
+  });
+
+  it('flags a set teaching a recipe the system no longer holds, and addresses that set', () => {
+    const { checks, issues } = evaluateRecipeReadiness(teaching('r-sword', 'r-gone'), {
+      systemRecipes: ROSTER
+    });
+    const issue = issues.find(entry => entry.id === 'missingTaughtRecipe');
+    assert.ok(issue, 'the missing taught recipe is an issue');
+    assert.equal(issue.severity, 'critical');
+    assert.equal(issue.target, 'results');
+    assert.equal(issue.focusTarget, 'result-group-g1');
+    assert.equal(check(checks, 'taughtRecipesResolve').satisfied, false);
+    assert.equal(recipeValidationRowStates({ checks, issues }).find(row => row.checkId === 'taughtRecipesResolve').issue, issue);
+  });
+
+  it('passes a set teaching only held recipes, and skips an unnamed row the save refuses', () => {
+    const { checks, issues } = evaluateRecipeReadiness(teaching('r-sword', ''), { systemRecipes: ROSTER });
+    assert.equal(issues.length, 0);
+    assert.equal(check(checks, 'taughtRecipesResolve').satisfied, true);
+  });
+
+  it('is silent without a roster, and adds no check to a recipe that teaches nothing', () => {
+    const silent = evaluateRecipeReadiness(teaching('r-gone'));
+    assert.equal(check(silent.checks, 'taughtRecipesResolve'), undefined, 'no roster, no check');
+    assert.equal(silent.issues.length, 0);
+    const plain = evaluateRecipeReadiness(
+      { name: 'Plain', enabled: true, ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'g1', results: [{ componentId: 'c1' }] }] },
+      { systemRecipes: ROSTER }
+    );
+    assert.equal(check(plain.checks, 'taughtRecipesResolve'), undefined, 'nothing taught, no check');
+  });
+});

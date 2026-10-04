@@ -95,6 +95,36 @@ const AMOUNT_ON_MATCH = new Set(['essence', 'currency']);
 const SUBJECT_KEY = { component: 'componentId', essence: 'essenceId', currency: 'unit' };
 const RESULT_SUBJECT_KEY = { component: 'componentId', currency: 'unit', knowledge: 'recipeId' };
 
+/**
+ * The read-only face per result kind, its hooks and its words, for a row whose kind its system
+ * cannot honour: a currency while currency is off, and a knowledge result while no player can see
+ * a learned recipe. Each keeps its value visible and says why.
+ */
+export const READONLY_FACES = Object.freeze({
+  currency: Object.freeze({
+    field: { 'data-recipe-option-currency': '' },
+    subject: { 'data-recipe-currency-unit': '', 'data-recipe-currency-readonly': '' },
+    marker: { 'data-recipe-currency-disabled': '' },
+    fallback: ['FABRICATE.Admin.Manager.Recipe.CurrencyDisabledUnitFallback', 'Currency'],
+    tag: ['FABRICATE.Admin.Manager.Recipe.CurrencyDisabledTag', 'Currency off'],
+    hint: [
+      'FABRICATE.Admin.Manager.Recipe.CurrencyDisabledHint',
+      'Currency is disabled for this system; this row is inactive until it is re-enabled.',
+    ],
+  }),
+  knowledge: Object.freeze({
+    field: { 'data-recipe-option-knowledge': '' },
+    subject: { 'data-recipe-knowledge-readonly': '' },
+    marker: { 'data-recipe-knowledge-disabled': '' },
+    fallback: ['FABRICATE.Admin.Manager.Recipe.KnowledgeTypeLabel', 'Recipe knowledge'],
+    tag: ['FABRICATE.Admin.Manager.Recipe.KnowledgeDisabledTag', 'Learning off'],
+    hint: [
+      'FABRICATE.Admin.Manager.Recipe.KnowledgeDisabledHint',
+      'Players on this system never see learned recipes, so this row cannot be awarded until a visibility mode that reveals learned recipes is chosen.',
+    ],
+  }),
+});
+
 /** Whether this table names `kind`; a row draws any other as a misconfiguration. */
 export const isKnownKind = (kind) => Object.hasOwn(KIND_META, kind);
 
@@ -123,7 +153,7 @@ export function toValue(entry) {
     return { kind, id, tags: [], tagMatch: 'any', quantity, quantityFormula, label, reason };
   }
   const match = entry?.match ?? {};
-  const kind = isKnownKind(match.type) ? match.type : 'component';
+  const kind = INGREDIENT_KINDS.includes(match.type) ? match.type : 'component';
   return {
     kind,
     id: match.type === kind ? match[SUBJECT_KEY[kind]] || '' : '',
@@ -174,10 +204,19 @@ export function emptyResult(kind, id) {
   return { id, componentId: null, quantity: 1 };
 }
 
-/** A result retyped to `kind`: its id and its shown amount, and nothing of the old kind's. */
+/**
+ * A result retyped to `kind`: its id, and for a counted kind its shown amount and any roll
+ * expression, since component and currency both roll; nothing of the old kind's subject.
+ */
 function retypedResult(entry, kind) {
   const retyped = emptyResult(kind, entry.id);
-  return kind === 'knowledge' ? retyped : { ...retyped, quantity: shownAmount(entry.quantity) };
+  if (kind === 'knowledge') return retyped;
+  const formula = entry.quantityFormula;
+  return withText(
+    { ...retyped, quantity: shownAmount(entry.quantity) },
+    'quantityFormula',
+    formula
+  );
 }
 
 /** `next` with `key` holding the typed `text` as typed, or without `key` when it is blank. */

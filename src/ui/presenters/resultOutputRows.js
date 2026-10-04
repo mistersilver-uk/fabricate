@@ -1,8 +1,8 @@
 /**
  * A recipe's expected outputs as display rows, one per routed result of every kind (issue 1773):
- * a component by its library entry, a currency reward by its label, and a knowledge reward by the
- * recipe it teaches when the viewer may see that recipe. Shared by the crafting detail's output
- * list and its outcome tiers.
+ * a component by its library entry, a currency reward by its label else its unit, and a knowledge
+ * reward by the recipe it teaches when the viewer may see that recipe. Shared by the crafting
+ * detail's output list and its outcome tiers.
  */
 import { currencyUnitDisplayName, findCurrencyUnit } from '../../systems/currencyProfile.js';
 import { resolvedComponentsFor } from '../../systems/scopedEntityReads.js';
@@ -69,7 +69,11 @@ function rewardRow(result, { units, taughtName, localize }) {
       currencyUnitDisplayName(findCurrencyUnit(units, result.unit)) || stringOrEmpty(result.unit);
     return {
       kind,
-      name: stringOrEmpty(result.label) || localize('FABRICATE.App.Crafting.Io.CurrencyReward'),
+      // Unlabelled, a credit reads as its unit, as the editor's closing line and the chat card do.
+      name:
+        stringOrEmpty(result.label) ||
+        unitName ||
+        localize('FABRICATE.App.Crafting.Io.CurrencyReward'),
       img: null,
       glyph: RESULT_KIND_GLYPHS.currency,
       qty: Number(result.quantity || 1),

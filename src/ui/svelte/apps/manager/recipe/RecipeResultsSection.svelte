@@ -22,7 +22,9 @@
     // undeletable "On a failed check" set — instead of the generic add/remove list.
     alchemySimple = false,
     componentOptions = [],
-    // `recipeResultKinds(…)`: what a result row offers and names, forwarded to every group card.
+    // The card's `surface` and `resultKinds`: `'recipe'` with what a result row offers and names,
+    // forwarded to every group card; a gathering task passes neither.
+    surface = 'gathering',
     resultKinds = null,
     // Result routing (routed systems only): `ingredientSets` builds the per-result-set options
     // and assignments, `outcomeTierOptions` is the system's routed-check tiers.
@@ -164,6 +166,7 @@
       <RecipeResultGroupCard
         group={alchemySuccessGroup}
         {componentOptions}
+        {surface}
         {resultKinds}
         {onOpenComponent}
         hideRemove={true}
@@ -173,6 +176,7 @@
       <RecipeResultGroupCard
         group={alchemyFailureGroup}
         {componentOptions}
+        {surface}
         {resultKinds}
         {onOpenComponent}
         reserved={true}
@@ -192,6 +196,7 @@
         group={simpleGroup}
         chromeless={true}
         {componentOptions}
+        {surface}
         {resultKinds}
         {progressive}
         {isTerminalStep}
@@ -224,6 +229,7 @@
           <RecipeResultGroupCard
             {group}
             {componentOptions}
+            {surface}
             {resultKinds}
             {routingProvider}
             {progressive}

@@ -198,6 +198,26 @@ describe('RecipeValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('flags a result teaching a recipe its system no longer holds (issue 1773)', async () => {
+    const target = await harness.mount({
+      recipe: {
+        name: 'Teacher',
+        enabled: true,
+        ingredientSets: [{ id: 's1' }],
+        resultGroups: [{ id: 'g1', results: [{ id: 'k', kind: 'knowledge', recipeId: 'r-gone' }] }]
+      },
+      systemRecipes: [{ id: 'r-teacher', name: 'Teacher' }]
+    });
+    const row = target.querySelector('[data-check="taughtRecipesResolve"]');
+    assert.equal(row?.dataset.satisfied, 'false', 'the taught-recipe check fails');
+    assert.match(
+      target.querySelector('[data-issue="missingTaughtRecipe"]').textContent,
+      /no longer in this system/,
+      'and says why, with the set it names'
+    );
+    harness.remount();
+  });
+
   it('reports an alchemy recipe with no blockers as ready (issue 549)', async () => {
     const target = await harness.mount({
       recipe: { name: 'Mana Potion', enabled: true, ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'r1' }] },

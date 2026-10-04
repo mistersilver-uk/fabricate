@@ -1,7 +1,8 @@
 /**
  * `RecipeResultGroupCard` renders every result through `PickerRow` (issue 1516): the hooks the
  * retired row carried, keying by entry identity, the rolled-amount error and the Fixed | Rolled
- * round trip through the card's own `onChange`; and its `Result` adder and offered kinds (1773).
+ * round trip through the card's own `onChange`; and its `Result` adder and offered kinds on a
+ * recipe, and its component picker on a gathering task (1773).
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -58,12 +59,16 @@ const { Roll: SEEDED_ROLL } = seededRollClass({
 
 const settle = () => new Promise((done) => setTimeout(done, 0));
 
-/** Mount the card controlled: every emitted group is recorded and fed back as its `group`. */
+/**
+ * Mount the card controlled: every emitted group is recorded and fed back as its `group`. A recipe
+ * card unless `extra` says otherwise; `surface: undefined` takes the card's own default.
+ */
 async function mountCard(results, extra = {}) {
   const groups = [];
   const target = await harness.mount({
     group: { id: 'grp-1', name: 'Primary', results },
     componentOptions: COMPONENTS,
+    surface: 'recipe',
     onChange: async (next) => {
       groups.push(next);
       await harness.setProps({ group: next });
@@ -99,6 +104,7 @@ const ALL_KINDS = recipeResultKinds({
 });
 
 const ADDER = '[data-recipe-add="result-item"]';
+const KIND_TRIGGER = '.fabricate-select-trigger[data-recipe-option-kind]';
 const nameField = (row) => row.querySelector('[data-recipe-option-search]');
 
 before(() => harness.setup());
@@ -244,6 +250,7 @@ describe('RecipeResultGroupCard: the Result adder', () => {
     ]);
     const adder = target.querySelector(ADDER);
     assert.equal(adder.textContent.trim(), 'Result');
+    assert.equal(adder.getAttribute('aria-label'), 'Add a result', 'its name keeps the verb');
     assert.ok(!adder.hasAttribute('aria-haspopup'), 'one kind needs no menu');
     adder.click();
     await settle();
@@ -270,6 +277,7 @@ describe('RecipeResultGroupCard: the Result adder', () => {
     });
     const adder = target.querySelector(ADDER);
     assert.equal(adder.textContent.trim(), 'Add result stage');
+    assert.equal(adder.getAttribute('aria-label'), 'Add result stage');
     adder.click();
     await settle();
     assert.deepEqual(
@@ -282,6 +290,7 @@ describe('RecipeResultGroupCard: the Result adder', () => {
     const { target, groups } = await mountCard([], { resultKinds: ALL_KINDS });
     const adder = target.querySelector(ADDER);
     assert.equal(adder.getAttribute('aria-haspopup'), 'menu');
+    assert.equal(adder.getAttribute('aria-label'), 'Add a result');
     adder.click();
     await settle();
     const doc = target.ownerDocument;
@@ -311,14 +320,68 @@ describe('RecipeResultGroupCard: the Result adder', () => {
       { id: 'x', kind: 'knowledge', recipeId: '', quantity: 1 }
     );
     const field = nameField(rows(target)[0]);
-    assert.equal(field.getAttribute('aria-label'), 'Search recipes…');
+    assert.equal(field.getAttribute('aria-label'), 'Search recipes...');
     assert.ok(doc.activeElement === field, 'focus lands on the new row, not back on the trigger');
+  });
+
+  it('focuses the first stage of an empty progressive set, though the add moves the adder', async () => {
+    const { target, groups } = await mountCard([], { progressive: true, resultKinds: ALL_KINDS });
+    const sibling = target.querySelector(ADDER);
+    assert.ok(
+      !sibling.closest('.fabricate-sortable-list'),
+      'with no stage, the adder is a sibling'
+    );
+    sibling.click();
+    await settle();
+    await settle();
+    assert.equal(groups.at(-1).results.length, 1);
+    assert.ok(
+      target.querySelector(ADDER).closest('.fabricate-sortable-list'),
+      'PRE-CONDITION: the add moved the adder into the list’s footer, a new instance'
+    );
+    assert.ok(
+      target.ownerDocument.activeElement === nameField(rows(target)[0]),
+      'the new stage’s name field takes focus, never the document'
+    );
+  });
+});
+
+describe('RecipeResultGroupCard: a gathering task’s component picker', () => {
+  async function pickResult(target, label) {
+    target.querySelector(ADDER).click();
+    await settle();
+    [...target.ownerDocument.querySelectorAll('.manager-travel-option')]
+      .find((option) => option.textContent.includes(label))
+      .click();
+    await settle();
+  }
+
+  it('raises a fixed row already producing the pick, and appends beside a rolled one', async () => {
+    const { target, groups } = await mountCard(
+      [
+        { id: 'r1', componentId: 'cmp-herb', quantity: 2 },
+        { id: 'r2', componentId: 'cmp-water', quantity: 1, quantityFormula: '1d4+1' },
+      ],
+      { surface: undefined, resultKinds: ALL_KINDS }
+    );
+    assert.equal(target.querySelector(ADDER).textContent.trim(), 'Add item');
+    for (const row of rows(target)) {
+      assert.ok(!row.classList.contains('is-reward'), 'a gathering row is no reward row');
+    }
+    assert.deepEqual(selectOptionValues(target, KIND_TRIGGER), ['component'], 'nor offers one');
+
+    await pickResult(target, 'Mountain Herb');
+    assert.deepEqual(groups.at(-1).results[0], { id: 'r1', componentId: 'cmp-herb', quantity: 3 });
+    assert.equal(groups.at(-1).results.length, 2, 'a fixed row is raised, not repeated');
+
+    await pickResult(target, 'Pure Water');
+    const added = groups.at(-1).results[2];
+    assert.ok(added?.id, 'a rolled row is never raised, so the pick appends with an eager id');
+    assert.deepEqual({ ...added, id: 'x' }, { id: 'x', componentId: 'cmp-water', quantity: 1 });
   });
 });
 
 describe('RecipeResultGroupCard: what a result row offers', () => {
-  const KIND_TRIGGER = '.fabricate-select-trigger[data-recipe-option-kind]';
-
   it('a flat row offers the set’s kinds, and a stage component alone', async () => {
     const { target } = await mountCard([{ id: 'r1', componentId: 'cmp-herb', quantity: 1 }], {
       resultKinds: ALL_KINDS,
@@ -348,6 +411,37 @@ describe('RecipeResultGroupCard: what a result row offers', () => {
     assert.deepEqual(groups.at(-1).results, [
       { id: 'r1', kind: 'currency', unit: '', quantity: 3 },
     ]);
+  });
+
+  it('a retype keeps a typed roll between counted kinds, and resets an empty Rolled to Fixed', async () => {
+    const { target, groups } = await mountCard(
+      [
+        { id: 'r1', componentId: 'cmp-herb', quantity: 2, quantityFormula: '1d4' },
+        { id: 'r2', componentId: 'cmp-water', quantity: 1 },
+      ],
+      { resultKinds: ALL_KINDS }
+    );
+    const kindOf = (n) => `[data-recipe-result-item]:nth-child(${n}) ${KIND_TRIGGER}`;
+    chooseSelectOption(target, kindOf(1), 'currency');
+    await settle();
+    assert.deepEqual(groups.at(-1).results[0], {
+      id: 'r1',
+      kind: 'currency',
+      unit: '',
+      quantity: 2,
+      quantityFormula: '1d4',
+    });
+    assert.ok(radio(rows(target)[0], 'rolled').checked, 'the roll survives the retype');
+    assert.equal(rows(target)[0].querySelector('[data-recipe-option-formula]').value, '1d4');
+
+    // Rolled opened with nothing typed writes nothing, so only the amount's own state holds it.
+    await choose(radio(rows(target)[1], 'rolled'));
+    chooseSelectOption(target, kindOf(2), 'currency');
+    await settle();
+    assert.ok(
+      radio(rows(target)[1], 'fixed').checked,
+      'the new kind’s amount starts Fixed rather than on an empty Rolled the data never held'
+    );
   });
 
   it('draws an authored currency result read-only once the system’s currency is off', async () => {

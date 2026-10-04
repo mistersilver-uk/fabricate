@@ -8289,7 +8289,8 @@
 }
 
 .fabricate-manager .manager-checks-tier-add > .fabricate-button,
-.fabricate-manager .manager-salvage-stage-add > .fabricate-button {
+.fabricate-manager .manager-salvage-stage-add > .fabricate-button,
+.fabricate-manager .manager-recipe-ingredient-set-add > .manager-recipe-add-result {
   flex: 1 1 auto;
 }
 

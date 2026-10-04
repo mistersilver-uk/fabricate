@@ -720,6 +720,52 @@ export function registerGatheringCases() {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
   });
 
+  // A gathering task's results keep their component picker and its quantity bump (issue 1773): only a
+  // recipe's result set took the `Result` adder, and a task's rows are not reward rows.
+  it('raises the quantity of a Direct task result when its component is picked again', async () => {
+    const calls = [];
+    mountManager(calls, {
+      taskResolutionMode: 'straight',
+      taskResultGroups: [
+        { id: 'group-ore', name: '', results: [{ id: 'result-ore', componentId: 'c1', quantity: 2 }] },
+      ],
+      gatheringTaskValidation: () => ({ valid: true, errors: [], resultErrors: [] }),
+    });
+    await tick();
+    flushSync();
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const results = target.querySelector('[data-gathering-task-results="straight"]');
+    const adder = results.querySelector('[data-recipe-add="result-item"]');
+    assert.equal(adder.textContent.trim(), 'Add item', 'the component picker, not the Result adder');
+    assert.ok(!results.querySelector('.is-reward'), 'and its rows are no reward rows');
+    adder.click();
+    await tick();
+    flushSync();
+    [...document.querySelectorAll('.manager-travel-option')]
+      .find((option) => option.textContent.includes('Iron Ore'))
+      .click();
+    await tick();
+    flushSync();
+
+    target.querySelector(':scope .manager-header-actions .fabricate-button.is-primary').click();
+    await tick();
+    flushSync();
+    const saved = calls.find((call) => call[0] === 'updateGatheringLibraryTask');
+    assert.ok(saved, 'Save persists the task');
+    assert.deepEqual(saved[3].resultGroups[0].results, [
+      { id: 'result-ore', componentId: 'c1', quantity: 3 },
+    ]);
+  });
+
   it('authors task-owned gathering modes while retaining inactive result sources across save and reload', async () => {
     const calls = [];
     const retainedGroups = [

@@ -52,8 +52,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // Tool's world-default prerequisites against ONE actor, and the roster it offers is the shared,
   // GM-configurable player-character predicate rather than a second `type === 'character'` test.
   '../../../../systems/characterModifierPrerequisiteCopy.js',
-  // ADDED BY ISSUE 1773: the recipe editor offers a knowledge result only where the selected
-  // system's learned knowledge is observable, read through the service's own import-free leaf.
+  // The recipe editor offers a knowledge result only where the selected system's learned
+  // knowledge is observable, read through the service's own import-free leaf.
   '../../../../systems/learnedKnowledgeObservability.js',
   '../../../../utils/categoryIcons.js',
   '../../../../utils/componentCategories.js',

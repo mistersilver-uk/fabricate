@@ -335,6 +335,34 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
 }
 
 /**
+ * A knowledge result naming a recipe its system does not hold, which every craft's pre-flight
+ * refuses (issue 1773): one critical issue per offending set, and a check only on a recipe that
+ * teaches. An unnamed knowledge row is the save path's to refuse, so it is not counted here.
+ */
+function collectTaughtRecipeReadiness(executionSteps, isMultiStep, systemRecipes) {
+  const known = new Set(systemRecipes.map((recipe) => recipe?.id));
+  const issues = [];
+  let teaches = false;
+  for (const step of executionSteps) {
+    for (const group of step.resultGroups) {
+      const taught = asArray(group?.results).filter((result) => result?.kind === 'knowledge');
+      teaches ||= taught.length > 0;
+      if (taught.every((result) => !result?.recipeId || known.has(result.recipeId))) continue;
+      issues.push({
+        id: 'missingTaughtRecipe',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'results',
+        ...focusTag(resultGroupTarget(group)),
+        ...stepTag(step, isMultiStep),
+      });
+    }
+  }
+  const checks = teaches ? [{ id: 'taughtRecipesResolve', satisfied: issues.length === 0 }] : [];
+  return { issues, checks };
+}
+
+/**
  * Alchemy-only enable blockers: two checks the enable path enforces that are invisible to the
  * generic readiness list and used to throw only on the click.
  *
@@ -391,18 +419,19 @@ function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
 
 /**
  * Every check and issue for one projected recipe. `options` carries `systemComponents`, whose
- * absence no-ops overlap detection; `routingProvider`, which gates the routed warnings on `check`;
+ * absence no-ops overlap detection; `systemRecipes`, whose absence or emptiness no-ops the taught
+ * recipe check; `routingProvider`, which gates the routed warnings on `check`;
  * `routedOutcomeTierOptions`, the system's policy-conditional tiers; and `alchemy` with
  * `signatureConflicts`, which drive the two enable blockers above and are ignored without it.
  */
 export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   const systemComponents = Array.isArray(options.systemComponents) ? options.systemComponents : [];
+  const systemRecipes = Array.isArray(options.systemRecipes) ? options.systemRecipes : [];
   const routingProvider = options.routingProvider || null;
   const routedOutcomeTierOptions = Array.isArray(options.routedOutcomeTierOptions)
     ? options.routedOutcomeTierOptions
     : [];
-  const alchemy =
-    options.alchemy && typeof options.alchemy === 'object' ? options.alchemy : null;
+  const alchemy = options.alchemy && typeof options.alchemy === 'object' ? options.alchemy : null;
   const signatureConflicts = Array.isArray(options.signatureConflicts)
     ? options.signatureConflicts
     : [];
@@ -457,6 +486,13 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
     checks.push(...routed.checks);
   }
 
+  // A recipe is always in its own system's roster, so an empty one was never supplied.
+  if (systemRecipes.length > 0) {
+    const taught = collectTaughtRecipeReadiness(executionSteps, isMultiStep, systemRecipes);
+    issues.push(...taught.issues);
+    checks.push(...taught.checks);
+  }
+
   // The two blockers the enable path enforces and the generic readiness checks never inspect.
   const alchemyReadiness = collectAlchemyReadiness(recipe, alchemy, signatureConflicts);
   issues.push(...alchemyReadiness.issues);
@@ -500,6 +536,7 @@ export const CHECK_TO_ISSUES = Object.freeze({
   noRequirementOverlap: ['requirementOverlap'],
   routedResultGroupsRouted: ['unroutedResultGroup'],
   routedOutcomeTiersProduced: ['unproducedOutcomeTier'],
+  taughtRecipesResolve: ['missingTaughtRecipe'],
   alchemyResultSelection: ['alchemyResultSelection'],
   noSignatureCollision: ['signatureCollision'],
 });
@@ -526,7 +563,9 @@ export function recipeValidationRowStates(readiness = {}) {
   const claimed = new Set();
   const rows = checks.map((check) => {
     const owners = CHECK_TO_ISSUES[check.id] || [];
-    const issue = check.satisfied ? null : issues.find((entry) => owners.includes(entry.id)) || null;
+    const issue = check.satisfied
+      ? null
+      : issues.find((entry) => owners.includes(entry.id)) || null;
     if (issue) claimed.add(issue);
     return { checkId: check.id, issue, status: check.satisfied ? 'pass' : issueStatus(issue) };
   });
