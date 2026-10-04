@@ -251,14 +251,14 @@ test('the inputs every property below quantifies over are alive', () => {
   // once the inspector action button became the button primitive at full width.
   // 76 as of issue 1782: `Meter` and `BandedBar`, each on three and two importers; 77 with
   // `RuleRow` on its two; 76 once issue 1521 folded the explainer card onto the callout's `items`;
-  // 77 with `SetPicker` on its two.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 77, 'the shipped primitive set changed size');
+  // 77 with `SetPicker` on its two; 78 as of issue 1773: the requirement chooser, on the award face.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 78, 'the shipped primitive set changed size');
   // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
   // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;
   // 17 when `ChoiceGroup` joined at one caller (issue 1516).
   // 18 as of issue 1782: `StageBars`, whose one importer is `RunProgress`; 19 with `RuleSentence`,
-  // whose one importer is `RuleRow`.
-  assert.equal(NOT_A_PRIMITIVE.length, 19, 'the recorded non-member set changed size');
+  // whose one importer is `RuleRow`. 18 when issue 1773 moved the requirement chooser out.
+  assert.equal(NOT_A_PRIMITIVE.length, 18, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
