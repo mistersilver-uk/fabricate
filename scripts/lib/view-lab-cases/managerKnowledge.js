@@ -2,7 +2,7 @@
  * System scope: knowledge, progressive components, the import report and the remaining settings routes.
  */
 
-import { BULK_EDIT_CHROME_PATTERN } from './caseConstants.js';
+import { BULK_EDIT_CHROME_PATTERN, COMPONENT_EDITOR_MATCHES } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -231,7 +231,7 @@ export const CASES = Object.freeze([
     expectView: 'component-edit',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     id: 'manager-import-report',

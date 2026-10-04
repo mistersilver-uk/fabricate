@@ -6,6 +6,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   BULK_DELETE_CARD_PATTERN,
   BULK_EDIT_CHROME_PATTERN,
+  COMPONENT_EDITOR_MATCHES,
   REQUIREMENT_SUGGESTION,
   TYPEAHEAD_COMBOBOX_SOURCE,
 } from './caseConstants.js';
@@ -63,7 +64,7 @@ const SALVAGE_STAGE_GEOMETRY = Object.freeze({
 
 /** The salvage rows' sources: the editor and the requirement row it draws them with. */
 const SALVAGE_ROW_SOURCES = Object.freeze([
-  /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+  ...COMPONENT_EDITOR_MATCHES,
   /^src\/ui\/svelte\/apps\/manager\/recipe\/(PickerRow|PickerRowAmount)\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipe\/(pickerRowKinds|resultRows)\.js$/,
 ]);
@@ -241,7 +242,7 @@ export const CASES = Object.freeze([
     // The switch is a new control on this card (issue 1371), so it owns a real pointer hit rather than a DOM assertion.
     expectCenterHit: '[data-scoped-inherit-toggle="essences"]',
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   // The first open-panel frame in the component studio (issue 1510): the option list exists only
   // while the panel is open, so a closed-state frame cannot double for it (the portal occludes
@@ -268,10 +269,7 @@ export const CASES = Object.freeze([
     // The panel sits inside the application root rather than clipped by it.
     expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
     kinds: ['manager', 'components'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
-      ...ANCHORED_POPOVER_SOURCES,
-    ],
+    sourceMatches: [...COMPONENT_EDITOR_MATCHES, ...ANCHORED_POPOVER_SOURCES],
   }),
   managerCase({
     // The rules editor's read-only world tag card (issue 1371, round 3), which no frame reached.
@@ -304,7 +302,7 @@ export const CASES = Object.freeze([
       },
     ],
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     // The widened membership cohort (issue 1371): the ghost rows, their Add, and the toolbar counting the widened set.
@@ -565,7 +563,7 @@ export const CASES = Object.freeze([
     ],
     kinds: ['manager', 'components'],
     // The three complication components are claimed by the four complication and stage-strip cases below (issue 1286).
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   // Issue 1522: the refused save's blocking notice, a row of the entry column above the scroller.
   managerCase({
@@ -585,7 +583,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager #manager-component-edit-form > [data-notice-position] > [role="alert"]',
     expectCenterHit: '#manager-component-edit-form > [data-notice-position] > [role="alert"]',
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     // The other consumer of the shared frame, stacked (issue 1371 r19-entry2).
@@ -617,7 +615,7 @@ export const CASES = Object.freeze([
     ],
     position: { width: 980, height: 860 },
     kinds: ['manager', 'components', 'responsive'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     id: 'manager-component-edit-salvage',
@@ -681,7 +679,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   managerCase({
     id: 'manager-component-edit-salvage-simple',
@@ -697,7 +695,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
   // The fixed-or-rolled amount on salvage results (issue 1516): Steel Ingot Fixed, Tanned Leather
   // rolled, a third row opened on Rolled with nothing typed, and a fourth holding an unrollable
@@ -898,7 +896,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'components', 'complications'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      ...COMPONENT_EDITOR_MATCHES,
     ],
   }),
   managerCase({

@@ -1,36 +1,20 @@
 <script>
-  import Field from '../../components/Field.svelte';
-  import Chip from '../../components/Chip.svelte';
-  import Callout from '../../components/Callout.svelte';
   import Notice from '../../components/Notice.svelte';
   import EditorTabs from '../../components/EditorTabs.svelte';
-  import EditorValidationSurface from '../../components/EditorValidationSurface.svelte';
   import WorldComponentEntryPreviewRail from './scoped/WorldComponentEntryPreviewRail.svelte';
-  import InheritRow from './scoped/InheritRow.svelte';
   import { componentRulesValidationPresentation } from './component/componentRulesValidation.js';
   import { localize } from '../../util/foundryBridge.js';
-  import ToggleCard from '../../components/ToggleCard.svelte';
-  import Button from '../../components/Button.svelte';
-  import Stepper from '../../components/Stepper.svelte';
-  import SubjectModifierPicker from './SubjectModifierPicker.svelte';
-  import SearchablePopover from '../../components/SearchablePopover.svelte';
-  import Select from '../../components/Select.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
+  import ComponentCategoryTagsCards from './component/ComponentCategoryTagsCards.svelte';
+  import ComponentEssencesCard from './component/ComponentEssencesCard.svelte';
+  import ComponentSalvageCard from './component/ComponentSalvageCard.svelte';
+  import ComponentDifficultyCard from './component/ComponentDifficultyCard.svelte';
+  import ComponentRulesValidationTab from './component/ComponentRulesValidationTab.svelte';
   // The progressive-complications section (issue 1286). It owns its own visibility gate, so it is
   // placed unconditionally rather than behind a second predicate that could drift out of step.
   import ComponentComplicationsSection from './component/ComponentComplicationsSection.svelte';
-  // The one complication summary row, in its `readonly-gm` variant: six call sites share that
-  // shape, and SonarCloud's copy-paste detector reads `.svelte`.
-  import ComplicationSummaryRow from './ComplicationSummaryRow.svelte';
-  import { complicationSummary } from '../../../model/complicationSummary.js';
-  import SortableList from '../../components/SortableList.svelte';
-  import PickerRow from './recipe/PickerRow.svelte';
-  import { fromValue, toValue } from './recipe/pickerRowKinds.js';
-  import { componentCatalogue, resultAmountInvalid, withAddedResult } from './recipe/resultRows.js';
-  // The shared essence quantity card (issue 772). It lives under `components/` because the
-  // browser's bulk-edit panel renders it too, and the screenshot evidence map names it there.
-  import EssenceQuantityCard from './components/EssenceQuantityCard.svelte';
-  import StatusToggle from '../../components/StatusToggle.svelte';
+  import { fromValue } from './recipe/pickerRowKinds.js';
+  import { withAddedResult } from './recipe/resultRows.js';
   import {
     GENERAL_COMPONENT_CATEGORY,
     getComponentCategoryLabel,
@@ -41,24 +25,17 @@
     carriedComponentEssences,
     clampComponentEssenceQuantity,
   } from '../../util/componentEditor.js';
-  // The add-new offer projection (issue 1036): only what this grid RENDERS is narrowed. The draft
-  // stays unfiltered — it is the sole source `buildComponentEditorUpdates` rebuilds essences from.
-  import { visibleEssenceOptions } from '../../../model/essenceValidation.js';
-  // The salvage check override (issue 2005): the DC or the character-value adjustment.
-  import CheckOverrideField from './component/CheckOverrideField.svelte';
   import {
     buildComponentCategoryOptions,
     buildSalvageRouteOptions,
   } from './component/componentEditSelectOptions.js';
   import { salvageResolutionModeOptions } from './resolutionModeOptions.js';
-  import IconButton from '../../components/IconButton.svelte';
   import {
     componentCategoryInheritOffered,
     componentCategoryNote,
     componentEssenceChips,
     componentEssenceInheritOffered,
     componentEssenceNote,
-    componentTagMergeNote,
     componentWorldEssenceMap,
   } from './scoped/componentScoped.js';
 
@@ -225,14 +202,6 @@
   let tagDraft = $state([]);
   let categoryDraft = $state(GENERAL_COMPONENT_CATEGORY);
   let essenceDraft = $state([]);
-  // The rendered subset (issue 1036): every ENABLED essence plus any disabled one already carried
-  // at a positive quantity. `essenceDraft` stays whole; narrowing it would delete those quantities.
-  const offeredEssences = $derived(
-    visibleEssenceOptions(
-      essenceDraft,
-      (option) => clampComponentEssenceQuantity(option?.quantity) > 0
-    )
-  );
   // Deep clone of `component.salvage` so edits never mutate the upstream card. Unedited fields are
   // preserved and spread back through `buildUpdates`, so a save never drops them.
   let salvageDraft = $state(cloneSalvage(null));
@@ -496,29 +465,6 @@
   }
 
   const worldTagsApplied = $derived(worldTags.filter((tag) => !worldMutedTags.includes(tag)));
-  const ownTagLabel = $derived(
-    format('FABRICATE.Admin.Manager.Component.TagsEdit.OwnGroup', '{system}’s tags', {
-      system: systemLabel,
-    })
-  );
-  // THE WORLD BRANCH STATES WHAT IS TRUE, WHICH IS NOT WHAT THE REFERENCE STATES: the runtime does
-  // not merge world tags — `resolveComponentTags` computes the additive set and the read union's
-  // trailing in-system re-spread discards it. `## GM World Component Screens` forbids asserting the
-  // false half, so this is a licensed departure. The card still SHOWS the world run.
-  const tagCardSubtitle = $derived(
-    worldTags.length > 0
-      ? format(
-          'FABRICATE.Admin.Manager.Component.TagsEdit.SubtitleWorld',
-          'The world record’s tags are listed here; {system}’s own are the ones in effect.',
-          { system: systemLabel }
-        )
-      : format(
-          'FABRICATE.Admin.Manager.Component.TagsEdit.SubtitleOwn',
-          '{system}’s item tags. Another system’s tags are its own business.',
-          { system: systemLabel }
-        )
-  );
-
   // THE `How players see it` RAIL (M27): `WorldComponentEntryPreviewRail` draws it on both screens
   // and this editor supplies only the scope and the data. BOTH FACT GROUPS ARE NARROWED TO THIS
   // SYSTEM — the world projection's `requiredBy` and `producedBy` are world-wide, and a rail on a
@@ -596,21 +542,6 @@
     categoryDraft = normalizeComponentCategory(value);
   }
 
-  // Blank when unset, else the staged number. Read off the prop: the draft lives in the root.
-  const difficultyInputValue = $derived(
-    difficulty === null || difficulty === undefined ? '' : difficulty
-  );
-
-  // Stage on input so the editor's dirty state and Save button track edits live. Blank, sub-1,
-  // non-integer or invalid stages null; a valid value stages the truncated integer.
-  function handleDifficultyInput(raw) {
-    const trimmed = String(raw ?? '').trim();
-    const parsed = Number(trimmed);
-    onDifficultyChange(
-      trimmed === '' || !Number.isFinite(parsed) || parsed < 1 ? null : Math.trunc(parsed)
-    );
-  }
-
   function cloneTagOptions(options = []) {
     return (options || []).map((option) => ({
       tag: option.tag,
@@ -678,14 +609,6 @@
         })
       ),
     };
-  }
-
-  // `difficulty` is projected onto the component options; a component that has never been given
-  // one reads null and the badge says so rather than showing a spurious 0.
-  function salvageResultDifficulty(componentId) {
-    const option = componentOptions.find((opt) => opt.id === componentId);
-    const numeric = Number(option?.difficulty);
-    return Number.isFinite(numeric) ? numeric : null;
   }
 
   function clampSalvageQuantity(value) {
@@ -1039,70 +962,6 @@
     return componentOptions.find((option) => option.id === componentId)?.name || '';
   }
 
-  function salvageComponentOption(componentId) {
-    return componentId
-      ? componentOptions.find((option) => option.id === componentId) || null
-      : null;
-  }
-
-  /**
-   * The complication band's eyebrow. Two FULL key literals rather than one composed key, because
-   * `tests/ui-lang-keys-resolve.test.js` can only prove a key it can see written down.
-   */
-  function stripTitle(count, componentId) {
-    const key =
-      count === 1
-        ? 'FABRICATE.Admin.Manager.Component.Complications.StripTitleOne'
-        : 'FABRICATE.Admin.Manager.Component.Complications.StripTitle';
-    const fallback = count === 1 ? '1 complication on {name}' : '{count} complications on {name}';
-    return text(key, fallback)
-      .replace('{count}', String(count))
-      .replace('{name}', salvageComponentName(componentId));
-  }
-
-  // The read-only complication strip under a progressive salvage row (issue 1286): the complications
-  // authored on the YIELD component the row REFERENCES, never this component's own. It reads the
-  // UNREDACTED authored list, because `forecastComplications` filters to the PLAYER's projection and
-  // the authored default is `gmOnly`. Filtered to the SALVAGE activity.
-  function salvageComplicationsFor(componentId) {
-    const authored = salvageComponentOption(componentId)?.complications;
-    return (Array.isArray(authored) ? authored : []).filter(
-      (complication) => complication?.activities?.salvage === true
-    );
-  }
-
-  // The macro and trigger vocabularies are SYSTEM-scoped, so this view's own lists resolve the
-  // referenced component's names too; without them the sentence names nothing a GM recognises.
-  const complicationMacroNames = $derived(
-    new Map(
-      (macroOptions || [])
-        .filter((macro) => macro?.uuid)
-        .map((macro) => [macro.uuid, macro.name || macro.uuid])
-    )
-  );
-
-  const complicationTriggerLabels = $derived(
-    new Map(
-      (complicationTriggerOptions || [])
-        .filter((option) => option?.id)
-        .map((option) => [option.id, option.label || option.id])
-    )
-  );
-
-  function complicationStripSummary(complication) {
-    return complicationSummary(complication, {
-      translate: text,
-      macroName: complicationMacroNames.get(complication?.macroUuid) || '',
-      triggerName: complicationTriggerLabels.get(complication?.when?.checkTrigger) || '',
-    });
-  }
-
-  // A salvage result names a component and nothing else, as a recipe result does (issue 1516).
-  const SALVAGE_RESULT_KINDS = ['component'];
-  const salvageCatalogue = $derived(componentCatalogue(componentOptions));
-  const SALVAGE_NAME_HOOK = { 'data-salvage-result-component': '' };
-  const SALVAGE_AMOUNT = { inputProps: { 'data-salvage-result-quantity': '' } };
-
   // The adder's option list (issue 676). `icon` is the fallback for a component whose linked item
   // has no art: `SearchablePopover` renders a raw `<img>` only when `img` is truthy.
   const salvageAdderOptions = $derived(
@@ -1264,937 +1123,108 @@
           onOpenWorldEntry={() => onOpenWorldEntry(WORLD_ENTRY_ROUTE, worldEntry?.id)}
         />
 
-        <!--
-        CATEGORY AND TAGS, SIDE BY SIDE in one `minmax(0,1fr) minmax(0,1.3fr)` grid, which is what
-        fits the tag card's two labelled groups beside a control one line high.
-      -->
-        <div class="manager-component-rules-duo">
-          <!-- ONE CONTROL, IN THE BODY, FULL WIDTH. The `InheritRow` it replaces is untouched for
-          its other callers. -->
-          <section class="manager-component-rules-card" data-component-edit-section="category">
-            <div class="manager-component-rules-card-head">
-              <i
-                class="fas fa-folder-open manager-component-rules-card-glyph is-accent"
-                aria-hidden="true"
-              ></i>
-              <div>
-                <h3>{text('FABRICATE.Admin.Manager.Component.Category.Title', 'Category')}</h3>
-                <p class="manager-component-rules-card-sub">
-                  {format(
-                    'FABRICATE.Admin.Manager.Component.Category.Sub',
-                    'World default, or a category from {system}.',
-                    { system: systemLabel }
-                  )}
-                </p>
-              </div>
-            </div>
-            <!-- The shared one-of-N picker since issue 1510, so the app draws the list. Both hooks
-            ride `triggerProps` onto the trigger button; `class` lands on the picker root, which is
-            where the sheet hangs the trigger's width and its `border-strong` hairline. No tick: the
-            trigger states the value and the six rows are distinct names (design-system/spec.md, the
-            configurable tick). -->
-            <Select
-              class="manager-component-category-select"
-              value={categorySelectValue}
-              options={categorySelectOptions}
-              showTick={false}
-              ariaLabel={text(
-                'FABRICATE.Admin.Manager.Component.Category.Label',
-                'Component category'
-              )}
-              disabled={saving}
-              triggerProps={{
-                'data-component-edit-category': '',
-                ...(categoryLocked ? { 'data-component-edit-category-locked': '' } : {}),
-              }}
-              onChange={setCategorySelection}
-            />
-            <!--
-            THE NOTE IS DIRECTLY UNDER THE SELECT, with the model's own glyph and tone: `info` while
-            inheriting, `warning` while overriding, subtle where the world authored nothing. The
-            inheriting branch's raw literal maps to the info token (E-4) and is not quoted here,
-            because the theme-colour contract scans prose as well as declarations.
-          -->
-            <p
-              class={`manager-component-cat-note is-${categoryNote.tone}`}
-              data-component-edit-category-note={categoryNote.state}
-            >
-              <i class={categoryNote.icon} aria-hidden="true"></i>
-              <span>{categoryNote.text}</span>
-            </p>
-          </section>
-
-          <!--
-          TWO LABELLED TAG GROUPS AND A MERGE NOTE, the world run first and the system's own beneath.
-          THE WORLD GROUP IS READ-ONLY HERE, per D-r5: muting is authored on the world entry, where
-          the list and its exceptions are visible together. Both PAINTS still apply, because a
-          read-only chip must show which tags are muted. The route to the world record is the
-          attribution banner at the top of this editor.
-        -->
-          <section class="manager-component-rules-card" data-component-edit-section="tags">
-            <div class="manager-component-rules-card-head">
-              <i class="fas fa-tags manager-component-rules-card-glyph is-tag" aria-hidden="true"
-              ></i>
-              <div>
-                <h3>{text('FABRICATE.Admin.Manager.Component.TagsEdit.Title', 'Tags')}</h3>
-                <p class="manager-component-rules-card-sub">{tagCardSubtitle}</p>
-              </div>
-            </div>
-
-            {#if worldEntry && worldTags.length > 0}
-              <div class="manager-component-tag-group" data-component-edit-section="world-tags">
-                <p class="manager-micro-label">
-                  {text('FABRICATE.Admin.Manager.Component.WorldTags.GroupLabel', 'From the world')}
-                </p>
-                <div class="manager-component-tag-run" data-component-edit-world-tags>
-                  {#each worldTags as tag (tag)}
-                    <!-- `struck` is the MUTED paint. NOT `disabled` — `Chip` joins `is-disabled`
-                       to the WARNING family, which would paint a muted tag amber and read as a
-                       hazard. `density="tag-run"` is the scale of a chip that is a control rather
-                       than a badge, and composes with both paints so every tag renders at one size.
-                       `info` rather than `tag` inks the WORLD run blue; the run below is purple. -->
-                    <Chip
-                      density="tag-run"
-                      tone={worldMutedTags.includes(tag) ? 'muted' : 'info'}
-                      struck={worldMutedTags.includes(tag)}
-                      icon={worldMutedTags.includes(tag)
-                        ? 'fas fa-eye-slash'
-                        : 'fas fa-earth-americas'}
-                      data-component-edit-world-tag={tag}
-                      data-component-world-tag-muted={worldMutedTags.includes(tag)}>{tag}</Chip
-                    >
-                  {/each}
-                </div>
-              </div>
-            {/if}
-
-            <div class="manager-component-tag-group">
-              <p class="manager-micro-label" data-component-own-tags-label>{ownTagLabel}</p>
-              {#if tagDraft.length > 0}
-                <!-- The pill IS the shared `Chip` (issue 772), with `aria-pressed` as the state
-                   rather than a class, and written without internal whitespace because call sites
-                   assert on exact `textContent`. THE LABEL ALONE, with no leading glyph and no
-                   trailing state circle (UX F-F): the pair roughly doubled each chip's width, and
-                   `aria-pressed` is what a screen reader reads. -->
-                <div class="manager-component-tag-run" data-component-edit-tags>
-                  {#each tagDraft as option (option.tag)}
-                    <Chip
-                      tag="button"
-                      type="button"
-                      density="tag-run"
-                      tone={option.checked ? 'tag' : 'neutral'}
-                      aria-pressed={option.checked === true}
-                      data-component-edit-tag-toggle={option.tag}
-                      data-component-tag-checked={option.checked === true}
-                      onclick={() => toggleTag(option.tag, option.checked !== true)}
-                      disabled={saving}>{option.tag}</Chip
-                    >
-                  {/each}
-                </div>
-              {:else}
-                <p class="manager-muted">
-                  {text(
-                    'FABRICATE.Admin.Manager.Component.TagsEdit.NoTags',
-                    'This system defines no item tags.'
-                  )}
-                </p>
-              {/if}
-            </div>
-
-            <!-- `proto:1338`: the merge note under BOTH groups, at 9.5px in the subtle ink. -->
-            <p class="manager-component-tag-merge-note" data-component-edit-world-tags-note>
-              {componentTagMergeNote(
-                {
-                  effective: tagDraft.filter((option) => option.checked).length,
-                  muted: worldMutedTags.length,
-                },
-                format
-              )}
-            </p>
-          </section>
-        </div>
-
-        <!--
-        THE PROGRESSIVE DC CARD, DECLARED ONCE AND RENDERED IN ONE OF TWO PLACES. `component.difficulty`
-        is ONE component-level scalar THREE engines read — progressive recipes, salvage and gathering
-        — so the root gates the card on `componentDifficultyAxisProgressive`, true on any of them.
-        Nesting it under salvage would hide it for every progressive-crafting or -gathering system
-        whose salvage is simple or off, which is what the smoke harness drives. A `{#snippet}` rather
-        than two copies, so `data-component-edit-section="difficulty"` resolves to exactly one element.
-      -->
-        {#snippet progressiveDcCard()}
-          {#if showDifficulty}
-            <!-- "This component's Progressive DC" (issue 676).
-             `data-component-edit-section="difficulty"` is PRESERVED VERBATIM:
-             `scripts/foundry-test-run.mjs` fills `[data-component-edit-section="difficulty"] input`
-             and that step is not waivable. STAGED, not written on change, so it contributes to the
-             dirty state and the exit guard; a SIBLING of `salvage`, never part of `updates.salvage`. -->
-            <section
-              class="manager-component-panel manager-component-inline-panel"
-              data-component-edit-section="difficulty"
-            >
-              <div class="manager-task-card-heading">
-                <div>
-                  <!-- Its OWN key: `Component.ProgressiveDifficulty` is a SHORT label shared with
-                   the browser badge and the evidence row, so it must not carry this sentence. -->
-                  <h3>
-                    {text(
-                      'FABRICATE.Admin.Manager.Component.ProgressiveDifficultyCardTitle',
-                      'This component’s Progressive DC'
-                    )}
-                  </h3>
-                  <p class="manager-muted">
-                    {text(
-                      'FABRICATE.Admin.Manager.Component.ProgressiveDifficultyHint',
-                      'Set once here — shown read-only wherever this component appears as a progressive result. Each salvage yield below carries its own DC, edited in its component.'
-                    )}
-                  </p>
-                </div>
-                <!-- `manager-task-card-heading-control` opts this wrapper OUT of the heading's
-                 `> div { flex: 1 1 200px }` rule, which would otherwise grow it to half the row. -->
-                <div class="manager-component-inline-stepper manager-task-card-heading-control">
-                  <span class="manager-component-micro-label"
-                    >{text(
-                      'FABRICATE.Admin.Manager.Component.ProgressiveDifficultyMicro',
-                      'DC'
-                    )}</span
-                  >
-                  <Stepper
-                    value={difficultyInputValue === '' ? 0 : difficultyInputValue}
-                    min={0}
-                    max={35}
-                    ariaLabel={text(
-                      'FABRICATE.Admin.Manager.Component.ProgressiveDifficultyLabel',
-                      'Difficulty value'
-                    )}
-                    decrementLabel={text(
-                      'FABRICATE.Admin.Manager.Component.ProgressiveDifficultyDecrement',
-                      'Decrease difficulty'
-                    )}
-                    incrementLabel={text(
-                      'FABRICATE.Admin.Manager.Component.ProgressiveDifficultyIncrement',
-                      'Increase difficulty'
-                    )}
-                    disabled={saving}
-                    onChange={(next) => handleDifficultyInput(next)}
-                  />
-                </div>
-              </div>
-            </section>
-          {/if}
-        {/snippet}
+        <ComponentCategoryTagsCards
+          {text}
+          {format}
+          {systemLabel}
+          {saving}
+          {categorySelectValue}
+          {categorySelectOptions}
+          {categoryLocked}
+          {categoryNote}
+          hasWorldEntry={Boolean(worldEntry)}
+          {worldTags}
+          {worldMutedTags}
+          {tagDraft}
+          onCategorySelect={setCategorySelection}
+          onToggleTag={toggleTag}
+        />
 
         {#if showEssences}
-          <!--
-        `Essence contribution`, whose subtitle states what a GM must know before authoring one: these
-        values are keyed to the essences THIS system uses, and dropping an essence drops them with it.
-      -->
-          <section class="manager-component-rules-card" data-component-edit-section="essences">
-            <div class="manager-component-rules-card-head">
-              <i
-                class="fas fa-flask-vial manager-component-rules-card-glyph is-info"
-                aria-hidden="true"
-              ></i>
-              <div>
-                <h3>
-                  {text(
-                    'FABRICATE.Admin.Manager.Component.EssencesEdit.Title',
-                    'Essence contribution'
-                  )}
-                </h3>
-                <p class="manager-component-rules-card-sub">
-                  {format(
-                    'FABRICATE.Admin.Manager.Component.EssencesEdit.Hint',
-                    'Keyed to the {count} essences {system} uses. A system that drops an essence drops these values with it.',
-                    { count: offeredEssences.length, system: systemLabel }
-                  )}
-                </p>
-              </div>
-            </div>
-            <!--
-              THE INHERIT-OR-OVERRIDE CHOICE (M31): the shared `InheritRow`, filtered to the one
-              section this card governs and drawn INSIDE the card beside the values it locks. ON is
-              overridden. Withheld, with its note, while the world authored no map.
-            -->
-            {#if essenceInheritOffered}
-              <InheritRow
-                entityType="component"
-                section="essences"
-                inherited={{ essences: essenceInheritStaged }}
-                disabled={saving}
-                onToggle={(_section, nextInherit) => setEssenceInheritance(nextInherit)}
-              />
-            {/if}
-            <p
-              class={`manager-component-cat-note is-${essenceNote.tone}`}
-              data-component-edit-essence-note={essenceNote.state}
-            >
-              <i class={essenceNote.icon} aria-hidden="true"></i>
-              <span>{essenceNote.text}</span>
-            </p>
-            <!-- THE COUNT AND THE GUARD READ THE ARRAY THE GRID DRAWS — `offeredEssences`, issue
-               1036's enabled-plus-carried subset, not the whole roster. Reading the other array made
-               the card miscount and the `No essences are defined …` empty state unreachable. -->
-            {#if offeredEssences.length > 0}
-              <div class="manager-component-essence-grid">
-                {#each offeredEssences as option (option.id)}
-                  <!-- The shared `EssenceQuantityCard` (issue 772), also rendered by the bulk-edit
-                     panel. Its `Stepper` emits the already-clamped ABSOLUTE value for both adjuncts
-                     and typed input, so one `setEssenceQuantity` covers every path. -->
-                  <!-- LOCKED WHILE INHERITING (M31): the tile shows the WORLD value and its stepper
-                     is inert, exactly as the category select is pinned to the inherit option. -->
-                  <EssenceQuantityCard
-                    id={option.id}
-                    name={option.name}
-                    icon={option.icon}
-                    quantity={essenceLocked ? (worldEssenceMap[option.id] ?? 0) : option.quantity}
-                    disabled={saving || essenceLocked}
-                    ariaLabel={text(
-                      'FABRICATE.Admin.Items.Editor.QuantityLabel',
-                      'Quantity for {name}'
-                    ).replace('{name}', option.name)}
-                    decrementLabel={text(
-                      'FABRICATE.Admin.Items.Editor.DecrementEssence',
-                      'Decrement {name}'
-                    ).replace('{name}', option.name)}
-                    incrementLabel={text(
-                      'FABRICATE.Admin.Items.Editor.IncrementEssence',
-                      'Increment {name}'
-                    ).replace('{name}', option.name)}
-                    colorToken={option.colorToken || ''}
-                    onChange={(quantity) => setEssenceQuantity(option.id, quantity)}
-                  />
-                {/each}
-              </div>
-            {:else if essenceDraft.length === 0}
-              <p class="manager-muted">
-                {text(
-                  'FABRICATE.Admin.Manager.Component.EssencesEdit.NoEssences',
-                  'No essences are defined for this system yet.'
-                )}
-              </p>
-            {:else}
-              <!-- TWO EMPTY STATES, BECAUSE THE GRID IS EMPTY FOR TWO REASONS: the guard reads
-                 `offeredEssences`, so an all-DISABLED roster reaches it on a system that DOES define
-                 essences. The fork is the only fact a GM can act on differently. -->
-              <p class="manager-muted">
-                {text(
-                  'FABRICATE.Admin.Manager.Component.EssencesEdit.NoEnabledEssences',
-                  'No essences are enabled for this system yet, and this component carries none.'
-                )}
-              </p>
-            {/if}
-          </section>
+          <ComponentEssencesCard
+            {text}
+            {format}
+            {systemLabel}
+            {saving}
+            {essenceDraft}
+            {essenceInheritOffered}
+            {essenceInheritStaged}
+            {essenceLocked}
+            {essenceNote}
+            {worldEssenceMap}
+            onInheritChange={setEssenceInheritance}
+            onQuantityChange={setEssenceQuantity}
+          />
         {/if}
 
-        <!-- `data-add-salvage-group` rides this button only while there is no backing group,
-             because in that state this IS the add-group control: it takes a progressive component
-             from zero groups to one, which the normalizer's clamp requires before `enabled` can
-             ever be true. One definition, rendered as the list's footer while there are stages and
-             under the empty message otherwise (issue 1512). -->
-        {#snippet salvageStageAdder()}
-          <Button
-            role="dashed"
-            fullWidth
-            data-add-salvage-result
-            data-add-salvage-group={salvageStageGroup ? undefined : ''}
-            onclick={() => addSalvageStage()}
-            disabled={saving}
-          >
-            <i class="fas fa-plus" aria-hidden="true"></i>
-            <span
-              >{text(
-                'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
-                'Add result'
-              )}</span
-            >
-          </Button>
-        {/snippet}
-
-        <!-- A stage's read-only DC and its Edit link, the row's `trailing`: `difficulty` belongs to
-             the result component, whose own editor owns its save lifecycle, so the link is the way
-             to change it. The navigation is guarded (the `component-edit` row of
-             `ROUTE_EXIT_GUARDS` waives no navigation), so a dirty draft prompts. The DC's fallback
-             matches the lang value `DifficultyUnset` resolves to, as the recipe stage row's does. -->
-        {#snippet salvageStageControls(result)}
-          {@const difficulty = salvageResultDifficulty(result.componentId)}
-          <span
-            class="manager-salvage-result-difficulty"
-            data-salvage-result-difficulty={difficulty === null ? '' : String(difficulty)}
-            >{difficulty === null
-              ? text(
-                  'FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset',
-                  'No difficulty'
-                )
-              : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyShort', 'DC')} ${difficulty}`}</span
-          >
-          {#if result.componentId}
-            <button
-              type="button"
-              class="manager-salvage-stage-edit"
-              data-salvage-result-edit={result.componentId}
-              data-keyboard-focus="true"
-              aria-label={text(
-                'FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult',
-                'Edit {name}'
-              ).replace('{name}', salvageComponentName(result.componentId))}
-              title={text(
-                'FABRICATE.Admin.Manager.Component.SalvageEditor.EditDcHint',
-                'Set on this component in its editor'
-              )}
-              onclick={() => onOpenComponent(result.componentId)}
-              disabled={saving}
-            >
-              <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Edit', 'Edit')}</span>
-              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-            </button>
-          {/if}
-        {/snippet}
-
         {#if showSalvage}
-          <section
-            class="manager-component-rules-card"
-            data-component-edit-section="salvage"
-            data-salvage-section
-          >
-            <!-- THE HEADING IS THE CONTROL ROW (issue 676): mode pill, divider, ENABLED, toggle,
-             all on the heading line. -->
-            <div class="manager-component-rules-card-head">
-              <i
-                class="fas fa-recycle manager-component-rules-card-glyph is-accent"
-                aria-hidden="true"
-              ></i>
-              <div>
-                <h3>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Title', 'Salvage')}</h3>
-                <p class="manager-component-rules-card-sub">
-                  {format(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.Hint',
-                    'What this component yields when it is broken down in {system}.',
-                    { system: systemLabel }
-                  )}
-                </p>
-              </div>
-              <!-- `data-recipe-section` / `data-recipe-field` are `ToggleCard`'s hooks, kept
-               verbatim now the toggle is hand-rolled into the heading: the AC4/AC9/AC10 suites drive
-               them, and renaming them would silently unpin the salvage enablement rulings. -->
-              <!-- `manager-task-card-heading-control`: see the DC card's note. -->
-              <div
-                class="manager-component-heading-controls manager-task-card-heading-control"
-                data-recipe-section="salvage-enabled"
-              >
-                {#if salvageModeLabel}
-                  <!-- Read-only: the mode is a SYSTEM setting, authored on Crafting Settings, and
-                   it names the mode that decides this panel's shape. EXEMPT FROM RULING A: the pill
-                   is not chrome that only means something once salvage runs, and the result editor
-                   below stays authorable while salvage is off. `tone="secondary"` is a step louder
-                   than `neutral` and quieter than every semantic family. -->
-                  <Chip
-                    density="list"
-                    tone="secondary"
-                    icon={salvageModeOption?.icon || ''}
-                    class="manager-salvage-mode-pill"
-                    data-salvage-mode={salvageResolutionMode}
-                  >
-                    <span>{salvageModeLabel}</span>
-                  </Chip>
-                  <span class="manager-component-heading-divider" aria-hidden="true"></span>
-                {/if}
-                <span class="manager-component-micro-label"
-                  >{text(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.EnabledMicro',
-                    'Enabled'
-                  )}</span
-                >
-                <!-- The per-component salvage gate (issue 676): persisted, normalized and a live
-                 runtime gate long before any control wrote it, so a component auto-disabled by
-                 `_disableInvalidSalvageConfigs` was permanently unsalvageable from the UI. The
-                 zero-groups explanation is VISIBLE body copy (`[data-salvage-disabled-notice]`),
-                 never a `title` here: a disabled `<button>` receives no mouse events. -->
-                <!-- The shared switch, so this card and `ToggleCard` draw one control rather than
-                 two spellings of it (issue 1040). -->
-                <StatusToggle
-                  on={salvageEnabled}
-                  ariaLabel={text(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.Enable',
-                    'Salvage this component'
-                  )}
-                  disabled={salvageToggleDisabled}
-                  data-recipe-field="salvageEnabled"
-                  onclick={() => setSalvage({ enabled: !salvageEnabled })}
-                />
-              </div>
-            </div>
-
-            {#if !salvageEnabled}
-              <p class="manager-muted" data-salvage-disabled-notice>{salvageDisabledNotice}</p>
-            {/if}
-
-            <!-- The banner and the reorder policy sit ABOVE the list (issue 676): both describe
-             what the ORDER MEANS, and the order is what is authored below. -->
-            {#if salvageShowChrome && salvageProgressive}
-              <!-- The shared `Callout`. NEUTRAL, not info (issue 1505): the specimen reserves the
-               info tint for a note about LIVE state, and roll budget is an invariant. It also sits
-               directly above an info-tinted `ToggleCard`. -->
-              <Callout
-                tone="neutral"
-                icon="fas fa-circle-info"
-                data-salvage-roll-budget
-                text={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageEditor.RollBudget',
-                  'Roll budget flows down the list: each result is claimed in order while the check total still covers its DC.'
-                )}
-              />
-
-              <!-- Progressive-only: the flag has no meaning in the simple or routed salvage modes,
-               which award a whole group rather than spending down a list. -->
-              <ToggleCard
-                variant="is-info"
-                icon="fas fa-arrow-down-a-z"
-                section="salvage-allow-player-result-reorder"
-                field="salvageAllowPlayerResultReorder"
-                title={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageReorder.Title',
-                  'Allow player result re-ordering'
-                )}
-                sub={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageReorder.Sub',
-                  'Let players drag the salvage order at the table; off keeps this GM order fixed.'
-                )}
-                toggleLabel={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageReorder.Toggle',
-                  'Allow player result re-ordering'
-                )}
-                on={salvageDraft.allowPlayerResultReorder !== false}
-                disabled={saving}
-                onToggle={(next) => setSalvage({ allowPlayerResultReorder: next === true })}
-              />
-            {/if}
-
-            <Field as="div" data-salvage-result-groups="">
-              {#if salvageProgressive}
-                <!-- PROGRESSIVE: an ordered list of SINGLE results, with no group chrome. See
-               `salvageStageGroup` for why the groups are still the storage. -->
-                <span class="manager-component-readonly-label">
-                  <span
-                    >{text(
-                      'FABRICATE.Admin.Manager.Component.SalvageEditor.Results',
-                      'Results'
-                    )}</span
-                  >
-                </span>
-                <!-- The ordered salvage stage list is the shared one (issue 1512): the grip, the
-                     ordinal badge, the rocker, the delete, the drag source and the announcement are
-                     all the list's. Every control it draws is an `IconButton`, so each carries
-                     `type="button"` — this is the one converted site inside a `<form>`, where a
-                     control without it submits the draft on a keyboard move. The complication band
-                     is the list's body because it is full-bleed, and `has-band` is what stops a
-                     stage with no complication drawing an empty padded one. `removeData` keeps
-                     `data-remove-salvage-result`, the hook the mounted suite addresses a stage by,
-                     and its `disabled: saving`. -->
-                {#if salvageStages.length > 0}
-                  <SortableList
-                    items={salvageStages}
-                    itemLabel={(result) =>
-                      salvageComponentName(result.componentId) ||
-                      text('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result')}
-                    numbered
-                    alwaysOpen
-                    reorderable={!saving}
-                    onReorder={(from, to) => moveSalvageStage(from, to)}
-                    removable
-                    onRemove={(result) => removeSalvageStage(result.id)}
-                    rowClass={(result) =>
-                      salvageComplicationsFor(result.componentId).length > 0
-                        ? 'manager-salvage-stage-row has-band'
-                        : 'manager-salvage-stage-row'}
-                    rowData={(result) => ({
-                      'data-salvage-result': result.id,
-                      'data-salvage-stage': String(salvageStages.indexOf(result) + 1),
-                    })}
-                    removeData={() => ({
-                      'data-remove-salvage-result': '',
-                      disabled: saving,
-                    })}
-                  >
-                    {#snippet row(result)}
-                      <!-- No amount (issue 676): progressive awards one entry at a time, so "two
-                           of X" is authored by listing X twice. The clear stays, because a stage
-                           swaps its component in place to keep its order. -->
-                      <PickerRow
-                        value={toValue(result)}
-                        kinds={SALVAGE_RESULT_KINDS}
-                        catalogue={salvageCatalogue}
-                        amount={false}
-                        removable={false}
-                        disabled={saving}
-                        nameProps={SALVAGE_NAME_HOOK}
-                        class="is-result"
-                        onChange={(value) =>
-                          updateSalvageResult(salvageStageGroup.id, result, value)}
-                      >
-                        {#snippet trailing()}{@render salvageStageControls(result)}{/snippet}
-                      </PickerRow>
-                    {/snippet}
-                    {#snippet body(result)}
-                      {@const stageComplications = salvageComplicationsFor(result.componentId)}
-                      <!-- The read-only complication strip (issue 1286), the list's body and
-                           therefore full-bleed, as the Recipe Studio draws the same band: row and
-                           band are one card, with the band's `border-top` as the divider. This
-                           OVERRIDES the Component Studio prototype on a maintainer ruling. The
-                           `:has()` rules that bought the shape by hand are gone with the
-                           hand-rolled row (issue 1512). `role="presentation"` stays: the band
-                           annotates the stage above it and must never be announced as one. -->
-                      {#if stageComplications.length > 0}
-                        <div
-                          class="manager-salvage-stage-complications"
-                          role="presentation"
-                          data-salvage-stage-complications={result.componentId}
-                        >
-                          <div class="manager-salvage-stage-complications-head">
-                            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-                            <span class="manager-salvage-stage-complications-title"
-                              >{stripTitle(stageComplications.length, result.componentId)}</span
-                            >
-                            <!-- The only route to changing any of this: a complication belongs to
-                                 the referenced component, whose own editor owns its save lifecycle.
-                                 Its label names complications, so it differs from the row's Edit
-                                 link. -->
-                            <button
-                              type="button"
-                              class="manager-salvage-stage-edit"
-                              data-salvage-stage-complications-edit={result.componentId}
-                              aria-label={text(
-                                'FABRICATE.Admin.Manager.Component.Complications.StripEdit',
-                                'Edit complications on {name}'
-                              ).replace('{name}', salvageComponentName(result.componentId))}
-                              title={text(
-                                'FABRICATE.Admin.Manager.Component.Complications.StripEdit',
-                                'Edit complications on {name}'
-                              ).replace('{name}', salvageComponentName(result.componentId))}
-                              onclick={() => onOpenComponent(result.componentId)}
-                              disabled={saving}
-                            >
-                              <span
-                                >{text(
-                                  'FABRICATE.Admin.Manager.Component.SalvageEditor.Edit',
-                                  'Edit'
-                                )}</span
-                              >
-                              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-                            </button>
-                          </div>
-                          <!-- No `severityLabel`: this prototype draws severity as the coloured dot
-                               alone. The Recipe Studio's strip draws the word too, and passes it. -->
-                          {#each stageComplications as complication (complication.id)}
-                            <ComplicationSummaryRow
-                              variant="readonly-gm"
-                              nameEmphasis="inline"
-                              name={complication.name}
-                              severity={complication.severity}
-                              visibility={complication.visibility}
-                              playerLabel={text(
-                                'FABRICATE.Admin.Manager.Component.Complications.PlayerPill',
-                                'Player'
-                              )}
-                              playerTitle={text(
-                                'FABRICATE.Admin.Manager.Component.Complications.PlayerPillTitle',
-                                'Shown to the player when it fires.'
-                              )}
-                              triggerSentence={complicationStripSummary(complication)}
-                              data-salvage-stage-complication={complication.id || true}
-                            />
-                          {/each}
-                        </div>
-                      {/if}
-                    {/snippet}
-                    {#snippet footer()}
-                      <li class="manager-salvage-stage-add">{@render salvageStageAdder()}</li>
-                    {/snippet}
-                  </SortableList>
-                {:else}
-                  <p class="manager-muted">
-                    {text(
-                      'FABRICATE.Admin.Manager.Component.SalvageEditor.NoResultsYet',
-                      'No results yet.'
-                    )}
-                  </p>
-                  <!-- The adder follows the empty message (issue 1512): with no stages there is no
-                       list to be a footer of, and an empty state that says "add one" with nothing
-                       to press is a dead end. -->
-                  {@render salvageStageAdder()}
-                {/if}
-                <!-- The reference closes the progressive body with this component's own DC row.
-                 See the snippet's declaration for why it is rendered here. -->
-                {#if showDifficulty}
-                  {@render progressiveDcCard()}
-                {/if}
-              {:else}
-                <span class="manager-component-readonly-label">
-                  <span
-                    >{text(
-                      'FABRICATE.Admin.Manager.Component.SalvageEditor.ResultGroups',
-                      'Result sets'
-                    )}</span
-                  >
-                </span>
-                {#if salvageSimpleMode}
-                  <!-- REQUIRED visible hint (issue 764), never a `title`: a tooltip on an absent
-                 control never fires. It explains why Add result set is gone at the one-set cap. -->
-                  <p class="manager-muted" data-salvage-simple-hint>
-                    {text(
-                      'FABRICATE.Admin.Manager.Component.SalvageEditor.SimpleSingleGroupHint',
-                      'Simple mode uses a single result set.'
-                    )}
-                  </p>
-                {/if}
-                {#if salvageDraft.resultGroups.length > 0}
-                  <ul class="manager-recipe-ingredient-sets">
-                    {#each salvageDraft.resultGroups as group, groupIndex (group.id)}
-                      <!-- One `--fab-bg-1` card per result group behind a hairline, headed by the
-                       group's name and its count in the mono face. THE HEAD KEEPS ITS NAME INPUT AND
-                       THE BODY KEEPS ITS ROWS: the reference's read-only pill run cannot author a
-                       quantity, choose a component or rename a group. -->
-                      <li class="manager-salvage-group-card" data-salvage-group={group.id}>
-                        <div class="manager-salvage-group-header">
-                          <input
-                            type="text"
-                            class="manager-input"
-                            value={group.name}
-                            placeholder={text(
-                              'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupNamePlaceholder',
-                              'Set {n}'
-                            ).replace('{n}', String(groupIndex + 1))}
-                            aria-label={text(
-                              'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupName',
-                              'Result set name'
-                            )}
-                            data-salvage-group-name
-                            oninput={(event) =>
-                              updateSalvageGroup(group.id, { name: event.currentTarget.value })}
-                            disabled={saving}
-                          />
-                          <!-- The group's own count, in the mono face at weight 500 — the face
-                           ships 400 and 500 only, so the reference's 700 lands on 500. -->
-                          <span class="manager-salvage-group-count" data-salvage-group-count
-                            >{(group.results || []).length}</span
-                          >
-                          <IconButton
-                            class="is-danger"
-                            ariaLabel={text(
-                              'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveGroup',
-                              'Remove result set'
-                            )}
-                            data-remove-salvage-group=""
-                            onclick={() => removeSalvageGroup(group.id)}
-                            disabled={saving}
-                          >
-                            <i class="fas fa-xmark" aria-hidden="true"></i>
-                          </IconButton>
-                        </div>
-
-                        {#if (group.results || []).length > 0}
-                          <div class="manager-recipe-ingredient-set-groups">
-                            {#each group.results as result (result.id)}
-                              <!-- The quantity STAYS in simple and routed: these modes award the
-                                   whole group as authored. Only progressive drops it. -->
-                              <PickerRow
-                                value={toValue(result)}
-                                kinds={SALVAGE_RESULT_KINDS}
-                                catalogue={salvageCatalogue}
-                                amount={SALVAGE_AMOUNT}
-                                rollable
-                                clearable={false}
-                                removeHook="salvage-result"
-                                invalid={resultAmountInvalid(result, text)}
-                                disabled={saving}
-                                nameProps={SALVAGE_NAME_HOOK}
-                                removeProps={{ 'data-remove-salvage-result': '' }}
-                                class="is-result"
-                                data-salvage-result={result.id}
-                                onChange={(value) => updateSalvageResult(group.id, result, value)}
-                                onRemove={() => removeSalvageResult(group.id, result.id)}
-                              />
-                            {/each}
-                          </div>
-                        {:else}
-                          <p class="manager-muted">
-                            {text(
-                              'FABRICATE.Admin.Manager.Component.SalvageEditor.NoResults',
-                              'No results in this set yet.'
-                            )}
-                          </p>
-                        {/if}
-
-                        <!-- Adding a component the set already produces raises that row's
-                             quantity, unless that row is rolled (`withAddedResult`). -->
-                        <SearchablePopover
-                          options={salvageAdderOptions}
-                          panelLabel={text(
-                            'FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent',
-                            'Result component'
-                          )}
-                          searchPlaceholder={text(
-                            'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
-                            'Search components...'
-                          )}
-                          searchLabel={text(
-                            'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
-                            'Search components...'
-                          )}
-                          emptyHint={text(
-                            'FABRICATE.Admin.Manager.Component.SalvageEditor.NoComponentsDefined',
-                            'No components defined'
-                          )}
-                          disabled={saving}
-                          onSelect={(id) => addSalvageResult(group.id, id)}
-                        >
-                          {#snippet trigger({ attributes })}
-                            <!-- ratchet-exempt(design-system): the spread is the popover's own trigger contract (type, ARIA state, handlers, element attachment), never a caller's name -->
-                            <Button
-                              role="dashed"
-                              fullWidth
-                              data-add-salvage-result
-                              aria-label={text(
-                                'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
-                                'Add result'
-                              )}
-                              disabled={saving}
-                              {...attributes}
-                            >
-                              <i class="fas fa-plus" aria-hidden="true"></i>
-                              <span
-                                >{text(
-                                  'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
-                                  'Add result'
-                                )}</span
-                              >
-                            </Button>
-                          {/snippet}
-                        </SearchablePopover>
-                      </li>
-                    {/each}
-                  </ul>
-                {:else}
-                  <p class="manager-muted">
-                    {text(
-                      'FABRICATE.Admin.Manager.Component.SalvageEditor.NoGroups',
-                      'No result sets yet.'
-                    )}
-                  </p>
-                {/if}
-                <!-- HIDDEN at the Simple one-success-group cap (issue 764). Routed keeps the
-               multi-group list; Simple with no success group yet still shows it. -->
-                {#if !salvageHideAddGroup}
-                  <Button
-                    role="dashed"
-                    fullWidth
-                    data-add-salvage-group
-                    onclick={() => addSalvageGroup()}
-                    disabled={saving}
-                  >
-                    <i class="fas fa-plus" aria-hidden="true"></i>
-                    <span
-                      >{text(
-                        'FABRICATE.Admin.Manager.Component.SalvageEditor.AddGroup',
-                        'Add result set'
-                      )}</span
-                    >
-                  </Button>
-                {/if}
-              {/if}
-            </Field>
-
-            <!-- RULING A: everything below is CHROME and collapses when salvage is off. The
-             result-group editor above does NOT, because it owns the only add-group control. -->
-            {#if salvageShowChrome && salvageRouted}
-              <!-- A `--fab-bg-1` well behind a hairline, headed by an `OUTCOME ROUTING` micro-label
-               and holding one row per outcome. -->
-              <Field as="div" class="manager-salvage-routing-card" data-salvage-routing="">
-                <p class="manager-micro-label">
-                  {text(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.Routing',
-                    'Outcome routing'
-                  )}
-                </p>
-                {#if salvageOutcomeNames.length > 0}
-                  <!-- A `<div>`, not a `<label>`: `Select.svelte`'s host invariant. The caption names the trigger with `aria-labelledby` (issue 1510). -->
-                  <div class="manager-salvage-routing-list">
-                    {#each salvageOutcomeNames as outcomeName, routeIndex (outcomeName)}
-                      <div class="manager-salvage-routing-row">
-                        <span id={`${instanceId}-salvage-route-${routeIndex}`}>{outcomeName}</span>
-                        <Select
-                          size="inline"
-                          class="manager-salvage-route-select"
-                          value={salvageDraft.outcomeRouting[outcomeName] || ''}
-                          options={salvageRouteOptions}
-                          ariaLabelledBy={`${instanceId}-salvage-route-${routeIndex}`}
-                          disabled={saving}
-                          triggerProps={{ 'data-salvage-route': outcomeName }}
-                          onChange={(next) => setSalvageRoute(outcomeName, next)}
-                        />
-                      </div>
-                    {/each}
-                  </div>
-                {:else}
-                  <p class="manager-muted">
-                    {text(
-                      'FABRICATE.Admin.Manager.Component.SalvageEditor.NoOutcomes',
-                      'The routed salvage check has no outcome tiers to route yet.'
-                    )}
-                  </p>
-                {/if}
-              </Field>
-            {/if}
-
-            <!-- The component's own check-modifier pick (issue 1095), rendered only under the
-             salvage check's `bySubject` rule and only over a non-empty system catalogue. ITS GATE IS
-             ITS OWN, NOT THE DC OVERRIDE'S: `salvageShowDcOverride` is `simple || routed` and
-             excludes progressive, but `CraftingEngine._runSalvageCraftingCheck` builds the modifier
-             context before dispatch, so a progressive roll honoured a pick no editor could author. -->
-            {#if salvageShowChrome && salvageCheckEnabled && salvageModifierPolicy === 'bySubject'}
-              <SubjectModifierPicker
-                options={checkModifierOptions}
-                selectedIds={salvageDraft.checkModifierIds}
-                maxPicks={salvageModifierMaxPicks}
-                inheritedIds={salvageModifierDefaultIds}
-                disabled={saving}
-                subject="component"
-                testId="salvage-check-modifier"
-                onChange={(next) => setSalvage({ checkModifierIds: next })}
-              />
-            {/if}
-
-            {#if salvageShowChrome && salvageShowDcOverride}
-              <!-- Keyed per component: its staged Custom… choice is transient UI state, and a second
-               component must not inherit the first's open custom input. The PERSISTED value derives
-               the selection, so an off-tier override shows verbatim and rendering never dirties. -->
-              {#key componentKey}
-                <CheckOverrideField
-                  config={salvageCheckConfig}
-                  dcOverride={salvageDraft.dcOverride}
-                  adjustmentOverride={salvageDraft.adjustmentOverride}
-                  successesOverride={salvageDraft.successesOverride}
-                  tiers={salvageCheckTiers}
-                  systemDc={salvageCheckDc}
-                  {previewActors}
-                  {resolvePreviewCharacter}
-                  {instanceId}
-                  disabled={saving}
-                  onChange={setSalvage}
-                  onManagePresets={() => onManageCheckPresets()}
-                />
-              {/key}
-            {/if}
-          </section>
+          <ComponentSalvageCard
+            {text}
+            {format}
+            {systemLabel}
+            {saving}
+            {instanceId}
+            {componentKey}
+            {salvageDraft}
+            {salvageResolutionMode}
+            {salvageEnabled}
+            {salvageProgressive}
+            {salvageRouted}
+            {salvageSimpleMode}
+            {salvageHideAddGroup}
+            {salvageShowChrome}
+            {salvageShowDcOverride}
+            {salvageToggleDisabled}
+            {salvageDisabledNotice}
+            {salvageModeOption}
+            {salvageModeLabel}
+            {salvageRouteOptions}
+            {salvageAdderOptions}
+            {salvageOutcomeNames}
+            {salvageCheckEnabled}
+            {salvageCheckTiers}
+            {salvageCheckDc}
+            {salvageCheckConfig}
+            {previewActors}
+            {resolvePreviewCharacter}
+            {checkModifierOptions}
+            {salvageModifierPolicy}
+            {salvageModifierMaxPicks}
+            {salvageModifierDefaultIds}
+            {componentOptions}
+            {macroOptions}
+            {complicationTriggerOptions}
+            componentName={salvageComponentName}
+            {salvageStageGroup}
+            {salvageStages}
+            {showDifficulty}
+            {difficulty}
+            {onDifficultyChange}
+            onSalvageChange={setSalvage}
+            onAddGroup={addSalvageGroup}
+            onRemoveGroup={removeSalvageGroup}
+            onUpdateGroup={updateSalvageGroup}
+            onAddResult={addSalvageResult}
+            onRemoveResult={removeSalvageResult}
+            onUpdateResult={updateSalvageResult}
+            onSetRoute={setSalvageRoute}
+            onAddStage={addSalvageStage}
+            onRemoveStage={removeSalvageStage}
+            onMoveStage={moveSalvageStage}
+            {onOpenComponent}
+            {onManageCheckPresets}
+          />
         {/if}
 
         <!--
-      THE PROGRESSIVE DC CARD'S OTHER PLACEMENT, for the configuration the reference has none of and
-      the smoke harness drives: a progressive-crafting or -gathering system whose salvage is simple
-      or off.
-    -->
+        THE PROGRESSIVE DC CARD'S OTHER PLACEMENT: `component.difficulty` is ONE component-level
+        scalar THREE engines read — progressive recipes, salvage and gathering — so the root gates
+        the card on `componentDifficultyAxisProgressive`, true on any of them. A progressive-salvage
+        system draws it closing the stage list; every other system, which the smoke harness drives,
+        draws it here.
+      -->
         {#if showDifficulty && !(showSalvage && salvageProgressive)}
-          {@render progressiveDcCard()}
+          <ComponentDifficultyCard {text} {difficulty} {saving} {onDifficultyChange} />
         {/if}
 
         <!-- COMPLICATIONS (issue 1286), last in the body and after Salvage, since it is a
@@ -2214,24 +1244,7 @@
           }}
         />
       {:else}
-        <!--
-        THE VALIDATION TAB: the same `EditorValidationSurface` shape the world entry's draws. Its
-        checks are the SYSTEM rules', which is why they come from `componentRulesValidation.js` and
-        not `componentScopeValidation.js`, whose subject is the world record.
-      -->
-        <EditorValidationSurface
-          title=""
-          summary={validationSummary}
-          counts={validation.counts}
-          groups={validation.groups}
-          statusLabels={{
-            pass: text('FABRICATE.Admin.Manager.Validation.StatusPass', 'Pass'),
-            warn: text('FABRICATE.Admin.Manager.Validation.StatusWarn', 'Warning'),
-            block: text('FABRICATE.Admin.Manager.Component.Validation.Blocks', 'Blocks'),
-          }}
-          hookAttrs={{ root: { 'data-component-edit-validation': '' } }}
-          rowDataAttr="data-component-validation-check"
-        />
+        <ComponentRulesValidationTab {text} summary={validationSummary} {validation} />
       {/if}
     </div>
   </form>
@@ -2256,57 +1269,3 @@
     {text}
   />
 </main>
-
-<style>
-  /* The read-only complication strip (issue 1286). Component-SCOPED and theme-ROOT tokens only, so
-     the band renders the same wherever this row shape is reused. THE BAND IS ATTACHED, overriding the
-     prototype on a maintainer ruling: what goes is the margin, the surrounding border and the
-     right-hand radii; every value the parity spec measures stands. */
-
-  /* The three `:has()` rules that bought this shape by hand are gone (issue 1512): the list's row
-     is already a column whose line carries the padding and which clips itself, so a band rendered
-     as the row's body meets the row's own border by construction. */
-
-  /* NO margin and NO radius: the `border-top` IS the divider, and a divider only reads as one when
-     the two surfaces meet. The 2px `--fab-warning` left rule marks the stage's warning annotation. */
-  .manager-salvage-stage-complications {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 8px 11px;
-    border-top: 1px solid var(--fab-warning-border);
-    border-left: 2px solid var(--fab-warning);
-    background: var(--fab-warning-soft);
-  }
-
-  .manager-salvage-stage-complications-head {
-    display: flex;
-    gap: 7px;
-    align-items: center;
-    color: var(--fab-warning);
-    font-size: 9px;
-  }
-
-  /* The band's eyebrow. It names the OWNING component, because a GM scanning a list of stages needs
-     the band's subject stated rather than inferred from adjacency. */
-  .manager-salvage-stage-complications-title {
-    flex: 1 1 auto;
-    overflow: hidden;
-    color: var(--fab-warning-text);
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  /* `margin-left: auto` is stated rather than inherited: the shared `.manager-salvage-stage-edit`
-     rule places the link in the ROW's trailing cluster, and the title above takes the free space. */
-  .manager-salvage-stage-complications-head .manager-salvage-stage-edit {
-    flex: 0 0 auto;
-  }
-  /* THE CATEGORY NOTE IS STATED ONCE, IN THE SHEET. Svelte's scoping appends a hash class, so a
-     scoped copy here out-specified `.fabricate-manager .manager-component-cat-note` and quietly won
-     five declarations the sheet writes to the reference. */
-</style>

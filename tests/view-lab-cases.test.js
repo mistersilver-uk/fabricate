@@ -5513,6 +5513,36 @@ test('a change confined to recipeReadiness.js selects the recipe-editor cases, n
   );
 });
 
+// The component rules editor's cards (issue 1522), named files rather than a directory walk, so a
+// pattern that stops matching a file that still exists fails here.
+const COMPONENT_EDITOR_CARDS = Object.freeze(
+  [
+    'ComponentCategoryTagsCards',
+    'ComponentDifficultyCard',
+    'ComponentEssencesCard',
+    'ComponentSalvageStages',
+    'ComponentSalvageCard',
+    'ComponentRulesValidationTab',
+  ].map((name) => `src/ui/svelte/apps/manager/component/${name}.svelte`)
+);
+
+test('a change confined to one rules-editor card selects every frame the editor selects', () => {
+  const ids = (file) => mapChangedFilesToCases([file]).map((viewCase) => viewCase.id);
+  const editorFrames = ids('src/ui/svelte/apps/manager/ComponentEditView.svelte');
+  for (const expected of [
+    'manager-component-edit-normal',
+    'manager-component-edit-inheriting',
+    'manager-component-edit-salvage',
+    'manager-component-edit-salvage-simple',
+    'manager-component-complications-salvage-stage-strip',
+  ]) {
+    assert.ok(editorFrames.includes(expected), `the editor selects ${expected}`);
+  }
+  for (const card of COMPONENT_EDITOR_CARDS) {
+    assert.deepEqual(ids(card), editorFrames, `${card} selects the editor's frames`);
+  }
+});
+
 // The environment editor's validation tab (issue 1517). THE DEFECT THIS PINS WAS A STALE CLAIM, NOT
 // AN ABSENT ONE, and the difference is why it survived a green tree for as long as it did.
 const ENVIRONMENT_DIR = 'src/ui/svelte/apps/manager/environment/';
