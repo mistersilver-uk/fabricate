@@ -82,7 +82,7 @@ This is deliberate.
 A component that can be salvaged but yields nothing is not a setup Fabricate will save.
 
 When the system's salvage resolution mode is Simple, a component uses a single result set.
-In Simple mode the panel shows the hint **Simple mode uses a single result set**, so it is clear why only one is allowed; once you have added the one set, the **Add set** control is hidden.
+In Simple mode the panel shows the hint **Simple mode uses a single result set**, so it is clear why only one is allowed; once you have added the one set, the **Add result set** control is hidden.
 Routed and Progressive modes keep the full list, where each result set maps to an outcome or a stage.
 
 {: .note }
@@ -185,7 +185,7 @@ What it lists depends on the system's salvage resolution mode, and on whether yo
 | Routed by check | Every outcome you authored, with the materials each one recovers. |
 | Progressive | The result stages in order, each showing that component's own progressive DC as **DC N** and the check value that reaches it as **Reach ≥N**, plus a strip for any complications you told the player about. |
 | Routed or Progressive with no salvage check roll formula | **Salvage isn't ready**, and a line asking the player to speak to you. The action is disabled and nothing can be consumed. |
-| Simple, with a component left holding more than one result set | **Salvage isn't ready**, with a line saying the component has more than one result set and asking you to fix it in the component editor. This can only happen to a component set up before Simple mode enforced a single set and not re-saved since. It shows to you as the GM only, players never see the component. Re-saving the system trims the extra groups and clears the cue. |
+| Simple, with a component left holding more than one result set | **Salvage isn't ready**, with a line saying the component has more than one result set and asking you to fix it in the component editor. This can only happen to a component set up before Simple mode enforced a single set and not re-saved since. It shows to you as the GM only, players never see the component. Re-saving the system trims the extra sets and clears the cue. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
