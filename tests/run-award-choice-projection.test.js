@@ -213,3 +213,16 @@ test('1773 PR4: an unclaimable alternative and the stage hold come through the f
   );
   assert.equal(run.actions.disabledReason, 'awardChoicePending', 'the coin still holds the stage');
 });
+
+test('1773 PR4: a taught recipe this viewer may not read is named as one not learned', async () => {
+  const { built } = await craftWithGroup(pickGroup(), {
+    act: async (world) => {
+      await world.execute();
+      // A teaser entitles the run's evidence but never names the recipe it teaches.
+      const teaser = { evaluateRecipeAccess: () => ({ visible: true, reason: 'teaser' }) };
+      return { built: listing(world, { viewer: world.viewer, recipeVisibility: teaser }) };
+    },
+  });
+  const lore = owedRun(built).awardChoices[0].alternatives.find((entry) => entry.id === 'lore');
+  assert.match(lore.name, /AwardChoice\.UnlearnedRecipe/);
+});
