@@ -1195,11 +1195,23 @@ Where the shipped primitive departs from that pattern it MUST say so at the sour
 Its items hold focus and are buttons outside a form, so each MUST carry `data-keyboard-focus="true"` — the same obligation the Foundry contract places on any focusable non-form element, and the reason the listbox prohibition above does not reach a menu.
 The panel MUST be portaled through the shared overlay-host resolver rather than positioned inside its trigger's own container: an absolutely positioned menu is clipped by any scrolling ancestor, and a clipped panel reports its full box, so the failure is invisible to every geometric assertion and has to be proved by hit test.
 
+A caller MAY supply its own labelled trigger and a heading, and the primitive keeps the menu contract on both.
+The caller's trigger receives `aria-haspopup="menu"`, `aria-expanded`, the primitive's handlers and the binding that lets the primitive measure it and return focus to it, so a caller writes no ARIA of its own.
+A heading renders in the same portaled panel OUTSIDE the `role="menu"` element and names it through `aria-labelledby`, so the menu's children stay its items.
+An item MAY carry a tone, which tints its glyph and never its label.
+The requirement row's kind menu is this primitive: the `or…` control opens it under the heading that states what choosing does, each kind's item toned with that kind.
+
 #### Scenario: A surface needs a kebab over two or more commands
 
 - **WHEN** a surface needs an overflow menu of commands
 - **THEN** it renders the shared action-menu primitive
 - **AND** the trigger announces `aria-haspopup="menu"` over a `role="menu"` of `role="menuitem"` rows carrying no `aria-selected`
+
+#### Scenario: A menu is opened from a caller's own trigger and headed
+
+- **WHEN** a caller renders the action menu with its own trigger and a heading
+- **THEN** the trigger announces `aria-haspopup="menu"` and its expanded state without the caller writing either
+- **AND** the heading sits outside the `role="menu"` element and names it through `aria-labelledby`
 
 #### Scenario: A caller asks the picker to announce a menu
 
@@ -1372,6 +1384,7 @@ A set MUST be renameable in the surface that shows it, because every other surfa
 A set addressable only by position is what makes reordering dangerous.
 
 A CHOICE GROUP is this document's name for the OR-alternative bundle `DOMAIN.md` calls an Ingredient Group, widened because the same bundle is valid on the result side where "ingredient" would be wrong.
+It ships as `ChoiceGroup`, in its ingredient-side form, at one caller.
 On the ingredient side it is exactly that OR: the crafter spends one alternative and the rest are untouched.
 On the RESULT side the bundle is not always exclusive — its award strategy states how many of its alternatives are handed over — so the name is retained for the shape the two sides share, which is a set of alternatives authored as one thing, rather than for the cardinality, which differs by side.
 Where the two documents are read together, they name one thing.

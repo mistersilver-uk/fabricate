@@ -5,6 +5,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   createMountedComponentHarness,
+  KIND_MENU_COMPILED_MODULES,
+  KIND_MENU_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   TYPEAHEAD_RUNE_MODULES,
 } from '../helpers/svelte-component-harness.js';
@@ -129,6 +131,7 @@ const RAW_MODULES = [
   'src/systems/normalize/checkEvaluation.js',
   'src/utils/fillPlaceholders.js',
   ...SEARCHABLE_POPOVER_RAW_MODULES,
+  ...KIND_MENU_RAW_MODULES,
   // A progressive stage row draws its component's complications read-only (issue 1286).
   'src/ui/model/complicationSummary.js',
   'src/systems/characterPrerequisites.js',
@@ -166,9 +169,10 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeModeBanner.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
-  'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
+  'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+  ...KIND_MENU_COMPILED_MODULES,
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
@@ -3917,11 +3921,11 @@ describe('RecipeEditView (mounted)', () => {
     const req = target.querySelector('[data-recipe-group-id="grp-1"]');
     const triggers = req.querySelectorAll('.manager-recipe-or-trigger');
     assert.equal(triggers.length, 1, 'exactly one "or..." trigger per requirement');
-    // `listbox`, NOT `dialog` (issue 1503). This menu passes `showSearch={false}`.
+    // A menu of kinds to append, not a list of values to select (issue 1516).
     assert.equal(
       triggers[0].getAttribute('aria-haspopup'),
-      'listbox',
-      'it reuses SearchablePopover (aria-haspopup, Escape-dismiss, focus-on-open)'
+      'menu',
+      'it is the shared ActionMenu (aria-haspopup, Escape-dismiss, focus-on-open)'
     );
     for (const row of req.querySelectorAll('[data-recipe-option]')) {
       assert.ok(
@@ -3984,6 +3988,109 @@ describe('RecipeEditView (mounted)', () => {
       );
     }
     editHarness.remount();
+  });
+
+  it('the "or..." menu and the box adders offer the same kinds in the same order', async () => {
+    // design-system: the convert control and the group's adder state one subset in one order.
+    // `ui-entity-editors` keeps the box's four `alt <kind>` adders, so the adders are the second
+    // trigger; currency keeps its `cost` hook on the adder, so both read back as kinds.
+    const KIND_OF = {
+      'alternative-component': 'component',
+      'alternative-tag': 'tags',
+      'alternative-essence': 'essence',
+      'alternative-currency': 'currency',
+      'alternative-cost': 'currency',
+    };
+    const base = { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS };
+    const allDisabled = ESSENCE_OPTIONS.map((essence) => ({ ...essence, enabled: false }));
+    const cases = [
+      [
+        { ...base, currencyUnits: CURRENCY_UNITS, essenceOptions: ESSENCE_OPTIONS },
+        ['component', 'tags', 'essence', 'currency'],
+      ],
+      [base, ['component', 'tags']],
+      [{ ...base, currencyUnits: CURRENCY_UNITS, currencyEnabled: false }, ['component', 'tags']],
+      [{ ...base, essenceOptions: allDisabled }, ['component', 'tags', 'essence']],
+    ];
+    const kindsOf = (nodes) => nodes.map((node) => KIND_OF[node.getAttribute('data-recipe-add')]);
+
+    // Each mount is torn down even when an assertion fails, so a stale menu never reaches the next.
+    async function readMounted(options, props, read) {
+      const { target } = await mountSingleGroup(options, { props });
+      try {
+        return await read(target);
+      } finally {
+        editHarness.remount();
+      }
+    }
+
+    for (const [props, expected] of cases) {
+      const named = JSON.stringify(Object.keys(props));
+      const fromMenu = await readMounted(
+        [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+        props,
+        async (target) => {
+          await openOrMenu(target, 'grp-1');
+          return kindsOf([
+            ...document.querySelectorAll('.manager-recipe-or-menu [role="menuitem"]'),
+          ]);
+        }
+      );
+      const box = await readMounted(
+        [
+          { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+          { quantity: 1, match: { type: 'tags', tags: ['herb'], tagMatch: 'any' } },
+        ],
+        props,
+        (target) => {
+          const group = target.querySelector('[data-recipe-group-id="grp-1"]');
+          const members = [...group.querySelectorAll('[data-recipe-option]')];
+          return {
+            fromAdders: kindsOf([
+              ...group.querySelectorAll('.manager-recipe-requirement-adds [data-recipe-add]'),
+            ]),
+            members: members.length,
+            converting: members.filter((row) =>
+              row.querySelector('.manager-recipe-or-trigger, .fabricate-action-menu')
+            ).length,
+          };
+        }
+      );
+      assert.deepEqual(fromMenu, expected, `the menu's kinds for ${named}`);
+      assert.deepEqual(box.fromAdders, fromMenu, `both triggers offer one list for ${named}`);
+      // No member row converts: the box's adders are its only way to add an alternative.
+      assert.equal(box.members, 2);
+      assert.equal(box.converting, 0, 'no member row renders the convert control');
+    }
+  });
+
+  it('choosing a kind moves focus to the new alternative’s name field', async () => {
+    // The box replaces the row whose trigger focus would return to, so the patch is fed back as the
+    // parent does and focus is read off the row it creates.
+    const NAME_FIELD = {
+      'alternative-component': '[data-recipe-option-search]',
+      'alternative-tag': '[data-recipe-add-tag]',
+    };
+    for (const [token, field] of Object.entries(NAME_FIELD)) {
+      const { target, patches } = await mountSingleGroup(
+        [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+        { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+      );
+      try {
+        await pickOrOption(target, 'grp-1', token);
+        const { ingredientSets } = patches.at(-1);
+        await editHarness.setProps({ recipe: { ...RECIPE, ingredientSets } });
+        await flushRender();
+        const group = target.querySelector('[data-recipe-group-id="grp-1"]');
+        const rows = [...group.querySelectorAll('[data-recipe-option]')];
+        assert.equal(rows.length, 2, `${token} turns the row into the box`);
+        const expected = rows[1].querySelector(field);
+        assert.ok(Boolean(expected), `the new row draws ${field}`);
+        assert.ok(document.activeElement === expected, `focus lands on the ${token} row's name field`);
+      } finally {
+        editHarness.remount();
+      }
+    }
   });
 
   it('drops the cost and essence box buttons when the system configures neither', async () => {
@@ -4055,9 +4162,9 @@ describe('RecipeEditView (mounted)', () => {
       null,
       'no ARIA option-group headings — the menu is a single flat list'
     );
-    const listbox = document.querySelector('.manager-recipe-or-popover [role="listbox"]');
+    const menu = document.querySelector('.manager-recipe-or-menu [role="menu"]');
     assert.deepEqual(
-      [...listbox.querySelectorAll('[data-recipe-add]')].map((option) =>
+      [...menu.querySelectorAll('[data-recipe-add]')].map((option) =>
         option.getAttribute('data-recipe-add')
       ),
       ['alternative-component', 'alternative-tag', 'alternative-essence', 'alternative-currency'],
@@ -4066,7 +4173,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('gives the "or..." trigger, dialog and search a NEUTRAL accessible name', async () => {
+  it('gives the "or..." trigger and its menu a NEUTRAL accessible name', async () => {
     const { target } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       {
@@ -4089,15 +4196,15 @@ describe('RecipeEditView (mounted)', () => {
     );
 
     await openOrMenu(target, 'grp-1');
-    const dialog = target.querySelector('.manager-travel-popover[role="dialog"]');
-    assert.equal(dialog.getAttribute('aria-label'), NEUTRAL);
-    assert.equal(dialog.querySelector('[role="listbox"]').getAttribute('aria-label'), NEUTRAL);
-    // The row-level "or..." popover drops the search box entirely (issue 643).
+    const panel = document.querySelector('.manager-recipe-or-menu');
+    const menu = panel.querySelector('[role="menu"]');
     assert.equal(
-      dialog.querySelector('input[type="text"]'),
-      null,
-      'the search-less row popover renders no search input'
+      document.querySelector(`[id="${menu.getAttribute('aria-labelledby')}"]`)?.textContent.trim(),
+      NEUTRAL,
+      'the menu is named by its own heading'
     );
+    // The row-level "or..." menu has no search box (issue 643).
+    assert.ok(!panel.querySelector('input'), 'the menu renders no search input');
     editHarness.remount();
   });
 
@@ -4125,33 +4232,27 @@ describe('RecipeEditView (mounted)', () => {
     closeSelectPanel(target, KIND_TRIGGER);
 
     await openOrMenu(target, 'grp-1');
-    const popover = document.querySelector('.manager-recipe-or-popover');
+    const popover = document.querySelector('.manager-recipe-or-menu');
     assert.ok(Boolean(popover), 'the "or..." menu is open');
 
     // THE HEADER (`proto:2293`). It is what makes a one-word entry legible.
-    const heading = popover.querySelector('[data-popover-header] .manager-travel-popover-title');
+    const heading = popover.querySelector('.manager-action-menu-heading');
     assert.ok(Boolean(heading), 'the panel carries the eyebrow that names what choosing does');
     assert.equal(heading.textContent.trim(), 'Accept instead');
 
-    const entries = [...popover.querySelectorAll('[role="listbox"] [data-recipe-add]')];
+    const entries = [...popover.querySelectorAll('[role="menu"] [data-recipe-add]')];
     assert.deepEqual(
-      entries.map((entry) => entry.querySelector('.manager-travel-option-name').textContent.trim()),
+      entries.map((entry) => entry.querySelector('span').textContent.trim()),
       kindWords,
       'every entry is the bare kind name the row select uses, in the same order'
     );
 
-    // THE TINT, TAKEN FROM THE ROW'S OWN MARK rather than from a second table. The class the
-    // glyph carries IS `styles/fabricate.css`'s per-kind ink rule, so the menu cannot drift
-    // from the plate and the chosen chip beside it; `manager-layout.test.js` measures the four
-    // colours it resolves to in a real cascade.
-    const marks = entries.map((entry) => entry.querySelector('i').className);
-    for (const mark of marks) {
-      assert.ok(
-        mark.includes('manager-recipe-option-mark'),
-        `an entry glyph carries the row's own tinted-mark class (got \`${mark}\`)`
-      );
-    }
-    const tones = marks.map((mark) => mark.match(/\bis-[a-z]+\b/)?.[0] || '');
+    // THE TINT, carried by each item's `tone`. The class is a selector of the sheet's per-kind
+    // ink rule, the one that inks the row's plate and chosen chip, so the menu cannot drift from
+    // them; `manager-layout.test.js` measures the four colours it resolves to in a real cascade.
+    const tones = entries.map(
+      (entry) => [...entry.classList].find((name) => /^is-[a-z]+$/.test(name)) || ''
+    );
     assert.deepEqual(
       tones,
       ['is-component', 'is-tag', 'is-essence', 'is-currency'],

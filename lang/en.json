@@ -3047,7 +3047,6 @@
           "AltCurrency": "alt currency",
           "OrTrigger": "or…",
           "OrTriggerHint": "Accept another kind of ingredient in place of this one.",
-          "OrSearchPlaceholder": "Search options...",
           "AcceptInstead": "Accept instead",
           "PickComponent": "Pick component",
           "ComponentSearchPlaceholder": "Search components...",

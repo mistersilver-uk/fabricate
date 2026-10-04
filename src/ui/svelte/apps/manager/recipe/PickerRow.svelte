@@ -12,20 +12,21 @@
   | `kinds` | match types | all four | What the kind select offers; the row's own kind is always listed too. |
   | `catalogue` | `{ [kind]: [{ id, label, icon, img, offered }] }` | `{}` | Suggestions list the entries whose `offered` is not `false`; the named pill resolves `value.id` against all of them. `catalogue.tags` is the tag picker's vocabulary. |
   | `readonlyKinds` | match types | `[]` | Kinds drawn on the read-only face. Only `currency` has one, for a system whose currency feature is off. |
-  | `disabled` | boolean | `false` | Forwarded to every control the row draws. The `convert` and `trailing` snippets are the caller's own. |
+  | `disabled` | boolean | `false` | Forwarded to every control the row draws. The `trailing` snippet is the caller's own. |
   | `invalid` | `{ amount?: string }` | `{}` | Marks the amount control invalid and describes it with the message. |
   | `amount` | `false` \| `{ min, max, unit, inputProps, ariaLabel, … }` | `{}` | `false` draws no amount; the object's keys, which carry the amount slot's localized copy, are stated in `PickerRowAmount.svelte`. |
   | `rollable` / `removable` | booleans | `false` / `true` | The Fixed \| Rolled toggle on a `component` row; and the remove button. |
+  | `allowAny` | boolean | `false` | The `or…` kind menu, `PickerRowKindMenu.svelte`, after the amount and a divider, offering `kinds`. |
   | `clearable` / `removeHook` | boolean / string | `true` / `'alternative'` | The named pill's clear; and the remove's `data-recipe-remove` value. The remove is `Remove {name}` and the kind select `Kind of {name}`, `{name}` being the subject's or, unnamed, the kind's. |
   | `nameProps` / `removeProps` | attribute objects | `{}` | A caller's own hooks on the name field and on the remove, spread before the row's own. |
 
   Snippets:
-  - `convert` — the requirement's "or…" control, after the amount and a divider.
   - `trailing` — the caller's own controls, before the remove button.
 
   Callbacks:
   - `onChange(value)` — the whole next `value`; the caller merges it with `fromValue(entry, value)`.
   - `onRemove()` — the remove button was pressed.
+  - `onSelect(kind)` — a kind was chosen from the `or…` menu.
 
   Rest spread:
   - `{...rest}` lands on the root `<div>`, written after `class={…}` and `data-recipe-option`.
@@ -52,6 +53,7 @@
   import Select from '../../../components/Select.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import PickerRowAmount from './PickerRowAmount.svelte';
+  import PickerRowKindMenu from './PickerRowKindMenu.svelte';
   // The ONE kind table: the plate's glyph and tint and the kind select's four words are read from
   // it rather than restated here.
   import { KIND_ORDER, isKnownKind, kindMeta } from './pickerRowKinds.js';
@@ -81,10 +83,11 @@
     nameProps = {},
     removeProps = {},
     class: className = '',
-    convert = null,
+    allowAny = false,
     trailing = null,
     onChange = () => {},
     onRemove = () => {},
+    onSelect = () => {},
     ...rest
   } = $props();
 
@@ -480,9 +483,9 @@
       />
     {/if}
 
-    {#if convert}
+    {#if allowAny}
       <span class="manager-recipe-option-divider" aria-hidden="true"></span>
-      {@render convert()}
+      <PickerRowKindMenu {kinds} {disabled} {onSelect} />
     {/if}
 
     <!-- One line, so a row with no `trailing` gains no text node. -->
