@@ -162,7 +162,7 @@ test('1773 V&A 16: a group signs its settings and alternatives, and never as an 
   assert.notEqual(sign(group()), sign({ componentId: 'gem', quantity: 2 }));
   assert.notEqual(sign(group()), sign(group({ chooser: 'rolled' })), 'the chooser signs');
   assert.notEqual(sign(group()), sign(group({ awardStrategy: 'upTo', awardCount: 2 })));
-  const swapped = group({ alternatives: [...group().alternatives].reverse() });
+  const swapped = group({ alternatives: group().alternatives.toReversed() });
   assert.equal(sign(group()), sign(swapped), 'alternative order does not sign');
   assert.notEqual(
     sign(group()),

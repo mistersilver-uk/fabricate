@@ -7,8 +7,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { serializedOperationResult } from '../src/systems/journalRunReply.js';
 import { createJournalRunCommandService } from '../src/systems/journalRunCommands.js';
+import { serializedOperationResult } from '../src/systems/journalRunReply.js';
 
 import { coin, craftWithGroup, lore, pickGroup } from './helpers/choiceGroupWorld.js';
 

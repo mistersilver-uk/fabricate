@@ -55,20 +55,20 @@ import {
   recordedNumber,
   taskCountNeed,
 } from './journalCheckText.js';
-import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
+import { taughtNameReader } from './resultOutputRows.js';
 import {
   awardChoiceFields,
   awardHeldAvailability,
   inFlightAwardJournal,
   stepAwardEvidence,
 } from './runAwardChoiceProjection.js';
+import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
 import {
   ingredientNeed,
   ingredientOptionName,
   ingredientOverrideIndex,
   selectedIngredientIndex,
 } from './runJournalIngredientOptions.js';
-import { taughtNameReader } from './resultOutputRows.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';

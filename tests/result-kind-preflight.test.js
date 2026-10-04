@@ -212,7 +212,8 @@ test('1773 V&A 5 control: a rolled group credits the member its selection roll d
 /** A group whose chooser is the player, in the success set or the failure-role set alone. */
 const PLAYER_CHOOSER_WORLDS = Object.freeze({
   'the success set': () => rewardWorld({ results: [playerCoins] }),
-  'the failure-role set alone': () => rewardWorld({ results: [COIN], failureResults: [playerCoins] }),
+  'the failure-role set alone': () =>
+    rewardWorld({ results: [COIN], failureResults: [playerCoins] }),
 });
 
 for (const [where, build] of Object.entries(PLAYER_CHOOSER_WORLDS)) {
@@ -224,7 +225,11 @@ for (const [where, build] of Object.entries(PLAYER_CHOOSER_WORLDS)) {
       assert.match(result.message, /the player chooses is awarded only through the Journal/);
       assert.equal(wood(world), 5, 'the wood is all still there');
       assert.equal(world.crafter.updates.length, 0, 'nothing was credited or granted');
-      assert.equal(versionedRefusal(world), null, 'the versioned start, which can settle it, begins');
+      assert.equal(
+        versionedRefusal(world),
+        null,
+        'the versioned start, which can settle it, begins'
+      );
     });
   });
 }

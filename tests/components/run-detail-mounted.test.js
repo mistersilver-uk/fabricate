@@ -1958,7 +1958,7 @@ describe('RunDetail award face (issue 1773)', () => {
       run: owedRun({ blocker: 'notOwner' }),
       journal: settlingJournal(null),
     });
-    assert.ok(Boolean(target.querySelector('[data-award-alternative="gem"] [role="img"]')));
+    assert.ok(Boolean(target.querySelector(':scope [data-award-alternative="gem"] [role="img"]')));
     assert.ok(!tile(target, 'gem'), 'no pressable tile');
     assert.ok(!confirmButton(target), 'no confirm');
     assert.match(target.querySelector('[data-award-blocker]').textContent, /AwardChoice\.ReadOnly/);

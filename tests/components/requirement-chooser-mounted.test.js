@@ -448,9 +448,11 @@ describe('RequirementChooser award face (issue 1773)', () => {
     const chosen = [];
     const target = await harness.mount({
       slots: [AWARD],
-      onChoose: (_slot, alternative) => chosen.push(alternative.id),
+      onChoose: (_slot, alternative) => {
+        chosen.push(alternative.id);
+      },
     });
-    const tonic = target.querySelector('[data-requirement-alternative="tonic"] button');
+    const tonic = target.querySelector(':scope [data-requirement-alternative="tonic"] button');
     assert.equal(tonic.disabled, true);
     tonic.click();
     assert.deepEqual(chosen, [], 'a disabled tile fires no choice');
@@ -460,7 +462,7 @@ describe('RequirementChooser award face (issue 1773)', () => {
     assert.equal(status.textContent.trim(), AWARD.status);
     const describedBy = tonic.getAttribute('aria-describedby').split(' ');
     assert.ok(describedBy.includes(reason.id) && describedBy.includes(status.id));
-    target.querySelector('[data-requirement-alternative="gem"] button').click();
+    target.querySelector(':scope [data-requirement-alternative="gem"] button').click();
     assert.deepEqual(chosen, ['gem'], 'an open tile still chooses');
   });
 
@@ -469,9 +471,11 @@ describe('RequirementChooser award face (issue 1773)', () => {
     const target = await harness.mount({
       slots: [CHOICE, AWARD],
       openSlotId: 'g-haft',
-      onChoose: (_slot, alternative) => chosen.push(alternative.id),
+      onChoose: (_slot, alternative) => {
+        chosen.push(alternative.id);
+      },
     });
-    const bog = target.querySelector('[data-requirement-alternative="bog"] button');
+    const bog = target.querySelector(':scope [data-requirement-alternative="bog"] button');
     assert.equal(bog.disabled, false, 'short is dimmed, never disabled');
     bog.click();
     assert.deepEqual(chosen, ['bog']);
@@ -479,8 +483,8 @@ describe('RequirementChooser award face (issue 1773)', () => {
 
   it('draws read-only award tiles as labelled images', async () => {
     const target = await harness.mount({ slots: [AWARD], readOnly: true });
-    assert.equal(target.querySelectorAll('[data-slot-kind="award"] button').length, 0);
-    const gem = target.querySelector('[data-requirement-alternative="gem"] [role="img"]');
+    assert.equal(target.querySelectorAll(':scope [data-slot-kind="award"] button').length, 0);
+    const gem = target.querySelector(':scope [data-requirement-alternative="gem"] [role="img"]');
     assert.equal(gem.getAttribute('aria-label'), 'Gem, ×2');
   });
 });

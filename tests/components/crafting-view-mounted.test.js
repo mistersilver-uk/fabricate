@@ -124,7 +124,11 @@ describe('CraftingView mounted behavior', () => {
       lastRollResult: { 'recipe-1': { success: true, runId: 'run-7', awardChoicePending: true } },
     });
     const target = await harness.mount({
-      services: services(store, { navigateToJournalRun: (runId) => opened.push(runId) }),
+      services: services(store, {
+        navigateToJournalRun: (runId) => {
+          opened.push(runId);
+        },
+      }),
     });
     const notice = target.querySelector('[data-crafting-award-pending]');
     assert.match(notice.textContent, /Crafting\.Run\.AwardPending/);
