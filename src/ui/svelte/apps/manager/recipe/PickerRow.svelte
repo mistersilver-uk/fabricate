@@ -240,6 +240,10 @@
   const kindLabel = $derived(
     forSubject('FABRICATE.Admin.Manager.Recipe.KindFor', 'Kind of {name}')
   );
+  const searchTagsWord = localizeOr(
+    'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
+    'Search tags...'
+  );
 
   // The SAME two strings the policy word above reads, so the control and the sentence it writes
   // can never disagree.
@@ -324,14 +328,8 @@
         ariaLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
         triggerTitle={localizeOr('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
         panelLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-        searchPlaceholder={localizeOr(
-          'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
-          'Search tags...'
-        )}
-        searchLabel={localizeOr(
-          'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
-          'Search tags...'
-        )}
+        searchPlaceholder={searchTagsWord}
+        searchLabel={searchTagsWord}
         emptyHint={localizeOr('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
         showChevron={false}
         {disabled}
