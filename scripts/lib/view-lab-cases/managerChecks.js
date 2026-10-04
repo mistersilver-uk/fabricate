@@ -289,7 +289,7 @@ const overFixed = (dc) => [
 ];
 const triggerPreset = (preset) => [
   { selector: '#checks-section-triggers' },
-  { selector: `[data-rule-row-preset="${preset}"]` },
+  { selector: `[data-check-trigger-presets] [data-rule-row-preset="${preset}"]` },
 ];
 /** Two fixed ranges, Spoiled 1–20 and Sound 21–30, typed onto Runework's fresh fixed list. */
 const FIXED_RANGES = Object.freeze([
@@ -2206,11 +2206,11 @@ export const CASES = Object.freeze([
     frame: '15',
     steps: [
       { selector: '#checks-section-triggers' },
-      { selector: '[data-rule-row-preset="botch"]' },
+      { selector: '[data-check-trigger-presets] [data-rule-row-preset="botch"]' },
     ],
     expectSelector:
-      '.fabricate-manager:has([data-rule-row-preset="low"])' +
-      ':not(:has([data-rule-row-preset="high"]))' +
+      '.fabricate-manager:has([data-check-trigger-presets] [data-rule-row-preset="low"])' +
+      ':not(:has([data-check-trigger-presets] [data-rule-row-preset="high"]))' +
       ' [data-trigger] [data-rule-row-title]:has-text("Net successes")',
   }),
   authoringCase({

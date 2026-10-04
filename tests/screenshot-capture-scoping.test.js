@@ -1906,6 +1906,8 @@ const CHECK_TRIGGERS_SRC = readFileSync(
   'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
   'utf8',
 );
+// Each trigger is a `RuleRow`, which emits the remove hook the walk clicks (issue 1782).
+const TRIGGER_ROW_SRC = `${CHECK_TRIGGERS_SRC}\n${readFileSync('src/ui/svelte/components/RuleRow.svelte', 'utf8')}`;
 
 test('the Phase D0 tier-step walk drives hooks the trigger component still emits', () => {
   // Lint and Prettier cannot see a selector drift in the smoke walk, so this file is the
@@ -1916,25 +1918,31 @@ test('the Phase D0 tier-step walk drives hooks the trigger component still emits
   // BOTH sides are asserted, not just the harness: a harness-only pin stays green
   // through a rename in the component, which is exactly the drift that would surface as
   // a post-merge beta smoke break rather than a red PR.
-  for (const hook of [
-    'data-trigger-tier-step',
-    'data-trigger-tier-step-steps',
-    'data-trigger-tier-step-target',
-    'data-triggers-empty',
-  ]) {
-    assert.ok(HARNESS.includes(hook), `the Phase D0 walk no longer drives [${hook}]`);
-    assert.ok(
-      CHECK_TRIGGERS_SRC.includes(hook),
-      `CheckTriggers.svelte no longer emits [${hook}], so the walk points at nothing`,
-    );
-  }
-
+  //
+  // The walk AUTHORS a trigger, so it must remove it again: a left-behind trigger dirties the
+  // Checks draft and the next navigation raises a discard prompt mid-phase. Its remove selector
+  // pairs the row hook `CheckTriggers` stamps with the part hook `RuleRow` emits.
+  //
   // The mode segments are stamped by `SegmentedControl`'s `optionDataAttr`, so the
   // attribute NAME and the option VALUE are authored apart and only the harness pairs
   // them into one selector — which is the pairing that can rot silently.
-  assert.ok(HARNESS.includes('[data-trigger-tier-step-mode="up"]'), 'the up segment');
-  assert.ok(HARNESS.includes('[data-trigger-tier-step-mode="target"]'), 'the target segment');
-  assert.match(CHECK_TRIGGERS_SRC, /optionDataAttr="data-trigger-tier-step-mode"/);
+  for (const [walked, emitted] of [
+    ['data-trigger-tier-step', 'data-trigger-tier-step'],
+    ['data-trigger-tier-step-steps', 'data-trigger-tier-step-steps'],
+    ['data-trigger-tier-step-target', 'data-trigger-tier-step-target'],
+    ['data-triggers-empty', 'data-triggers-empty'],
+    ['[data-add-trigger]', 'data-add-trigger'],
+    ['[data-trigger] [data-rule-row-remove]', 'data-trigger={'],
+    ['[data-trigger] [data-rule-row-remove]', 'data-rule-row-remove=""'],
+    ['[data-trigger-tier-step-mode="up"]', 'optionDataAttr="data-trigger-tier-step-mode"'],
+    ['[data-trigger-tier-step-mode="target"]', 'optionDataAttr="data-trigger-tier-step-mode"'],
+  ]) {
+    assert.ok(HARNESS.includes(walked), `the Phase D0 walk no longer drives ${walked}`);
+    assert.ok(
+      TRIGGER_ROW_SRC.includes(emitted),
+      `the trigger rows no longer emit ${emitted}, so the walk points at nothing`,
+    );
+  }
   const tierStepModes = CHECK_TRIGGERS_SRC.match(/const TIER_STEP_MODES = \[[\s\S]*?\n {2}\];/)?.[0];
   assert.ok(tierStepModes, 'the TIER_STEP_MODES declaration was not found');
   for (const mode of ['up', 'target']) {
@@ -1943,14 +1951,6 @@ test('the Phase D0 tier-step walk drives hooks the trigger component still emits
       `TIER_STEP_MODES no longer offers a '${mode}' segment for the walk to click`,
     );
   }
-
-  // The walk AUTHORS a trigger, so it must remove it again: a left-behind trigger
-  // dirties the Checks draft and the next navigation raises a discard prompt mid-phase.
-  assert.ok(HARNESS.includes('[data-add-trigger]'), 'the walk must add a trigger');
-  assert.ok(
-    HARNESS.includes('[data-trigger] [data-rule-row-remove]'),
-    'the walk must remove the trigger it authored',
-  );
 });
 
 // ── The shared fixtured-section lifecycle (issues #784 / 785) ──────────────────
