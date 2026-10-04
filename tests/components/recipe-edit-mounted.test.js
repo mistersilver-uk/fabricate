@@ -3991,7 +3991,7 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('the "or..." menu and the box adders offer the same kinds in the same order', async () => {
-    // design-system: the convert control and the group's adder state ONE subset in ONE order.
+    // design-system: the convert control and the group's adder state one subset in one order.
     // `ui-entity-editors` keeps the box's four `alt <kind>` adders, so the adders are the second
     // trigger; currency keeps its `cost` hook on the adder, so both read back as kinds.
     const KIND_OF = {
@@ -4001,45 +4001,97 @@ describe('RecipeEditView (mounted)', () => {
       'alternative-currency': 'currency',
       'alternative-cost': 'currency',
     };
-    const props = {
-      componentOptions: COMPONENT_OPTIONS,
-      itemTags: ITEM_TAGS,
-      currencyUnits: CURRENCY_UNITS,
-      essenceOptions: ESSENCE_OPTIONS,
-    };
+    const base = { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS };
+    const allDisabled = ESSENCE_OPTIONS.map((essence) => ({ ...essence, enabled: false }));
+    const cases = [
+      [
+        { ...base, currencyUnits: CURRENCY_UNITS, essenceOptions: ESSENCE_OPTIONS },
+        ['component', 'tags', 'essence', 'currency'],
+      ],
+      [base, ['component', 'tags']],
+      [{ ...base, currencyUnits: CURRENCY_UNITS, currencyEnabled: false }, ['component', 'tags']],
+      [{ ...base, essenceOptions: allDisabled }, ['component', 'tags', 'essence']],
+    ];
     const kindsOf = (nodes) => nodes.map((node) => KIND_OF[node.getAttribute('data-recipe-add')]);
 
-    const bare = await mountSingleGroup(
-      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
-      { props }
-    );
-    await openOrMenu(bare.target, 'grp-1');
-    const fromMenu = kindsOf([
-      ...document.querySelectorAll('.manager-recipe-or-menu [role="menuitem"]'),
-    ]);
-    editHarness.remount();
+    // Each mount is torn down even when an assertion fails, so a stale menu never reaches the next.
+    async function readMounted(options, props, read) {
+      const { target } = await mountSingleGroup(options, { props });
+      try {
+        return await read(target);
+      } finally {
+        editHarness.remount();
+      }
+    }
 
-    const box = await mountSingleGroup(
-      [
-        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
-        { quantity: 1, match: { type: 'tags', tags: ['herb'], tagMatch: 'any' } },
-      ],
-      { props }
-    );
-    const group = box.target.querySelector('[data-recipe-group-id="grp-1"]');
-    const fromAdders = kindsOf([
-      ...group.querySelectorAll('.manager-recipe-requirement-adds [data-recipe-add]'),
-    ]);
-    assert.deepEqual(fromMenu, ['component', 'tags', 'essence', 'currency']);
-    assert.deepEqual(fromAdders, fromMenu, 'both triggers offer one list');
-    // No member row converts: the box's adders are its only way to add an alternative.
-    const members = [...group.querySelectorAll('[data-recipe-option]')];
-    assert.equal(members.length, 2);
-    assert.ok(
-      members.every((row) => !row.querySelector('.manager-recipe-or-trigger, .fabricate-action-menu')),
-      'no member row renders the convert control'
-    );
-    editHarness.remount();
+    for (const [props, expected] of cases) {
+      const named = JSON.stringify(Object.keys(props));
+      const fromMenu = await readMounted(
+        [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+        props,
+        async (target) => {
+          await openOrMenu(target, 'grp-1');
+          return kindsOf([
+            ...document.querySelectorAll('.manager-recipe-or-menu [role="menuitem"]'),
+          ]);
+        }
+      );
+      const box = await readMounted(
+        [
+          { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+          { quantity: 1, match: { type: 'tags', tags: ['herb'], tagMatch: 'any' } },
+        ],
+        props,
+        (target) => {
+          const group = target.querySelector('[data-recipe-group-id="grp-1"]');
+          const members = [...group.querySelectorAll('[data-recipe-option]')];
+          return {
+            fromAdders: kindsOf([
+              ...group.querySelectorAll('.manager-recipe-requirement-adds [data-recipe-add]'),
+            ]),
+            members: members.length,
+            converting: members.filter((row) =>
+              row.querySelector('.manager-recipe-or-trigger, .fabricate-action-menu')
+            ).length,
+          };
+        }
+      );
+      assert.deepEqual(fromMenu, expected, `the menu's kinds for ${named}`);
+      assert.deepEqual(box.fromAdders, fromMenu, `both triggers offer one list for ${named}`);
+      // No member row converts: the box's adders are its only way to add an alternative.
+      assert.equal(box.members, 2);
+      assert.equal(box.converting, 0, 'no member row renders the convert control');
+    }
+  });
+
+  it('choosing a kind moves focus to the new alternative’s name field', async () => {
+    // The box replaces the row whose trigger focus would return to, so the patch is fed back as the
+    // parent does and focus is read off the row it creates.
+    const NAME_FIELD = {
+      'alternative-component': '[data-recipe-option-search]',
+      'alternative-tag': '[data-recipe-add-tag]',
+    };
+    for (const [token, field] of Object.entries(NAME_FIELD)) {
+      const { target, patches } = await mountSingleGroup(
+        [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+        { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
+      );
+      try {
+        await pickOrOption(target, 'grp-1', token);
+        const { ingredientSets } = patches.at(-1);
+        await editHarness.setProps({ recipe: { ...RECIPE, ingredientSets } });
+        await flushRender();
+        const rows = [
+          ...target.querySelectorAll('[data-recipe-group-id="grp-1"] [data-recipe-option]'),
+        ];
+        assert.equal(rows.length, 2, `${token} turns the row into the box`);
+        const expected = rows[1].querySelector(field);
+        assert.ok(Boolean(expected), `the new row draws ${field}`);
+        assert.ok(document.activeElement === expected, `focus lands on the ${token} row's name field`);
+      } finally {
+        editHarness.remount();
+      }
+    }
   });
 
   it('drops the cost and essence box buttons when the system configures neither', async () => {
