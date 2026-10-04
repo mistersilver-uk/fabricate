@@ -1,11 +1,11 @@
 <!--
   THE manager's editor tab strip: a `role="tablist"` of buttons, each optionally carrying one or more
-  MARKS, with the ARIA tablist keyboard pattern. Nine hand-rolled strips converged here.
+  MARKS, with the ARIA tablist keyboard pattern. Every converted hand-rolled strip renders it.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `tabs` / `activeTab` / `onSelect(tabId)` | `{ id, icon, labelKey, label }[]` / string / function | `[]` / `''` / no-op | The tabs in render order, where `labelKey` is looked up and `label` is the English fallback; the current tab; and the selection callback. The strip holds no state. |
+  | `tabs` / `activeTab` / `onSelect(tabId)` | `{ id, icon, labelKey, label }[]` / string / function | `[]` / `''` / no-op | The tabs in render order, where `labelKey` is looked up and `label` is the English fallback, and a tab with no `icon` draws no glyph; the current tab; and the selection callback. The strip holds no state. |
   | `badges` | per tab id: one mark, or an array of them | `{}` | A mark is a plain value, or `{ vehicle, label, tone, name, class, suppressZero }`. `tone` ∈ neutral/success/positive/warning/danger and applies to the CHIP; `name` is the accessible name, REQUIRED by any mark that renders no readable text; `class` is one modifier class appended to `badgeClass` on the chip only; `suppressZero` defaults true. A tab may carry more than one mark, because a section can be both authored and unready at once. |
   | `ariaLabelKey` / `ariaLabel` | strings | `''` | The strip's own accessible name. |
   | `idStem` / `buttonIdStem` / `panelIdStem` | strings | `'editor'` / `''` / `''` | `idStem` builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`; the other two override either half of that pair for a site whose ids do not share the `-tab-`/`-panel-` shape. |
@@ -183,7 +183,7 @@
       onclick={() => onSelect(tab.id)}
       onkeydown={(event) => onKeydown(event, index)}
     >
-      <i class={tab.icon} aria-hidden="true"></i>
+      {#if tab.icon}<i class={tab.icon} aria-hidden="true"></i>{/if}
       <span>{localizeOr(tab.labelKey, tab.label)}</span>
       {#each markList(tab) as mark, markIndex (`${tab.id}-${markIndex}`)}
         {#if mark.vehicle === 'count'}

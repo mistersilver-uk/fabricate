@@ -163,7 +163,7 @@ const EXCEPTIONS = Object.freeze([
     component: 'EditorTabs',
     name: REST,
     fault: NO_CLASS,
-    reason: 'the root class prop is `containerClass`, which nine converged sites already pass',
+    reason: 'the root class prop is `containerClass`, which its converged sites already pass',
   },
   {
     component: 'EmptyState',

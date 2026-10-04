@@ -141,6 +141,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-section-badged-and-dotted',
     'manager-environment-edit-events',
     'manager-knowledge-learned-lost-copy',
+    'interactables-browser-tasks',
   ]),
   // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([

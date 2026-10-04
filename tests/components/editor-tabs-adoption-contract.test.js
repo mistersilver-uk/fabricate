@@ -14,6 +14,8 @@ import {
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PRIMITIVE = 'src/ui/svelte/components/EditorTabs.svelte';
+/** Every Svelte component is walked (issue 1779), so a new hand-rolled strip reds wherever it lands. */
+const WALKED_DIRECTORY = 'src/ui/svelte/';
 const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
 /** The five player directories (issue 1518); none may write a raw tablist. */
 const PLAYER_DIRECTORIES = Object.freeze(
@@ -21,7 +23,6 @@ const PLAYER_DIRECTORIES = Object.freeze(
     (name) => `src/ui/svelte/apps/${name}/`
   )
 );
-const WALKED_DIRECTORIES = Object.freeze([MANAGER_DIRECTORY, ...PLAYER_DIRECTORIES]);
 
 /** EMPTY, and the empty array is the claim. */
 const RAW_BUTTON_ALLOWLIST = Object.freeze([]);
@@ -52,8 +53,7 @@ definePrimitiveAdoptionContract({
   primitive: PRIMITIVE,
   contractClass: 'manager-editor-tab-button',
   allowlist: RAW_BUTTON_ALLOWLIST,
-  // 12 call sites in 12 components, measured with `scripts/lib/componentImporters.js`. 7 is a
-  // real floor with headroom.
+  // Measured with `scripts/lib/componentImporters.js`; 7 is a real floor with headroom.
   callSiteFloor: 7,
   fileFloor: 7,
   detectorFixture: {
@@ -82,16 +82,14 @@ definePrimitiveAdoptionContract({
 });
 
 /**
- * Every raw element under a walked directory — plus the primitive itself — carrying
- * `role="tablist"`.
+ * Every raw element under the walked directory carrying `role="tablist"`.
  *
  * @returns {{file: string, element: string}[]} one entry per raw tablist element, with the tag
  */
 function rawTablistElements() {
   const found = [];
   for (const [file, source] of Object.entries(SOURCES)) {
-    const walked = WALKED_DIRECTORIES.some((directory) => file.startsWith(directory));
-    if (!walked && file !== PRIMITIVE) continue;
+    if (!file.startsWith(WALKED_DIRECTORY)) continue;
     walkTemplate(parse(source, { modern: true, filename: join(repoRoot, file) }).fragment, (node) => {
       if (node.type === 'Component') return;
       const role = (node.attributes ?? []).find(
@@ -112,19 +110,27 @@ function rawTablistElements() {
 }
 
 /** @returns {string[]} repo-relative paths, one entry per raw tablist element */
-function rawManagerTablists() {
+function rawTablists() {
   return rawTablistElements().map((entry) => entry.file);
 }
 
-/** The manager files that may still write a raw `role="tablist"`, and why. */
+/** The files that may still write a raw `role="tablist"`, in code-point order, and why. */
 const TABLIST_HOSTS = Object.freeze([
-  // In CODE-POINT order, matching the walk's own comparator. The order INVERTED at issue 1509:
+  // The player app's vertical nav rail: the library's `<AppRail>`, not a tab strip (issue 1779, E2).
+  'src/ui/svelte/apps/FabricateAppRoot.svelte',
+  // Conversion pending: it needs the strip capabilities issue 1779 adds in its second change.
   `${MANAGER_DIRECTORY}downtime/WorldDowntimeTabs.svelte`,
   // THE primitive. It is the one file that is supposed to write this.
   PRIMITIVE,
 ]);
 
-test('the manager tablist walk is alive, so the clause below is not vacuous', () => {
+test('the tablist walk is alive, so the clause below is not vacuous', () => {
+  const walkedFiles = Object.keys(SOURCES).filter((file) => file.startsWith(WALKED_DIRECTORY));
+  assert.ok(walkedFiles.length > 300, `the walk reached ${walkedFiles.length} files under ${WALKED_DIRECTORY}`);
+  assert.ok(
+    new Set(walkedFiles).has('src/ui/svelte/apps/InteractableBrowserRoot.svelte'),
+    'the walk reaches the top-level app roots, not only the manager and player directories'
+  );
   const managerFiles = Object.keys(SOURCES).filter((file) => file.startsWith(MANAGER_DIRECTORY));
   assert.ok(
     managerFiles.length > 50,
@@ -137,16 +143,16 @@ test('the manager tablist walk is alive, so the clause below is not vacuous', ()
   }
   // The walk must find the PRIMITIVE's own tablist. If it found nothing at all.
   assert.ok(
-    rawManagerTablists().includes(PRIMITIVE),
+    rawTablists().includes(PRIMITIVE),
     'the walk cannot see `EditorTabs` own `<div role="tablist">`, so it sees no tablist at all'
   );
 });
 
-test('no manager or converted player component outside the pinned set hand-rolls a role="tablist"', () => {
+test('no component outside the pinned set hand-rolls a role="tablist"', () => {
   assert.deepEqual(
-    [...new Set(rawManagerTablists())],
+    [...new Set(rawTablists())],
     [...TABLIST_HOSTS],
-    'a walked component writes a raw `role="tablist"`. That is a hand-rolled tab strip ' +
+    'a component writes a raw `role="tablist"`. That is a hand-rolled tab strip ' +
       'whatever classes it carries, which is why this clause keys on the ROLE and the class ' +
       'clause above cannot replace it. Render `<EditorTabs>`; a capability it lacks is a prop to ' +
       'add there, never a second strip. Removing an entry from the pinned list is the direction ' +
@@ -154,7 +160,7 @@ test('no manager or converted player component outside the pinned set hand-rolls
   );
 });
 
-test('every manager tablist element is a div, so no implicit landmark is overridden', () => {
+test('every tablist element is a div, so no implicit landmark is overridden', () => {
   // Preserved from `TagsCategoriesView`, which recorded it before issue 1429 moved its strip:
   const hosts = rawTablistElements().map((entry) => `${entry.file} <${entry.element}>`);
   assert.ok(
@@ -164,7 +170,7 @@ test('every manager tablist element is a div, so no implicit landmark is overrid
   assert.deepEqual(
     hosts.filter((host) => !host.endsWith('<div>')),
     [],
-    'a manager tablist is hosted on an element with an implicit landmark role. `role="tablist"` ' +
+    'a tablist is hosted on an element with an implicit landmark role. `role="tablist"` ' +
       'overrides it, which the Svelte compiler reports and which removes the landmark from the ' +
       'screen structure while looking identical.'
   );
