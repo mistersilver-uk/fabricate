@@ -176,7 +176,8 @@ const CONVERTED_BATCHES = Object.freeze([
       Object.freeze({ file: 'src/ui/svelte/apps/manager/AccessTabView.svelte', sites: 2 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/BooksScrollsView.svelte', sites: 2 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/KnowledgeView.svelte', sites: 2 }),
-      Object.freeze({ file: 'src/ui/svelte/apps/manager/SystemEditView.svelte', sites: 2 }),
+      // 2 -> 1 at issue 1522: the blocker's Open link left the product for the `Notice`'s action.
+      Object.freeze({ file: 'src/ui/svelte/apps/manager/SystemEditView.svelte', sites: 1 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/VocabularyPanel.svelte', sites: 2 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/checks/ChecksView.svelte', sites: 2 }),
       Object.freeze({
@@ -1097,8 +1098,9 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    120,
-    'the conversion is 120 sites, whether or not a given one has been converted yet'
+    119,
+    // 120 until issue 1522 moved the System blocker's link into its `Notice`'s own action.
+    'the conversion is 119 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,

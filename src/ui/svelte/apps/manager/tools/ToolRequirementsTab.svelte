@@ -244,7 +244,7 @@
   <!-- `Callout` is the manager's standing-statement primitive and already draws exactly this. -->
   {#if intro}
     <!-- NEUTRAL, per `openspec/specs/ui-visual-style/spec.md` → "Standing statements". -->
-    <Callout tone="neutral" text={intro} data-tool-requirements-intro />
+    <Callout tone="neutral" text={intro} data-tool-requirements-intro data-tab-heading />
   {/if}
 
   <ToolInheritCard

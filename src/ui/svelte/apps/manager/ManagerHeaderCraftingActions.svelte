@@ -38,7 +38,6 @@
     recipeItemDraft = null,
     recipeItemEditDirty = false,
     recipeItemEditSaving = false,
-    recipeItemSaveFailed = false,
     canSaveRecipeItemEdit = false,
     backToBooksScrolls = () => {},
     deleteRecipeItemFromEdit = () => {},
@@ -133,13 +132,6 @@
     ></i>
     <span>{text('FABRICATE.Admin.Manager.RecipeItem.Save', 'Save recipe item')}</span>
   </Button>
-  <!-- An attempted-and-failed save is announced beside the control the GM just clicked
-       (issue 919). -->
-  {#if recipeItemSaveFailed}
-    <p class="manager-header-save-error" role="alert" data-recipe-item-save-error>
-      {text('FABRICATE.Admin.Manager.RecipeItem.SaveFailed', 'Save failed. Try again.')}
-    </p>
-  {/if}
 {:else if currentView === 'components'}
   <!-- `+ Add from catalogue` (gap-list row 99, `proto:1046`). The control opens a picker and
        navigates nowhere — `proto:1046` binds `onAddFrom`, which at `proto:5545` sets

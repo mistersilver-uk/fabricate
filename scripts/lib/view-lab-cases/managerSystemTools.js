@@ -400,6 +400,28 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    // Issue 1522: a refused save routes to Validation, whose panel states it at its notice position.
+    id: 'manager-tool-editor-save-failed',
+    label: 'Manager — Tool rules editor save failed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { saveFails: '1' },
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-edit-rules]' },
+      { selector: '[data-tool-breakage-choice="limitedUses"]' },
+      { selector: '[data-tool-editor-save]' },
+    ],
+    expectView: 'tool-edit',
+    // The refused write's own toast, and the save-all guard's warning that rides the same press.
+    allowedConsoleErrors: [/The Tool could not be saved/, /assign a component to every tool first/],
+    expectSelector:
+      '[data-tool-editor-panel="validation"] > [data-notice-position] > [data-tool-save-error]',
+    expectCenterHit: '[data-notice-position] > [data-tool-save-error]',
+    kinds: ['manager', 'tools'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+  }),
+  managerCase({
     // The overview frame is gone because the overview tab is (issue 1373).
     id: 'manager-tool-parity-02-remove-1280x720',
     label: 'Manager — Tool parity 02 remove from system 1280x720',

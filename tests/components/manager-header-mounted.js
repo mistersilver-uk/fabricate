@@ -840,7 +840,6 @@ const HEADER_CENSUS = Object.freeze({
       "+ 2 button class=\"fabricate-button fab-manager-button is-primary\" data-keyboard-focus=\"true\" data-recipe-item-save=\"true\" type=\"button\"",
       "+ 3 i aria-hidden=\"true\" class=\"fas fa-save\"",
       "+ 3 span | Save recipe item",
-      "+ 2 p class=\"manager-header-save-error\" data-recipe-item-save-error=\"\" role=\"alert\" | Save failed. Try again.",
     ],
     "Component Rules, whose catalogue action is the 38px icon button": [
       "- 2 div class=\"manager-page-kicker\"",

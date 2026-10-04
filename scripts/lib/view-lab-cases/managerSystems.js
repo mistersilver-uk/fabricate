@@ -180,6 +180,20 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-system-edit-blocked',
+    label: 'Manager — System edit blocked',
+    // Issue 1522: the system blocker is a warning notice in the stacking region above the first card.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', systemBlocked: '1' },
+    steps: ['System Overview', { selector: '#system-tab-settings' }],
+    expectView: 'system-edit',
+    expectSelector: '[data-system-edit-blocker][data-notice-position="stack"]',
+    expectCenterHit: '[data-system-edit-blocker] [data-notice-action]',
+    kinds: ['manager', 'system-edit'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+  }),
+  managerCase({
     id: 'manager-system-edit-validation',
     label: 'Manager — System edit validation tab',
     // The validation tab, which had no frame at all (issue 1515).

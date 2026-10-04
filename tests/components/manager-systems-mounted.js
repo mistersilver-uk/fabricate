@@ -1446,7 +1446,7 @@ export function registerSystemsCases() {
     assert.ok(target.querySelector('[data-system-details-dirty]'), 'the form is dirty');
 
     // The blocker link routes through confirmRouteExit('system-edit').
-    target.querySelector('[data-system-edit-blocker-link]').click();
+    target.querySelector(':scope [data-system-edit-blocker] [data-notice-action]').click();
     await settle();
 
     assert.ok(
@@ -1613,21 +1613,13 @@ export function registerSystemsCases() {
   it("switches to the Validation tab when the Settings tab's blocker link is clicked", async () => {
     await mountSystemOverviewPage(overviewReport);
 
-    const blockerLink = target.querySelector('[data-system-edit-blocker-link]');
-    assert.ok(blockerLink, 'the blocker banner exposes an open-overview link');
-    // Audit row 8's forgotten role (issue 1118). This is a "go and look at that" link inside a
-    // callout that already carries the alarm — the triangle, the title and the body copy — and
-    // at the base `.fabricate-button` weight it competed with the sentence explaining it. Ghost
-    // is the ruling `component/ComponentEditorHeader.svelte` states for its own Back: a
-    // secondary verb beside something that outranks it.
-    assert.ok(
-      blockerLink.classList.contains('fab-manager-button'),
-      `the blocker link renders through the Button primitive, got ${blockerLink.className}`
-    );
-    assert.ok(
-      blockerLink.classList.contains('is-ghost'),
-      `the blocker link takes the ghost role, got ${blockerLink.className}`
-    );
+    // The blocker is a non-blocking warning Notice in the stacking region (issue 1522), and its
+    // open-overview link is the Notice's own action.
+    const blocker = target.querySelector('[data-system-edit-blocker]');
+    assert.ok(blocker?.matches('.fab-notice.is-warning[data-notice-position="stack"]'));
+    assert.equal(blocker.getAttribute('role'), 'status', 'a standing state, not an alert');
+    const blockerLink = blocker.querySelector('[data-notice-action]');
+    assert.equal(blockerLink?.textContent, 'Open system overview');
     const detailsSave = target.querySelector('[data-system-details-save]');
     assert.ok(Boolean(detailsSave), 'the Identity card renders its Save details submit');
     assert.ok(

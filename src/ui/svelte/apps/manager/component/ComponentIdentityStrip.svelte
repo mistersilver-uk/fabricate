@@ -65,6 +65,7 @@
 <section
   class="manager-component-identity-strip"
   data-component-edit-section="identity"
+  data-tab-heading
   aria-label={text('FABRICATE.Admin.Manager.Component.Identity.Label', 'Component identity')}
 >
   <!-- `Medallion` takes the size; the card rung's radius is stated on the card, not here. -->

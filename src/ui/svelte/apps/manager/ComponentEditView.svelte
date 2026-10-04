@@ -2,6 +2,7 @@
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
   import Callout from '../../components/Callout.svelte';
+  import Notice from '../../components/Notice.svelte';
   import EditorTabs from '../../components/EditorTabs.svelte';
   import EditorValidationSurface from '../../components/EditorValidationSurface.svelte';
   import WorldComponentEntryPreviewRail from './scoped/WorldComponentEntryPreviewRail.svelte';
@@ -1212,10 +1213,8 @@
     class="manager-component-edit-view manager-component-entry-column"
     onsubmit={handleSave}
   >
-    <!--
-      THE TWO-TAB STRIP lives INSIDE the form: the header's Save submits this element by id, so a
-      form mounted only on the rules tab would stop being submittable on the Validation tab.
-    -->
+    <!-- The tab strip lives inside the form: the header's Save submits it by id, so a form mounted
+         only on the rules tab would stop being submittable on the Validation tab. -->
     <EditorTabs
       {tabs}
       {activeTab}
@@ -1228,10 +1227,23 @@
       badgeDataAttr="data-component-edit-tab-badge"
     />
 
-    <!--
-      THE SCROLLING PANEL (M26): the strip stays put and the tab body scrolls under it, carrying the
-      inset. It is also the tab panel the strip's `aria-controls` names.
-    -->
+    <!-- The page notice position: a row of the column above the scroller, so it stays in view. -->
+    {#if saveFailed}
+      <div class="manager-component-entry-notices" data-notice-position="page">
+        <Notice
+          blocking
+          tone="danger"
+          title={text('FABRICATE.Admin.Manager.Component.SaveFailed', 'Save failed')}
+          detail={text(
+            'FABRICATE.Admin.Manager.Component.SaveFailedDetail',
+            'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+          )}
+        />
+      </div>
+    {/if}
+
+    <!-- The scrolling panel (M26): the tab body scrolls under the strip, carrying the inset, and is
+         the tab panel the strip's `aria-controls` names. -->
     <div
       class="manager-component-entry-panel"
       data-component-edit-panel={activeTab}
@@ -1242,10 +1254,7 @@
       data-keyboard-focus="true"
     >
       {#if activeTab === 'rules'}
-        <!--
-        ONE IDENTITY CALLOUT; the source Item is authored on the world entry rather than here. See
-        `ComponentIdentityStrip`'s own header for why both smoke hooks survive.
-      -->
+        <!-- The rules tab's heading block; see `ComponentIdentityStrip` for its two smoke hooks. -->
         <ComponentIdentityStrip
           {component}
           {saving}
@@ -2205,15 +2214,6 @@
             complicationsDraft = next;
           }}
         />
-
-        {#if saveFailed}
-          <p class="manager-muted manager-form-warning">
-            {text(
-              'FABRICATE.Admin.Manager.Component.SaveFailed',
-              'Save failed. Try again or refresh the manager.'
-            )}
-          </p>
-        {/if}
       {:else}
         <!--
         THE VALIDATION TAB: the same `EditorValidationSurface` shape the world entry's draws. Its
