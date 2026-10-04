@@ -375,7 +375,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
           <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
         </div>
         <span class="manager-recipe-option-divider"></span>
-        <div class="fabricate-action-menu manager-action-menu"><button type="button" class="manager-recipe-or-trigger"><i class="fa-solid fa-code-branch"></i><span>or…</span></button></div>
+        <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger"><i class="fa-solid fa-code-branch"></i><span>or…</span></button></div>
         <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
       </div>`;
 
@@ -1351,7 +1351,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="fabricate-action-menu manager-action-menu">
+            <div class="fabricate-action-menu">
               <button type="button" class="manager-recipe-or-trigger" data-or-trigger>
                 <i class="fa-solid fa-code-branch"></i><span>or…</span>
               </button>
