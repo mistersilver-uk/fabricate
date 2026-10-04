@@ -943,10 +943,11 @@ test('manager environments browser and edit route define compact responsive geom
     !css.includes('--fab-env-comp-grid-ranked'),
     'the ranked grid variable is retired with the row variant that read it'
   );
+  // Issue 1522 put the row disclosure in that cluster: badge, gap and chevron, then the grip.
   assert.ok(
-    compBlock.includes('--fab-env-comp-lead: 22px;') &&
-      compBlock.includes('--fab-env-comp-lead-ranked: 58px;'),
-    "the strip's lead track is declared from the list's own badge, grip and gap"
+    compBlock.includes('--fab-env-comp-lead: 58px;') &&
+      compBlock.includes('--fab-env-comp-lead-ranked: 94px;'),
+    "the strip's lead track is declared from the list's own badge, disclosure, grip and gap"
   );
   assert.ok(
     blockFor('.fabricate-manager .manager-environment-comp-head').includes(

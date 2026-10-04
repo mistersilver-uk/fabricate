@@ -12,18 +12,18 @@
 
   const label = $derived(
     active
-      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OverrideOn', 'On')
-      : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OverrideOff', 'Off')
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OverrideOn', 'Adjusted')
+      : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OverrideOff', 'Default')
   );
   const title = $derived(
     active
       ? text(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OverrideOnTitle',
-          'Drop rate adjustment on'
+          'Drop rates adjusted in this environment'
         )
       : text(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OverrideOffTitle',
-          'Drop rate adjustment off'
+          'Default drop rates'
         )
   );
 </script>
