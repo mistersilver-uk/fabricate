@@ -66,7 +66,6 @@ A group's N resolves once, when the group is awarded, through the same roll seam
 A rolled group rolls its `selectionFormula` once for each alternative it draws, against the crafting character, never reusing the check the craft already made, and reads each roll off its alternatives' ranges as an ordered ladder.
 Without repeats each later roll reads only the alternatives not yet awarded; with repeats N is exact.
 A group whose chooser is the player awards nothing when the stage resolves: it persists a pending award choice that the player settles once, and the unversioned award paths refuse a recipe carrying one before anything is consumed.
-Until the settle command ships (issue 1773), every craft entrance refuses a group whose chooser is the player the same way: the run's start, a later stage's start, and the execute of a stage already started.
 `progressive` carries no choice group, because it awards every ordered entry its roll affords (`data-models/spec.md` § Result, requirement 14).
 
 ### Scenario: A failure-role set awards its group
@@ -88,14 +87,9 @@ Until the settle command ships (issue 1773), every craft entrance refuses a grou
 
 ### Scenario: A group whose chooser is the player awards at the player's pick
 
-- **WHEN**, once the settle command ships (issue 1773), a versioned stage awards a group whose chooser is the player and whose N is at least one
+- **WHEN** a versioned stage awards a group whose chooser is the player and whose N is at least one
 - **THEN** the stage completes holding a pending award choice and awards nothing from the group until it is settled
 - **AND** an unversioned craft carrying such a group is refused before it consumes anything
-
-### Scenario: The player's choice is refused until it can be settled
-
-- **WHEN** any craft entrance meets a group whose chooser is the player before the settle command ships
-- **THEN** it is refused before anything is consumed
 
 ## Check Source
 

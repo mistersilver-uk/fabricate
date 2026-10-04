@@ -2,8 +2,7 @@
  * Issue 1773 PR3: a choice group through the real engine, run manager and serialized actor flags.
  * A rolled group awards its draws through each member's own kind path; a group whose chooser is the
  * player persists a pending choice that the award-choice lane settles once, on an active or
- * terminal run. These worlds lift the PR3 gate through `awardPlayerChoices`; the gate's own tests
- * leave it closed.
+ * terminal run. Since PR4 the versioned stages award it, and only the unversioned paths refuse it.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -58,10 +57,10 @@ function interrupt(manager, stopAt) {
 
 /**
  * A run whose stages `onSteps` award `group`, from the start unless `midRun`; `act` drives it after
- * the start and answers extras. `gate: 'closed'` leaves the PR3 gate as it ships.
+ * the start and answers extras.
  */
 function craftWithGroup(group, options = {}) {
-  const { stageCount = 1, script = {}, extremes = {}, act = null, gate = 'lifted' } = options;
+  const { stageCount = 1, script = {}, extremes = {}, act = null } = options;
   const { onSteps = [0], midRun = false, ...fixture } = options;
   const award = (steps) => {
     for (const index of onSteps) steps[index].resultGroups[0].results.push(group);
@@ -76,7 +75,6 @@ function craftWithGroup(group, options = {}) {
       game.fabricate.getRecipeVisibilityService().isLearnedKnowledgeObservable = () => true;
       Object.assign(globalThis, { Roll: dice.Roll });
       bindGrants(engine);
-      engine.awardPlayerChoices = gate !== 'closed';
       if (!midRun) award(steps);
     },
     drive: async ({ engine, actor, sources, gm, runId, manager, steps, system }) => {
@@ -461,10 +459,9 @@ test('1773 V&A 14: a resume after award-results persists the choice and awards n
   assert.equal(gp, 1);
 });
 
-test('1773 V&A 18: until the settle ships, a later stage refuses a player choice added mid-run', async () => {
+test('1773 V&A 18: a later stage begins with a player choice added mid-run', async () => {
   const { begun, record } = await craftWithGroup(pickGroup(), {
     stageCount: 2,
-    gate: 'closed',
     onSteps: [1],
     midRun: true,
     act: async ({ execute, begin }) => {
@@ -472,20 +469,15 @@ test('1773 V&A 18: until the settle ships, a later stage refuses a player choice
       return { begun: await begin() };
     },
   });
-  assert.equal(begun.success, false);
-  assert.match(begun.message, /the player chooses cannot be awarded yet/);
-  assert.ok(!record.steps[1].preparedConsumption, 'the stage did not start');
+  assert.equal(begun.success, true, begun.message);
+  assert.ok(record.steps[1].preparedConsumption, 'the stage started');
 });
 
-test('1773 V&A 18: until the settle ships, a started stage refuses a player choice added mid-run', async () => {
-  const { executed, record } = await craftWithGroup(pickGroup(), {
-    gate: 'closed',
-    midRun: true,
-  });
-  assert.equal(executed.success, false);
-  assert.match(executed.message, /the player chooses cannot be awarded yet/);
-  assert.equal(record.currentStepIndex, 0, 'the stage is still owed its resolution');
-  assert.ok(!record.steps[0].pendingAwardChoices, 'and no choice was written');
+test('1773 V&A 18: a started stage awards a player choice added mid-run as a pending choice', async () => {
+  const { executed, record } = await craftWithGroup(pickGroup(), { midRun: true });
+  assert.equal(executed.success, true, executed.message);
+  assert.equal(record.status, 'succeeded', 'the stage resolved');
+  assert.equal(record.steps[0].pendingAwardChoices.length, 1, 'and owes the pick');
 });
 
 test('1773 V&A 5: a started stage refuses a group formula that cannot total for the crafter', async () => {
