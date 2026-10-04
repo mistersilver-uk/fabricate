@@ -249,7 +249,8 @@ A tool's durable identity is stamped on its source Item as `Item.flags.fabricate
 > A `knowledge` result names a `recipeId` and teaches that recipe's knowledge to the crafting character, so it takes no amount.
 > Only a `currency` result carries `label` or `reason`, and only a `component` result runs a `propertyMacroUuid`.
 > `Result.validate()` reports a result whose fields do not fit its kind.
-> This release adds the data shape and the crafting engine's handling of it; the Manager does not yet author these kinds.
+> A GM authors these kinds on a recipe's Results tab with the **+ Result** menu; see [Result Kinds]({% link crafting/recipes/index.md %}#result-kinds-items-currency-and-recipe-knowledge).
+> A recipe's progressive stages and the gathering task editor can only author components.
 > Gathering and salvage results stay components: gathering refuses another kind, and salvage drops it.
 
 {: .note }

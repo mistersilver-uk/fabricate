@@ -155,6 +155,8 @@ A recipe's result can also pay out currency or teach a recipe's knowledge instea
 A currency result shows its amount with the unit's name, such as "2d6 gp" in a preview and the rolled amount once awarded.
 A knowledge result shows as **Recipe knowledge**, and once awarded the history states that the recipe was learned, or that it was already known.
 A recipe you are not entitled to see is named **Unknown recipe** rather than by its real name.
+A currency result shows the name the GM gave it, such as "Finder's fee", and the reason they wrote, in place of the unit's name.
+The GM sets these on the recipe's Results tab; see [Result Kinds]({% link crafting/recipes/index.md %}#result-kinds-items-currency-and-recipe-knowledge).
 
 ### Reading a closed run
 
