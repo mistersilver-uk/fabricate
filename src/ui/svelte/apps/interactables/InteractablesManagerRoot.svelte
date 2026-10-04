@@ -27,6 +27,7 @@
     pickDefaultSystemId,
   } from '../../util/systemDisambiguation.js';
   import Chip from '../../components/Chip.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import Field from '../../components/Field.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
@@ -448,12 +449,13 @@
     aria-label={text('FABRICATE.Canvas.Manage.ListLabel', 'Interactables on this scene')}
   >
     {#if rows.length === 0}
-      <p class="fab-im-empty">
-        {text(
+      <EmptyState
+        hint={text(
           'FABRICATE.Canvas.Manage.Empty',
           'No interactables on this scene yet. Promote a region above, or drag one from the Interactable browser.'
         )}
-      </p>
+        data-interactable-manager-empty=""
+      />
     {:else}
       <ul class="fab-im-list">
         {#each rows as row (row.ref.regionId + '.' + row.ref.behaviorId)}
@@ -614,12 +616,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
-  }
-
-  .fab-im-empty {
-    margin: 0;
-    color: var(--fab-text-muted);
-    font-size: 0.85rem;
   }
 
   .fab-im-list {

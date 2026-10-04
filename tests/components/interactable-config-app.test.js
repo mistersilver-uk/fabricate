@@ -751,13 +751,12 @@ describe('InteractableConfigRoot body', () => {
       writes: ['data-interactable-identity-section'],
       spells: ['FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle'],
       renders: ['Notice'],
-      passesValues: [
-        ['Notice', 'tone', 'warning'],
+      // The failed load is the panel's other notice (issue 1779), so the banner is located by its hook.
+      rendersTimes: [[{ at: 'Notice', where: ['data-interactable-needs-config', ''] }, 1]],
+      gives: [
+        { at: 'Notice', where: ['data-interactable-needs-config', ''], attribute: 'tone', is: 'warning' },
       ],
-      passesProps: [
-        ['Notice', 'title'],
-        ['Notice', 'data-interactable-needs-config'],
-      ],
+      passesProps: [['Notice', 'title']],
       // The section-wide accent box left with the banner; nothing puts the class back.
       writesNo: ['is-unconfigured'],
     }

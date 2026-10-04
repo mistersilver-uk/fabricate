@@ -352,12 +352,14 @@
 
 <div class="fabricate-interactable-config">
   {#if !view}
-    <p class="fab-ic-empty">
-      {text(
+    <Notice
+      tone="danger"
+      title={text(
         'FABRICATE.Canvas.Interactable.Config.Unavailable',
         'This interactable could not be loaded.'
       )}
-    </p>
+      data-interactable-config-unavailable=""
+    />
   {:else}
     <header class="fab-ic-header">
       <h2 class="fab-ic-title">
@@ -1116,12 +1118,6 @@
 
   .fab-ic-actions-inline {
     display: flex;
-  }
-
-  .fab-ic-empty {
-    margin: 0;
-    color: var(--fab-text-muted);
-    font-size: 0.9rem;
   }
 
   .fab-ic-node-hint {
