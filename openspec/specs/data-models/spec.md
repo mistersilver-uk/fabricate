@@ -875,6 +875,8 @@ type CurrencyConfig = {
    No RECIPE-KEYED affordance, spend, or refund path reads the configuration any other way, which is why relocating it changed no engine logic.
    The paths that are not recipe-keyed are the two published world-scoped members of requirements 10 to 14, the affordability check and the currency credit — and one of those two WRITES.
    Both read the world half alone through the same `getCurrencyConfig` seam and compose nothing.
+   A recipe's currency result is a recipe-keyed credit.
+   It composes the system's `requirements.currency.enabled` through `getCurrencyRequirementConfig` and then reuses the credit effect writer.
 9. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
    The difference is that an exported recipe's currency cost names a unit id that is unusable unless the unit arrives with it, whereas no exported record references a party.
 10. The published affordability check (`game.fabricate.checkAffordability`) and the published currency credit (`game.fabricate.creditCurrency`), both members of the companion contract — see `companion-api` — answer against the WORLD configuration ALONE and consult no crafting system's `requirements.currency.enabled` toggle.
@@ -3114,12 +3116,12 @@ Result = {
    The RESOLVED amount of a rolled result is a separate value, and only it may be zero.
    A zero resolved amount is an EMPTY AWARD: the result creates no item, and the award states the roll that produced nothing rather than omitting the result.
    Zero is the floor, so a negative total clamps to it.
-3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true.
+3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true, and only on a `component` result.
 4. `kind` is a closed set, and an absent `kind` IS `"component"`.
    Every result persisted before this change carries no `kind` and reads unchanged, so the discriminator is additive and needs no migration.
    An unrecognized `kind` is a misconfiguration rather than a new state, and is reported where an unknown resolution mode is.
-5. Where `kind` is `"currency"`, `unit` is required and is a configured world `CurrencyConfig.units[].id`; where it is `"knowledge"`, `recipeId` is required.
-   A `"knowledge"` result grants through `game.fabricate.grantRecipeKnowledge` rather than by writing an item.
+5. Where `kind` is `"currency"`, `unit` is required and is a configured world unit id; where it is `"knowledge"`, `recipeId` is required and names a recipe of the same crafting system, and `quantityFormula` is not valid.
+   A `"knowledge"` result grants through the knowledge grant `game.fabricate.grantRecipeKnowledge` is built on, never by writing an item, and an already-known recipe writes nothing.
 6. `label` and `reason` are valid only where `kind` is `"currency"`, and each is optional.
    An amount of a currency states a quantity and no meaning, which is what they exist to supply; a component, an essence and a piece of recipe knowledge each name a record whose own name is the label.
 7. A non-empty `quantityFormula` means the amount is ROLLED, and `quantity` is not the number awarded.
@@ -3154,12 +3156,13 @@ This section states only what is persisted.
 14. A choice group is NOT valid inside a `progressive` result group.
     Progressive awards every ordered entry whose difficulty the roll affords and normalizes a result's quantity to 1, so neither a chooser nor an award strategy has anything to mean there.
     A payload carrying one is a misconfiguration; the authoring surface does not offer it.
+    A non-component `kind` is not valid inside a `progressive` result group either.
 15. A `ResultGroup` whose `role` is `"failure"` MAY hold choice groups on the same terms as any other result group.
     The reserved role is a statement about ROUTING rather than about the shape of what the group holds.
 16. `Result.toJSON()` omits every key above whose value is the one the constructor rebuilds from absence, under the issue-1135 omission policy the `Ingredient` section states.
     `id`, `componentId` where the kind is a component, and `quantity` are never omitted.
     Absence is the pre-change on-disk state for all of them, so no reader gains a case it did not already have.
-17. The addition is LOSSLESS FORWARD and LOSSY BACKWARD: a payload written by an older build carries none of these keys and reads identically, while a downgrade drops a group's alternatives and settings rather than degrading them, and MUST say so at the point of downgrade.
+17. The addition is LOSSLESS FORWARD and LOSSY BACKWARD: a payload written by an older build carries none of these keys and reads identically, while a downgrade drops a group's alternatives and settings rather than degrading them, and the release's upgrade note says so, because an older build cannot.
 
 ## Versioned Run Lifecycle
 
@@ -3456,6 +3459,18 @@ CraftingRunStepState = {
     img?: string | null,  // captured at award time; absent on pre-capture historical records
   }>,
 
+  // What a `currency` and a `knowledge` result awarded (issue 1773); absent on a step written before
+  // it and on a step whose routed set held neither. `amount: 0` is an empty award with no write.
+  // `unitName` and `recipeName` are captured at award time, as `createdResults` names are.
+  currencyCredits?: Array<{
+    resultId: string, alternativeId?: string, unit: string, amount: number,
+    rolled?: { formula: string, total: number }, label?: string, reason?: string, unitName?: string,
+  }>,
+  knowledgeGrants?: Array<{
+    resultId: string, alternativeId?: string, recipeId: string,
+    outcome: "granted" | "alreadyKnown", recipeName?: string,
+  }>,
+
   failureReason?: string,
 }
 ```
@@ -3498,6 +3513,9 @@ CraftingRunStepState = {
    It is a **complete** map over every key in `resolvedEssences`, not only the disabled ones, because run persistence is a flag merge that cannot delete a key inside a surviving run and an omitted key would resurrect with its old value.
    An ABSENT map — a run armed before the field existed — reads as all-enabled.
    A collapsed multi-step chain has no such snapshot at all, because it consumes nothing when its single gate is armed and executes every step live at maturity; it therefore evaluates enabled-ness at maturity, consistent with its already-live essence resolution.
+9. `currencyCredits` and `knowledgeGrants` are each absent on a step written before issue 1773, and an older build ignores them.
+   They are written by the versioned `award-rewards` effect, which follows `award-results` and is planned only when the routed set holds a currency or knowledge result, and by the unversioned award paths right after their items.
+   A credit is written through the world strategy's own writer with the marker `{ runId, effectId: 'award-rewards', resultId, index }`, and an interrupted reward step is recovery-required and never replayed.
 
 #### Optional historical evidence
 
@@ -3595,7 +3613,8 @@ Requirements:
 3. `sourceItemUuid` should reference the matched owned recipe item used to learn.
    It is an actor-owned item uuid, so it dangles permanently once that copy is deleted, and it is written as `null` by BOTH of the paths that learn without a book: the craft-time auto-learn (alchemy `learnOnCraft`) and the knowledge grant of requirement 4.
    Two such writers rather than one is exactly what makes a null uuid insufficient on its own as a display discriminant, and is why a granted entry carries a flag of its own.
-4. `granted` and `grantedBy` are optional scalars written only by the companion contract's knowledge grant (see `companion-api` and `recipe-visibility`).
+4. `granted` and `grantedBy` are written by the knowledge grant and by a `knowledge` result's award (see `companion-api` and `recipe-visibility`).
+   The award's `grantedBy` is the awarding recipe's name, cut to 64 code points, because it names a record rather than a module and a cut name still names it.
    `granted` is written as `true` and is NEVER written `false`: an entry that was not granted OMITS the field, so its presence is the whole fact and no reader has to tell `false` from absent.
    `grantedBy` is the caller-supplied label for what did the granting — trimmed, at most 64 characters, and absent when the caller supplied none.
    The grant REFUSES a non-string, an over-long, or an object- or array-valued label rather than coercing or truncating it, and writes nothing in that case, because a truncated module id names a DIFFERENT module.

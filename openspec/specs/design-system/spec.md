@@ -1231,25 +1231,26 @@ There is no "result" kind and no "ingredient" kind: the row does not name which 
 The CONTEXT the row is rendered in decides which kinds its select offers, and that is the only difference between the two sides.
 
 The kind vocabulary is closed.
-Two of the six are NOT yet shipped in this repository and are marked as such, because a vocabulary that presents a planned kind as a live one sends an implementer looking for code that does not exist:
+One of the six is NOT yet shipped in this repository and is marked as such, because a vocabulary that presents a planned kind as a live one sends an implementer looking for code that does not exist:
 
 - `component` — both sides.
 - `currency` — both sides.
 - `activity` — a completed activity, both sides.
   NOT SHIPPED here; it exists in the premium companion and enters this repository only with the work that needs it.
 - `knowledge` — recipe knowledge, RESULT only.
-  NOT SHIPPED here.
 - `tag` — INGREDIENT only.
 - `essence` — INGREDIENT only.
 
 `tag` and `essence` are ingredient-only because each describes a CLASS of thing to consume rather than a record, and a craft cannot produce a class.
 `knowledge` is result-only because knowing a recipe is something a craft grants and never something it consumes.
 At the commit that promoted the row, the shipped ingredient side offered `component`, `currency`, `essence` and `tag`; the shipped result side offered `component` alone, as did gathering task results and salvage.
+As of issue 1773 a recipe's non-progressive result set offers `component`, `currency` where the system takes part in currency and world units exist, and `knowledge` where learned knowledge is observable; a progressive result set, gathering task results and salvage offer `component` alone.
 
 The row's kind maps to the persisted model in one module and nowhere else.
 On the ingredient side the kind IS `Ingredient.match.type`, the row's `tag` being the model's `tags`; the subject is `match.componentId`, `match.essenceId` or `match.unit`, and the amount is `match.amount` for `currency` and `essence` and `Ingredient.quantity` otherwise.
 On the result side the kind is `Result.kind`, an absent `kind` being `component` as `data-models` specifies, and the amount is `quantity` beside `quantityFormula`.
-The row reads a result's kind and never writes it, and an unrecognised kind is rendered as a misconfiguration rather than as a component.
+The result subject is `componentId`, `unit` or `recipeId` by kind.
+The row writes a result's kind through that one module when the GM picks a kind, clearing the previous kind's value, and an unrecognised kind is rendered as a misconfiguration rather than as a component.
 
 Every row leads with a kind-tinted chip, and the tint is what makes a list of eight rows scannable before any label is read.
 `tag` MUST take the purple family, because it is the one kind in the set that matches any item carrying a value rather than naming one record, and that abstraction is the distinction the reader most needs at a glance.
@@ -1293,7 +1294,8 @@ That menu lists the offered kinds for the row’s context, each with its kind ti
 
 The offered subset belongs to the SURFACE and not to the row, and the kind select, the convert menu and the set's adders MUST all state the same subset.
 A downtime activity awards what a patron can hand over, so it offers `component`, `currency` and `knowledge` — teaching a recipe is a reward a patron can give.
-A gathering task offers `component` and `currency` alone: it hands over material the character carried back, and neither recipe knowledge nor a completed activity is something a wilderness task produces.
+A gathering task offers `component`, and `currency` once gathering currency ships; until then it offers `component` alone.
+It hands over material the character carried back, and neither recipe knowledge nor a completed activity is something a wilderness task produces.
 A row that offers a kind its surface cannot award is authoring that validation has to reject later.
 
 A `currency` row on the RESULT side opens a body for what the reward is CALLED and why the player gets it, because an amount of a currency states a quantity and no meaning.
@@ -1307,7 +1309,7 @@ Naming the adders after the kinds would state the menu's own list twice.
 #### Scenario: The same authoring surface is used for results
 
 - **WHEN** the row is rendered in a result context
-- **THEN** its kind select offers component, currency, activity and knowledge
+- **THEN** its kind select offers only the result kinds its surface awards — in a recipe, component, currency and knowledge
 - **AND** it offers neither tag nor essence
 
 #### Scenario: A tag requirement matches on more than one tag
@@ -1349,7 +1351,7 @@ Naming the adders after the kinds would state the menu's own list twice.
 #### Scenario: A gathering task offers fewer kinds than a downtime activity
 
 - **WHEN** a result row is rendered inside a gathering task
-- **THEN** its kind select offers component and currency alone
+- **THEN** its kind select offers component alone, gathering currency being NOT SHIPPED here
 - **AND** its convert menu and the set's adder offer that same subset
 
 ### Requirement: Simple and alchemy carry a reserved failure set
