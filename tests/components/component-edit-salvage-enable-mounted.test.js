@@ -246,7 +246,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     // The hint must be VISIBLE TEXT — not a `title`.
     const hint = target.querySelector('[data-salvage-disabled-notice]');
     assert.ok(hint, 'the zero-group explanation renders as visible body copy');
-    assert.match(hint.textContent, /Add a result below/);
+    assert.match(hint.textContent, /Add a result set below/);
     assert.equal(
       enableToggle(target).getAttribute('title'),
       null,
