@@ -338,9 +338,9 @@
           <strong>{essence.associatedItem.name || essence.sourceName}</strong>
         </div>
       </div>
-      <!-- The SAME primitive as the verbs above, paired in a two-column grid. Copy changes no
+      <!-- The same primitive as the verbs above, paired in a two-column grid. Copy changes no
            record, so it is `ghost`; Unlink breaks a reference the GM can re-make exactly and
-           destroys nothing, so it is the CAUTION verb, `warning`, never `danger`. -->
+           destroys nothing, so it is the caution verb, `warning`, never `danger`. -->
       <div class="manager-essence-inspector-source-actions">
         <Button
           role="ghost"

@@ -282,7 +282,7 @@ Each verb takes the role its verb names:
 - Unlink is `warning`: it breaks a reference the GM can re-make exactly and destroys nothing.
 - The quiet verb that changes no record, such as Copy source UUID, is `ghost`.
 
-Recorded non-conformance: the recipe, component and Tool Studio inspectors are the declared conversion backlog, and each converts onto the button primitive's roles rather than keeping a treatment of its own; the Tags & Categories inspector left that backlog by being retired rather than converted (issue 1915), so the count is three.
+Recorded non-conformance: the recipe, component and Tool Studio inspectors are the declared conversion backlog, and each converts onto the button primitive's roles rather than keeping a treatment of its own; the Tags & Categories inspector left that backlog by being retired rather than converted (issue 1915), so the count is three — for the component inspector, its Copy source UUID, Unlink and Delete commands, which sit in the kebab menu rather than in the rail's verb stack.
 The essence inspector and the three world catalogue inspectors render every verb through the button primitive, and the component inspector's pinned primary does too; a rail that coexists with unconverted treatments has added a variant rather than removed one, so the remainder is a debt with an owner rather than an accepted state.
 
 #### No-state messages
