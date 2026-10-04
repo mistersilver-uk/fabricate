@@ -214,7 +214,7 @@ const EDITORS = {
   [`${MANAGER}/RecipeItemEditor.svelte`]: {
     open: () => openRecipeItemEditor(),
     cards:
-      '.manager-recipe-item-field, .manager-recipe-item-contents-head, ' +
+      '.manager-recipe-item-field, .manager-recipe-item-contents-heading, ' +
       `[data-recipe-item-limits-card], ${VALIDATION}`,
     raise: async () => {
       await openRecipeItemEditor({ saveRecipeItemResult: false });

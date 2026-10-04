@@ -159,18 +159,21 @@
             count: chosen.length,
           })}</span
     >
-    <Button
-      role="ghost"
-      data-set-picker-clear=""
-      onclick={() => (staging = membershipChange(committed, []))}
-      >{localizeOr('FABRICATE.Common.SetPicker.Clear', 'Clear all')}</Button
-    >
-    <Button
-      role="primary"
-      data-set-picker-apply=""
-      disabled={failed || !dirty}
-      onclick={() => apply(close)}>{localizeOr('FABRICATE.Common.SetPicker.Apply', 'Apply')}</Button
-    >
+    <div class="fabricate-set-picker-actions">
+      <Button
+        role="ghost"
+        data-set-picker-clear=""
+        onclick={() => (staging = membershipChange(committed, []))}
+        >{localizeOr('FABRICATE.Common.SetPicker.Clear', 'Clear all')}</Button
+      >
+      <Button
+        role="primary"
+        data-set-picker-apply=""
+        disabled={failed || !dirty}
+        onclick={() => apply(close)}
+        >{localizeOr('FABRICATE.Common.SetPicker.Apply', 'Apply')}</Button
+      >
+    </div>
   </div>
 {/snippet}
 
@@ -291,10 +294,13 @@
     color: var(--fab-accent);
   }
 
+  /* The actions wrap below the status as one unit when the pending line leaves them no room. */
   .fabricate-set-picker-footer {
     display: flex;
     flex: 0 0 auto;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: var(--fab-space-2);
     padding-top: var(--fab-space-1);
     border-top: 1px solid var(--fab-border);
@@ -303,7 +309,13 @@
   .fabricate-set-picker-selected {
     flex: 1 1 auto;
     min-width: 0;
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 11px;
+  }
+
+  .fabricate-set-picker-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: var(--fab-space-2);
   }
 </style>

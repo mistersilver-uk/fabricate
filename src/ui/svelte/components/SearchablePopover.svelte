@@ -192,7 +192,7 @@
   } = $derived(
     listedOptions({
       source,
-      remote,
+      remote: source ? remote : PENDING_SOURCE,
       options,
       filterOptions,
       query: normalizedSearch,
