@@ -191,7 +191,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-triggers' },
       // The list collapses (issue 1096), so the tier-step row is not in the document until its trigger is opened.
-      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
+      { selector: '[data-trigger="rw-trig-step-up"] [data-rule-row-disclosure]' },
       // Anchored on a named trigger's tier-step row: which control is last depends on the mode.
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]', scroll: true },
     ],
@@ -218,7 +218,7 @@ export const CASES = Object.freeze([
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-triggers' },
-      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
+      { selector: '[data-trigger="rw-trig-step-up"] [data-rule-row-disclosure]' },
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]', scroll: true },
     ],
     expectView: 'checks-crafting',

@@ -2225,7 +2225,7 @@
 
 /* The studio's remove action: a subtle danger icon button, 26px square, not the manager's 34px `.fabricate-icon-button`. The converted tier list's delete is `SortableList`'s own since issue 1512; the outcome list in `CraftingCheckEditor.svelte` still draws this one. */
 .fabricate-manager .manager-checks-tier-row .manager-checks-tier-remove,
-.fabricate-manager .manager-checks-trigger-head .manager-checks-trigger-remove {
+.fabricate-rule-row .fabricate-rule-row-head .fabricate-rule-row-remove {
   appearance: none;
   -webkit-appearance: none;
   display: flex;
@@ -2804,7 +2804,7 @@
 
 /* The numeric tracks are 102px, not the 84/72/96px they were pinned at before issue 1050. */
 
-/* ── A TRIGGER IS A COLLAPSED CARD (issue 419 recombine, redrawn for issue 1096) ── A trigger card states itself in a HEAD a GM can read at a glance — glyph tile, condition title, effect sentence, result chip, chevron, delete — and hides its controls until that head is clicked. */
+/* ── A TRIGGER IS A COLLAPSED CARD (issue 419 recombine, redrawn for issue 1096) ── A trigger card states itself in a HEAD a GM can read at a glance — glyph tile, condition title, effect sentence, result chip, chevron, delete — and hides its controls until that head is clicked. The head, the body and the sentence are `RuleRow`'s, rooted at it (issue 1782); the card's frame is the caller's class. */
 .fabricate-manager .manager-checks-trigger-route {
   display: grid;
   gap: 8px;
@@ -2831,7 +2831,7 @@
   border-color: var(--fab-border-strong);
 }
 
-.fabricate-manager .manager-checks-trigger-head {
+.fabricate-rule-row .fabricate-rule-row-head {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -2840,7 +2840,7 @@
 }
 
 /* THE WHOLE HEAD IS THE DISCLOSURE. Foundry's core `button` rule sets a fixed height and its own border, and a card head is neither — the same reset the rail's digest rows take, and for the same reason: `min-height: 0` does not cancel a fixed `height`, so a two-line head would draw on top of itself. */
-.fabricate-manager .manager-checks-trigger-disclosure {
+.fabricate-rule-row .fabricate-rule-row-disclosure {
   appearance: none;
   -webkit-appearance: none;
   display: flex;
@@ -2864,12 +2864,12 @@
   text-align: left;
 }
 
-.fabricate-manager button.manager-checks-trigger-disclosure {
+.fabricate-rule-row button.fabricate-rule-row-disclosure {
   cursor: pointer;
 }
 
 /* The effect's glyph tile. Its family is the effect's own — a step up reads info, a step down reads warning — so a list of triggers is scannable by colour before it is read. */
-.fabricate-manager .manager-checks-trigger-glyph {
+.fabricate-rule-row .fabricate-rule-row-glyph {
   display: flex;
   flex: 0 0 28px;
   align-items: center;
@@ -2880,39 +2880,39 @@
   font-size: 12px;
 }
 
-.fabricate-manager .manager-checks-trigger-glyph.is-info {
+.fabricate-rule-row .fabricate-rule-row-glyph.is-info {
   color: var(--fab-info-text);
   background: var(--fab-info-soft);
 }
 
-.fabricate-manager .manager-checks-trigger-glyph.is-warning {
+.fabricate-rule-row .fabricate-rule-row-glyph.is-warning {
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-manager .manager-checks-trigger-glyph.is-success {
+.fabricate-rule-row .fabricate-rule-row-glyph.is-success {
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .manager-checks-trigger-glyph.is-danger {
+.fabricate-rule-row .fabricate-rule-row-glyph.is-danger {
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
 }
 
-.fabricate-manager .manager-checks-trigger-glyph.is-neutral {
+.fabricate-rule-row .fabricate-rule-row-glyph.is-neutral {
   color: var(--fab-text-subtle);
   background: var(--fab-surface-soft);
 }
 
-.fabricate-manager .manager-checks-trigger-headline {
+.fabricate-rule-row .fabricate-rule-row-headline {
   display: block;
   flex: 1 1 auto;
   min-width: 0;
 }
 
 /* A `<span>`, not a heading: it sits inside the disclosure `<button>`, where a heading is not permitted content. */
-.fabricate-manager .manager-checks-trigger-title {
+.fabricate-rule-row .fabricate-rule-row-title {
   display: block;
   color: var(--fab-text);
   font-family: var(--fab-font-serif);
@@ -2922,7 +2922,7 @@
   text-transform: none;
 }
 
-.fabricate-manager .manager-checks-trigger-lead {
+.fabricate-rule-row .fabricate-rule-row-lead {
   display: block;
   margin-top: 3px;
   color: var(--fab-text-muted);
@@ -2932,7 +2932,7 @@
 }
 
 /* The result chip: the effect in two words, at the right of the head. Same family as the glyph tile, so the pair reads as one statement. */
-.fabricate-manager .manager-checks-trigger-chip {
+.fabricate-rule-row .fabricate-rule-row-chip {
   flex: 0 0 auto;
   padding: 4px 9px;
   border: 1px solid transparent;
@@ -2942,43 +2942,38 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-checks-trigger-chip.is-info {
+.fabricate-rule-row .fabricate-rule-row-chip.is-info {
   color: var(--fab-info-text);
   border-color: var(--fab-info-border);
   background: var(--fab-info-soft);
 }
 
-.fabricate-manager .manager-checks-trigger-chip.is-warning {
+.fabricate-rule-row .fabricate-rule-row-chip.is-warning {
   color: var(--fab-warning-text);
   border-color: var(--fab-warning-border);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-manager .manager-checks-trigger-chip.is-success {
+.fabricate-rule-row .fabricate-rule-row-chip.is-success {
   color: var(--fab-success-text);
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .manager-checks-trigger-chip.is-danger {
+.fabricate-rule-row .fabricate-rule-row-chip.is-danger {
   color: var(--fab-danger-text);
   border-color: var(--fab-danger-border);
   background: var(--fab-danger-soft);
 }
 
-.fabricate-manager .manager-checks-trigger-chevron {
+.fabricate-rule-row .fabricate-rule-row-chevron {
   flex: 0 0 auto;
   color: var(--fab-text-subtle);
   font-size: 10px;
 }
 
-/* Remove button: at the head's right, outside the disclosure — a `<button>` inside a `<button>` is invalid and the DOM the browser builds from it is not the one authored. */
-.fabricate-manager .manager-checks-trigger-remove {
-  flex: 0 0 auto;
-}
-
 /* The expanded body: a darker inset under a hairline, as the prototype draws it, holding the condition, the two effect groups, the break-tools card and the closing quotation. */
-.fabricate-manager .manager-checks-trigger-body {
+.fabricate-rule-row .fabricate-rule-row-body {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -2989,7 +2984,7 @@
 }
 
 /* `CONDITION` — the body's own section heading, above the row of fields. */
-.fabricate-manager .manager-checks-trigger-legend {
+.fabricate-rule-row .fabricate-rule-row-legend {
   margin: 0;
   color: var(--fab-text-subtle);
   font-size: 8.5px;
@@ -3007,7 +3002,7 @@
 }
 
 /* THIS STUDIO'S FIELD SCALE, restated in scope rather than moved onto the manager-wide `.fabricate-field` — the same move `.manager-checks-flag-list` and the Validation route already make with their own shared surfaces. */
-.fabricate-manager .manager-checks-trigger-body .fabricate-field > span {
+.fabricate-rule-row .fabricate-rule-row-body .fabricate-field > span {
   color: var(--fab-text-subtle);
   font-size: 8px;
   font-weight: 700;
@@ -3015,12 +3010,12 @@
   text-transform: uppercase;
 }
 
-.fabricate-manager .manager-checks-trigger-body .fabricate-field {
+.fabricate-rule-row .fabricate-rule-row-body .fabricate-field {
   gap: 5px;
 }
 
-.fabricate-manager
-  .manager-checks-trigger-body
+.fabricate-rule-row
+  .fabricate-rule-row-body
   .fabricate-field
   input:not(.fab-stepper-input):not([type="radio"]):not([type="range"]) {
   height: 32px;
@@ -3051,28 +3046,28 @@
 }
 
 /* The break-tools card inside a trigger: the shared `ToggleCard` at this studio's metrics, the same restatement the On failure screen's flag list makes. */
-.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-card {
+.fabricate-manager .manager-checks-breakage-trigger .manager-recipe-status-card {
   gap: 11px;
   padding: 10px 12px;
   border-radius: 9px;
   background: var(--fab-bg-2);
 }
 
-.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-card.is-on {
+.fabricate-manager .manager-checks-breakage-trigger .manager-recipe-status-card.is-on {
   border-color: var(--fab-accent-border);
   background: var(--fab-accent-soft);
 }
 
-.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-title {
+.fabricate-manager .manager-checks-breakage-trigger .manager-recipe-status-title {
   font-size: 11.5px;
 }
 
-.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-sub {
+.fabricate-manager .manager-checks-breakage-trigger .manager-recipe-status-sub {
   font-size: 10px;
 }
 
 /* The closing restatement, quotation-marked: the controls above are the parts and this is what they add up to. */
-.fabricate-manager .manager-checks-trigger-quote {
+.fabricate-rule-row .fabricate-rule-row-quote {
   display: flex;
   gap: 9px;
   margin: 0;
@@ -3085,7 +3080,7 @@
   line-height: 1.5;
 }
 
-.fabricate-manager .manager-checks-trigger-quote > i {
+.fabricate-rule-row .fabricate-rule-row-quote > i {
   flex: 0 0 auto;
   color: var(--fab-text-subtle);
   font-size: 10px;
@@ -3975,8 +3970,30 @@
   flex-wrap: wrap;
 }
 
-.fabricate-manager .manager-condition-modifier-row-reference .manager-character-modifier-row-reference-header {
+/* A rule that does not collapse lays its head, its field chain and its remove on one line (issue 1782). */
+.fabricate-rule-row .fabricate-rule-row-line {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
   flex-wrap: nowrap;
+}
+
+.fabricate-rule-row .fabricate-rule-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.fabricate-rule-row .fabricate-rule-row-label {
+  flex: 1 1 auto;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.fabricate-rule-row-line .fabricate-rule-row-remove {
+  margin-left: auto;
 }
 
 .fabricate-manager .manager-condition-modifier-row-reference.is-positive {
