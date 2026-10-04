@@ -1,14 +1,19 @@
 /** `Callout`'s `items` mounted (issue 1521): the folded explainer's glyph-led points. */
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { importedModules } from '../helpers/moduleAst.js';
+import { sourceAstEntriesUnder } from '../helpers/parsedSource.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { rendersComponent } from '../helpers/svelteStructureContract.js';
 
+const repoRoot = resolve(import.meta.dirname, '../..');
 const CALLOUT_PATH = 'src/ui/svelte/components/Callout.svelte';
 
 const harness = createMountedComponentHarness({
-  repoRoot: resolve(import.meta.dirname, '../..'),
+  repoRoot,
   tmpPrefix: 'fabricate-callout-items-',
   compiledModules: [CALLOUT_PATH],
   componentPath: CALLOUT_PATH,
@@ -66,5 +71,21 @@ describe('Callout items', () => {
     const note = root.querySelector('[data-x]');
     assert.equal(note.tagName, 'P', 'no title, actions or items is the plain form');
     assert.ok(!note.querySelector('.manager-callout-items'), 'and draws no list');
+  });
+
+  it('retires the explainer card: no file, import or render of it remains', () => {
+    const retired = 'ExplainerCard';
+    assert.equal(
+      existsSync(resolve(repoRoot, `src/ui/svelte/apps/manager/${retired}.svelte`)),
+      false
+    );
+    const users = [...sourceAstEntriesUnder('src'), ...sourceAstEntriesUnder('scripts')]
+      .filter(
+        ([, ast]) =>
+          importedModules(ast).some((specifier) => specifier.endsWith(`/${retired}.svelte`)) ||
+          (ast.fragment !== undefined && rendersComponent(ast, retired))
+      )
+      .map(([path]) => path);
+    assert.deepEqual(users, []);
   });
 });

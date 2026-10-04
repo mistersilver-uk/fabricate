@@ -55,7 +55,6 @@
   `eyebrow` prop, so it sits above the name inside the row's copy column. A separate
   ordinal tile beside the severity tile would put three leading boxes in a 300px
   column, which is the failure the stage row's `stacked` treatment exists to prevent.
-  One metadata slot, not two.
 
   ## What this card deliberately does NOT grow
 
