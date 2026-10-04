@@ -62,12 +62,12 @@ Moving a multi-INGREDIENT-SET recipe into `alchemy` is a best-effort
 ## Result-Side Choice Groups
 
 A result carrying `alternatives` is a choice group (`data-models/spec.md` § Result, requirements 8 to 15), and every non-progressive mode awards it in whichever result set the mode routed to, the reserved failure-role set included.
-A group's N resolves once per award, through the same roll seam a rolled amount does, floored at zero and capped at 64.
-A rolled group rolls its `selectionFormula` once per award against the crafting character, never reusing the check the craft already made, and reads each roll off its members' ranges as an ordered ladder.
-Without repeats each later roll reads only the members not yet awarded; with repeats N is exact.
-A player-chooser group awards nothing when the stage resolves: it persists a pending award choice that the player settles once, and the unversioned award paths refuse a recipe carrying one before anything is consumed.
-Until the settle command ships (issue 1773), every craft entrance refuses a player-chooser group the same way.
-`progressive` carries no choice group, as its result set carries no non-component kind.
+A group's N resolves once, when the group is awarded, through the same roll seam a rolled amount does, floored at zero and capped at 64.
+A rolled group rolls its `selectionFormula` once for each alternative it draws, against the crafting character, never reusing the check the craft already made, and reads each roll off its alternatives' ranges as an ordered ladder.
+Without repeats each later roll reads only the alternatives not yet awarded; with repeats N is exact.
+A group whose chooser is the player awards nothing when the stage resolves: it persists a pending award choice that the player settles once, and the unversioned award paths refuse a recipe carrying one before anything is consumed.
+Until the settle command ships (issue 1773), every craft entrance refuses a group whose chooser is the player the same way: the run's start, a later stage's start, and the execute of a stage already started.
+`progressive` carries no choice group, because it awards every ordered entry its roll affords (`data-models/spec.md` § Result, requirement 14).
 
 ### Scenario: A failure-role set awards its group
 
@@ -78,19 +78,24 @@ Until the settle command ships (issue 1773), every craft entrance refuses a play
 
 - **WHEN** a rolled group awards up to 2 and its count rolls 2
 - **THEN** its count is rolled once and its selection twice, each against the crafting character
-- **AND** a selection that falls between two ranges awards the member whose range starts highest at or below it, and one below every range awards the lowest
+- **AND** a selection that falls between two ranges awards the alternative whose range starts highest at or below it, and one below every range awards the lowest
 
 ### Scenario: Repeats decide whether a draw exhausts the group
 
-- **WHEN** a rolled group without repeats awards up to 5 from three members
-- **THEN** it awards each member once and rolls its selection three times
-- **AND** with repeats it rolls five times and may award a member more than once
+- **WHEN** a rolled group without repeats awards up to 5 from three alternatives
+- **THEN** it awards each alternative once and rolls its selection three times
+- **AND** with repeats it rolls five times and may award an alternative more than once
 
-### Scenario: A player-chooser group awards at the player's pick
+### Scenario: A group whose chooser is the player awards at the player's pick
 
-- **WHEN** a versioned stage awards a player-chooser group whose N is at least one
+- **WHEN**, once the settle command ships (issue 1773), a versioned stage awards a group whose chooser is the player and whose N is at least one
 - **THEN** the stage completes holding a pending award choice and awards nothing from the group until it is settled
 - **AND** an unversioned craft carrying such a group is refused before it consumes anything
+
+### Scenario: The player's choice is refused until it can be settled
+
+- **WHEN** any craft entrance meets a group whose chooser is the player before the settle command ships
+- **THEN** it is refused before anything is consumed
 
 ## Check Source
 

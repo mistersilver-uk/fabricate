@@ -66,7 +66,7 @@ The player sees the craft refused, and their ingredients stay where they are.
 > A progressive recipe has no amount on its stage rows, because a progressive award drops every formula.
 > Any rolled amount on a progressive recipe is ignored.
 
-A result row names its component and cannot be cleared.
+A component result row names its component and cannot be cleared.
 To change a result, remove the row and add another.
 A progressive stage is the exception, because it can swap its component in place and so keep its place in the order.
 Adding a component that a result set already produces raises that row's quantity.
@@ -76,7 +76,7 @@ A progressive recipe always adds a new stage, so repeat a component there to pro
 ### Moving a World Back to an Older Version
 
 {: .warning }
-> Currency results, recipe-knowledge results and result choice groups need this version of Fabricate or a later one.
+> Currency results, recipe-knowledge results and result choice groups (one reward offered from several alternatives) need the Fabricate release that introduced them, or a later one.
 > An older version expects every result to name a component, so a recipe carrying any of them fails its validation there and cannot be crafted until you remove that result.
 > An older version also ignores a craft's record of a reward still waiting for the player's choice, so that reward can no longer be claimed.
 > Back up your world before moving it to an older version, and settle any waiting rewards first.
