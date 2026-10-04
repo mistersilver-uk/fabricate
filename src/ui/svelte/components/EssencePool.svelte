@@ -16,6 +16,7 @@
     essenceLabel = (essence) => essence,
     sourceReading = () => '',
     overshootLabel = () => '',
+    meterValueLabel = () => '',
     allocationLabel = (source) => source?.label ?? '',
     decrementLabel = () => '',
     incrementLabel = () => '',
@@ -177,7 +178,7 @@
                 color: !isMet && tint ? `var(--fab-tag-${tint})` : '',
               },
             ]}
-            valueText={`${got} / ${need}`}
+            valueText={meterValueLabel(got, need)}
             labelId={`${nameIdPrefix}-${index}`}
           />
         </div>

@@ -2374,6 +2374,13 @@ describe('Journal versioned lifecycle (mounted)', () => {
       /6 \/ 6/
     );
     assert.match(essence.target.querySelector('[data-essence-total="fire"]').textContent, /3 \/ 3/);
+    assert.equal(
+      essence.target
+        .querySelector(':scope [data-essence-threshold="earth"] [role="meter"]')
+        .getAttribute('aria-valuetext'),
+      '6 of 6',
+      'the journal meter reads the localized pool sentence, not "6 slash 6"'
+    );
   });
 
   it('collects all three gathering modes but never treats fixture plans without receipts as awards', async () => {

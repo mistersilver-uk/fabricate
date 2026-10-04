@@ -8,14 +8,14 @@
   | `value` / `max` | number / number | `0` / `100` | The fill is `value / max` to the whole percent, clamped; a `max` of zero or less reads full, because nothing is owed. `aria-valuenow` is the clamped value. |
   | `segments` | `{ tone?, color? }[]` | `[]` | The ordered fills. The first paints the track through `FillBar`'s `tone` and `color`; `FillBar` draws one fill, so a later entry is not drawn. |
   | `valueText` | string | `''` | The caller-formatted reading, already localized, announced as `aria-valuetext`. |
-  | `label` / `labelId` | string / string | `''` / `''` | Exactly one: `labelId` names the meter by an element the caller renders; `label` renders visually hidden inside it. |
+  | `label` / `labelId` | string / string | `''` / `''` | Exactly one: `labelId` names the meter by an element the caller renders; `label` renders visually hidden inside it. With neither, no label is drawn and a rest `aria-label` names it. |
 
   Rest spread:
   - `{...rest}` lands on the meter root, written after `class={…}`.
 
   Invariants:
-  - The track is `FillBar` at `compact` density, and the root is a flex item that fills the width
-    its caller gives it — pinned by `tests/components/instruments-mounted.test.js`.
+  - The track is `FillBar` at `compact` density — pinned by
+    `tests/components/instruments-mounted.test.js`.
 -->
 <script>
   import FillBar from './FillBar.svelte';
@@ -46,10 +46,10 @@
   aria-valuemax={ceiling}
   aria-valuenow={now}
   aria-valuetext={valueText || undefined}
-  aria-labelledby={labelId || hiddenLabelId}
+  aria-labelledby={labelId || (label ? hiddenLabelId : undefined)}
   {...rest}
 >
-  {#if !labelId}<span class="visually-hidden" id={hiddenLabelId}>{label}</span>{/if}
+  {#if !labelId && label}<span class="visually-hidden" id={hiddenLabelId}>{label}</span>{/if}
   <FillBar value={percent} density="compact" tone={fill.tone} color={fill.color} />
 </span>
 

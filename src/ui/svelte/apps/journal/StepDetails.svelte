@@ -506,6 +506,8 @@
         })}
       overshootLabel={(essence, amount) =>
         localize('FABRICATE.App.Journal.Stage.Overshoot', { essence, amount })}
+      meterValueLabel={(delivered, need) =>
+        localize('FABRICATE.App.Crafting.Pool.MeterValue', { delivered, need })}
       allocationLabel={(source) =>
         localize('FABRICATE.App.Journal.Stage.Allocate', { name: source.label })}
       decrementLabel={(source) =>
