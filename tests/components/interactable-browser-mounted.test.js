@@ -72,6 +72,13 @@ const tab = (root, id) => root.querySelector(`#fab-ib-tab-${id}`);
 const empty = (root, value) =>
   root.querySelector(`.manager-empty.is-note[data-interactable-browser-empty="${value}"]`);
 
+function assertNote(root, value, sentence) {
+  const note = empty(root, value);
+  assert.ok(Boolean(note), `the ${value} note renders`);
+  assert.equal(note.textContent.trim(), sentence, `the ${value} note states its sentence`);
+  assert.ok(!note.querySelector('h3'), 'a note is one line, not a titled panel');
+}
+
 async function press(root, button, key) {
   button.focus();
   const event = new globalThis.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
@@ -111,6 +118,14 @@ describe('the browser tabs are the shared strip', () => {
         `${key} swaps in the ${to} panel`
       );
     }
+  });
+
+  it('names the strip', async () => {
+    const root = await harness.mount({ services: services(POPULATED) });
+    assert.equal(
+      root.querySelector('[role="tablist"]').getAttribute('aria-label'),
+      'Interactable browser'
+    );
   });
 
   it('points only the selected tab at its panel', async () => {
@@ -159,38 +174,30 @@ describe('the browser tabs are the shared strip', () => {
 describe('the browser empties are EmptyState notes', () => {
   it('states that there is no crafting system', async () => {
     const root = await harness.mount({ services: services({ systems: [] }) });
-    assert.ok(Boolean(empty(root, 'no-systems')), 'the no-systems note renders');
+    assertNote(root, 'no-systems', 'No crafting systems available.');
     assert.ok(!root.querySelector('[role="tablist"]'), 'no strip renders without a system');
   });
 
   it('states that the system has no tools, and no tasks', async () => {
     const root = await harness.mount({ services: services() });
-    assert.ok(
-      Boolean(root.querySelector('#fab-ib-panel-tools') && empty(root, 'no-tools')),
-      'no tools'
-    );
+    assert.ok(Boolean(root.querySelector('#fab-ib-panel-tools')), 'the tools panel renders');
+    assertNote(root, 'no-tools', 'No tools in this system.');
     tab(root, 'tasks').click();
     await settle();
-    assert.ok(
-      Boolean(root.querySelector('#fab-ib-panel-tasks') && empty(root, 'no-tasks')),
-      'no tasks'
-    );
+    assert.ok(Boolean(root.querySelector('#fab-ib-panel-tasks')), 'the tasks panel renders');
+    assertNote(root, 'no-tasks', 'No gathering tasks in this system.');
   });
 
   it('states a search that matches nothing on either tab, and clearing it restores the rows', async () => {
     const root = await harness.mount({ services: services(POPULATED) });
     await search(root, 'zzzz');
-    assert.ok(
-      Boolean(root.querySelector('#fab-ib-panel-tools') && empty(root, 'no-matches')),
-      'tools'
-    );
+    assert.ok(Boolean(root.querySelector('#fab-ib-panel-tools')), 'the tools panel renders');
+    assertNote(root, 'no-matches', 'No matching tools.');
     assert.ok(!empty(root, 'no-tools'), 'a filtered-out list is not an empty system');
     tab(root, 'tasks').click();
     await settle();
-    assert.ok(
-      Boolean(root.querySelector('#fab-ib-panel-tasks') && empty(root, 'no-matches')),
-      'tasks'
-    );
+    assert.ok(Boolean(root.querySelector('#fab-ib-panel-tasks')), 'the tasks panel renders');
+    assertNote(root, 'no-matches', 'No matching gathering tasks.');
     assert.ok(!empty(root, 'no-tasks'), 'a filtered-out list is not an empty system');
     await search(root, '');
     assert.ok(!root.querySelector('.manager-empty'), 'no note survives the cleared search');

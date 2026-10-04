@@ -319,7 +319,7 @@ test('(a) the two primitives issue 1116 named now publish a frame that renders t
   );
 });
 
-test('(a) the two older overrides still name the frame that renders their state', () => {
+test('(a) the older overrides still name the frame that renders their state', () => {
   // The DOMAIN is pinned above and the VALUES have to be pinned too, one primitive at a time,
   // because a value is only ever wrong in a way no other assertion can see: repoint an override at
   // a case id that is already in the representative pair and the selection is unchanged, the entry
@@ -343,8 +343,14 @@ test('(a) the two older overrides still name the frame that renders their state'
     [
       'src/ui/svelte/components/EmptyState.svelte',
       'world-tool-entry-on-break-repair-tag-picker-empty',
-      'the one frame that draws the `note` variant — every other empty in the corpus is a ' +
-        'bordered panel filling a region',
+      'the frame that draws the `note` variant inside the picker popover it was made for — both ' +
+        'representative frames are populated states',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'interactables-browser-tasks',
+      'the one caller whose tab entries carry no icon, so the only frame that draws the ' +
+        'glyph-less strip',
     ],
   ];
   for (const [file, caseId, because] of expectations) {
