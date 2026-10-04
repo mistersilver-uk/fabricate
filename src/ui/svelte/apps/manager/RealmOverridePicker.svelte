@@ -18,6 +18,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import SearchablePopover from '../../components/SearchablePopover.svelte';
+  import { recordPickerOptions } from './recordPickerOptions.js';
 
   let { value = '', realms = [], disabled = false, onChoose = () => {} } = $props();
 
@@ -31,32 +32,26 @@
     text('FABRICATE.Admin.Manager.Travel.Parties.OverrideDisabledSuffix', '(disabled)')
   );
 
-  const options = $derived([
-    { id: '', label: autoLabel, icon: 'fas fa-wand-magic-sparkles' },
-    ...realms.map((realm) => ({
-      id: realm.id,
-      label: realm.name,
-      icon: 'fas fa-map-location-dot',
-      trailing: realm.enabled ? '' : disabledSuffix,
-    })),
-  ]);
-
-  const selectedName = $derived(
-    value
-      ? realms.find((realm) => realm.id === value)?.name ||
-          text('FABRICATE.Admin.Manager.Travel.Parties.OverrideStale', 'Unknown realm')
-      : autoLabel
+  const picker = $derived(
+    recordPickerOptions({
+      records: realms,
+      value,
+      leading: { label: autoLabel, icon: 'fas fa-wand-magic-sparkles' },
+      recordIcon: 'fas fa-map-location-dot',
+      disabledSuffix,
+      staleLabel: text('FABRICATE.Admin.Manager.Travel.Parties.OverrideStale', 'Unknown realm'),
+    })
   );
 </script>
 
 <SearchablePopover
   {value}
-  {options}
+  options={picker.options}
   {disabled}
   pickerClass="manager-travel-parties-override"
   triggerClass="fabricate-button manager-travel-picker-trigger manager-travel-parties-override-trigger"
   triggerIcon="fas fa-location-crosshairs"
-  triggerLabel={selectedName}
+  triggerLabel={picker.selectedName}
   valueClass="manager-travel-parties-override-value"
   minWidth={268}
   maxWidth={268}

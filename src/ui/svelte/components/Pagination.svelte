@@ -27,7 +27,7 @@
     requires; callers pass a RESOLVED string, not a key.
 -->
 <script>
-  import { localize } from '../util/foundryBridge.js';
+  import { localizeOr } from '../util/localizeOr.js';
   import IconButton from './IconButton.svelte';
   import Select from './Select.svelte';
 
@@ -59,11 +59,6 @@
   );
   const showNav = $derived(persistent || totalPages > 1);
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   function goToPage(index) {
     const next = Math.max(0, Math.min(totalPages - 1, index));
     if (next !== pageIndex) onPageChange(next);
@@ -87,23 +82,24 @@
     class="fabricate-pagination"
     class:is-compact={compact}
     data-pagination-compact={compact || undefined}
-    aria-label={ariaLabel || text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
+    aria-label={ariaLabel || localizeOr('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
   >
     <span class="manager-pagination-summary" data-pagination-summary>
-      {text('FABRICATE.Admin.Manager.Pagination.Range', 'Showing {first}–{last} of {total}')
-        .replace('{first}', firstShown)
-        .replace('{last}', lastShown)
-        .replace('{total}', totalCount)}
+      {localizeOr('FABRICATE.Admin.Manager.Pagination.Range', 'Showing {first}–{last} of {total}', {
+        first: firstShown,
+        last: lastShown,
+        total: totalCount,
+      })}
     </span>
     {#if showNav}
       <nav
         class="manager-pagination-nav"
         aria-label={navLabel ||
-          text('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}
+          localizeOr('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}
       >
         <IconButton
           data-pagination-prev=""
-          ariaLabel={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
+          ariaLabel={localizeOr('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
           disabled={pageIndex === 0}
           onclick={() => goToPage(pageIndex - 1)}
         >
@@ -114,13 +110,14 @@
           class:manager-pagination-hidden={compact}
           data-pagination-page
         >
-          {text('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}')
-            .replace('{page}', pageIndex + 1)
-            .replace('{total}', totalPages)}
+          {localizeOr('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}', {
+            page: pageIndex + 1,
+            total: totalPages,
+          })}
         </span>
         <IconButton
           data-pagination-next=""
-          ariaLabel={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
+          ariaLabel={localizeOr('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
           disabled={pageIndex >= totalPages - 1}
           onclick={() => goToPage(pageIndex + 1)}
         >
@@ -131,7 +128,7 @@
     {#if showPageSize}
       <span class="manager-pagination-size">
         <span id={captionId} class:manager-pagination-hidden={compact}
-          >{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span
+          >{localizeOr('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span
         >
         <Select
           size="inline"

@@ -46,7 +46,7 @@
     with focus outside the strip, stopping it before the window's keybindings so the host stays open.
 -->
 <script>
-  import { localize } from '../util/foundryBridge.js';
+  import { localizeOr } from '../util/localizeOr.js';
   import Chip from './Chip.svelte';
 
   const DEFAULT_CLASSES = Object.freeze({
@@ -118,13 +118,8 @@
     return () => host?.removeEventListener('keydown', onDocumentKeydown, true);
   });
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   function optionalText(key = '', fallback = '') {
-    return text(key, fallback) || undefined;
+    return localizeOr(key, fallback) || undefined;
   }
 
   function isDescribed(tab) {
@@ -279,7 +274,7 @@
   bind:this={tablistNode}
   class={`fabricate-tabs ${containerClass}`}
   role="tablist"
-  aria-label={text(ariaLabelKey, ariaLabel)}
+  aria-label={localizeOr(ariaLabelKey, ariaLabel)}
   {...rest}
 >
   {#each tabs as tab, index (tab.id)}
@@ -304,7 +299,7 @@
       onblur={() => untrack('focus', tab.id)}
     >
       {#if tab.icon}<i class={tab.icon} aria-hidden="true"></i>{/if}
-      <span>{text(tab.labelKey, tab.label)}</span>{#if tab.tierGated}<i
+      <span>{localizeOr(tab.labelKey, tab.label)}</span>{#if tab.tierGated}<i
           class="fas fa-lock manager-editor-tab-lock"
           aria-hidden="true"
         ></i>{/if}
@@ -338,7 +333,7 @@
     bind:this={tooltipNodes[tab.id]}
     onmouseenter={() => track('hover', tab.id)}
     onmouseleave={() => untrack('hover', tab.id)}
-    {...tooltipAttributes(tab)}>{text(tab.tooltipKey, tab.tooltip)}</span
+    {...tooltipAttributes(tab)}>{localizeOr(tab.tooltipKey, tab.tooltip)}</span
   >{/each}
 
 <style>

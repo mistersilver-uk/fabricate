@@ -21,7 +21,7 @@ import {
   selectTriggerText,
 } from '../helpers/select-control.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const { missingCensusHooks } = await import('../helpers/resultRowCensus.js');
 const { normalizeGatheringResultGroups } = await import(
@@ -49,6 +49,7 @@ const harness = createMountedComponentHarness({
     'src/utils/rollExpressionAverage.js',
     'src/utils/rollFormulaRollability.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/dropRateTier.js',

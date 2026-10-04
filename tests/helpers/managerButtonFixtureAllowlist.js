@@ -127,14 +127,6 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
     }),
   }),
   Object.freeze({
-    file: 'tests/components/component-studio-font-size.test.js',
-    classes: 'fabricate-button manager-salvage-component-trigger',
-    count: 1,
-    why:
-      'Population B: the salvage result component picker trigger. Root-carrying since issue ' +
-      '1502, and still unconverted, so it keeps its place here.',
-  }),
-  Object.freeze({
     file: 'tests/components/bulk-edit-dock-pinning.test.js',
     classes: 'fabricate-button is-danger',
     count: 1,

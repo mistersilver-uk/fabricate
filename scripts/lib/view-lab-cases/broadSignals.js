@@ -185,15 +185,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-actor-picker',
     'manager-recipe-edit-tag-picker',
     'world-tool-entry-on-break-repair-tag-picker-empty',
-    'manager-recipe-edit-ingredients-or-menu',
-    // An eighth, and it is the primitive's grid list form (issue 1503).
+    // A seventh, and it is the primitive's grid list form (issue 1503).
     'manager-essences-source-picker',
-    // A ninth and a tenth: the primitive's multi-select mode and the caller that stays open without it (issue 1513).
+    // An eighth and a ninth: the primitive's multi-select mode and the caller that stays open without it (issue 1513).
     'player-crafting-sources-picker',
     'manager-recipe-item-contents-picker',
   ]),
   // The primitive's portaled panel (issue 1719), which draws the whole of what a picker presents.
-  // Fifteen frames rather than the parent's ten, because the panel is also what `Select`,
+  // Fourteen frames rather than the parent's nine, because the panel is also what `Select`,
   // `ModifierPillSelect` and `IconPicker` open, and the three `Select` frames are the
   // only ones that draw it with no header and no search row — the shape most importers get.
   'src/ui/svelte/components/SearchablePopoverPanel.svelte': Object.freeze([
@@ -203,7 +202,6 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-actor-picker',
     'manager-recipe-edit-tag-picker',
     'world-tool-entry-on-break-repair-tag-picker-empty',
-    'manager-recipe-edit-ingredients-or-menu',
     'manager-essences-source-picker',
     'player-crafting-sources-picker',
     'manager-recipe-item-contents-picker',
@@ -239,9 +237,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-essences-source-picker',
   ]),
   // The overflow action menu (issue 1477), extracted from four hand-rolled menus and one `SearchablePopover`.
+  // The requirement row's kind menu is its headed form with a caller's own trigger (issue 1516).
   'src/ui/svelte/components/ActionMenu.svelte': Object.freeze([
     'manager-environment-edit-automatic-force-add',
     'manager-systems-row-menu-open',
+    'manager-recipe-edit-ingredients-or-menu',
+    'manager-recipe-edit-choice-group-menu',
   ]),
   // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same change.
   'src/ui/svelte/components/ModifierPillSelect.svelte': Object.freeze([

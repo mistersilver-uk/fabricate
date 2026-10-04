@@ -96,6 +96,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(MapLinksTab|PartiesTab|RealmsTab)/,
       /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
+      /^src\/ui\/svelte\/apps\/manager\/InlineRenameField\.svelte$/,
     ],
   }),
   managerCase({
@@ -301,6 +302,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RealmOverridePicker\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recordPickerOptions\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/InlineRenameField\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GatheringPartiesTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/Party/,
       ...ANCHORED_POPOVER_SOURCES,

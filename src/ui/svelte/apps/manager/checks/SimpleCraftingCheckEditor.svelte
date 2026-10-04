@@ -355,19 +355,17 @@
         <div class="manager-checks-flag-list">
           <IconFactRow
             icon="fas fa-circle-check"
-            dataAttr="data-simple-outcome"
-            dataValue="success"
+            data-simple-outcome="success"
             title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}
             subtitle={countOutcomes?.success ??
               text(
                 'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
-                'The roll reaches the DC, and the recipe’s result group is produced in full.'
+                'The roll reaches the DC, and the recipe’s result set is produced in full.'
               )}
           />
           <IconFactRow
             icon="fas fa-circle-xmark"
-            dataAttr="data-simple-outcome"
-            dataValue="failure"
+            data-simple-outcome="failure"
             title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure')}
             subtitle={countOutcomes?.failure ??
               text(

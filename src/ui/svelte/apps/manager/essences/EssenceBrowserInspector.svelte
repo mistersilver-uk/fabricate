@@ -13,7 +13,7 @@
 <script>
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
   import IconFactRow from '../IconFactRow.svelte';
-  import InspectorActionButton from '../InspectorActionButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Chip from '../../../components/Chip.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
@@ -271,9 +271,7 @@
 <!-- THE ACTIONS SIT ABOVE `Source` AND `Usage`: ordered after two detail cards the primary fell
      past the fold, so the rail's one loud control was invisible in every captured frame. -->
 <section class="manager-essence-inspector-section" data-essence-section="actions">
-  <!-- The three verbs render through `InspectorActionButton`, the extracted point-of-arrival
-       button for every right inspector. The primary was `.fabricate-button.is-primary`, the SUCCESS
-       family, so `Edit essence` painted green where the design's primary is the accent. -->
+  <!-- Every verb on the rail is a full-width `Button` in the role its verb names. -->
   <!--
     NO DUPLICATE. `store.duplicateEssence` minted a SYSTEM-owned essence with its own name, icon and
     colour from a rail whose banner two cards above says those come from the Essence Catalogue and
@@ -282,26 +280,25 @@
     into another system's rules for the SAME essence, already shipped one click away.
   -->
   <div class="manager-essence-inspector-actions">
-    <InspectorActionButton
-      tone="primary"
-      icon="fas fa-pen"
-      label={text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
-      data-essence-action="edit"
-      onClick={() => onEdit(essence.id)}
-    />
+    <Button role="primary" fullWidth data-essence-action="edit" onclick={() => onEdit(essence.id)}>
+      <i class="fas fa-pen" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}</span>
+    </Button>
     <!-- The SINGLE delete keeps the `confirmDialog` the store owns; the two-step ARM is the BULK
          panel's alone. It is WARNED, not BLOCKED: never disabled by component usage, with the
          cascade's counts stated in the dialog and previewed below. -->
-    <InspectorActionButton
-      tone="danger"
-      icon="fas fa-trash"
-      label={text('FABRICATE.Admin.Manager.Essence.Delete', 'Delete essence')}
-      ariaLabel={format('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}', {
+    <Button
+      role="danger"
+      fullWidth
+      aria-label={format('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}', {
         name: essence.name,
       })}
       data-essence-action="delete"
-      onClick={() => onDelete(essence.id)}
-    />
+      onclick={() => onDelete(essence.id)}
+    >
+      <i class="fas fa-trash" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Essence.Delete', 'Delete essence')}</span>
+    </Button>
   </div>
   {#if essence.componentUsageCount > 0}
     <p class="manager-muted manager-essence-delete-note" data-essence-delete-impact>
@@ -341,13 +338,13 @@
           <strong>{essence.associatedItem.name || essence.sourceName}</strong>
         </div>
       </div>
-      <!-- The SAME primitive as the three verbs above, paired in a two-column grid: a rail sizing
-           its source actions differently from its entity actions is the drift the extraction
-           removes. `warning` carries the amber `Unlink Source` wore — it breaks a reference. -->
+      <!-- The same primitive as the verbs above, paired in a two-column grid. Copy changes no
+           record, so it is `ghost`; Unlink breaks a reference the GM can re-make exactly and
+           destroys nothing, so it is the caution verb, `warning`, never `danger`. -->
       <div class="manager-essence-inspector-source-actions">
-        <InspectorActionButton
-          icon="fas fa-copy"
-          label={text('FABRICATE.Admin.Manager.Essence.CopySource', 'Copy source UUID')}
+        <Button
+          role="ghost"
+          fullWidth
           title={sourceUuid ||
             text(
               'FABRICATE.Admin.Manager.Essence.SourceNoUuid',
@@ -355,15 +352,20 @@
             )}
           disabled={!sourceUuid}
           data-essence-action="copy-source"
-          onClick={() => onCopySource()}
-        />
-        <InspectorActionButton
-          tone="warning"
-          icon="fas fa-unlink"
-          label={text('FABRICATE.Admin.Manager.Essence.UnlinkSource', 'Unlink Source')}
+          onclick={() => onCopySource()}
+        >
+          <i class="fas fa-copy" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Essence.CopySource', 'Copy source UUID')}</span>
+        </Button>
+        <Button
+          role="warning"
+          fullWidth
           data-essence-action="unlink-source"
-          onClick={() => onUnlinkSource()}
-        />
+          onclick={() => onUnlinkSource()}
+        >
+          <i class="fas fa-unlink" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Essence.UnlinkSource', 'Unlink Source')}</span>
+        </Button>
       </div>
     {:else}
       <div class="manager-essence-source-drop-zone manager-essence-inspector-source-drop-zone">

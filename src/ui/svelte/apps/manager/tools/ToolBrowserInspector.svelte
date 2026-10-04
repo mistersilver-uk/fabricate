@@ -188,8 +188,7 @@
           subtitle={fact.subtitle}
           tile
           density="rule"
-          dataAttr="data-tool-inspector-rule"
-          dataValue={fact.id}
+          data-tool-inspector-rule={fact.id || true}
         />
       {/each}
     </div>

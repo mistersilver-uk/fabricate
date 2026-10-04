@@ -24,7 +24,7 @@ import {
   OR_MENU_LABELS,
   assertOneTrackPerGridChild,
   kindPickerFixture,
-  orMenuGroupCardSource,
+  orMenuSource,
 } from './manager-layout-recipes-fixtures.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -375,7 +375,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
           <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
         </div>
         <span class="manager-recipe-option-divider"></span>
-        <div class="fabricate-picker manager-travel-picker manager-recipe-or-picker"><button type="button" class="manager-recipe-or-trigger"><i class="fa-solid fa-code-branch"></i><span class="manager-travel-picker-value">or…</span></button></div>
+        <div class="fabricate-action-menu"><button type="button" class="manager-recipe-or-trigger"><i class="fa-solid fa-code-branch"></i><span>or…</span></button></div>
         <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
       </div>`;
 
@@ -1155,33 +1155,25 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
 test('the "or…" menu is a 150px panel of four tinted, one-word entries under its own header', async () => {
   // WHY IT IS MEASURED AND NOT READ. Three of this panel's claims are cascade questions that a
   // sheet cannot answer on its own:
-  const popoverScoped = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/components/SearchablePopoverPanel.svelte')
+  const kickerScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/components/Kicker.svelte')
   );
-  const stamp = (markup) =>
-    [
-      'manager-travel-popover',
-      'manager-travel-popover-header',
-      'manager-travel-popover-title',
-      'manager-travel-popover-options',
-      'manager-travel-option',
-      'manager-travel-option-name',
-    ].reduce((html, className) => withScopeHash(html, className, popoverScoped.hashClass), markup);
 
-  // The panel exactly as `SearchablePopover` portals it: the primitive's own two classes.
-  const panel = stamp(
-    '<div class="fabricate-picker-popover manager-travel-popover manager-recipe-or-popover" ' +
-      'role="dialog" aria-label="Accept instead" style="width: 150px;">' +
-      '<div class="manager-travel-popover-header" data-popover-header>' +
-      '<span class="manager-travel-popover-title">Accept instead</span></div>' +
-      '<div class="manager-travel-popover-options" role="listbox" aria-label="Accept instead">' +
+  // The panel exactly as `ActionMenu` portals it with a heading: the heading beside the menu.
+  const panel = withScopeHash(
+    '<div class="fabricate-action-menu-panel manager-action-menu-panel manager-recipe-or-menu">' +
+      '<div class="manager-action-menu-heading" id="or-menu-heading">' +
+      '<span class="fab-kicker">Accept instead</span></div>' +
+      '<div class="manager-action-menu-list" role="menu" aria-labelledby="or-menu-heading">' +
       OR_MENU_KINDS.map(
         (kind) =>
-          `<button type="button" class="manager-travel-option" role="option" data-recipe-add="alternative-${kind}" data-kind="${kind}">` +
-          `<i class="${OR_MENU_GLYPHS[kind]} manager-recipe-option-mark is-${kind}"></i>` +
-          `<span class="manager-travel-option-name">${OR_MENU_LABELS[kind]}</span></button>`
+          `<button type="button" class="manager-action-menu-item is-${kind}" role="menuitem" data-recipe-add="alternative-${kind}" data-kind="${kind}">` +
+          `<i class="${OR_MENU_GLYPHS[kind]}"></i>` +
+          `<span>${OR_MENU_LABELS[kind]}</span></button>`
       ).join('') +
-      '</div></div>'
+      '</div></div>',
+    'fab-kicker',
+    kickerScoped.hashClass
   );
 
   // The reference marks: the same four classes, on the plate a requirement ROW draws.
@@ -1209,7 +1201,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
               a.button, button { display: flex; justify-content: center; }
             }
             @layer modules { ${css} }
-            ${popoverScoped.css}
+            ${kickerScoped.css}
             body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
             .fas::before, .fa-solid::before { content: "x"; }
           </style>
@@ -1224,12 +1216,12 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
     `);
 
     const report = await page.evaluate(() => {
-      const panelNode = document.querySelector('.manager-recipe-or-popover');
+      const panelNode = document.querySelector('.manager-recipe-or-menu');
       const panelStyle = getComputedStyle(panelNode);
-      const heading = panelNode.querySelector('.manager-travel-popover-title');
+      const heading = panelNode.querySelector('.fab-kicker');
       const entries = [...panelNode.querySelectorAll('[data-recipe-add]')].map((entry) => {
         const glyph = entry.querySelector('i');
-        const label = entry.querySelector('.manager-travel-option-name');
+        const label = entry.querySelector('span');
         const style = getComputedStyle(entry);
         const box = entry.getBoundingClientRect();
         const labelStyle = getComputedStyle(label);
@@ -1238,6 +1230,8 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
           justifyContent: style.justifyContent,
           fontSize: style.fontSize,
           fontWeight: style.fontWeight,
+          minHeight: style.minHeight,
+          height: Number(box.height.toFixed(2)),
           // The offset of the glyph from the entry's own padding edge.
           glyphIndent: Number(
             (
@@ -1287,6 +1281,8 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
       );
       assert.equal(entry.fontSize, '11px', `\`proto:4683\`: the ${entry.kind} entry is 11px`);
       assert.equal(entry.fontWeight, '600', `\`proto:4683\`: the ${entry.kind} entry is 600`);
+      assert.equal(entry.minHeight, '28px', `\`proto:4683\`: a 28px ${entry.kind} entry`);
+      assert.ok(entry.height >= 28, `the ${entry.kind} entry paints 28px or more (${entry.height}px)`);
       assert.equal(entry.glyphFontSize, '10px', '`proto:4683`: a 10px glyph');
       assert.equal(entry.glyphWidth, '14px', '`proto:4683`: a 14px glyph column');
       assert.ok(
@@ -1313,13 +1309,12 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
     await context.close();
   }
 
-  // THE WIDTH'S OWN SOURCE. The primitive writes the computed width onto the node.
+  // The width's own source. The sheet sizes the panel by the class the caller hands the menu.
   assert.match(
-    orMenuGroupCardSource,
-    /minWidth=\{150\}/,
-    '`proto:2292` fixes the panel at 150px, so the caller must ask for exactly that'
+    orMenuSource,
+    /menuClass="manager-recipe-or-menu"/,
+    '`proto:2292` fixes the panel at 150px through the class the measured panel carries'
   );
-  assert.match(orMenuGroupCardSource, /maxWidth=\{150\}/, 'and must not let it grow past it');
 });
 
 
@@ -1360,9 +1355,9 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="fabricate-picker manager-travel-picker manager-recipe-or-picker">
+            <div class="fabricate-action-menu">
               <button type="button" class="manager-recipe-or-trigger" data-or-trigger>
-                <i class="fa-solid fa-code-branch"></i><span class="manager-travel-picker-value">or…</span>
+                <i class="fa-solid fa-code-branch"></i><span>or…</span>
               </button>
             </div>
             <div class="fabricate-picker manager-travel-picker manager-recipe-tag-picker">
@@ -1449,7 +1444,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
   // it, so the claim that these ARE the two triggers is pinned at both call sites: neither may
   // ask for the chip shape whose own scoped block is what discarded the rules above.
   assert.doesNotMatch(
-    orMenuGroupCardSource,
+    orMenuSource,
     /\n\s+triggerChip\b/,
     'the "or…" trigger is a bare button this sheet can style, not a Chip'
   );

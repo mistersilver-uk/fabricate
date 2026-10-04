@@ -33,7 +33,7 @@
 <script>
   import Medallion from '../../components/Medallion.svelte';
   import Stepper from '../../components/Stepper.svelte';
-  import { localize } from '../../util/foundryBridge.js';
+  import { localizeOr } from '../../util/localizeOr.js';
 
   let {
     id = '',
@@ -59,19 +59,6 @@
     minRows = 5,
     children,
   } = $props();
-
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
-  function phrase(key, fallback, data) {
-    let result = text(key, fallback);
-    for (const [token, value] of Object.entries(data ?? {})) {
-      result = result.replaceAll(`{${token}}`, String(value));
-    }
-    return result;
-  }
 
   // Spread, following `Callout`'s hook idiom: the attribute NAME is a parameter, so it cannot be
   // written literally. `''` rather than `true`, because Svelte serialises `true` as `="true"`.
@@ -148,19 +135,19 @@
               min={row.min === undefined ? 0 : row.min}
               max={row.max ?? max}
               disabled={inert || row.disabled === true}
-              ariaLabel={phrase(
+              ariaLabel={localizeOr(
                 'FABRICATE.Admin.Manager.BulkEdit.EssenceValueFor',
                 'Value for {name}',
                 {
                   name: row.name,
                 }
               )}
-              decrementLabel={phrase(
+              decrementLabel={localizeOr(
                 'FABRICATE.Admin.Manager.BulkEdit.EssenceStepDown',
                 'Step {name} down',
                 { name: row.name }
               )}
-              incrementLabel={phrase(
+              incrementLabel={localizeOr(
                 'FABRICATE.Admin.Manager.BulkEdit.EssenceStepUp',
                 'Step {name} up',
                 {
@@ -213,11 +200,15 @@
          categories, tags and essences alike. `Page {page} of {of}` is the reference's own sentence
          (`proto:1157`, `Page 1 of 1`); the world panel's `Page {page}/{of}` is its own key. -->
     <span class="fab-bulk-inset-range" data-bulk-inset-range={id}>
-      {phrase('FABRICATE.Admin.Manager.BulkEdit.InsetRange', 'Showing {start}-{end} of {total}', {
-        start: page?.rangeStart ?? 0,
-        end: page?.rangeEnd ?? 0,
-        total: page?.total ?? 0,
-      })}
+      {localizeOr(
+        'FABRICATE.Admin.Manager.BulkEdit.InsetRange',
+        'Showing {start}-{end} of {total}',
+        {
+          start: page?.rangeStart ?? 0,
+          end: page?.rangeEnd ?? 0,
+          total: page?.total ?? 0,
+        }
+      )}
     </span>
     <div class="fab-bulk-inset-pages">
       <!-- EVERY `<button>` HERE DECLARES `data-keyboard-focus="true"`: Foundry's
@@ -229,13 +220,13 @@
         data-keyboard-focus="true"
         data-bulk-inset-prev={id}
         disabled={disabled || pageIndex === 0}
-        aria-label={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
+        aria-label={localizeOr('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
         onclick={() => onPage(pageIndex - 1)}
       >
         <i class="fas fa-chevron-left" aria-hidden="true"></i>
       </button>
       <span class="fab-bulk-inset-page-label">
-        {phrase('FABRICATE.Admin.Manager.BulkEdit.InsetPage', 'Page {page} of {of}', {
+        {localizeOr('FABRICATE.Admin.Manager.BulkEdit.InsetPage', 'Page {page} of {of}', {
           page: pageIndex + 1,
           of: pageCount,
         })}
@@ -246,7 +237,7 @@
         data-keyboard-focus="true"
         data-bulk-inset-next={id}
         disabled={disabled || pageIndex >= pageCount - 1}
-        aria-label={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
+        aria-label={localizeOr('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
         onclick={() => onPage(pageIndex + 1)}
       >
         <i class="fas fa-chevron-right" aria-hidden="true"></i>

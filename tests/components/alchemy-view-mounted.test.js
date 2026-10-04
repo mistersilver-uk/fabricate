@@ -8,7 +8,10 @@ import {
   PLAYER_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 import { primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -18,6 +21,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-alchemy-view-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/rollPromptOrigin.js',
     'src/ui/svelte/util/overlayHost.js',
   ],

@@ -33,7 +33,7 @@
   import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
   import { createVocabularyBrowserState } from '../../../model/managerBrowserViewState.js';
-  import { localize } from '../../util/foundryBridge.js';
+  import { localizeOr } from '../../util/localizeOr.js';
   import VocabularyPanel from './VocabularyPanel.svelte';
   import { sortVocabularyRows, toggledDirection, VOCABULARY_SORT_KEYS } from './vocabularyShell.js';
 
@@ -52,18 +52,13 @@
   let ownBrowserState = $state(createVocabularyBrowserState());
   const ui = $derived(browserState ?? ownBrowserState);
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   const sortKey = $derived(String(ui.sortKey || 'name'));
   const sortDirection = $derived(ui.sortDirection === 'desc' ? 'desc' : 'asc');
   const sortedRows = $derived(sortVocabularyRows(rows, sortKey, sortDirection));
   const sortKeyOptions = $derived(
     VOCABULARY_SORT_KEYS.map((option) => ({
       value: option.id,
-      label: text(option.key, option.fallback),
+      label: localizeOr(option.key, option.fallback),
     }))
   );
 </script>
@@ -81,7 +76,7 @@
     <!-- A `<span>` rather than a `<label>`: it names TWO controls, and a `<label>` may point at
          one. Its id is PER PANEL, since three copies of one id would collapse the references. -->
     <span class="manager-vocabulary-shell-sort-label" id={sortLabelId}>
-      {text('FABRICATE.Admin.Manager.Scoped.List.SortByLabel', 'Sort by')}
+      {localizeOr('FABRICATE.Admin.Manager.Scoped.List.SortByLabel', 'Sort by')}
     </span>
     <Select
       size="toolbar"
@@ -101,15 +96,18 @@
       data-keyboard-focus="true"
       data-vocabulary-direction={sortDirection}
       aria-pressed={sortDirection === 'asc'}
-      title={text('FABRICATE.Admin.Manager.Scoped.List.SortDirection', 'Reverse the sort order')}
+      title={localizeOr(
+        'FABRICATE.Admin.Manager.Scoped.List.SortDirection',
+        'Reverse the sort order'
+      )}
       onclick={() => (ui.sortDirection = toggledDirection(sortDirection))}
     >
       {#if sortDirection === 'asc'}
         <i class="fas fa-arrow-down-a-z" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Scoped.List.SortAsc', 'Asc')}</span>
+        <span>{localizeOr('FABRICATE.Admin.Manager.Scoped.List.SortAsc', 'Asc')}</span>
       {:else}
         <i class="fas fa-arrow-up-a-z" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Scoped.List.SortDesc', 'Desc')}</span>
+        <span>{localizeOr('FABRICATE.Admin.Manager.Scoped.List.SortDesc', 'Desc')}</span>
       {/if}
     </button>
   </FilterBar>

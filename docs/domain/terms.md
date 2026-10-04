@@ -110,6 +110,7 @@ The RESOLVED amount is a different value from the authored one and only it may b
 Validation is rollability and never parsability: `Roll.validate` passes expressions that cannot evaluate, so the floor is a maximised evaluation of the formula AS AUTHORED, applied by the authoring surface and by the gathering data boundary alike.
 A craft is also refused before anything is consumed when a non-progressive result's formula cannot total finitely against the crafting character's roll data, maximised and minimised (`validateCraft`, `src/systems/rolledAmountResolver.js`).
 A progressive system skips that check, because its award drops every formula.
+A non-progressive salvage is refused the same way before anything is consumed, and saving an enabled salvage with a non-rollable formula is refused (`validateSalvage`, `assertSalvageAmounts`); a progressive salvage skips both.
 Result-only — a requirement amount and a gathering drop row's quantity are always fixed, and a progressive or salvage-progressive award strips the formula and awards 1.
 
 Canonical mapping: `Result.quantityFormula`, `Result.quantity`, `quantityFormulaErrors` (`src/models/Result.js`); `resolveRolledAmount` (`src/systems/rolledAmountResolver.js`); `maximisedTotal` (`src/utils/rollFormulaRollability.js`)
@@ -443,6 +444,7 @@ Spec reference: openspec/specs/data-models/spec.md
 ## Result Group
 
 In routed and alchemy flows, it is the routing target.
+The interface names it a **result set** throughout `lang/en.json`; engine-authored validation messages and the persisted default name `Result Group N` still say result group.
 
 Canonical mapping: Plain object `{ id, name, results[] }`
 

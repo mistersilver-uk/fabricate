@@ -189,7 +189,7 @@ describe('RollResultBox evidence rows', () => {
       ['needed', 'Needed', 'DC 12, meet or beat'],
       ['margin', 'Margin', '+3'],
     ]);
-    assert.equal(over.querySelector('[data-roll-summary]').textContent, 'The result group is produced.');
+    assert.equal(over.querySelector('[data-roll-summary]').textContent, 'The result set is produced.');
     const order = [...over.querySelector('[data-recipe-section]').children].map(
       (child) => child.className.split(' ', 1)[0]
     );
@@ -204,7 +204,7 @@ describe('RollResultBox evidence rows', () => {
   it('says what a roll-under outcome means for the award, beside its evidence', async () => {
     const summaryOf = (root) => root.querySelector('[data-roll-summary]')?.textContent;
     const passed = await harness.mount({ result: result(executedCheck()) });
-    assert.equal(summaryOf(passed), 'The result group is produced.');
+    assert.equal(summaryOf(passed), 'The result set is produced.');
     const head = [...passed.querySelector('[data-recipe-section="roll-result"]').children];
     assert.equal(head[1].dataset.rollSummary, '', 'directly under the head');
     harness.remount();
@@ -241,7 +241,7 @@ describe('RollResultBox evidence rows', () => {
     assert.deepEqual(tilesOf(root), modelTiles(COUNT_DISPLAY), 'the one tile model (N29)');
     assert.ok(root.querySelector('[data-dice-tiles-legend]'), 'the result box draws the legend');
     assert.deepEqual(rowsOf(root), COUNT_ROWS);
-    assert.equal(root.querySelector('[data-roll-summary]').textContent, 'The result group is produced.');
+    assert.equal(root.querySelector('[data-roll-summary]').textContent, 'The result set is produced.');
     const order = [...root.querySelector('[data-recipe-section]').children].map(
       (child) => child.className.split(' ', 1)[0]
     );
@@ -400,7 +400,7 @@ describe('SalvageRollSummary evidence rows', () => {
       ['needed', 'Needed', 'DC 12, meet or beat'],
       ['margin', 'Margin', '+3'],
     ]);
-    assert.ok(!markupOf(root).includes('result group'), 'the outcome sentence is crafting-only');
+    assert.ok(!markupOf(root).includes('result set'), 'the outcome sentence is crafting-only');
   });
 
   it("states a count salvage's tiles and rows, and no roll for a zero pool (issue 2006)", async () => {

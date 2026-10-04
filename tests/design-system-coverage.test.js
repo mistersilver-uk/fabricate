@@ -190,14 +190,15 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 23 library entries with no shipped implementation (issue 1505). Re-derived from the array
+ * The 21 library entries with no shipped implementation (issue 1505). Re-derived from the array
  * rather than carried forward: `SortableList` left it at issue 1512, `Well` at issue 2008,
  * `PickerRow` at issue 1516 and `RequirementChooser` at issue 1518, when each specified primitive
- * shipped, and the count this docblock states is the array's own length.
+ * shipped, and `ChoiceGroup` and `Menu` at issue 1516, when each specified entry gained its
+ * manifest row; the count this docblock states is the array's own length.
  */
 const SPECIFIED_ONLY = [
-  'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
-  'DataTable', 'InfoStrip', 'LogList', 'Menu',
+  'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard',
+  'DataTable', 'InfoStrip', 'LogList',
   'Meter', 'NavSidebar', 'PageHeader', 'Rail',
   'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
   'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
@@ -608,8 +609,7 @@ test('a divergent entry names the issue that decided it', () => {
  * Shipped manifest rows without a named library specimen.
  */
 const UNDOCUMENTED_ROWS = [
-  // `components/ActionMenu` is the newest arrival and is the ORDINARY kind of growth: a member of
-  // the set that no `library.html` specimen names (issue 1458).
+  // `components/ActionMenu` left at issue 1516, when it claimed `<Menu>`.
   'src/ui/svelte/apps/ActorSelectTopBar.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
   // Issue 2005's executed check evidence rows: no specimen names a key-and-value evidence list.
@@ -620,8 +620,9 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
+  // Issue 1521's one rename field for the party card and the realm inspector.
+  'src/ui/svelte/apps/manager/InlineRenameField.svelte',
   'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
-  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   // The world modifier library's entry row (issue 1373, maintainer round 4).
   'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
@@ -650,7 +651,6 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
-  'src/ui/svelte/components/ActionMenu.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',

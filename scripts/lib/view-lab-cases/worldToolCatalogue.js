@@ -82,6 +82,16 @@ export const CASES = Object.freeze([
       },
       // The fifth inspector card is gone, and nothing replaces it here.
     ],
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-scoped-tool-open-entry]',
+          styles:
+            'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
+        },
+      ],
+    },
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     // The placeholder claim is gone, and dropping it is not optional bookkeeping.

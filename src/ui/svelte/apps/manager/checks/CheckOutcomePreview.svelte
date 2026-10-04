@@ -242,8 +242,7 @@
                     icon={row.icon}
                     density="line"
                     tone={row.tone}
-                    dataAttr="data-checks-simulator-fact"
-                    dataValue={row.id}
+                    data-checks-simulator-fact={row.id || true}
                     metaAttr="data-checks-simulator-fact-meta"
                     title={row.label}
                     subtitle={row.meta}

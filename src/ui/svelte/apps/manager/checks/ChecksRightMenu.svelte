@@ -280,7 +280,7 @@
   // echoing the field back through it REWRITES what was typed. It therefore keeps its raw
   // text and reseeds from upstream only when the two describe DIFFERENT ORDERS, so an order
   // from a route change, a discarded draft or a reload still lands. Seeded through `untrack`
-  // and resynced by the effect, the shipped `PartyNameField` idiom — but the guard is needed
+  // and resynced by the effect, the shipped `InlineRenameField` idiom — but the guard is needed
   // here and is not there, this field committing on every keystroke rather than on blur.
   let sandboxText = $state(untrack(() => previewDifficultiesText));
   $effect(() => {

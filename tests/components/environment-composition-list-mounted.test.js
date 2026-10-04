@@ -13,7 +13,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -131,7 +131,8 @@ describe('CompositionList mounted layout', () => {
       // THE manager's labelled push-button (issue 1118). Restore and the warning Force add
       // both render it. Omitting a rendered `.svelte` HANGS the suite (# cancelled).
       'src/ui/svelte/components/IconButton.svelte',
-      // THE shared overflow action menu (issue 1477).
+      // THE shared overflow action menu (issue 1477), and the eyebrow its heading renders.
+      'src/ui/svelte/components/Kicker.svelte',
       'src/ui/svelte/components/ActionMenu.svelte',
       // The product's one ordered list and the disclosure it renders (issue 1512). This loop has no
       // dependency validator, so omitting either reports the file as `# cancelled`.
@@ -171,6 +172,7 @@ describe('CompositionList mounted layout', () => {
       'src/utils/scalars.js',
       'src/ui/svelte/apps/manager/environment/compositionStateMeta.js',
       ...FOUNDRY_BRIDGE_RAW_MODULES,
+      ...LOCALIZE_OR_RAW_MODULES,
       'src/ui/svelte/util/listReorderAnnouncement.js',
       'src/ui/svelte/components/stepperLabels.js',
       'src/ui/svelte/actions/dismissOnOutsideClick.js',

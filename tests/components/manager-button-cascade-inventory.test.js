@@ -90,13 +90,12 @@ const CONVERTED_BATCHES = Object.freeze([
       }),
       // 4 -> 0 AT ISSUE 1371's C7.6. The stacked action column of four `.fabricate-button`s is
       // gone: the reference draws ONE primary plus a kebab, so the inspector now renders a
-      // single `InspectorActionButton` — a primitive whose own header records that it is
-      // deliberately NOT `.fabricate-button` — with the other three commands as `ActionMenu`
-      // DATA rather than as controls. Licensed by the same rule as every other movement in
-      // this ledger: the four SITES left the product, rather than leaving this instrument's
-      // view. The entry is kept at 0 rather than dropped, so the two ledger checks below —
-      // that the file writes no literal `class="fabricate-button"` and that the instrument
-      // derives no site in it — keep guarding it against a regression.
+      // single primary `Button` — whose class the primitive writes, not this file — with the
+      // other three commands as `ActionMenu` DATA rather than as controls. Licensed by the same
+      // rule as every other movement in this ledger: the four SITES left the product, rather
+      // than leaving this instrument's view. The entry is kept at 0 rather than dropped, so the
+      // two ledger checks below — that the file writes no literal `class="fabricate-button"` and
+      // that the instrument derives no site in it — keep guarding it against a regression.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte',
         sites: 0,
@@ -113,10 +112,12 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 8,
     files: Object.freeze([
-      // 14 sites across the recipe editor tree, all `<button>` — 13 booked here now.
+      // 14 sites across the recipe editor tree, all `<button>` — 10 booked here now.
+      // 4 -> 1 at issue 1516: the choice group's four `alt <kind>` adders render from one
+      // `{#each}` over the kind menu's own list, so the four sites are one.
       Object.freeze({
-        file: 'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-        sites: 4,
+        file: 'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
+        sites: 1,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
@@ -672,14 +673,9 @@ const REVIEWED = [
       'string, so it never gains `fab-manager-button`.',
   },
   {
-    id: globalRule('.fabricate-button.fabricate-button.manager-salvage-component-trigger'),
-    disposition: 'EXCLUDE',
-    why: 'Salvage component popover trigger, population B.',
-  },
-  {
     id: globalRule('.fabricate-button.fabricate-button.manager-tool-replacement-component-trigger'),
     disposition: 'EXCLUDE',
-    why: 'The second selector of that same group, likewise population B only.',
+    why: 'Tool replacement component popover trigger, population B only.',
   },
   {
     id: globalRule(
@@ -1101,14 +1097,14 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    123,
-    'the conversion is 123 sites, whether or not a given one has been converted yet'
+    120,
+    'the conversion is 120 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
     48,
     // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), and one for the
-    // salvage DC card's move into `CheckOverrideField` (issue 2005); the 123-site total above is
+    // salvage DC card's move into `CheckOverrideField` (issue 2005); the 120-site total above is
     // unchanged, because nothing converted.
     'across 48 components'
   );
@@ -1147,10 +1143,12 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // plain dashed `<Button>`s that create an empty row. The sixth is `+ Tag`, which the
   // design draws as a dashed tag-tinted PILL (`proto:2256`) and which is a `triggerChip` now,
   // writing no `fabricate-button` class at all.
+  // AND ONE LEFT AT ISSUE 1516, taking the count to 10: the salvage yield picker's trigger, both
+  // salvage rows now naming their component through the requirement row.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    11,
-    'plus the 11 SearchablePopover triggerClass sites still named as debt'
+    10,
+    'plus the 10 SearchablePopover triggerClass sites still named as debt'
   );
   // ...AND THE ONE THAT LEFT LEFT BY CONVERSION AND THEN BY RULING.
   const retiredSite = readFileSync(resolve(repoRoot, POPULATION_B_RETIRED_SITE_FILE), 'utf8');

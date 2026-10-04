@@ -1,7 +1,7 @@
 /**
- * The hooks the result rows carried at `3342471700b0` (issue 1516), the last commit before they
- * became `PickerRow`, by row face. Every selector must still match the row or a node inside it on
- * each surface that renders `RecipeResultGroupCard`.
+ * The hooks the result rows carried before they became `PickerRow` (issue 1516), by row face: the
+ * recipe and gathering task rows at `3342471700b0`, and the salvage rows at `74502ace8`. Every
+ * selector must still match the row or a node inside it on each surface that renders that face.
  */
 export const RESULT_ROW_CENSUS = Object.freeze({
   flat: Object.freeze([
@@ -15,6 +15,19 @@ export const RESULT_ROW_CENSUS = Object.freeze({
     '[data-recipe-result-item]',
     '.manager-recipe-stage-dc[data-recipe-result-difficulty]',
     '.manager-recipe-stage-edit[data-recipe-result-edit][data-keyboard-focus="true"]',
+  ]),
+  salvageFlat: Object.freeze([
+    '[data-salvage-result]',
+    '[data-salvage-result-component]',
+    '[data-salvage-result-quantity]',
+    '[data-remove-salvage-result]',
+  ]),
+  salvageStage: Object.freeze([
+    '[data-salvage-result][data-salvage-stage]',
+    '[data-salvage-result-component]',
+    '[data-salvage-result-difficulty]',
+    '[data-salvage-result-edit]',
+    '[data-remove-salvage-result]',
   ]),
 });
 

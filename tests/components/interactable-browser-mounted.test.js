@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
@@ -17,6 +18,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-interactable-browser-',
   rawModules: [
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/actions/dragSource.js',
     'src/canvas/interactableDragPayload.js',
     'src/models/toolDisplay.js',

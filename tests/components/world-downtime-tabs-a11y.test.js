@@ -6,7 +6,10 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { flushSync, tick } from 'svelte';
 
 import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from '../../src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 import { useShippedLocalization } from '../helpers/manager/managerLocalization.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -22,7 +25,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-downtime-tabs-a11y-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',
