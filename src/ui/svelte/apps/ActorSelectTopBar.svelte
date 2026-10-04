@@ -1,5 +1,5 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(comment-share): deleting the low-comment ComponentEditorRoot (issue 1779) lifted this directory over the cap without adding a comment line -->
+<!-- ratchet-exempt(comment-share): deleting the low-comment ComponentEditorRoot (issue 1779) lifted this directory over the cap without adding a comment line; issue 2184 condenses the directory and removes this marker -->
 <!--
   ActorSelectTopBar is the shared, content-width actor-selection bar above all
   unified-window tabs. Its left side is a portrait + caret trigger that opens a
