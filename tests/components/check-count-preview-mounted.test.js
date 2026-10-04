@@ -331,6 +331,10 @@ describe('count odds and the simulator readout', () => {
     const only = odds(root).querySelector('[data-banded-bar-track]');
     assert.equal(only.dataset.bandedBarTrack, 'botch');
     assert.equal(only.closest('[role="meter"]').getAttribute('aria-valuenow'), '100');
+    assert.ok(
+      only.closest('.fab-banded-bar-band[data-banded-bar-row="botch"]'),
+      'drawn in the band row the histogram draws, not as a chance bar'
+    );
     await roll(root);
     const readout = root.querySelector('[data-checks-simulator-readout][data-checks-simulator-botch]');
     assert.ok(Boolean(readout), 'the readout is marked a botch');

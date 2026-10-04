@@ -1913,6 +1913,17 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-botch]:has([data-checks-simulator-margin="botch"]) [data-checks-simulator-total="-3"]',
   }),
+  // Issue 1782: a one-outcome chart is the single-row meter, drawn in the histogram's band row.
+  countCase({
+    id: 'manager-checks-count-botch-odds',
+    label: 'a botch-only odds chart',
+    frame: '40 semantic',
+    state: 'dice-pool-extended',
+    nav: 'gathering',
+    steps: COUNT_ODDS,
+    expectSelector:
+      '.fabricate-manager [data-checks-odds-product="count"] [role="meter"] .fab-banded-bar-band[data-banded-bar-row="botch"]',
+  }),
   rolledCase({
     id: 'manager-checks-count-over-rolled-failure',
     label: 'six d10s short of Masterwork, no botch',

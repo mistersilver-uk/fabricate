@@ -6,8 +6,9 @@
   THE `all N faces` CAPTION IS NOT DRAWN HERE: the rail section's heading row carries it, and a
   second copy could disagree, the head's own fallback being a regex over the AUTHORED formula. IT
   ABSTAINS LOUDLY, a formula outside the enumerable shape rendering a STATED note naming the
-  reason rather than an approximation. The bars are the multi-row `BandedBar`, flat: each row
-  announces as a name and a percentage, with its track hidden. No gradient: the band strip's
+  reason rather than an approximation. The bars are a compact `BandedBar`, flat: each row
+  announces as a name and a percentage, with its track hidden, and a one-outcome chart is its
+  meter drawn in the same band row. No gradient: the band strip's
   full-track semantic scale is the only exemption.
 -->
 <script>

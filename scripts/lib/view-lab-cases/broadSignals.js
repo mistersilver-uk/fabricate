@@ -58,11 +58,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-essence-pool',
     'fabricate-journal-lifecycle-essence-shared',
   ]),
-  // One chance bar of each scale, and the Checks Studio's odds histogram.
+  // One chance bar of each scale, and the Checks Studio's odds histogram and one-outcome chart.
   'src/ui/svelte/components/BandedBar.svelte': Object.freeze([
     'player-gathering-task-ready',
     'player-gathering-events',
     'manager-checks-crafting-odds-enumerable',
+    'manager-checks-count-botch-odds',
   ]),
   // The bare leaf's one remaining caller: an opened gathering drop row's chance track.
   'src/ui/svelte/components/FillBar.svelte': Object.freeze(['player-gathering-drop-open']),

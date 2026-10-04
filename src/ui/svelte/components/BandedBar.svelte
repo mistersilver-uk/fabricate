@@ -6,9 +6,9 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `rows` | `{ id?, name, percent, fill? }[]` | `[]` | `percent` is 0–100 and is printed as given. `fill` is a semantic tone or a ramp key; absent, it is read off the ramp at `percent` in `direction`. A single row's `name` is its visible caption and default accessible name, and an empty one draws no caption. |
+  | `rows` | `{ id?, name, percent, fill? }[]` | `[]` | `percent` is 0–100 and is printed as given. `fill` is a semantic tone or a ramp key, and anything else paints `neutral`; absent, it is read off the ramp at `percent` in `direction`. A single row's `name` is its visible caption and default accessible name, and an empty one draws no caption. Every row, a single one included, carries `data-banded-bar-row`, `-track` and `-percent` keyed `id ?? index`. |
   | `direction` | `'ascending'` \| `'descending'` | `'ascending'` | `ascending` is the drop-rate ramp (better is rarer); `descending` is the risk scale, the hazard at a high chance. |
-  | `density` | `'default'` \| `'compact'` | `'default'` | Forwarded to `FillBar`. |
+  | `density` | `'default'` \| `'compact'` | `'default'` | Forwarded to `FillBar`. At `compact` a single row stays a meter but draws the histogram's band row. |
 
   Rest spread:
   - `{...rest}` lands on the root, written after `class={…}`; on the single-row meter a rest
@@ -16,7 +16,7 @@
 
   Invariants:
   - Every hue resolves through `util/dropRateTier.js` or `FillBar`'s own tones, so no colour is
-    mixed here — pinned by `tests/components/instruments-mounted.test.js`.
+    mixed here — pinned by `tests/components/theme-colour-contract.test.js`.
 -->
 <script>
   import { dropRateRampKey, hazardFill, rampColour } from '../util/dropRateTier.js';
@@ -42,8 +42,22 @@
   }
 </script>
 
+{#snippet band(row, key, hidden)}
+  {@const fill = fillOf(row)}
+  <span class="fab-banded-bar-name">{row.name}</span>
+  <FillBar
+    value={row.percent}
+    {density}
+    tone={fill.tone}
+    color={fill.color}
+    aria-hidden={hidden ? 'true' : undefined}
+    data-banded-bar-track={key}
+  />
+  <span class="fab-banded-bar-percent" data-banded-bar-percent={key}>{row.percent}%</span>
+{/snippet}
+
 {#if single}
-  {@const fill = fillOf(single)}
+  {@const key = single.id ?? 0}
   <div
     class={['fab-banded-bar', 'is-single', extraClass]}
     role="meter"
@@ -53,37 +67,32 @@
     aria-label={single.name || undefined}
     {...rest}
   >
-    {#if single.name}<Kicker as="span">{single.name}</Kicker>{/if}
-    <span class="fab-banded-bar-row">
-      <FillBar
-        value={single.percent}
-        {density}
-        tone={fill.tone}
-        color={fill.color}
-        data-banded-bar-track={single.id ?? ''}
-      />
-      <span class="fab-banded-bar-single-percent" data-banded-bar-percent={single.id ?? ''}
-        >{single.percent}%</span
-      >
-    </span>
+    {#if density === 'compact'}
+      <span class="fab-banded-bar-band" data-banded-bar-row={key}>
+        {@render band(single, key, false)}
+      </span>
+    {:else}
+      {@const fill = fillOf(single)}
+      {#if single.name}<Kicker as="span">{single.name}</Kicker>{/if}
+      <span class="fab-banded-bar-row" data-banded-bar-row={key}>
+        <FillBar
+          value={single.percent}
+          {density}
+          tone={fill.tone}
+          color={fill.color}
+          data-banded-bar-track={key}
+        />
+        <span class="fab-banded-bar-single-percent" data-banded-bar-percent={key}
+          >{single.percent}%</span
+        >
+      </span>
+    {/if}
   </div>
 {:else if rows.length > 1}
   <ul class={['fab-banded-bar', 'is-histogram', extraClass]} {...rest}>
     {#each rows as row, index (row.id ?? index)}
-      {@const fill = fillOf(row)}
       <li class="fab-banded-bar-band" data-banded-bar-row={row.id ?? index}>
-        <span class="fab-banded-bar-name">{row.name}</span>
-        <FillBar
-          value={row.percent}
-          {density}
-          tone={fill.tone}
-          color={fill.color}
-          aria-hidden="true"
-          data-banded-bar-track={row.id ?? index}
-        />
-        <span class="fab-banded-bar-percent" data-banded-bar-percent={row.id ?? index}
-          >{row.percent}%</span
-        >
+        {@render band(row, row.id ?? index, true)}
       </li>
     {/each}
   </ul>
