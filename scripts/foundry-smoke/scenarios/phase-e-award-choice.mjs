@@ -1,14 +1,21 @@
 /**
  * Phase E's award-time pick (issue 1773): a one-stage recipe whose results hold a group the player
- * chooses up to two from (a charm, 5 gp and a taught recipe) and a group a `1d1+9` selection draws
- * from, crafted through the Journal command. The pick is then sent as `chooseAward` from a second
- * client joined as the crafter's owning player while the GM stays connected, and re-sent under the
- * same request. Asserted in every profile; nothing is captured.
+ * chooses up to three from (a charm, 5 gp and a taught recipe) and a group a `1d1+9` selection
+ * draws from, crafted through the Journal command. An observer's `chooseAward` is refused; the pick
+ * of all three is then sent from a second client joined as the crafter's owning player while the
+ * GM stays connected, and re-sent under the same request. Both joined clients' consoles are gated.
+ * Asserted in every profile; nothing is captured.
  */
 
 import { joinWorldSession } from '../../lib/foundryBrowserBoot.js';
+import { appendAllowedConsoleErrorPatterns } from '../../lib/foundrySmokeSignal.js';
 import { dismissStandingPrompts, withinTime } from '../pageOps/chatCardCrafts.mjs';
-import { closeOpenApplications } from '../pageOps/pageLifecycle.mjs';
+import {
+  attachConsoleCapture,
+  closeOpenApplications,
+  suppressFoundryTours,
+} from '../pageOps/pageLifecycle.mjs';
+import { readAllowedConsoleErrorPatternsCsv } from '../profile.mjs';
 
 const AWARD_FORGE = Object.freeze({
   name: 'Smoke Award Choice Forge',
@@ -16,11 +23,11 @@ const AWARD_FORGE = Object.freeze({
   charmName: 'Smoke Award Charm',
 });
 const PLAYER = 'Fabricate Gatherer';
+const OBSERVER = 'Fabricate Observer';
 const GP_PATH = 'system.currency.gp';
 const CREDIT = 5;
 const PICK_ID = 'smoke-award-pick';
-const PICKS = Object.freeze(['coin', 'lore']);
-const REQUEST_ID = 'smoke-award-choose';
+const PICKS = Object.freeze(['charm', 'coin', 'lore']);
 // The stage's own charm and the `1d1+9` draw's three, which only a total of 10 reaches.
 const STAGE_CHARMS = 1 + 3;
 
@@ -49,6 +56,7 @@ async function seedAwardForge(page, crafterId, forge) {
         learned: foundry.utils.deepClone(
           crafter.getFlag('fabricate', 'fabricate.learnedRecipes') ?? null
         ),
+        gp: foundry.utils.getProperty(crafter, gpPath) ?? null,
       };
       const units = (snapshot.currency.units ?? [])
         .filter((unit) => unit?.id && unit.id !== 'gp')
@@ -121,7 +129,7 @@ async function seedAwardForge(page, crafterId, forge) {
                 id: pickId,
                 chooser: 'playerChooses',
                 awardStrategy: 'upTo',
-                awardCount: 2,
+                awardCount: 3,
                 alternatives: [
                   { id: 'charm', componentId: charmId, quantity: 1 },
                   { id: 'coin', kind: 'currency', unit: 'gp', quantity: credit },
@@ -195,6 +203,9 @@ async function readWorld(page, { crafterId, recipeId, loreId, charmName }) {
         cards: game.messages.contents.filter((message) =>
           String(message.content ?? '').includes('fabricate-craft-chat')
         ).length,
+        awardRows: game.messages.contents.filter((message) =>
+          String(message.content ?? '').includes('data-reward-kind="awardChoice"')
+        ).length,
         run: run
           ? {
               id: run.id,
@@ -239,42 +250,55 @@ async function readJournal(page, { crafterId, runId }) {
   );
 }
 
-/** A second client, joined as the crafter's owning player, with Fabricate ready. */
-async function joinAsPlayer(page) {
+/**
+ * A second client joined as `userLabel` with Fabricate ready, its console and page errors gated by
+ * the run's waivers; `errors()` answers the unwaived ones.
+ */
+async function joinAs(page, userLabel) {
   const context = await page
     .context()
     .browser()
-    .newContext({ viewport: { width: 1280, height: 860 } });
-  const playerPage = await context.newPage();
-  await playerPage.goto(new URL('/join', page.url()).href, { waitUntil: 'domcontentloaded' });
-  await joinWorldSession(playerPage, { userLabel: PLAYER });
-  await playerPage.waitForFunction(() => game?.ready === true && Boolean(game.fabricate), null, {
+    .newContext({ viewport: { width: 1920, height: 1080 } });
+  await suppressFoundryTours(context);
+  const clientPage = await context.newPage();
+  const sinks = { consoleErrors: [], waivedConsoleErrors: [], consoleLog: [] };
+  const waivers = appendAllowedConsoleErrorPatterns(
+    [/favicon/i],
+    readAllowedConsoleErrorPatternsCsv()
+  );
+  attachConsoleCapture(clientPage, waivers, sinks);
+  await clientPage.goto(new URL('/join', page.url()).href, { waitUntil: 'domcontentloaded' });
+  await joinWorldSession(clientPage, { userLabel });
+  await clientPage.waitForFunction(() => game?.ready === true && Boolean(game.fabricate), null, {
     timeout: 120_000,
   });
-  return { context, playerPage };
+  return { context, clientPage, errors: () => [...sinks.consoleErrors] };
 }
 
-/** `chooseAward` sent from the player's client under `REQUEST_ID`; resolves to its reply. */
-async function chooseAsPlayer(playerPage, { crafterId, runId }) {
-  return await playerPage.evaluate(
-    async ({ crafterId, runId, pickId, picks, requestId }) => {
-      const crafter = game.actors.get(crafterId);
-      const run = game.fabricate.getCraftingRunManager().getRun(crafter, runId);
-      return await game.fabricate.executeJournalRunCommand(
+/** `chooseAward` of `PICKS` sent from `clientPage` under `requestId`; resolves to its reply. */
+async function chooseFrom(clientPage, { actorUuid, runId, expectedRevision, requestId }) {
+  return await clientPage.evaluate(
+    async ({ actorUuid, runId, expectedRevision, pickId, picks, requestId }) =>
+      await game.fabricate.executeJournalRunCommand(
         {
-          actorUuid: crafter.uuid,
+          actorUuid,
           runType: 'crafting',
           runId,
-          expectedRevision: run.runRevision,
+          expectedRevision,
           action: 'chooseAward',
           requestId,
           payload: { choiceId: pickId, picks },
         },
         { interactive: false }
-      );
-    },
-    { crafterId, runId, pickId: PICK_ID, picks: [...PICKS], requestId: REQUEST_ID }
+      ),
+    { actorUuid, runId, expectedRevision, pickId: PICK_ID, picks: [...PICKS], requestId }
   );
+}
+
+/** Fail on any unwaived console or page error a joined client raised. */
+function assertCleanConsole(client, label) {
+  const errors = client.errors();
+  if (errors.length > 0) throw new Error(`the ${label} client logged: ${errors.join(' | ')}`);
 }
 
 /** Craft through the Journal command: the stage commits owing the pick and the draw has landed. */
@@ -310,6 +334,9 @@ async function proveStageOwesPick(ctx, forge) {
   if (!after.run.choice || after.run.choice.settledAt != null) {
     throw new Error(`the pick is ${JSON.stringify(after.run.choice)}`);
   }
+  if (after.awardRows - before.awardRows !== 1) {
+    throw new Error(`the stage card carries ${after.awardRows - before.awardRows} award rows`);
+  }
   if (after.charms - before.charms !== STAGE_CHARMS) {
     throw new Error(
       `the stage awarded ${after.charms - before.charms} charms, not ${STAGE_CHARMS}`
@@ -331,22 +358,54 @@ async function proveStageOwesPick(ctx, forge) {
   if (journal.dismissal !== 'award-choice-pending') {
     throw new Error(`dismissal answered ${journal.dismissal}`);
   }
-  return { runId: after.run.id, revision: after.run.runRevision, charms: after.charms };
+  const actorUuid = await page.evaluate((id) => game.actors.get(id).uuid, crafterId);
+  return { runId: after.run.id, actorUuid, revision: after.run.runRevision, charms: after.charms };
 }
 
-/** The player's pick: credited, taught, recorded once with one card, and a replay awarding nothing. */
-async function provePlayerPick(ctx, forge, staged) {
+/** An observer who does not own the crafter is refused `owner-required`, and nothing changes. */
+async function proveObserverRefused(ctx, forge, staged, requestId) {
+  const { page } = ctx;
+  const read = () => readWorld(page, { crafterId: ctx.shared.cleanup.crafterId, ...forge });
+  const before = await read();
+  const observer = await joinAs(page, OBSERVER);
+  try {
+    const refused = await withinTime(
+      chooseFrom(observer.clientPage, {
+        ...staged,
+        expectedRevision: before.run.runRevision,
+        requestId: `${requestId}-observer`,
+      }),
+      60_000,
+      'the observer settle never answered'
+    );
+    if (refused?.reason !== 'owner-required') {
+      throw new Error(`the observer was answered ${JSON.stringify(refused)}`);
+    }
+    const after = await read();
+    if (after.gp !== before.gp || after.run.runRevision !== before.run.runRevision) {
+      throw new Error('the refused settle changed the run');
+    }
+    assertCleanConsole(observer, 'observer');
+    return { reason: refused.reason };
+  } finally {
+    await observer.context.close().catch(() => {});
+  }
+}
+
+/**
+ * The player's pick of all three: credited, taught, one charm created, recorded once with one
+ * card, and a replay awarding nothing.
+ */
+async function provePlayerPick(ctx, forge, staged, requestId) {
   const { page } = ctx;
   const { crafterId } = ctx.shared.cleanup;
   const read = () => readWorld(page, { crafterId, ...forge });
   const before = await read();
-  const { context, playerPage } = await joinAsPlayer(page);
+  const player = await joinAs(page, PLAYER);
+  const expectedRevision = before.run.runRevision;
+  const send = () => chooseFrom(player.clientPage, { ...staged, expectedRevision, requestId });
   try {
-    const settled = await withinTime(
-      chooseAsPlayer(playerPage, { crafterId, runId: staged.runId }),
-      60_000,
-      'the player settle never answered'
-    );
+    const settled = await withinTime(send(), 60_000, 'the player settle never answered');
     if (settled?.success !== true) {
       throw new Error(`the settle was refused: ${settled?.reason} ${settled?.message ?? ''}`);
     }
@@ -356,7 +415,9 @@ async function provePlayerPick(ctx, forge, staged) {
     if (after.gp - before.gp !== CREDIT) throw new Error(`gp rose by ${after.gp - before.gp}`);
     if (after.learned?.granted !== true)
       throw new Error(`learned: ${JSON.stringify(after.learned)}`);
-    if (after.charms !== before.charms) throw new Error('an unpicked charm was awarded');
+    if (after.charms - before.charms !== 1) {
+      throw new Error(`the picked charm awarded ${after.charms - before.charms}`);
+    }
     if (choice?.outcome !== 'awarded' || JSON.stringify(choice.picks) !== JSON.stringify(PICKS)) {
       throw new Error(`the choice settled ${JSON.stringify(choice)}`);
     }
@@ -374,27 +435,24 @@ async function provePlayerPick(ctx, forge, staged) {
       throw new Error('the run revision did not advance');
     if (after.cards - before.cards !== 1)
       throw new Error(`${after.cards - before.cards} cards posted`);
-    const replay = await withinTime(
-      chooseAsPlayer(playerPage, { crafterId, runId: staged.runId }),
-      60_000,
-      'the replayed settle never answered'
-    );
+    const replay = await withinTime(send(), 60_000, 'the replayed settle never answered');
     await page.waitForTimeout(1500);
     const again = await read();
     if (again.gp !== after.gp || again.charms !== after.charms || again.cards !== after.cards) {
       throw new Error(`the replay (${JSON.stringify(replay)}) awarded again`);
     }
+    assertCleanConsole(player, 'player');
     return { replayed: replay?.success === true, replayReason: replay?.reason ?? null };
   } finally {
-    await context.close().catch(() => {});
+    await player.context.close().catch(() => {});
   }
 }
 
-/** The currency ladder and the crafter's learned recipes, as they were. */
-async function restoreWorld(ctx, { crafterId, snapshot }) {
+/** The currency ladder, the crafter's gp, learned recipes and charms, as they were. */
+async function restoreWorld(ctx, { crafterId, snapshot, charmName }) {
   try {
     await ctx.page.evaluate(
-      async ({ crafterId, snapshot }) => {
+      async ({ crafterId, snapshot, charmName, gpPath }) => {
         await game.settings.set('fabricate', 'currencyConfig', snapshot.currency);
         await game.fabricate.getCurrencyConfigStore?.()?.load?.();
         const crafter = game.actors.get(crafterId);
@@ -402,8 +460,16 @@ async function restoreWorld(ctx, { crafterId, snapshot }) {
         if (snapshot.learned) {
           await crafter.update({ 'flags.fabricate.fabricate.learnedRecipes': snapshot.learned });
         }
+        if (snapshot.gp !== null) await crafter.update({ [gpPath]: snapshot.gp });
+        const charms = crafter.items.contents.filter((item) => item.name === charmName);
+        if (charms.length > 0) {
+          await crafter.deleteEmbeddedDocuments(
+            'Item',
+            charms.map((item) => item.id)
+          );
+        }
       },
-      { crafterId, snapshot }
+      { crafterId, snapshot, charmName, gpPath: GP_PATH }
     );
   } catch (error) {
     ctx.results.steps.push({ step: 'award-choice-restore', passed: false, error: error.message });
@@ -425,18 +491,25 @@ export async function runAwardChoice(ctx) {
   cleanup.executionSystemIds = [...(cleanup.executionSystemIds || []), forge.systemId];
   cleanup.executionItemIds = [...(cleanup.executionItemIds || []), ...forge.itemIds];
   cleanup.recipeIds = [...(cleanup.recipeIds || []), ...forge.recipeIds];
+  // Per run, so a reused world's ledger never answers this run's settle as another session's.
+  const requestId = `smoke-award-choose-${Date.now()}`;
   try {
     let staged = null;
     await runStep(ctx, 'award-choice-stage', async () => {
       staged = await proveStageOwesPick(ctx, forge);
       return staged;
     });
+    await runStep(ctx, 'award-choice-observer-refused', () => {
+      if (!staged) throw new Error('the stage never owed a pick');
+      return proveObserverRefused(ctx, forge, staged, requestId);
+    });
     await runStep(ctx, 'award-choice-player-pick', () => {
       if (!staged) throw new Error('the stage never owed a pick');
-      return provePlayerPick(ctx, forge, staged);
+      return provePlayerPick(ctx, forge, staged, requestId);
     });
   } finally {
-    await restoreWorld(ctx, { crafterId: cleanup.crafterId, snapshot: forge.snapshot });
+    const { snapshot, charmName } = forge;
+    await restoreWorld(ctx, { crafterId: cleanup.crafterId, snapshot, charmName });
     await closeOpenApplications(page).catch(() => {});
   }
 }
