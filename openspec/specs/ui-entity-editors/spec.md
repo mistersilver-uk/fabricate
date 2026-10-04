@@ -409,10 +409,10 @@ The GM component surfaces: the component browser and the component editor.
    Replacing or unlinking a component's source item restamps durable component identity and saves; carrying source fields through the draft's update path would skip that restamping.
 4. The component salvage panel derives its presentation from `salvageResolutionMode` plus salvage-check enablement, gated by `features.salvage` and `component.salvage.enabled`.
    The persisted `routed` token is displayed as "Routed by check".
-5. The result-group editor remains reachable when salvage is disabled.
+5. The result-set editor remains reachable when salvage is disabled.
    Disabling salvage collapses the mode, DC, routing, and reorder chrome only.
-   The per-component enable control is disabled, with a visible explanation, until at least one result group exists; since the add-group control lives in the result-group editor, collapsing that editor would make enabling unreachable.
-   The disabled-state copy distinguishes "no result groups authored yet" from "authored but disabled".
+   The per-component enable control is disabled, with a visible explanation, until at least one result set exists; since the add-set control lives in the result-set editor, collapsing that editor would make enabling unreachable.
+   The disabled-state copy distinguishes "no result sets authored yet" from "authored but disabled".
 6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
    A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
    A "Manage presets" link routes to the system's Checks screen.
@@ -523,23 +523,23 @@ The UI must expose required data fields from `resolution-modes/spec.md`, but mod
 
 - One ingredient set
 - Ingredient-group editor within that set (including OR options)
-- One result group editor
+- One result set editor
 
 ### Routed UI
 
 The routing basis is the system **mode**, not a per-recipe provider: the recipe inspector carries NO result-selection provider selector (it was removed in the routed split — the basis is derived from `routedByIngredients` / `routedByCheck`).
 
 - `routedByIngredients` UI:
-  - Ingredient sets map to result groups via `resultGroupId`.
+  - Ingredient sets map to result sets via `resultGroupId`.
   - Validation enforces deterministic mapping for all satisfiable sets.
   - The crafting check is optional (no provider toggle, no check requirement surfaced here) and is authored via the shared simple pass/fail editor (`SimpleCraftingCheckEditor`, bound to `craftingCheck.simple`).
   - `routedByIngredients` recipes offer the per-recipe "Check tier" (DC-tier) dropdown sourced from `craftingCheck.simple.tiers` when the simple check uses static `dcMode`; they do NOT get the `minSuccessOutcomeId` minimum-success-tier control (which is `routedByCheck + fixed` only).
 - `routedByCheck` UI:
   - Routes by the system crafting-check outcome (the system requires an authored `craftingCheck.routed.rollFormula`).
-  - Result groups carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
+  - Result sets carry the routed-check outcome tier assignment (`checkOutcomeIds`); the outcome also routes by normalized match to `ResultGroup.name`.
     The `checkOutcomeIds` assignment picker offers **success tiers only** (`success === true`), matching the success-only routing rule (a failure tier never routes and awards nothing).
-  - A step with exactly one result group needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
-- Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-group names.
+  - A step with exactly one result set needs no outcome/tier mapping (the single-group exemption): it is produced on any non-failure outcome.
+- Validation and helper copy must reserve failure keywords, including compatibility aliases such as former miss/event terms, and forbid them as result-set names.
 
 ### Alchemy check-mode selector (issue 554)
 
@@ -569,7 +569,7 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 
 - alchemy + `simple` → the simple pass/fail editor rendered below the selector, with a LIVE Active switch: simple is OPTIONAL, and turning it off stages `checkMode: "none"`.
 - alchemy + `tiered` → the routed editor below the selector, with the LOCKED always-on reading of the switch and the requiredHint (ungated by `checksEnabled`).
-  Tiered cannot be disabled because it routes result groups by outcome tier and so cannot resolve without a roll.
+  Tiered cannot be disabled because it routes result sets by outcome tier and so cannot resolve without a roll.
 - alchemy + `none` → the shared switched-off panel with its "Turn this check on" action, and a live Active switch reading off.
   Turning it back on stages `checkMode: "simple"`.
 - The Crafting checks help copy describes simple/tiered and the off state.
@@ -577,11 +577,11 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 ### Alchemy Recipe UI (GM Editor)
 
 - Removes the `resultSelection.provider` selector and the Complex/multi-set toggle (retired, issue 554).
-  Ingredient-set vs result-group rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
+  Ingredient-set vs result-set rendering is derived from `alchemy.checkMode`, not the single `complex` flag; the ingredient set is ALWAYS single.
   - **None** → single ingredient set + single result set.
   - **Simple** → a labeled "On success" result set + a reserved, static-labeled ("On a failed check", warning/danger accent), undeletable, empty-by-default failure result set (synthesized in the derived view, persisted on first edit; `Recipe.validate` tolerates its absence).
     No "add result set" beyond the two.
-  - **Tiered** → result groups with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
+  - **Tiered** → result sets with routed outcome-tier assignment (reusing the `routedByCheck` UI; `routingProvider === "check"`).
 - Shows alchemy-only signature collision diagnostics spanning all recipes in the system.
 - Save remains blocked until all collisions are resolved.
 

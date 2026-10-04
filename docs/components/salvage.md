@@ -19,15 +19,15 @@ See [Salvaging From the Inventory Tab](#salvaging-from-the-inventory-tab).
 
 ## Salvage Resolution Mode
 
-The salvage resolution mode controls how result groups are awarded when a component is salvaged.
+The salvage resolution mode controls how result sets are awarded when a component is salvaged.
 It is set at the system level.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Mode        | Description                                                                                                                          |
 |:------------|:-------------------------------------------------------------------------------------------------------------------------------------|
-| Simple      | Always awards exactly one result group. No check required. This is the default.                                                      |
-| Routed      | Awards a result group based on the outcome of a salvage check. Each outcome (such as critical, pass, or fail) is mapped to a result group on the component. |
+| Simple      | Always awards exactly one result set. No check required. This is the default.                                                        |
+| Routed      | Awards a result set based on the outcome of a salvage check. Each outcome (such as critical, pass, or fail) is mapped to a result set on the component. |
 | Progressive | Awards results sequentially as the check value exceeds each result's difficulty threshold.                                           |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -37,8 +37,8 @@ The card offers Simple, Progressive, and Routed by check, with Simple selected b
 A salvaged component has a single ingredient, so it cannot route by ingredient set, which is why ingredient-set routing (and Alchemy) is not offered here.
 Changing the mode is not destructive to recipes or runs, but any component whose salvage setup is incompatible with the new mode has its salvage disabled until you reconfigure it.
 
-Simple mode awards a single result group.
-When you switch a system into Simple mode, any component that has more than one result group is trimmed back to its first.
+Simple mode awards a single result set.
+When you switch a system into Simple mode, any component that has more than one result set is trimmed back to its first.
 Fabricate warns you by name when this happens, listing every component it trimmed, so you always know which setups changed.
 
 You can also set the salvage resolution mode through the API.
@@ -69,26 +69,26 @@ See [Salvage Resolution Mode](#salvage-resolution-mode).
 A component is not salvageable until you turn it on with the **Salvage this component** toggle.
 Setting one up is two steps, in this order:
 
-1. Add at least one result group under **Result groups**, describing what the component yields when it is broken down.
+1. Add at least one result set under **Result sets**, describing what the component yields when it is broken down.
 2. Turn on **Salvage this component**.
 
-The toggle stays unavailable until the component has a result group, because there is nothing to enable yet.
+The toggle stays unavailable until the component has a result set, because there is nothing to enable yet.
 The panel tells you which of the two states you are in, so you are never left guessing why the toggle will not move.
 
 {% include screenshot.html case="manager-component-edit-salvage" caption="The salvage section of the component editor." %}
 
-Removing a component's last result group turns salvage back off for that component.
+Removing a component's last result set turns salvage back off for that component.
 This is deliberate.
 A component that can be salvaged but yields nothing is not a setup Fabricate will save.
 
-When the system's salvage resolution mode is Simple, a component uses a single result group.
-In Simple mode the panel shows the hint **Simple mode uses a single result group**, so it is clear why only one is allowed; once you have added the one group, the **Add group** control is hidden.
-Routed and Progressive modes keep the full list, where each result group maps to an outcome or a stage.
+When the system's salvage resolution mode is Simple, a component uses a single result set.
+In Simple mode the panel shows the hint **Simple mode uses a single result set**, so it is clear why only one is allowed; once you have added the one set, the **Add set** control is hidden.
+Routed and Progressive modes keep the full list, where each result set maps to an outcome or a stage.
 
 {: .note }
 > **Existing components show this toggle turned off, and that is correct.**
 > Before this toggle existed, per-component salvage was already stored and already enforced, but nothing in the interface could turn it on.
-> Components you set up with result groups therefore render with **Salvage this component** off.
+> Components you set up with result sets therefore render with **Salvage this component** off.
 > This is the true stored state being shown for the first time rather than a setting that has been lost, and nothing has been reset or migrated.
 > Turn the toggle on for each component you want salvageable.
 
@@ -104,7 +104,7 @@ A progressive stage has no amount, because a progressive salvage always recovers
 
 **Add result** opens a component picker, so you choose the component you are adding.
 A flat row cannot clear its component, so to change one, remove the row and add another.
-Adding a component that the result group already produces raises that row's quantity by one, unless that row is rolled, in which case Fabricate adds a new row.
+Adding a component that the result set already produces raises that row's quantity by one, unless that row is rolled, in which case Fabricate adds a new row.
 A progressive stage can swap its component in place.
 
 Fabricate marks a row whose expression cannot be rolled, or can never come out above zero.
@@ -185,7 +185,7 @@ What it lists depends on the system's salvage resolution mode, and on whether yo
 | Routed by check | Every outcome you authored, with the materials each one recovers. |
 | Progressive | The result stages in order, each showing that component's own progressive DC as **DC N** and the check value that reaches it as **Reach ≥N**, plus a strip for any complications you told the player about. |
 | Routed or Progressive with no salvage check roll formula | **Salvage isn't ready**, and a line asking the player to speak to you. The action is disabled and nothing can be consumed. |
-| Simple, with a component left holding more than one result group | **Salvage isn't ready**, with a line saying the component has more than one result group and asking you to fix it in the component editor. This can only happen to a component set up before Simple mode enforced a single group and not re-saved since. It shows to you as the GM only, players never see the component. Re-saving the system trims the extra groups and clears the cue. |
+| Simple, with a component left holding more than one result set | **Salvage isn't ready**, with a line saying the component has more than one result set and asking you to fix it in the component editor. This can only happen to a component set up before Simple mode enforced a single set and not re-saved since. It shows to you as the GM only, players never see the component. Re-saving the system trims the extra groups and clears the cue. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
