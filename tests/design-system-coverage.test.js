@@ -13,7 +13,9 @@ import {
 } from '../scripts/lib/designSystemPrimitives.js';
 import { listSvelteComponents, toRepositoryPaths } from '../scripts/lib/svelteComponentFiles.js';
 
+import { readDeclaration } from './helpers/apiConvention.js';
 import { parseDesignLibrary, primitiveNamesIn, readDesignLibrary } from './helpers/designLibrary.js';
+import { componentAstOf } from './helpers/parsedSource.js';
 import { styleTextFor } from './helpers/styleBlockScan.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -503,6 +505,26 @@ test('every member row records a scope from the closed vocabulary, and no non-me
   }
 });
 
+/** The ruled-out register's verdicts; only `merged` names a library entry as its replacement. */
+const RULED_OUT_VERDICTS = ['composition', 'foundry-owns', 'merged', 'out-of-scope'];
+
+test('every ruled-out verdict is from the closed set, and a merged name points at an entry', () => {
+  for (const entry of RULED_OUT) {
+    assert.ok(
+      RULED_OUT_VERDICTS.includes(entry.verdict),
+      `${entry.name} carries verdict ${JSON.stringify(entry.verdict)}, outside the closed set`
+    );
+  }
+  const merged = RULED_OUT.filter((entry) => entry.verdict === 'merged');
+  assert.ok(merged.length > 0, 'no entry is merged, so the replacement half has no domain');
+  for (const entry of merged) {
+    assert.ok(
+      library.names.includes(entry.replacement),
+      `${entry.name} was merged into ${JSON.stringify(entry.replacement)}, which heads no entry`
+    );
+  }
+});
+
 test('a manager-only row states its reason, and no caller outside the manager contradicts it', () => {
   const scoped = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.scope === 'manager-only');
   assert.ok(scoped.length > 0, 'no row is manager-only, so both clauses below are vacuous');
@@ -606,8 +628,24 @@ test('every name issue 1782 built reads shipped in the library', () => {
 test('every name issue 1782 merged away is no entry and is recorded as ruled out', () => {
   for (const name of DELETED_BY_1782) {
     assert.ok(!library.names.includes(name), `${name} was merged and still heads an entry`);
-    assert.ok(RULED_OUT_NAMES.includes(name), `${name} was merged and the register omits it`);
+    const entry = RULED_OUT.find((row) => primitiveNamesIn(row.name).includes(name));
+    assert.ok(entry, `${name} was merged and the register omits it`);
+    assert.equal(entry.verdict, 'merged', `${name} is on the register under another verdict`);
   }
+});
+
+test('the <ValidationSummary> specimen names every prop its shipped component declares', () => {
+  const row = DESIGN_SYSTEM_PRIMITIVES.find((member) => member.library === '<ValidationSummary>');
+  assert.ok(row, 'no manifest row names <ValidationSummary>, so there is no component to read');
+  const props = readDeclaration({ file: row.path, ast: componentAstOf(row.path) }).names;
+  const block = library.blocks.find((entry) => entry.names.includes('ValidationSummary'));
+  const named = new Set(block?.apiNames);
+  assert.ok(props.length > 0 && named.size > 0, 'one half of the comparison read nothing');
+  assert.deepEqual(
+    props.filter((name) => !named.has(name)),
+    [],
+    'a prop the component takes and the specimen omits is the fidelity gap `shipped` denies'
+  );
 });
 
 test('a divergent entry names the issue that decided it', () => {
