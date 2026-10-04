@@ -593,9 +593,9 @@ describe('RecipeDetail mounted behavior', () => {
     const formula = target.querySelector('[data-check-formula]');
     assert.ok(formula, 'check formula rendered');
     assert.equal(formula.getAttribute('data-check-formula-resolved'), 'true');
-    const code = formula.querySelector('code');
-    assert.equal(code.textContent.trim(), '1d20 + 2', 'shows resolved numbers, not @placeholders');
-    assert.equal(code.getAttribute('title'), '1d20 + @prof', 'raw formula kept as the tooltip');
+    const value = formula.querySelector('.fabricate-info-strip-value');
+    assert.equal(value.textContent.trim(), '1d20 + 2', 'shows resolved numbers, not @placeholders');
+    assert.equal(formula.getAttribute('title'), '1d20 + @prof', 'raw formula kept as the tooltip');
     assert.equal(
       target.querySelector('[data-check-formula-error]'),
       null,
@@ -624,15 +624,22 @@ describe('RecipeDetail mounted behavior', () => {
     const formula = target.querySelector('[data-check-formula]');
     assert.equal(formula.getAttribute('data-check-formula-resolved'), 'false');
     assert.equal(
-      formula.querySelector('code').textContent.trim(),
+      formula.querySelector('.fabricate-info-strip-value').textContent.trim(),
       '1d20 + @prof',
       'the raw formula stays visible in the error state'
     );
-    assert.ok(target.querySelector('[data-check-formula-error]'), 'error note rendered');
-    assert.ok(
-      target.querySelector('section.fabricate-card.crafting-check-card.is-formula-error'),
-      'the check card is the shared card box, marked as an error'
+    // Issue 1521: the error is a danger notice after the strip, inside the check section, and the
+    // strip itself is never tinted.
+    const error = target.querySelector(
+      ':scope [data-recipe-section="check"] > .fabricate-info-strip + .fab-notice.is-danger[data-check-formula-error]'
     );
+    assert.ok(Boolean(error), 'the danger notice follows the strip inside the check section');
+    assert.equal(
+      error.textContent.trim(),
+      'FABRICATE.App.Crafting.Check.FormulaUnresolved',
+      'it carries only its reason'
+    );
+    assert.ok(!target.querySelector('.is-formula-error'), 'no card tint marks the error');
   });
 
   it('renders only the teaser header for a redaction-redacted recipe — no ingredient/result detail', async () => {

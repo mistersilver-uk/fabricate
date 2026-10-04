@@ -248,8 +248,8 @@ export function playerCountResultCases() {
       steps: [CRAFT_HORSESHOE[0], { selector: '[data-recipe-section="check"]', scroll: true }],
       expectSelector:
         '[data-recipe-section="check"][data-check-usable="true"]:not(:has([data-check-dc]))' +
-        ':has([data-check-formula] code:text-is("2d6 · each ≥ 1"))' +
-        ' [data-check-successes-needed="1"]:text-is("1 success needed")',
+        ':has([data-check-formula] .fabricate-info-strip-value:text-is("2d6 · each ≥ 1"))' +
+        ' [data-check-successes-needed="1"] .fabricate-info-strip-value:text-is("1 success needed")',
       kinds: ['player', 'crafting'],
       sourceMatches: [
         CRAFTING_SHARED,

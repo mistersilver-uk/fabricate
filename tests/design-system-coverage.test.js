@@ -197,12 +197,13 @@ test('every manifest library name resolves to a library entry', () => {
  * `PickerRow` at issue 1516, `RequirementChooser` at issue 1518, and the three instruments, the
  * validation pair, the rule pair and the set picker at issue 1782 — `ValidationSummary` by naming
  * its shipped component and `ValidationList` by being merged into it — when each specified
- * primitive shipped, and `ChoiceGroup` and `Menu` at issue 1516, when each specified entry gained
- * its manifest row; the count this docblock states is the array's own length.
+ * primitive shipped, `ChoiceGroup` and `Menu` at issue 1516, when each specified entry gained its
+ * manifest row, and `InfoStrip` at issue 1521, when it shipped on its two importers; the count this
+ * docblock states is the array's own length.
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BrowseCard',
-  'DataTable', 'InfoStrip', 'LogList',
+  'DataTable', 'LogList',
   'NavSidebar', 'PageHeader', 'Rail',
   'Search',
   'TierTrack', 'ViewToggle', 'XrefList',

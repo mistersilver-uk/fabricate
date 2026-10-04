@@ -623,6 +623,14 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "Issue 1518 ships the specified player-side chooser as one component (maintainer ruling, 2026-09-18): a row of slot tiles over `SlotTile`, one open slot through a caller-owned `openSlotId` the component never writes, the open slot's alternatives as pressable tiles with `onChoose` as the only selection event, and a `panel` snippet for the caller's essence pool. Issue 1773 adds the award face: an `award` slot draws no row tile and an always-open well of reward tiles, an alternative may be native `disabled` with its reason, and the slot's ceiling sentence is a visible `role=\"status\"` every tile is described by. Two importers: `apps/crafting/detail/RequirementRail.svelte`, the crafting rail, and `apps/journal/RunAwardChoice.svelte`, the Journal's award face. Scoped `shared`: both the player window's crafting and journal trees draw it. `player-crafting-chooser-open` draws it open on a choice slot, and `player-journal-award-choice` and `player-journal-award-choice-ceiling` draw the award face."
+    },
+    {
+      "path": "src/ui/svelte/components/InfoStrip.svelte",
+      "library": "<InfoStrip>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1521 builds the specified strip of current values: an optional kicker that names the group, an optional read-only badge drawn through `Chip`, and glyph-led facts whose values arrive caller-formatted in mono, with nothing focusable inside it. Two importers: `apps/crafting/detail/CraftingCheckCard.svelte`, whose DC, successes needed, target, target source, skill and formula are its facts under a Required or Optional badge, and `apps/gathering/GatheringDetail.svelte`, whose stamina pool is its one fact under the Stamina kicker. Scoped `shared`: the player crafting and gathering tabs both draw it, and its family is rooted at `fabricate-info-strip`, the class it writes. `checks/CheckModeCallout.svelte` and `apps/ActorSelectTopBar.svelte` are recorded non-matching in the library census."
     }
   ],
   "notAPrimitive": [

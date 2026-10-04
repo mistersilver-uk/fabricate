@@ -1786,7 +1786,8 @@
           "StaminaCost": "Stamina cost",
           "StaminaCostOnly": "Costs {cost} stamina",
           "StaminaCostWithPool": "Costs {cost} stamina (you have {current}/{max})",
-          "StaminaPool": "Stamina: {current}/{max}",
+          "StaminaKicker": "Stamina",
+          "StaminaPool": "{current}/{max}",
           "StaminaPoolNone": "No stamina pool set"
         }
       },

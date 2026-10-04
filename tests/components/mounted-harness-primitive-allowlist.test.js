@@ -61,6 +61,9 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/DiceTiles.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/Well.svelte',
+  // The strip of current values (issue 1521): the crafting check card and the gathering detail
+  // render it, so every crafting and gathering tree compiles it.
+  'src/ui/svelte/components/InfoStrip.svelte',
   // THE manager's labelled push-button (issue 1096). It is the sharpest entry on this list
   // after `Chip`: the button class is a CSS convention repeated across more than sixty
   // components, so every step of the conversion sweep drops this primitive into another

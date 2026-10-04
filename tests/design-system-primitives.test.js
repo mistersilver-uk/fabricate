@@ -114,6 +114,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
+  // Issue 1521: the strip of current values, on the check card's facts and the stamina pool.
+  'src/ui/svelte/components/InfoStrip.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
   // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites.
@@ -251,8 +253,9 @@ test('the inputs every property below quantifies over are alive', () => {
   // once the inspector action button became the button primitive at full width.
   // 76 as of issue 1782: `Meter` and `BandedBar`, each on three and two importers; 77 with
   // `RuleRow` on its two; 76 once issue 1521 folded the explainer card onto the callout's `items`;
-  // 77 with `SetPicker` on its two; 78 as of issue 1773: the requirement chooser, on the award face.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 78, 'the shipped primitive set changed size');
+  // 77 with `SetPicker` on its two; 78 as of issue 1773: the requirement chooser, on the award face;
+  // 79 when issue 1521 built `InfoStrip` on its two importers, the check card and the stamina pool.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 79, 'the shipped primitive set changed size');
   // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
   // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;
   // 17 when `ChoiceGroup` joined at one caller (issue 1516).
@@ -388,6 +391,16 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'src/ui/svelte/apps/manager/IconFactRow.svelte',
       'world-essence-catalogue',
       'a frame that draws the `rule` density as catalogue cards',
+    ],
+    [
+      'src/ui/svelte/components/InfoStrip.svelte',
+      'player-crafting-check-formula-unresolved',
+      'the one frame that draws the check strip over its danger notice',
+    ],
+    [
+      'src/ui/svelte/components/InfoStrip.svelte',
+      'player-gathering-economy-strip',
+      'the one frame that draws the stamina pool strip',
     ],
   ];
   for (const [file, caseId, because] of expectations) {

@@ -503,6 +503,61 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     );
   });
 
+  // Issue 1521: the stamina pool is the one fact of an info strip under its own kicker; the node
+  // legend is a muted line after it, and with stamina off no strip renders.
+  it('states the stamina pool as an info strip named by its kicker, the node legend after it', async () => {
+    const env = environment({
+      staminaEnabled: true,
+      nodesEnabled: true,
+      economyMode: 'both',
+      staminaPool: { current: 6, max: 10 },
+    });
+    await mountView(makeServices(listing([env])).services);
+
+    const strip = target.querySelector('.fabricate-info-strip[data-gathering-economy-strip]');
+    assert.ok(Boolean(strip), 'the economy strip is the shared info strip');
+    assert.equal(strip.getAttribute('data-economy-mode'), 'both');
+    const kicker = strip.querySelector('.fab-kicker');
+    assert.equal(kicker.textContent, 'FABRICATE.App.Gathering.Detail.StaminaKicker');
+    const named = document.querySelector(`[id="${strip.getAttribute('aria-labelledby')}"]`);
+    assert.ok(named?.contains(kicker), 'the kicker names the strip');
+    const facts = strip.querySelectorAll('.fabricate-info-strip-fact');
+    assert.equal(facts.length, 1, 'the stamina pool is the only fact');
+    assert.equal(facts[0].getAttribute('data-gathering-stamina-pool'), '');
+    assert.ok(facts[0].querySelector('i.fa-bolt'), 'the pool keeps its glyph');
+    assert.equal(
+      facts[0].querySelector('.fabricate-info-strip-value').textContent,
+      'FABRICATE.App.Gathering.Detail.StaminaPool:{"current":6,"max":10}'
+    );
+    const legend = strip.nextElementSibling;
+    assert.ok(legend.matches('p[data-gathering-nodes-legend]'), 'the legend follows the strip');
+    assert.equal(legend.textContent, 'FABRICATE.App.Gathering.Detail.NodesLegend');
+  });
+
+  it('says a stamina pool is unset inside the strip', async () => {
+    const env = environment({ staminaEnabled: true, economyMode: 'stamina', staminaPool: null });
+    await mountView(makeServices(listing([env])).services);
+    const fact = target.querySelector(
+      ':scope [data-gathering-economy-strip] [data-gathering-stamina-pool]'
+    );
+    assert.equal(fact.getAttribute('data-gathering-stamina-pool'), 'none');
+    assert.equal(fact.textContent.trim(), 'FABRICATE.App.Gathering.Detail.StaminaPoolNone');
+    assert.ok(!target.querySelector('[data-gathering-nodes-legend]'), 'no legend with nodes off');
+  });
+
+  it('draws no strip with stamina off, and the node legend alone as a muted line', async () => {
+    const env = environment({ nodesEnabled: true, economyMode: 'nodes' });
+    await mountView(makeServices(listing([env])).services);
+    assert.ok(!target.querySelector('[data-gathering-economy-strip]'), 'no strip without stamina');
+    assert.ok(!target.querySelector('.fabricate-info-strip'), 'no info strip at all');
+    assert.ok(
+      target
+        .querySelector('[data-gathering-nodes-legend]')
+        .classList.contains('gathering-detail-nodes-legend'),
+      'the legend is its own muted line'
+    );
+  });
+
   it('shows a fallback description (center row + inspector) when a task has none', async () => {
     const { services } = makeServices(
       listing([environment({ tasks: [taskModel({ id: 'task-nodesc', description: '' })] })])

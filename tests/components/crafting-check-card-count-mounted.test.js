@@ -7,7 +7,10 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  CHECK_CARD_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { shippedLocalize } from '../helpers/checkEvidenceFixtures.js';
 import { fill } from '../../src/utils/fillPlaceholders.js';
@@ -18,11 +21,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-check-card-count-',
   rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
-  compiledModules: [
-    'src/ui/svelte/components/Kicker.svelte',
-    'src/ui/svelte/components/InspectorCard.svelte',
-    CHECK_CARD,
-  ],
+  compiledModules: [...CHECK_CARD_COMPILED_MODULES],
   componentPath: CHECK_CARD,
   rootClass: 'fabricate fabricate-app',
 });
@@ -51,7 +50,7 @@ describe('CraftingCheckCard successes needed', () => {
     const needed = root.querySelector('[data-check-successes-needed]');
     assert.equal(needed.textContent.trim(), '3 successes needed');
     assert.equal(needed.dataset.checkSuccessesNeeded, '3');
-    assert.equal(root.querySelector('[data-check-formula] code').textContent, '4d10 · each ≥ 8');
+    assert.equal(root.querySelector('[data-check-formula] .fabricate-info-strip-value').textContent, '4d10 · each ≥ 8');
     assert.ok(!root.querySelector('[data-check-dc]'), 'a count check has no DC chip');
     harness.remount();
     const one = await harness.mount({ check: card({ successesNeeded: 1 }) });

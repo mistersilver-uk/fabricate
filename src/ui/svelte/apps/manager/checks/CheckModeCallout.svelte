@@ -4,9 +4,9 @@
   paragraph on what it does with a roll, and a facts row. MODE-AWARE for every mode the product
   renders, from the pure `checkModeCallout.js`, which is proven exhaustive.
 
-  Not the shared `Callout`, and what still separates the two is the FACT ROW: a run of
-  label/value facts is an `InfoStrip`, deferred while it has one qualifying caller, and a
-  paragraph plus a fact list under one title is two shapes wearing one name.
+  Not the shared `Callout`, and what still separates the two is the FACT ROW; nor the shared
+  `InfoStrip`, whose facts are mono figures under a kicker where these are words under a title,
+  and a paragraph plus a fact list under one title is two shapes wearing one name.
 
   DORMANT modes render the same shape with the shipped dormancy sentence and a clock glyph.
   Props: activity / mode / alchemyCheckMode; outcomeCount, for the `{count} tiers` fact.
