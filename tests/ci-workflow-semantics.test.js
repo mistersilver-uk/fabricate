@@ -1049,7 +1049,7 @@ test('the ratchet jobs check out and name their base, and a release test run opt
       // Sharded as in ci.yml: run whole, the suite meets a 15-minute bound.
       assert.equal(jobEnv(source, name).UNIT_TEST_SHARD, '${{ matrix.shard }}/4', `${file} job "${name}"`);
       assert.ok(Number(job['timeout-minutes']) <= 10, `${file} job "${name}" runs a quarter of the suite`);
-      assert.ok(!job.steps.some((step) => /\bnpm test\b/.test(step.run)), `${file} runs the whole suite`);
+      assert.ok(job.steps.every((step) => !/\bnpm test\b/.test(step.run)), `${file} runs the whole suite`);
     }
     assert.match(source, /\n {8}shard: \[1, 2, 3, 4\]\n/, `${file} must run all four shards`);
   }
