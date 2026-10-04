@@ -96,6 +96,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     component('EssencePool'),
     component('RunProgress'),
+    'src/ui/svelte/components/StageBars.svelte',
     component('StageNav'),
     component('StageCard'),
     component('ListRow'),
@@ -1547,7 +1548,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       'unattempted stages do not enter the account'
     );
     assert.ok(!mounted.target.querySelector('[data-stage-card] .is-complete'));
-    const tracks = [...mounted.target.querySelectorAll('[data-stage-progress-state]')];
+    const tracks = [...mounted.target.querySelectorAll('[data-stage-bars-state]')];
     assert.equal(tracks.length, 0, 'terminal history has no active progress');
   });
 
@@ -2238,7 +2239,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.match(left.textContent, /3h 0m 0s/u, 'the TIME card still reports three hours left');
 
     const fill = paused.target.querySelector(
-      '[data-journal-stages] [data-run-progress-track="0"] .fab-fill-bar-fill'
+      '[data-journal-stages] [data-stage-bars-stage="0"] .fab-fill-bar-fill'
     );
     assert.equal(
       fill.getAttribute('style'),

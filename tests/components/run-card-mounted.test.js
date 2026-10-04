@@ -37,6 +37,7 @@ const harness = createMountedComponentHarness({
     // The shared primitives this tree draws.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/RunProgress.svelte',
+    'src/ui/svelte/components/StageBars.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/journal/RunCard.svelte'
@@ -173,14 +174,17 @@ describe('RunCard mounted behavior', () => {
     assert.ok(countdown.textContent.includes('8m 20s'), 'countdown formats availableAt - now (1000 - 500 = 500s)');
     const progress = target.querySelector('[data-run-progress]');
     assert.equal(progress.getAttribute('data-run-progress'), '50', 'progress is 50% at the halfway point');
-    assert.equal(progress.getAttribute('role'), 'progressbar', 'progress bar exposes the progressbar role');
-    // The reused Progress.Label key now resolves to run-neutral "Crafting progress"
-    // copy (issue 734); the bar tracks the time gate, not a step count.
+    // Issue 1782: the wrapper carries no role; the bars are a named group of stage progress bars.
+    assert.ok(!progress.hasAttribute('role'), 'the wrapper is layout and a hook only');
+    const group = progress.querySelector('[role="group"]');
     assert.equal(
-      progress.getAttribute('aria-label'),
+      group.getAttribute('aria-label'),
       'FABRICATE.App.Journal.Progress.Label',
-      'progress bar carries the localized crafting-progress aria-label'
+      'the stage group carries the localized progress label'
     );
+    const bar = group.querySelector('[role="progressbar"]');
+    assert.equal(bar.getAttribute('aria-valuenow'), '50', 'the one stage reads its clock');
+    assert.equal(bar.getAttribute('aria-label'), 'Brew', 'and is named by its stage');
   });
 
   it('shows "ready to continue" once the gate has matured', async () => {
@@ -214,17 +218,19 @@ describe('RunCard mounted behavior', () => {
     const target = await harness.mount({ run, now: 0 });
     const progress = target.querySelector('[data-run-progress]');
     assert.ok(progress, 'the bar survives a stage with no clock');
-    // Issue 1648, UX2-5. The accessible value states what the TRACKS draw. `progress` is null
-    // with no gate, so publishing the clock fraction told a screen-reader user "Progress, 0"
-    // beside a filled track; `.fab-run-progress-tracks` is `aria-hidden`, so there was no second
-    // reading to correct it.
-    assert.equal(progress.getAttribute('aria-valuenow'), '50', 'one of two stages is complete');
-    const tracks = [...target.querySelectorAll('[data-run-progress-track]')];
+    // Issue 1648, UX2-5: the hook states what the tracks draw, completed stages over total. Each
+    // track is its own progress bar since issue 1782, so the reading is per stage as well.
+    assert.equal(progress.getAttribute('data-run-progress'), '50', 'one of two stages is complete');
+    const tracks = [...target.querySelectorAll('[data-stage-bars-stage]')];
     assert.equal(tracks.length, 2, 'one track per authored stage');
     assert.deepEqual(
-      tracks.map((track) => track.dataset.stageProgressState),
+      tracks.map((track) => track.dataset.stageBarsState),
       ['success', 'accent'],
       'the finished stage reads done and the unbegun one reads current'
+    );
+    assert.deepEqual(
+      tracks.map((track) => track.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')),
+      ['100', '0']
     );
     // A countdown needs a deadline and this stage has none. `None` is the string a MATURED wait
     // prints, so the row says nothing about time rather than something false.
@@ -265,7 +271,7 @@ describe('RunCard mounted behavior', () => {
     const target = await harness.mount({ run: makeCraftingRun(), now: 500 });
     const progress = target.querySelector('[data-run-progress]');
     assert.ok(progress, 'a gated run still reports its clock');
-    assert.equal(progress.getAttribute('aria-valuenow'), '50');
+    assert.equal(progress.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '50');
   });
 
   it('marks the selected card with aria-pressed and the selection class', async () => {

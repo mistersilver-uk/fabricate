@@ -329,5 +329,5 @@ export const previewScoped = scopedComponentCss(
   resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte')
 );
 export const oddsScoped = scopedComponentCss(
-  resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte')
+  resolve(__dirname, '../../src/ui/svelte/components/BandedBar.svelte')
 );

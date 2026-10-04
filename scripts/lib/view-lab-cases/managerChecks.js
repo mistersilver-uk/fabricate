@@ -1423,7 +1423,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [...underMultiplySteps('@skills.med.mod + 51'), ...SCROLL_ODDS],
     expectSelector:
-      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]',
+      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track]',
   }),
   underCase({
     id: 'manager-checks-under-attribute-rolled',
@@ -1464,7 +1464,7 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       '.fabricate-manager' +
-      ':has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar])' +
+      ':has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track])' +
       ':not(:has([data-checks-simulator-state="needs-preview-actor"]))',
   }),
   underCase({
@@ -1579,7 +1579,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     expectSelector:
-      '.fabricate-manager:has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]):has([data-checks-odds-domain])',
+      '.fabricate-manager:has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track]):has([data-checks-odds-domain])',
     kinds: ['manager', 'checks'],
     sourceMatches: PARITY_SOURCES,
   }),
@@ -1617,7 +1617,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     expectSelector:
-      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]',
+      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-banded-bar-track]',
     // The 1024x640 declared floor, stacked, for the same enumerated row `manager-checks-stacked-floor`
     // proves for sum/over: the odds panel restacks under the same ladder for a roll-under record.
     position: { width: 1024, height: 640 },
@@ -1810,7 +1810,7 @@ export const CASES = Object.freeze([
     frame: 6,
     steps: [...COUNT_IDRIN, ...COUNT_ODDS],
     expectSelector:
-      '.fabricate-manager:has([data-checks-odds-expected="1.33"]) [data-checks-odds-product="count"] [data-checks-odds-row="botch"] [data-checks-odds-bar]',
+      '.fabricate-manager:has([data-checks-odds-expected="1.33"]) [data-checks-odds-product="count"] [data-banded-bar-row="botch"] [data-banded-bar-track]',
   }),
   countCase({
     id: 'manager-checks-count-over-rolled',
@@ -1879,7 +1879,7 @@ export const CASES = Object.freeze([
     nav: 'gathering',
     steps: COUNT_ODDS,
     expectSelector:
-      '.fabricate-manager [data-checks-odds-product="count"] [data-checks-odds-row="botch"]',
+      '.fabricate-manager [data-checks-odds-product="count"] [data-banded-bar-row="botch"]',
   }),
   countCase({
     id: 'manager-checks-count-progressive',
@@ -1888,7 +1888,7 @@ export const CASES = Object.freeze([
     state: 'dice-pool-extended',
     steps: [{ selector: '[data-checks-preview-difficulties]', fill: '1, 1, 2' }, ...COUNT_ROLL],
     expectSelector:
-      '.fabricate-manager:has([data-checks-odds-row="botch"]):has([data-checks-simulator-band])',
+      '.fabricate-manager:has([data-banded-bar-row="botch"]):has([data-checks-simulator-band])',
   }),
   countCase({
     id: 'manager-checks-count-zero',

@@ -38,6 +38,7 @@ const harness = createMountedComponentHarness({
     // this suite by name.
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/FillBar.svelte',
+    'src/ui/svelte/components/Meter.svelte',
     'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
@@ -151,7 +152,7 @@ describe('EssencePoolPanel mounted behavior', () => {
       const target = await harness.mount({ pool: overshot() });
       const meter = target.querySelector('[data-essence-meter="radiant"]');
       assert.equal(meter.querySelector('.essence-pool-meter-ratio').textContent.trim(), '2/2');
-      assert.equal(meter.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '2');
+      assert.equal(meter.querySelector('[role="meter"]').getAttribute('aria-valuenow'), '2');
     });
 
     it('is absent while the allocation delivers no more than the need', async () => {
@@ -160,10 +161,10 @@ describe('EssencePoolPanel mounted behavior', () => {
     });
   });
 
-  // A RATIO meter, not a percentage one: `aria-valuemax` is the requirement's need.
-  it('exposes each requirement as a ratio progressbar over its own need', async () => {
+  // A RATIO meter, not a percentage one: `aria-valuemax` is the requirement's need (issue 1782).
+  it('exposes each requirement as a ratio meter over its own need', async () => {
     const target = await harness.mount({ pool: SHARED });
-    const bars = [...target.querySelectorAll('[role="progressbar"]')];
+    const bars = [...target.querySelectorAll('[role="meter"]')];
     assert.deepEqual(
       bars.map((bar) => [
         bar.getAttribute('aria-valuemin'),
@@ -175,7 +176,11 @@ describe('EssencePoolPanel mounted behavior', () => {
         ['0', '1', '3'],
       ]
     );
-    assert.match(bars[0].getAttribute('aria-label'), /Pool\.Meter/);
+    // Named by a visually hidden label and read by the split value key.
+    const name = bars[0].querySelector('.visually-hidden');
+    assert.equal(name.id, bars[0].getAttribute('aria-labelledby'), 'the hidden label names it');
+    assert.match(name.textContent, /Pool\.MeterLabel/);
+    assert.match(bars[0].getAttribute('aria-valuetext'), /Pool\.MeterValue/);
   });
 
   it('reports met and short requirements distinctly on one shared pool', async () => {
