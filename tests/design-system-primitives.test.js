@@ -84,6 +84,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/ActionMenu.svelte',
   // Issue 1506: an actor's portrait, and the FIRST key this list gains by a primitive ARRIVING.
   'src/ui/svelte/components/Avatar.svelte',
+  // Issue 1782: the three instruments arrive over the fill leaf, which gains its own frame.
+  'src/ui/svelte/components/BandedBar.svelte',
   // Issue 1518: the button, on the two journal frames whose run action bar draws its roles.
   'src/ui/svelte/components/Button.svelte',
   // Issue 1505: the widened standing statement, the FIRST entry whose primitive earned its frames by
@@ -106,6 +108,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/EssencePool.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
@@ -117,6 +120,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1506: the app's ONE art tile, after it absorbed both crafting thumbnails. ONE frame,
   // because one STATE is what neither representative frame reaches: a TINTED glyph-chip tile.
   'src/ui/svelte/components/Medallion.svelte',
+  'src/ui/svelte/components/Meter.svelte',
   // Issue 2021: the modal chrome's banded frame, which every dialog draws since epic 1997.
   'src/ui/svelte/components/Modal.svelte',
   // Issue 1458: the pill multi-select's add menu became a `SearchablePopover`, which left the
@@ -163,6 +167,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   // because it arrives with three named frames — the surfaces whose row geometry moved — rather
   // than with the representative pair, which would publish two frames that do not contain it.
   'src/ui/svelte/components/SortableList.svelte',
+  'src/ui/svelte/components/StageBars.svelte',
   'src/ui/svelte/components/StageCard.svelte',
   'src/ui/svelte/components/StageNav.svelte',
   'src/ui/svelte/components/StatBox.svelte',
@@ -214,7 +219,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-  'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/TintPicker.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',
 ];
@@ -240,11 +244,13 @@ test('the inputs every property below quantifies over are alive', () => {
   // 74 as of issue 1516: `PickerRow` on its second importer, the result card.
   // 75 as of issue 1521, whose `InlineRenameField` replaced the party and realm name fields; 74
   // once the inspector action button became the button primitive at full width.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 74, 'the shipped primitive set changed size');
+  // 76 as of issue 1782: `Meter` and `BandedBar`, each on three and two importers.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 76, 'the shipped primitive set changed size');
   // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
   // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;
   // 17 when `ChoiceGroup` joined at one caller (issue 1516).
-  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
+  // 18 as of issue 1782: `StageBars`, whose one importer is `RunProgress`.
+  assert.equal(NOT_A_PRIMITIVE.length, 18, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
@@ -322,7 +328,7 @@ test('(a) the two primitives issue 1116 named now publish a frame that renders t
   );
 });
 
-test('(a) the two older overrides still name the frame that renders their state', () => {
+test('(a) the older overrides still name the frame that renders their state', () => {
   // The DOMAIN is pinned above and the VALUES have to be pinned too, one primitive at a time,
   // because a value is only ever wrong in a way no other assertion can see: repoint an override at
   // a case id that is already in the representative pair and the selection is unchanged, the entry
@@ -346,8 +352,24 @@ test('(a) the two older overrides still name the frame that renders their state'
     [
       'src/ui/svelte/components/EmptyState.svelte',
       'world-tool-entry-on-break-repair-tag-picker-empty',
-      'the one frame that draws the `note` variant — every other empty in the corpus is a ' +
-        'bordered panel filling a region',
+      'the frame that draws the `note` variant inside the picker popover it was made for — both ' +
+        'representative frames are populated states',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'interactables-browser-tasks',
+      'the one caller whose tab entries carry no icon, so the only frame that draws the ' +
+        'glyph-less strip',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-world-downtime-tracking-described',
+      'the frame that draws the premium padlock and the wide strip`s description above its own tab',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-world-downtime-narrow-settings',
+      'the frame that draws the strip wrapped, with its last tab`s description at the card`s end',
     ],
   ];
   for (const [file, caseId, because] of expectations) {

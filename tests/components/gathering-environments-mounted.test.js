@@ -187,7 +187,12 @@ describe('GatheringView mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     // Issue 2053: the attempt buttons record the window a roll prompt opens in.
-    for (const rawModule of [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/rollPromptOrigin.js']) {
+    // Issue 1782: the drop-rate ramp the chance bar's `BandedBar` reads its fills from.
+    for (const rawModule of [
+      ...SEARCHABLE_POPOVER_RAW_MODULES,
+      'src/ui/svelte/util/rollPromptOrigin.js',
+      'src/ui/svelte/util/dropRateTier.js',
+    ]) {
       const rawDestination = join(tempRoot, rawModule);
       mkdirSync(dirname(rawDestination), { recursive: true });
       writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
@@ -200,7 +205,13 @@ describe('GatheringView mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     // GatheringView now renders the center-column detail tree.
-    writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
+    // `ChanceBar` is a single-row `BandedBar` over the shared `FillBar` (issue 1782).
+    for (const instrument of [
+      'src/ui/svelte/components/FillBar.svelte',
+      'src/ui/svelte/components/BandedBar.svelte',
+    ]) {
+      writeCompiledSvelte(instrument);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/ChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');

@@ -18,6 +18,9 @@
         "Expand": "Show details for {name}",
         "Collapse": "Hide details for {name}"
       },
+      "StageBars": {
+        "Unnamed": "Stage {index} of {count}"
+      },
       "DiceTiles": {
         "Generated": "rolled by an explosion",
         "More": "+{count} more",
@@ -841,6 +844,7 @@
       "ActorBar": {
         "Trigger": "Select a character",
         "Stamina": "Stamina",
+        "StaminaValue": "{current} of {max}",
         "SearchPlaceholder": "Search characters…",
         "SearchLabel": "Search characters",
         "NoActorsTitle": "No selectable characters",
@@ -1011,7 +1015,8 @@
           "YourSelection": "Your selection",
           "Owned": "You own {count}.",
           "Contribution": "{amount} {name}",
-          "Meter": "{name} has {delivered} of {need} delivered.",
+          "MeterLabel": "{name} delivered",
+          "MeterValue": "{delivered} of {need}",
           "Overshoot": "{essence}: {amount} more than required",
           "Allocate": "Units of {name} to spend",
           "AllocateLess": "Spend one less {name}",
@@ -8309,8 +8314,6 @@
         "NoManagedItems": "No Components",
         "NoManagedItemsHint": "Drag in world or compendium items to build this system's item library.",
         "NoSystemHint": "Create or select a crafting system to manage components.",
-        "Tags": "Tags",
-        "Essences": "Essences",
         "Salvage": "Salvage",
         "SalvageQuantity": "Uses {count}",
         "SalvageTools": "Tools {count}",
@@ -8359,18 +8362,13 @@
           "Summary": "Imported {added} new, updated {updated}, skipped {skipped} of {total} items with folder categories and tags."
         },
         "Editor": {
-          "WindowTitle": "Edit {name}",
           "HintTagsAndEssences": "Edit this component's tags and essences.",
           "HintTagsOnly": "Edit this component's tags.",
           "HintEssencesOnly": "Edit this component's essences.",
           "NoEditableFields": "No editable component fields are enabled for this system.",
-          "NoTagsDefined": "No tags defined in this system.",
-          "NoEssencesDefined": "No essences defined in this system.",
           "IncrementEssence": "Increase {name}",
           "DecrementEssence": "Decrease {name}",
-          "QuantityLabel": "{name} quantity",
-          "Save": "Save Component",
-          "Cancel": "Cancel"
+          "QuantityLabel": "{name} quantity"
         }
       },
       "Environments": {

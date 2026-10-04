@@ -74,6 +74,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     component('EssencePool'),
     component('RunProgress'),
+    'src/ui/svelte/components/StageBars.svelte',
     component('StageNav'),
     component('StageCard'),
     component('ListRow'),

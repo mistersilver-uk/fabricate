@@ -80,6 +80,7 @@ const harness = createMountedComponentHarness({
       'ChoiceOptionList',
       'EssencePool',
       'RunProgress',
+      'StageBars',
       'StageNav',
       'StageCard',
       'YieldScale',

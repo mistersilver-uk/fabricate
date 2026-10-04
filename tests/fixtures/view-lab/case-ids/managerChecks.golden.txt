@@ -84,6 +84,7 @@ manager-checks-count-routed
 manager-checks-count-progressive
 manager-checks-count-zero
 manager-checks-count-botch
+manager-checks-count-botch-odds
 manager-checks-count-over-rolled-failure
 manager-checks-count-routed-rolled
 manager-checks-count-forced

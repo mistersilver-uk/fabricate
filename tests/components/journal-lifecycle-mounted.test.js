@@ -98,6 +98,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     component('EssencePool'),
     component('RunProgress'),
+    'src/ui/svelte/components/StageBars.svelte',
     component('StageNav'),
     component('StageCard'),
     component('ListRow'),
@@ -1549,7 +1550,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       'unattempted stages do not enter the account'
     );
     assert.ok(!mounted.target.querySelector('[data-stage-card] .is-complete'));
-    const tracks = [...mounted.target.querySelectorAll('[data-stage-progress-state]')];
+    const tracks = [...mounted.target.querySelectorAll('[data-stage-bars-state]')];
     assert.equal(tracks.length, 0, 'terminal history has no active progress');
   });
 
@@ -2240,7 +2241,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.match(left.textContent, /3h 0m 0s/u, 'the TIME card still reports three hours left');
 
     const fill = paused.target.querySelector(
-      '[data-journal-stages] [data-run-progress-track="0"] .fab-fill-bar-fill'
+      '[data-journal-stages] [data-stage-bars-stage="0"] .fab-fill-bar-fill'
     );
     assert.equal(
       fill.getAttribute('style'),
@@ -2375,6 +2376,13 @@ describe('Journal versioned lifecycle (mounted)', () => {
       /6 \/ 6/
     );
     assert.match(essence.target.querySelector('[data-essence-total="fire"]').textContent, /3 \/ 3/);
+    assert.equal(
+      essence.target
+        .querySelector(':scope [data-essence-threshold="earth"] [role="meter"]')
+        .getAttribute('aria-valuetext'),
+      '6 of 6',
+      'the journal meter reads the localized pool sentence, not "6 slash 6"'
+    );
   });
 
   it('collects all three gathering modes but never treats fixture plans without receipts as awards', async () => {

@@ -1,6 +1,7 @@
 interactables-browser-tools
 interactables-browser-tasks
 interactables-browser-filtered
+interactables-browser-no-matches
 interactables-config-configured
 interactables-config-needs-configuration
 interactables-config-source-open
