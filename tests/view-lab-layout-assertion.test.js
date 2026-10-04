@@ -325,6 +325,14 @@ test('rejects a geometry selector too thin to measure anything', async () => {
   );
 });
 
+test('rejects row geometry declared without a container', async () => {
+  const { containerSelector: _container, ...uncontained } = ROWS;
+  await assert.rejects(
+    assertViewLabLayout(rowsFrame(), uncontained, 'uncontained'),
+    /uncontained: a layout expectation needs a containerSelector/
+  );
+});
+
 // A wrapped row's lines: each line's boxes share its first box's band, each below the line before.
 const wrappedRow = (boxes) => ({ querySelector: (selector) => boxes[selector] ?? null });
 const WRAPPED = Object.freeze({
@@ -375,19 +383,35 @@ test('rejects a control off its stated line, and a row missing one', async () =>
 });
 
 // A control's computed style, each declared value resolved in the control's own context (issue
-// 1521): the fake probe resolves a declared value through `RESOLVED`, as the browser would.
+// 1521). The fake browser parses only `PARSED` properties, resolves a value through `RESOLVED`,
+// computes an unresolved `var()` to its initial transparent, and reads anything undeclared as ''.
+const PARSED = new Set(['min-height', 'font-size', 'background-color']);
 const RESOLVED = { '0.72rem': '11.52px', 'var(--fab-success)': 'rgb(80, 160, 90)' };
+const TRANSPARENT = 'rgba(0, 0, 0, 0)';
+const ON_RUNG = Object.freeze({
+  '--fab-success': 'rgb(80, 160, 90)',
+  'min-height': '34px',
+  'font-size': '11.52px',
+  'background-color': 'rgb(80, 160, 90)',
+});
 
-function controlFrame(measured, { probes = [], queried = [] } = {}) {
-  const styleOf = (lookup) => ({ getPropertyValue: lookup });
-  const control = {
+function verbControl(measured, probes = []) {
+  const styleOf = (lookup) => ({ getPropertyValue: (property) => lookup(property) ?? '' });
+  const resolveValue = (value) =>
+    RESOLVED[value] ?? (value?.startsWith('var(') ? TRANSPARENT : value);
+  return {
     ownerDocument: {
       createElement: () => {
         const declared = {};
         const probe = {
-          style: { setProperty: (property, value) => (declared[property] = value) },
+          style: {
+            setProperty: (property, value) => {
+              if (PARSED.has(property)) declared[property] = value;
+            },
+            getPropertyValue: (property) => declared[property] ?? '',
+          },
           remove: () => (probe.removed = true),
-          computedStyle: styleOf((property) => RESOLVED[declared[property]] ?? declared[property]),
+          computedStyle: styleOf((property) => resolveValue(declared[property])),
         };
         probes.push(probe);
         return probe;
@@ -396,37 +420,27 @@ function controlFrame(measured, { probes = [], queried = [] } = {}) {
     append: () => {},
     computedStyle: styleOf((property) => measured[property]),
   };
-  return frame({ '[data-verb]': control }, queried);
 }
 
-const PRIMARY_VERB = {
-  controls: [
-    {
-      selector: '[data-verb]',
-      styles: 'min-height: 34px; font-size: 0.72rem; background-color: var(--fab-success);',
-    },
-  ],
-};
+function controlFrame(measured, { probes = [], queried = [] } = {}) {
+  return frame({ '[data-verb]': verbControl(measured, probes) }, queried);
+}
+
+const verbStyled = (styles) => ({ controls: [{ selector: '[data-verb]', styles }] });
+const PRIMARY_VERB = verbStyled(
+  'min-height: 34px; font-size: 0.72rem; background-color: var(--fab-success);'
+);
 
 test('accepts a control whose computed styles resolve to the declared values', async () => {
   const probes = [];
-  const measured = {
-    'min-height': '34px',
-    'font-size': '11.52px',
-    'background-color': 'rgb(80, 160, 90)',
-  };
   await assert.doesNotReject(
-    assertViewLabLayout(controlFrame(measured, { probes }), PRIMARY_VERB, 'verb')
+    assertViewLabLayout(controlFrame(ON_RUNG, { probes }), PRIMARY_VERB, 'verb')
   );
   assert.ok(probes.length === 1 && probes[0].removed, 'the probe is removed before the capture');
 });
 
 test('rejects a control whose computed style differs, naming each property', async () => {
-  const measured = {
-    'min-height': '36px',
-    'font-size': '11.52px',
-    'background-color': 'rgb(200, 120, 90)',
-  };
+  const measured = { ...ON_RUNG, 'min-height': '36px', 'background-color': 'rgb(200, 120, 90)' };
   await assert.rejects(
     assertViewLabLayout(controlFrame(measured), PRIMARY_VERB, 'accent-primary'),
     /min-height is 36px, not 34px \(34px\); background-color is rgb\(200, 120, 90\), not var\(--fab-success\)/
@@ -435,11 +449,49 @@ test('rejects a control whose computed style differs, naming each property', asy
 
 test('checks controls without a grid when the case declares none', async () => {
   const queried = [];
-  const measured = {
-    'min-height': '34px',
-    'font-size': '11.52px',
-    'background-color': 'rgb(80, 160, 90)',
-  };
-  await assertViewLabLayout(controlFrame(measured, { queried }), PRIMARY_VERB, 'controls-only');
+  await assertViewLabLayout(controlFrame(ON_RUNG, { queried }), PRIMARY_VERB, 'controls-only');
   assert.deepEqual(queried, ['[data-verb]']);
+});
+
+test('rejects a declaration the browser does not parse, not comparing two blanks', async () => {
+  await assert.rejects(
+    assertViewLabLayout(controlFrame(ON_RUNG), verbStyled('min-heigth: 34px'), 'misspelt'),
+    /misspelt: \[data-verb\] min-heigth: 34px does not parse/
+  );
+});
+
+test('rejects a var() naming an unset custom property, not comparing two initials', async () => {
+  const transparent = { ...ON_RUNG, 'background-color': TRANSPARENT };
+  await assert.rejects(
+    assertViewLabLayout(
+      controlFrame(transparent),
+      verbStyled('background-color: var(--fab-sucess)'),
+      'misnamed'
+    ),
+    /misnamed: \[data-verb\] --fab-sucess is unset/
+  );
+});
+
+test('rejects a control that declares no styles to measure', async () => {
+  for (const styles of [undefined, '', ' ; ']) {
+    await assert.rejects(
+      assertViewLabLayout(controlFrame(ON_RUNG), verbStyled(styles), 'unstyled'),
+      /unstyled: control \[data-verb\] declares no styles to measure/
+    );
+  }
+});
+
+test('rejects a control selector that matches nothing', async () => {
+  await assert.rejects(
+    assertViewLabLayout(frame({}), PRIMARY_VERB, 'absent'),
+    /absent: control selector "\[data-verb\]" was not found/
+  );
+});
+
+test('rejects a control selector that matches more than one element', async () => {
+  const twice = frame({ '[data-verb]': [verbControl(ON_RUNG), verbControl(ON_RUNG)] });
+  await assert.rejects(
+    assertViewLabLayout(twice, PRIMARY_VERB, 'twice'),
+    /twice: control selector "\[data-verb\]" matched 2 elements/
+  );
 });
