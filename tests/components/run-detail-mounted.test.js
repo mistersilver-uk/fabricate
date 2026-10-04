@@ -1885,7 +1885,7 @@ describe('RunDetail award face (issue 1773)', () => {
     assert.ok(gold.getAttribute('aria-describedby').includes(reason.id), 'the tile names why');
   });
 
-  it('V&A 13: up to N disables unpicked tiles at the ceiling, says why, and an unpick reopens them', async () => {
+  it('scenario "A player reaches the reward ceiling": unpicked tiles are disabled and a sentence says why', async () => {
     const target = await harness.mount({ run: owedRun(), journal: settlingJournal(null) });
     tile(target, 'gem').click();
     await settleTurns();
