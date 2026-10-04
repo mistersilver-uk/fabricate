@@ -25,7 +25,8 @@ import {
   templatesOf,
   workingTree,
 } from '../helpers/designSystemRatchet.js';
-import { parseMarkers } from '../helpers/mergeBaseRatchet.js';
+import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
+import { parseMarkers, siteMarker } from '../helpers/mergeBaseRatchet.js';
 import { collectWorkingTreeSources, stripComments } from '../helpers/sourceScan.js';
 import {
   declarationsIn,
@@ -706,6 +707,92 @@ test('no new native <select> is written into a JavaScript template string', (t) 
       'answer first is whether it should be an application window instead; where it must stay ' +
       'a dialog, a `// ratchet-exempt(design-system): <reason>` above the line says why.'
   );
+});
+
+/** The three DialogV2 bodies that keep a native select, with the body each renders (issue 1779). */
+const DIALOG_SELECT_BODIES = Object.freeze({
+  'src/canvas/environmentDialog.js': [
+    '<div class="fabricate-canvas-env-dialog">',
+    '    <p>FABRICATE.Canvas.Interactable.EnvironmentDialogHint</p>',
+    '    <label>FABRICATE.Canvas.Interactable.EnvironmentDialogLabel',
+    '      <select name="environmentId"><option value="cave" selected>Cave</option></select>',
+    '    </label>',
+    '    <p class="fabricate-canvas-env-dialog-modifier-hint">FABRICATE.Canvas.Interactable.DropModifierHint</p>',
+    '  </div>',
+  ].join('\n'),
+  'src/ui/compendiumDirectoryContext.js': [
+    '',
+    '    <div class="fabricate-compendium-import">',
+    '      <p>FABRICATE.Admin.Items.CompendiumImportDialogPrompt</p>',
+    '      <select name="systemId" style="width: 100%;"><option value="s1" selected>One</option></select>',
+    '    </div>',
+  ].join('\n'),
+  'src/ui/foundryCompat.js': [
+    '',
+    ' '.repeat(4),
+    '    <div class="form-group">',
+    '      <label for="fabricate-recipe-select">Pick</label>',
+    '      <select id="fabricate-recipe-select" name="recipe" aria-label="Pick"><option value="r1" selected>R1</option></select>',
+    '    </div>',
+  ].join('\n'),
+});
+
+/** The `content` each dialog hands a stubbed `DialogV2`, keyed by its file. */
+async function capturedDialogBodies() {
+  const bodies = [];
+  class StubDialogV2 {
+    constructor(options) {
+      bodies.push(options.content);
+      options.close?.();
+    }
+    render() {}
+    static async prompt({ content }) {
+      bodies.push(content);
+    }
+    static async wait({ content }) {
+      bodies.push(content);
+    }
+  }
+  const env = installFoundryBridgeEnv({ dialog: StubDialogV2 });
+  try {
+    const { promptDropEnvironment } = await import('../../src/canvas/environmentDialog.js');
+    const { promptSelectCraftingSystem } =
+      await import('../../src/ui/compendiumDirectoryContext.js');
+    const { selectDialog } = await import('../../src/ui/foundryCompat.js');
+    const localize = (key) => key;
+    await promptDropEnvironment({ environments: [{ id: 'cave', name: 'Cave' }], localize });
+    await promptSelectCraftingSystem([{ id: 's1', name: 'One' }], { localize });
+    await selectDialog({
+      title: 'T',
+      options: [{ value: 'r1', label: 'R1' }],
+      selectLabel: 'Pick',
+    });
+  } finally {
+    env.restore();
+  }
+  return Object.fromEntries(Object.keys(DIALOG_SELECT_BODIES).map((file, i) => [file, bodies[i]]));
+}
+
+test('each JavaScript dialog select is its own statement under a reasoned marker', async () => {
+  const files = Object.keys(DIALOG_SELECT_BODIES);
+  const { readFile } = workingTree(MODULE_CORPUS);
+  const sites = nativeSelectsInJavaScript(readFile, files);
+  assert.deepEqual(
+    sites.map((site) => site.file),
+    files,
+    'each dialog file reports exactly one select line, so the marker check below is not vacuous'
+  );
+  for (const { file, line } of sites) {
+    assert.ok(
+      siteMarker(file, readFile(file), DESIGN_SYSTEM_FAMILY, line),
+      `${file}:${line} has no reasoned \`// ratchet-exempt(design-system)\` on or directly above it`
+    );
+  }
+  const bodies = await capturedDialogBodies();
+  for (const [file, body] of Object.entries(DIALOG_SELECT_BODIES)) {
+    assert.equal(bodies[file], body, `${file} renders the same dialog body, byte for byte`);
+    assert.doesNotMatch(bodies[file], /ratchet-exempt/u, `${file} leaks its marker into the body`);
+  }
 });
 
 /* ─────────────────────────────── gate 6: radii ─────────────────────────────── */
