@@ -223,6 +223,8 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
 // The result card's rows beyond `<Select>` (issue 1516): the requirement row, its amount slot and
 // the amount floor the card reads. A tree rendering `RecipeResultGroupCard` spreads both lists.
 export const RESULT_ROW_RAW_MODULES = Object.freeze([
+  // Issue 1521: the card and the requirement row localize through `localizeOr`.
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
   'src/systems/characterModifierPrerequisiteCopy.js',
   'src/systems/characterPrerequisites.js',
