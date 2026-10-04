@@ -75,7 +75,6 @@
     recipeItemDraft = null,
     recipeItemEditDirty = false,
     recipeItemEditSaving = false,
-    recipeItemSaveFailed = false,
     canSaveRecipeItemEdit = false,
     backToBooksScrolls = () => {},
     deleteRecipeItemFromEdit = () => {},
@@ -253,7 +252,6 @@
         {recipeItemDraft}
         {recipeItemEditDirty}
         {recipeItemEditSaving}
-        {recipeItemSaveFailed}
         {canSaveRecipeItemEdit}
         {backToBooksScrolls}
         {deleteRecipeItemFromEdit}

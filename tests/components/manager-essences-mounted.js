@@ -912,7 +912,9 @@ export function registerEssencesCases() {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Rain');
-    assert.ok(target.textContent.includes('Save failed.'));
+    // The name is editable here and the store refuses a duplicate, so the notice says so.
+    assert.ok(target.textContent.includes('Save failed'));
+    assert.ok(target.textContent.includes('may already have this name'));
 
     unmount(mounted);
     target.remove();
@@ -947,7 +949,7 @@ export function registerEssencesCases() {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Storm');
-    assert.ok(target.textContent.includes('Save failed.'));
+    assert.ok(target.textContent.includes('Save failed'));
 
     unmount(mounted);
     target.remove();

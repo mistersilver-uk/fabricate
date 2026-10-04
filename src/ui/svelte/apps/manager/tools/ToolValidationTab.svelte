@@ -1,8 +1,8 @@
 <!--
   The Tool editor's VALIDATION tab, rendering the shared `ScopedValidationTab`. It keeps its
   `manager-tool-tab-stack` class, its `data-tool-validation-tab` hook and its
-  `data-tool-validation-check` row hook, and keeps the save-failure alert below the surface as the
-  primitive's trailing snippet. UNLIKE AN ESSENCE, A TOOL REFUSES TO SAVE while a blocking issue
+  `data-tool-validation-check` row hook; a failed save is the editor's notice, not this tab's
+  (issue 1522). Unlike an essence, a Tool refuses to save while a blocking issue
   stands, which is why its block row reads `BLOCKS ENABLE` — the one thing the two sites disagree
   about, and the only status label either passes.
 
@@ -34,7 +34,6 @@
     tool = null,
     authority = 'toolSpecific',
     validation = { valid: false, errors: [] },
-    saveError = '',
     focusValidationNonce = 0,
     // Whether the world catalogue holds a record for this Tool, and the route to it: an unlifted
     // pre-migration Tool has no world half, so the notice states the defect and offers no route.
@@ -213,13 +212,5 @@
       data-tool-identity-notice
       actions={worldRecordExists ? worldToolAction : undefined}
     />
-  {/if}
-  {#if saveError && saveError !== 'invalid'}
-    <p class="manager-validation-error" role="alert" data-tool-save-error>
-      {text(
-        'FABRICATE.Admin.Manager.Tools.Editor.SaveFailed',
-        'The Tool could not be saved. Try again.'
-      )}
-    </p>
   {/if}
 </ScopedValidationTab>

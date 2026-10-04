@@ -3,6 +3,7 @@
  * consumed, through the real `craft()` (whose one gate precedes `commitCraft` and both failure
  * paths) and the versioned start, against a crafter who holds the ingredient. The control world
  * consumes and credits, so the unchanged inventory each refusal asserts is one that could move.
+ * Issue 1773 PR3 adds the choice group's refusals: a player chooser, and a group formula.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -18,8 +19,9 @@ const COIN = { kind: 'currency', unit: 'gp', quantity: 3 };
 const LORE = { kind: 'knowledge', recipeId: 'taught', quantity: 1 };
 
 /** A craft of two wood into `results`, with a crafter whose currency and flags live on `_source`. */
-function rewardWorld({ results = [COIN, LORE], enabled = true, system } = {}) {
+function rewardWorld({ results = [COIN, LORE], enabled = true, system, failureResults } = {}) {
   const world = craftProbe({
+    failureResults,
     steps: [
       { ingredients: [{ componentId: 'wood', quantity: 2 }], results, timeRequirement: null },
     ],
@@ -55,7 +57,69 @@ const versionedRefusal = (world) =>
     runManager: {},
   });
 
+/** A rolled group of two gold credits: `1d6` at its maximum selects the second. */
+const rolledCoins = (extra = {}) => ({
+  id: 'purse',
+  chooser: 'rolled',
+  selectionFormula: '1d6',
+  alternatives: [
+    { ...COIN, id: 'one', quantity: 1, selectionRange: { from: 1, to: 3 } },
+    { ...COIN, id: 'two', quantity: 2, selectionRange: { from: 4, to: 6 } },
+  ],
+  ...extra,
+});
+const playerCoins = { id: 'purse', alternatives: rolledCoins().alternatives };
+
+/** A world whose rolled formula reads the crafter's name, which is text. */
+function textFormulaWorld(results) {
+  const world = rewardWorld({ results });
+  world.crafter.getRollData = () => ({ details: { name: 'Sera' } });
+  return world;
+}
+
 const REFUSALS = Object.freeze([
+  {
+    name: 'a player-chooser group (issue 1773, until its pick can be settled)',
+    world: () => rewardWorld({ results: [playerCoins] }),
+    reason: /the player chooses cannot be awarded yet/,
+  },
+  {
+    name: 'a player-chooser group in the failure-role set alone',
+    world: () => rewardWorld({ results: [COIN], failureResults: [playerCoins] }),
+    reason: /the player chooses cannot be awarded yet/,
+  },
+  {
+    name: 'a selection formula resolving to text',
+    world: () => textFormulaWorld([rolledCoins({ selectionFormula: '@details.name' })]),
+    reason: /"@details.name" cannot be rolled for this character/,
+  },
+  {
+    name: 'a count formula resolving to text',
+    world: () =>
+      textFormulaWorld([
+        rolledCoins({ awardStrategy: 'upTo', awardCountFormula: '@details.name' }),
+      ]),
+    reason: /"@details.name" cannot be rolled for this character/,
+  },
+  {
+    name: 'a member amount resolving to text',
+    world: () => {
+      const [first, second] = rolledCoins().alternatives;
+      const alternatives = [{ ...first, quantityFormula: '@details.name' }, second];
+      return textFormulaWorld([rolledCoins({ alternatives })]);
+    },
+    reason: /"@details.name" cannot be rolled for this character/,
+  },
+  {
+    name: 'a group member in an unconfigured unit',
+    world: () => {
+      const [first, second] = rolledCoins().alternatives;
+      return rewardWorld({
+        results: [rolledCoins({ alternatives: [first, { ...second, unit: 'mark' }] })],
+      });
+    },
+    reason: /"mark" is not configured/,
+  },
   {
     name: 'an unconfigured unit',
     world: () => rewardWorld({ results: [{ ...COIN, unit: 'mark' }] }),
@@ -141,6 +205,17 @@ test('1773 V&A 5 control: an honoured reward consumes the ingredient, credits an
       true
     );
     assert.equal(versionedRefusal(world), null, 'and the versioned start would begin');
+  });
+});
+
+test('1773 V&A 5 control: a rolled group credits the member its selection roll draws', async () => {
+  await withRoll(Roll, async () => {
+    const world = rewardWorld({ results: [rolledCoins()] });
+    const result = await world.craftWith(world.crafter, [world.sourceActor]);
+    assert.equal(result.success, true, result.message);
+    assert.equal(wood(world), 3, 'two wood were consumed');
+    assert.equal(world.crafter._source.system.currency.gp, 7, 'the second member, two gold');
+    assert.equal(versionedRefusal(world), null);
   });
 });
 

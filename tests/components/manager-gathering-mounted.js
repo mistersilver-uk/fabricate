@@ -2035,18 +2035,25 @@ export function registerGatheringCases() {
     await settleSaveAttempt();
   }
 
-  // Every one of these alerts is asserted THROUGH the toolbar.
+  // The gathering alerts are asserted through the toolbar; the recipe item's is its editor's
+  // blocking notice at the notice position (issue 1522), whose title names the failure.
+  const RECIPE_ITEM_ALERT = '[data-recipe-item-save-error]';
+  const alertMessage = (selector) =>
+    selector === RECIPE_ITEM_ALERT ? 'Save failed' : SAVE_FAILED_MESSAGE;
+
   function saveErrorNode(selector) {
-    return target.querySelector(`.manager-header-actions ${selector}`);
+    return selector === RECIPE_ITEM_ALERT
+      ? target.querySelector(`[data-recipe-item-editor] [data-notice-position="page"] > ${selector}`)
+      : target.querySelector(`.manager-header-actions ${selector}`);
   }
 
   function assertSaveErrorRendered(selector) {
     const alert = saveErrorNode(selector);
-    assert.ok(alert, `expected the failed-save alert ${selector} in the header toolbar`);
+    assert.ok(alert, `expected the failed-save alert ${selector} where its editor announces it`);
     assert.equal(alert.getAttribute('role'), 'alert', 'the failed-save alert is a live region');
     assert.equal(
-      alert.textContent.trim(),
-      SAVE_FAILED_MESSAGE,
+      (alert.querySelector('.fab-notice-title') ?? alert).textContent.trim(),
+      alertMessage(selector),
       'the failed-save alert renders its localized message, not an empty element'
     );
   }
@@ -2054,7 +2061,7 @@ export function registerGatheringCases() {
   function assertSaveErrorAbsent(selector, why) {
     assert.equal(target.querySelector(selector), null, why);
     assert.equal(
-      target.textContent.includes(SAVE_FAILED_MESSAGE),
+      target.textContent.includes(alertMessage(selector)),
       false,
       `${why} (the message text is gone from the surface too)`
     );

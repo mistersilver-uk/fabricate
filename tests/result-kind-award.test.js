@@ -254,7 +254,7 @@ const recipeWith = (failureResults, { successResults = [] } = {}) => ({
 });
 const simple = { getMode: () => 'simple' };
 const refusals = (recipe, seams = seamsFor(), actor = hero(), modes = simple) =>
-  validateCraft(recipe, actor, modes, rewardRefusals(seams)).errors;
+  validateCraft(recipe, actor, modes, { refuseRewards: rewardRefusals(seams) }).errors;
 
 test('1773 V&A 5: the pre-flight refuses each reward its world cannot honour', () => {
   assert.deepEqual(refusals(recipeWith([currencyResult(), knowledgeResult])), []);

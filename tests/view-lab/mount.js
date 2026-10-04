@@ -134,6 +134,10 @@ function readParams() {
     // error frames (issue 1969).
     knowledgeLoading: params.get('knowledgeLoading') === '1',
     knowledgeError: params.get('knowledgeError') === '1',
+    // Refuse every editor save the save-failed frames photograph (issue 1522).
+    saveFails: params.get('saveFails') === '1',
+    // Strip Herbalism's progressive formula, for the System Overview's blocker (issue 1522).
+    systemBlocked: params.get('systemBlocked') === '1',
     // Build a world with NO Tools at all, for the world Tools Catalogue's empty state.
     noTools: params.get('noTools') === '1',
     // Withhold the world essence scope from the manager, so an essence editor renders unscoped,
@@ -681,6 +685,15 @@ async function mountManagerApp(content, params) {
     props.managerExtensions.publicApi.registerWorldNavProvider(labDowntimeProvider());
   }
   if (params.clearSystem) await props.store.selectSystem('');
+  if (params.saveFails) {
+    for (const action of ['updateRecipe', 'updateComponent', 'updateEssence', 'saveRecipeItem']) {
+      props.store[action] = async () => false;
+    }
+    // The Tool save reports its failure through the store's own catch, so the write throws.
+    globalThis.game.fabricate.getCraftingSystemManager().upsertTool = async () => {
+      throw new Error('view lab: save refused');
+    };
+  }
   const instance = mount(CraftingSystemManagerRoot, { target: content, props });
   return { instance, services, props, store: props.store, tab: params.tab };
 }
@@ -959,6 +972,7 @@ async function boot() {
         journalCaseState: params.journalCaseState,
         checkPreviewState: params.checkPreviewState,
         learnableBook: params.learnableBook,
+        systemBlocked: params.systemBlocked,
       });
   await seedRollPromptFixture(world, params.rollPromptState);
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);

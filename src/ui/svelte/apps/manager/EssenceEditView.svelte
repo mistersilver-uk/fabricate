@@ -45,6 +45,7 @@
     essenceOnCraftCount,
   } from './essences/essenceStudio.js';
   import Callout from '../../components/Callout.svelte';
+  import Notice from '../../components/Notice.svelte';
   import ToggleCard from '../../components/ToggleCard.svelte';
   import CopyRulesCard from './scoped/CopyRulesCard.svelte';
   import MembershipActions from './scoped/MembershipActions.svelte';
@@ -543,17 +544,9 @@
     in the View Lab, every click on a visible, enabled tab button was intercepted by the form. The
     wrapper keeps the grid at two children whatever this head grows to carry.
   -->
-  <!--
-    THE ROW ACTION'S LIVE REGION, hosted here rather than in the validation surface (issue 1517):
-    activating a row action sets `activeTab` to another value, which unmounts the whole validation
-    panel — live region included — in the same update that was supposed to announce. So the element
-    carrying `aria-live` is ALWAYS in the DOM, outside the `{#if activeTab}` chain, with its own
-    `{#if}` inside it.
-
-    A third child of this `<main>` does not break the two-row grid above: `.visually-hidden` is
-    `position: absolute`, so it is out of flow and takes no grid track. It is addressed by a
-    `data-` hook rather than a class, so it joins no pinned class family.
-  -->
+  <!-- The row action's live region (issue 1517): a row action unmounts the validation panel in
+       the update meant to announce, so this stays in the DOM outside the tab chain with its own
+       `{#if}`, out of flow (no grid track) and hooked by `data-` (no pinned class family). -->
   <div class="visually-hidden" role="status" aria-live="polite" data-essence-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
   </div>
@@ -569,8 +562,24 @@
   </div>
 
   <form id="manager-essence-edit-form" class="manager-essence-edit-view" onsubmit={handleSave}>
-    <!-- The pair below was already declared for the keyboard; since issue 1517 it is also the
-         ROUTE-ONLY validation row's focus destination, which is why the panel is BOUND. -->
+    {#if saveFailed}
+      <Notice
+        blocking
+        tone="danger"
+        data-notice-position="page"
+        title={text('FABRICATE.Admin.Manager.Essence.SaveFailed', 'Save failed')}
+        detail={rulesMode
+          ? text(
+              'FABRICATE.Admin.Manager.Essence.SaveFailedDetail',
+              'Nothing was saved. Try again, or refresh the manager if it keeps failing.'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Essence.SaveFailedNameDetail',
+              'Nothing was saved. Another essence in this system may already have this name; rename it and try again.'
+            )}
+      />
+    {/if}
+    <!-- Bound: the route-only validation row's focus destination (issue 1517). -->
     <div
       class="manager-essence-tab-panel"
       id={`essence-panel-${activeTab}`}
@@ -760,15 +769,6 @@
         </div>
       {/if}
     </div>
-
-    {#if saveFailed}
-      <p class="manager-muted manager-form-warning" role="alert">
-        {text(
-          'FABRICATE.Admin.Manager.Essence.SaveFailed',
-          'Save failed. Check for duplicate or blank names and try again.'
-        )}
-      </p>
-    {/if}
   </form>
 </main>
 

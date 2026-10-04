@@ -103,6 +103,35 @@ Canonical mapping: `Result.chooser`, `Result.selectionFormula`, `Result.selectio
 
 Spec reference: openspec/specs/design-system/spec.md, openspec/specs/resolution-modes/spec.md
 
+## Pending Award Choice
+
+A choice group whose chooser is the player that has been awarded but awaits settlement, persisted in `pendingAwardChoices`.
+The player must pick one or more alternatives according to the **Award Strategy** to settle the choice exactly once.
+An unsettled choice blocks later stage execution with the `awardChoicePending` blocker.
+
+Canonical mapping: `CraftingRunStepState.pendingAwardChoices`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Claimable
+
+An alternative in a pending award choice that can be awarded at settle time.
+Claimability is determined at settle time: an alternative is claimable if its component or source item exists, its world credit writer would accept it, or (for knowledge results) its recipe is available, observable, and not already known to the actor.
+
+Canonical mapping: settlement-time evaluation of `CraftingRunStepState.pendingAwardChoices[].alternatives`
+
+Spec reference: openspec/specs/data-models/spec.md
+
+## Forfeited
+
+A pending award choice that settles because no alternative remains claimable.
+A forfeited choice persists in the step's `pendingAwardChoices` with `outcome: "forfeited"` and no selections recorded.
+When a run is cleaned up while owing an unsettled choice, the choice settles forfeited instead of being deleted.
+
+Canonical mapping: `CraftingRunStepState.pendingAwardChoices[].outcome`, `CraftingRunStepState.groupAwards`
+
+Spec reference: openspec/specs/data-models/spec.md
+
 ## Rolled Amount
 
 Presence of `quantityFormula` IS the mode: absent or empty leaves the amount fixed at `quantity`, which stays the AUTHORED amount, is never omitted from disk, and is what a cleared formula returns to.

@@ -89,6 +89,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/Callout.svelte',
+    // The failed save's blocking notice (issue 1522).
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
