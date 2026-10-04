@@ -947,6 +947,8 @@ Independent criteria that narrow a list are filter toggles, because any combinat
 A one-of-N SCOPE the list is always in — rather than a filter that can be cleared — is a segmented control in the same bar; a segmented whose value could be "none" is a toggle in disguise.
 The journal's kind filter is therefore four independent toggles, because any combination of kinds is a valid view, while its active-status filter stays a segmented control, because its four values are mutually exclusive.
 
+An inspector rail's verbs render through the button primitive at full width, each taking the role its verb names.
+
 The Rail Marker Family in `DOMAIN.md` is four marks and MUST NOT be substituted for one another: a record COUNT is a bare mono numeral with no fill and no border; an ISSUE SUMMARY is a filled warning badge carrying its count; a DIRTY MARKER is a 6px dot; and the PREMIUM chip marks a tier gate, in the manager only.
 A count has two faces and neither licenses a third: at the end of a labelled row it is that bare mono numeral, and on an item whose only visible content is a glyph it is a filled pip on the icon well's outer corner with a 2px ground-coloured ring.
 The unsaved CHIP beside an editor title is a separate mark and is not a member of that family: it names the state of the record being edited rather than the state of something behind a navigation item.
@@ -1835,7 +1837,7 @@ An inspector rail is OPTIONAL and several shipped editors have none; where one i
 A blocking notice is the only element permitted between the tab bar and the first card.
 An info strip precedes the cards it describes and is never nested inside them.
 The inspector rail is READ-ONLY by convention: it shows consequences and links out, and never hosts editing controls.
-`openspec/specs/ui-visual-style/spec.md` contradicts that sentence at its "Right-inspector actions" rule, which requires every GM studio's inspector to END in a stack of verbs rendered through one shared primitive — `InspectorActionButton.svelte` today, and the contradiction is recorded as an OPEN row in the library's planned-migrations table for a maintainer to rule on rather than resolved here.
+`openspec/specs/ui-visual-style/spec.md` contradicts that sentence at its "Right-inspector actions" rule, which requires every GM studio's inspector to END in a stack of verbs rendered through the button primitive's roles, and the contradiction is recorded as an OPEN row in the library's planned-migrations table for a maintainer to rule on rather than resolved here.
 The reading that register recommends is that READ-ONLY means no editing INPUTS — nothing that edits the record in place — and that a stack of verbs rendered through the shared button is permitted.
 The environments screen's inspector rail is a declared repurposing of that third track: its gathering task, gathering event and gathering rules leaves all edit in place, and issue 1707 gave that departure file names in `environment/GatheringTaskInspector.svelte`, `environment/GatheringEventInspector.svelte`, `environment/GatheringRulesInspector.svelte` and the `environment/GatheringModifierEditor.svelte` the first two share.
 The maintainer ruled on 2026-09-19 that this departure is a declared exception to the read-only convention rather than an open row in the library's planned-migrations table.
@@ -2013,7 +2015,7 @@ A part that would need a specimen of its own is not a part; it is a candidate, a
 
 Candidates reviewed and declined MUST be recorded with the reasoning that declined them, so that the absence of a primitive is legible as a decision.
 
-The following are recorded as compositions and MUST NOT be reintroduced as components: a member row, which is a list row with a leading slot; an actor picker, which is a trigger plus the search popover; an add button, whose dashed treatment is a role on the button primitive; a rail card, which is a well, a kicker and a button; a feature card, which is option cards rendered non-interactive; a bounds input, which is two steppers, and whose last component form was inlined at issue 1521; and a currency input, which is a stepper and a select.
+The following are recorded as compositions and MUST NOT be reintroduced as components: a member row, which is a list row with a leading slot; an actor picker, which is a trigger plus the search popover; an add button, whose dashed treatment is a role on the button primitive; a rail card, which is a well, a kicker and a button; a feature card, which is option cards rendered non-interactive; a bounds input, which is two steppers, and whose last component form was inlined at issue 1521; an inspector action button, which is the button primitive at full width; and a currency input, which is a stepper and a select.
 
 A premium panel is recorded as out of scope rather than as a composition: its only original content is marketing copy, which is a product decision, and binding copy to a component makes the offer untranslatable against a codebase where every primitive takes pre-localized strings.
 A toast and a bespoke destructive-confirmation panel are recorded as surfaces Foundry already owns.

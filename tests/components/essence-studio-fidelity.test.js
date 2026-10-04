@@ -5,6 +5,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { componentAstOf } from '../helpers/parsedSource.js';
+import { renderedNodes } from '../helpers/structureShapes.js';
+import {
+  attributeValue,
+  declaresAttribute,
+  importsModule,
+} from '../helpers/svelteStructureContract.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 
@@ -24,7 +32,8 @@ const bulkPanelSource = read('src/ui/svelte/apps/manager/essences/EssenceBulkEdi
 // that matches nothing.
 const bulkDeleteCardSource = read('src/ui/svelte/apps/manager/BulkDeleteCard.svelte');
 const identityTabSource = read('src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte');
-const inspectorSource = read('src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte');
+const INSPECTOR = 'src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte';
+const inspectorSource = read(INSPECTOR);
 const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte');
 const studioSource = read('src/ui/svelte/apps/manager/essences/essenceStudio.js');
 const onCraftSource = read('src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte');
@@ -222,66 +231,62 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     );
   });
 
-  it('renders every inspector action through the shared point-of-arrival button', () => {
-    // The rendered symptom: chunky rail buttons at the app's inherited body size beside a
-    // Tool Studio whose header buttons are 0.72rem, and a PRIMARY painted in the success
-    // family — `Edit essence` was green where the design's primary, and the recipe and
-    // component inspectors one click away, are the accent.
+  it('renders every inspector action through the Button primitive at full width (issue 1521)', () => {
+    // Each verb takes the role its verb names; a manager primary is the success family
+    // (library.html section 16).
+    const inspector = componentAstOf(INSPECTOR);
     assert.ok(
-      inspectorSource.includes(
-        "import InspectorActionButton from '../InspectorActionButton.svelte';"
-      ),
-      'the inspector imports the shared button'
+      importsModule(inspector, '../../../components/Button.svelte'),
+      'the inspector imports the button primitive'
     );
-    // TOKEN-AWARE, not a prefix (issue 1502). The family is rooted at the class the primitive
-    // emits, so a hand-rolled site spells `class="fabricate-button …"` — and a prefix probe for
-    // the class that used to lead it no longer matches it. The probe would have gone quietly blind at
-    // exactly the moment the spelling it guards against changed, which is the failure mode this
-    // whole family of guards exists to prevent. Bounded to one `<tag …>` span so that a message
-    // literal or a JS string mentioning the class cannot pose as fixture markup: this file holds
-    // a `'<BulkEditSection'` string whose unterminated attribute run would otherwise swallow the
-    // prose below it.
+    const roles = Object.fromEntries(
+      renderedNodes(inspector, 'Button').map((node) => {
+        assert.ok(declaresAttribute(node, 'fullWidth'), 'every rail verb spans the rail');
+        return [attributeValue(node, 'data-essence-action'), attributeValue(node, 'role')];
+      })
+    );
+    assert.deepEqual(roles, {
+      edit: 'primary',
+      delete: 'danger',
+      'copy-source': 'ghost',
+      'unlink-source': 'warning',
+    });
+    // TOKEN-AWARE, not a prefix (issue 1502), and bounded to one `<tag …>` span so that a message
+    // literal mentioning the class cannot pose as fixture markup.
     const handRolled = [...inspectorSource.matchAll(/<[a-zA-Z][\w-]*\b[^<>]*>/g)]
       .flatMap((tag) => [...tag[0].matchAll(/class="([^"]*)"/g)].map(([, value]) => value))
       .filter((value) => value.split(/\s+/).includes('fabricate-button'));
     assert.deepEqual(handRolled, [], 'and hand-rolls no manager button of its own');
-    const primitive = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/InspectorActionButton.svelte'),
-      'utf8'
-    );
-    const styles = styleBlock(primitive);
-    assert.ok(
-      /\.fab-inspector-action \{[^}]*font-size: 0\.72rem;/s.test(styles),
+
+    // The paint is the global sheet's, so the rail and every other manager cluster agree.
+    assert.match(
+      globalCss,
+      /\.fabricate-button\.fabricate-button\.fab-manager-button \{[^}]*font-size: 0\.72rem;/,
       'at the Tool Studio header label size, which is the treatment the maintainer named'
     );
-    assert.ok(
-      /\.fab-inspector-action\.is-primary \{[^}]*background: var\(--fab-accent\);/s.test(styles),
-      'with the primary in the ACCENT family'
+    assert.match(
+      globalCss,
+      /\.fabricate-button\.fabricate-button\.is-primary:not\(:disabled\) \{[^}]*background: var\(--fab-success\);/,
+      'with the primary in the SUCCESS family'
     );
-    assert.ok(
-      /\.fab-inspector-action\.is-danger \{[^}]*color: var\(--fab-danger-text\);/s.test(styles),
-      'and the danger treatment preserved on delete'
+    // The quiet verb stays unfilled (issue 1372, maintainer parity round 6): Copy is `ghost`,
+    // whose manager rule sits on the pane. Delete is `danger`, whose rule states only its ink and
+    // edge, so it wears the family's resting fill like every other manager danger verb.
+    assert.match(
+      globalCss,
+      /\.fabricate-button\.fabricate-button\.fab-manager-button\.is-ghost:not\(:disabled\) \{[^}]*background: transparent;/,
+      'the ghost verb sits ON the pane, bounded by --fab-border'
     );
-    // THE TWO UNFILLED TONES STAY UNFILLED (issue 1372, maintainer parity round 6).
-    for (const [selector, pattern] of [
-      ['neutral', /\.fab-inspector-action \{[^}]*background: transparent;/s],
-      ['danger', /\.fab-inspector-action\.is-danger \{[^}]*background: transparent;/s],
-    ]) {
-      assert.ok(
-        pattern.test(styles),
-        `the ${selector} tone must sit ON the pane, not a rung above it — an unfilled button ` +
-          'bounded by --fab-border is what the rail and the prototype both already use'
-      );
-    }
-    // It must beat Foundry's host button geometry itself.
-    for (const declaration of ['appearance: none;', 'height: auto;', 'font-family: inherit;']) {
-      assert.ok(styles.includes(declaration), `the Foundry button reset states ${declaration}`);
-    }
-    // Its CSS is co-located, never in the global sheet.
+    const danger = /\.fabricate-button\.fabricate-button\.is-danger:not\(:disabled\),\s*\.fabricate-icon-button\.fabricate-icon-button\.is-danger:not\(:disabled\) \{([^}]*)\}/.exec(
+      globalCss
+    );
+    assert.ok(danger, 'the danger role still has its resting rule');
+    assert.match(danger[1], /color: var\(--fab-danger-text\);/, 'in danger text');
+    assert.doesNotMatch(danger[1], /background/, 'and no fill of its own');
     assert.equal(
       globalCss.includes('fab-inspector-action'),
       false,
-      'the primitive owns its appearance in its own scoped block'
+      'the retired rail button left no rule behind'
     );
   });
 

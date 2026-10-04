@@ -13,7 +13,7 @@
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import Chip from '../../../components/Chip.svelte';
   import EssenceChip from '../components/EssenceChip.svelte';
-  import InspectorActionButton from '../InspectorActionButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import ComponentCatalogueBulkPanel from './ComponentCatalogueBulkPanel.svelte';
@@ -493,17 +493,17 @@
   </div>
 {/snippet}
 
-<!--
-  THE INSPECTOR'S ONE PRIMARY ACTION, PINNED TO ITS FOOT: the frame owns the pinning and this
-  owns the verb. NO GLYPH — the external-link mark belongs to the ROW buttons, which leave.
--->
+<!-- The inspector's one primary verb, which the frame pins to its foot. No glyph: the external-link
+     mark belongs to the row buttons, which leave. -->
 {#snippet componentInspectorFoot(entry)}
-  <InspectorActionButton
-    tone="primary"
-    label={text('FABRICATE.Admin.Manager.Scoped.Component.OpenEntry', 'Open catalogue entry')}
+  <Button
+    role="primary"
+    fullWidth
     data-scoped-component-open-entry
-    onClick={() => onOpenEntry(entry.id)}
-  />
+    onclick={() => onOpenEntry(entry.id)}
+  >
+    {text('FABRICATE.Admin.Manager.Scoped.Component.OpenEntry', 'Open catalogue entry')}
+  </Button>
 {/snippet}
 
 <!--

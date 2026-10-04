@@ -1,10 +1,59 @@
 /**
- * Assert one View Lab layout from its declarative case expectation. `gridSelector` is optional: a
- * case may assert only the row geometry keys, each of which measures every match of its selector.
+ * Assert one View Lab layout from its declarative case expectation. Every key but `controls` is a
+ * layout measured inside `containerSelector`, whose `gridSelector` and row geometry keys are
+ * optional; `controls` alone needs no container.
  */
 export async function assertViewLabLayout(page, expectation, label) {
   if (!expectation) return;
+  const { controls = [], ...layout } = expectation;
+  if (Object.keys(layout).length > 0) await assertGridLayout(page, layout, label);
+  for (const control of controls) await assertControlStyles(page, control, label);
+}
 
+/**
+ * One control's computed style against `styles`, a CSS declaration list. Each declared value is
+ * resolved by a hidden probe inside the control, so `0.72rem` and `var(--fab-success)` compare in
+ * the control's own context; a declaration the browser rejects, or a `var()` naming an unset
+ * custom property, fails rather than comparing two empty or initial values.
+ */
+async function assertControlStyles(page, { selector, styles }, label) {
+  const declarations = String(styles ?? '')
+    .split(';')
+    .map((declaration) => declaration.split(':').map((part) => part.trim()))
+    .filter(([property]) => property);
+  if (declarations.length === 0) {
+    throw new Error(`${label}: control ${selector} declares no styles to measure`);
+  }
+  const control = await requiredLocator(page, selector, 'control', label);
+  const mismatches = await control.evaluate((element, declared) => {
+    const probe = element.ownerDocument.createElement('span');
+    probe.style.setProperty('display', 'none');
+    element.append(probe);
+    try {
+      const measured = globalThis.getComputedStyle(element);
+      return declared.flatMap(([property, value]) => {
+        probe.style.setProperty(property, value);
+        if (probe.style.getPropertyValue(property) === '') {
+          return [`${property}: ${value} does not parse`];
+        }
+        const unset = [...String(value).matchAll(/var\(\s*(--[\w-]+)/g)]
+          .map(([, name]) => name)
+          .filter((name) => measured.getPropertyValue(name) === '');
+        if (unset.length > 0) return unset.map((name) => `${name} is unset`);
+        const expected = globalThis.getComputedStyle(probe).getPropertyValue(property);
+        const actual = measured.getPropertyValue(property);
+        return actual === expected ? [] : [`${property} is ${actual}, not ${value} (${expected})`];
+      });
+    } finally {
+      probe.remove();
+    }
+  }, declarations);
+  if (mismatches.length > 0) {
+    throw new Error(`${label}: ${selector} ${mismatches.join('; ')}`);
+  }
+}
+
+async function assertGridLayout(page, expectation, label) {
   const {
     containerSelector,
     gridSelector,
@@ -13,6 +62,9 @@ export async function assertViewLabLayout(page, expectation, label) {
     absentSelector = '',
     fillSelector = '',
   } = expectation;
+  if (typeof containerSelector !== 'string') {
+    throw new TypeError(`${label}: a layout expectation needs a containerSelector`);
+  }
   const container = await requiredLocator(page, containerSelector, 'container', label);
   if (Number.isFinite(maxContentBoxInlineSize)) {
     const contentBoxInlineSize = await container.evaluate((element) => {

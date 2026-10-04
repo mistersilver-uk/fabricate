@@ -90,13 +90,12 @@ const CONVERTED_BATCHES = Object.freeze([
       }),
       // 4 -> 0 AT ISSUE 1371's C7.6. The stacked action column of four `.fabricate-button`s is
       // gone: the reference draws ONE primary plus a kebab, so the inspector now renders a
-      // single `InspectorActionButton` — a primitive whose own header records that it is
-      // deliberately NOT `.fabricate-button` — with the other three commands as `ActionMenu`
-      // DATA rather than as controls. Licensed by the same rule as every other movement in
-      // this ledger: the four SITES left the product, rather than leaving this instrument's
-      // view. The entry is kept at 0 rather than dropped, so the two ledger checks below —
-      // that the file writes no literal `class="fabricate-button"` and that the instrument
-      // derives no site in it — keep guarding it against a regression.
+      // single primary `Button` — whose class the primitive writes, not this file — with the
+      // other three commands as `ActionMenu` DATA rather than as controls. Licensed by the same
+      // rule as every other movement in this ledger: the four SITES left the product, rather
+      // than leaving this instrument's view. The entry is kept at 0 rather than dropped, so the
+      // two ledger checks below — that the file writes no literal `class="fabricate-button"` and
+      // that the instrument derives no site in it — keep guarding it against a regression.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte',
         sites: 0,

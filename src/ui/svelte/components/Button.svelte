@@ -28,10 +28,12 @@
     to build its browser probes, so the mapping stays a named object outside the array and the
     array's literals stay the three unconditional classes; an inline conditional there puts its
     tokens into every probe and the gate goes green while measuring markup nothing emits.
-  - THE ROLE SET IS CLOSED and a caller routes by MEANING: `danger` is the DESTRUCTIVE verb,
-    `warning` the OVERRIDE verb that proceeds against a flagged rule and destroys nothing, `dashed`
-    the ADD action at the foot of its list, `neutral` the empty modifier. A control that does both
-    of the first two is `danger`, and a per-site visual tweak is a pass-through on `class`.
+  - THE ROLE SET IS CLOSED and a caller routes by MEANING: `danger` is the DESTRUCTIVE verb, which
+    removes a record or breaks a reference together with data re-making it would not restore;
+    `warning` the CAUTION verb, which destroys nothing and proceeds against a flagged rule or breaks
+    a reference the GM can re-make exactly; `dashed` the ADD action at the foot of its list;
+    `neutral` the empty modifier. A control that both destroys and cautions is `danger`, and a
+    per-site visual tweak is a pass-through on `class`.
   - THE ROLE-TO-CLASS RELATION IS A NAMED MAPPING, never an `is-${role}` template: the sheet's amber
     treatment is `.fabricate-button.is-warning-action` and `.fabricate-button.is-warning` is declared
     nowhere, so a guessed spelling ships with no treatment; and `scripts/lib/stylesheetLiveClasses.js`
