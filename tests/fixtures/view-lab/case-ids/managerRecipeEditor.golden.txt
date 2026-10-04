@@ -38,9 +38,12 @@ manager-recipe-edit-results-kinds-narrow
 manager-recipe-edit-results-currency-body-empty
 manager-recipe-edit-results-currency-body-filled
 manager-recipe-edit-results-adder-menu
+manager-recipe-edit-results-learning-off
+manager-recipe-edit-results-missing-recipe
 manager-multistep-disable-confirm
 manager-recipe-edit-collapsed
 manager-recipe-edit-results-progressive
+manager-recipe-edit-results-progressive-adder
 manager-recipe-edit-results-alchemy
 manager-recipe-edit-access-rail
 manager-recipe-edit-access-inspector

@@ -70,6 +70,18 @@ function seedRewardCraft(content) {
   });
 }
 
+/** `reward-missing`: the `reward-craft` horseshoe also teaching a recipe Smithing no longer holds. */
+function seedRewardMissing(content) {
+  seedRewardCraft(content);
+  const { recipe } = recipeAndSystem(content, 'sm-r-horseshoe', 'reward-missing');
+  recipe.resultGroups[0].results.push({
+    id: 'sm-r-horseshoe-retired',
+    kind: 'knowledge',
+    recipeId: 'sm-r-retired-lore',
+    quantity: 1,
+  });
+}
+
 function seedRewardCraftLearned(actors) {
   const brenna = actors.find((actor) => actor.id === 'lab-actor-brenna');
   const learned = brenna?.flags?.fabricate?.fabricate?.learnedRecipes ?? {};
@@ -120,6 +132,7 @@ const RESULT_ROW_STATES = Object.freeze({
   unnamed: seedUnnamedResult,
   'reward-kinds': seedRewardKinds,
   'reward-craft': seedRewardCraft,
+  'reward-missing': seedRewardMissing,
   'reward-tiers': seedRewardTiers,
 });
 
@@ -560,7 +573,8 @@ function stripAuthoredWorldComponents(content) {
  * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
  * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component,
  *   `reward-kinds` for Bend Horseshoe awarding a currency and a knowledge result, `reward-craft`
- *   for that award crafted, or `reward-tiers` for a Runeblade tier paying a commission.
+ *   for that award crafted, `reward-missing` for it also teaching a recipe its system no longer
+ *   holds, or `reward-tiers` for a Runeblade tier paying a commission.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
@@ -816,8 +830,15 @@ function createLabRunAuthorityLedger(retainedClaim = false) {
  * KEPT.
  */
 function seedRetainedClaim(ledger) {
-  const { claimId, requestId, requestKind, requestStatus, failureReason, failureMessage, claimedAt } =
-    LAB_RETAINED_CLAIM;
+  const {
+    claimId,
+    requestId,
+    requestKind,
+    requestStatus,
+    failureReason,
+    failureMessage,
+    claimedAt,
+  } = LAB_RETAINED_CLAIM;
   ledger.flags.fabricate.journalRunAuthorityState = {
     version: 1,
     requests: {

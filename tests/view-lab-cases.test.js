@@ -706,7 +706,9 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-recipe-edit-results-rolled-narrow',
   'manager-recipe-edit-results-kinds',
   'manager-recipe-edit-results-kinds-narrow',
+  'manager-recipe-edit-results-adder-menu',
   'manager-recipe-edit-results-progressive',
+  'manager-recipe-edit-results-progressive-adder',
   'manager-recipe-edit-results-narrow',
   'manager-gathering-task-editor-straight-rolled',
   'manager-component-edit-salvage-rolled-narrow',
@@ -798,9 +800,7 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     // And the side rail runs the body's full height below the 1120px rung (issue 1976).
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
   }
-  for (const viewCase of declared.filter((entry) =>
-    RAIL_FILL_LAYOUT_CASE_IDS.includes(entry.id)
-  )) {
+  for (const viewCase of declared.filter((entry) => RAIL_FILL_LAYOUT_CASE_IDS.includes(entry.id))) {
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
     assert.equal(viewCase.expectLayout.expectedTracks, RAIL_FILL_LAYOUT_CASES[viewCase.id].tracks);
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
@@ -876,7 +876,9 @@ function layoutCasePosition(id) {
 }
 
 test('compact Journal captures add full, short, empty, restored and tool witnesses at both widths', () => {
-  const cases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'));
+  const cases = VIEW_LAB_CASES.filter((entry) =>
+    entry.id.startsWith('fabricate-journal-history-batch-')
+  );
   assert.equal(cases.length, 10);
   for (const width of [1240, 1024]) {
     for (const state of ['full', 'partial', 'empty', 'restored', 'tools']) {
@@ -884,7 +886,11 @@ test('compact Journal captures add full, short, empty, restored and tool witness
       assert.equal(capture.position.width, width);
       assert.equal(capture.expectTab, 'journal');
       assert.match(capture.expectSelector, /data-history-items="tools"/);
-      if (state === 'partial') assert.equal(capture.steps.filter((step) => step.selector.includes('data-pagination-next')).length, 4);
+      if (state === 'partial')
+        assert.equal(
+          capture.steps.filter((step) => step.selector.includes('data-pagination-next')).length,
+          4
+        );
       if (state === 'restored') assert.equal(capture.steps.at(-1).fill, '');
       if (state === 'empty') assert.match(capture.expectSelector, /is-fill/);
     }
@@ -894,14 +900,57 @@ test('compact Journal captures add full, short, empty, restored and tool witness
 // The evidence each history-data state exists to photograph, keyed by its own witness.
 const HISTORY_DATA_EVIDENCE = [
   // The saved world's two independent rolls, and the global cut that must NOT be synthesised.
-  ['legacy-row-rolls', [/legacy-iron-ore-roll-12"\]\.is-cleared/, /legacy-copper-ore-roll-94"\]\.is-cleared/, /:not\(:has\(\[data-yield-cut\]\)\)/]],
+  [
+    'legacy-row-rolls',
+    [
+      /legacy-iron-ore-roll-12"\]\.is-cleared/,
+      /legacy-copper-ore-roll-94"\]\.is-cleared/,
+      /:not\(:has\(\[data-yield-cut\]\)\)/,
+    ],
+  ],
   ['shared-roll-control', [/:has\(\[data-yield-cut\]\)/, /shared-ruby:2"\]\.is-missed/]],
-  ['recovered-materials', [/title="Steel Billet"/, /title="Coal"/, /consumed"\] i\.fa-box/, /produced"\] \[title="Steel Ingot"\]/]],
-  ['unknown-material-resolution', [/data-yield-shared-roll/, /data-history-unattributed\] \+ \[data-history-items="produced"/, /:not\(:has\(\[data-yield-entry="unknown-ruby"\]\.is-cleared\)\)/]],
-  ['settled-zero', [/data-journal-verdict="failed"/, /barren-iron-ore"\]\.is-missed/, /:not\(:has\(\[data-yield-entry\]\.is-cleared\)\)/]],
-  ['uncertain-awards', [/data-effect-phase="applied"\] \[data-list-row\]/, /data-effect-phase="applying"\] \[data-list-row\]/, /data-journal-recovery-evidence\] ~ \[data-journal-history-detail\] \[data-journal-guidance\]/]],
+  [
+    'recovered-materials',
+    [
+      /title="Steel Billet"/,
+      /title="Coal"/,
+      /consumed"\] i\.fa-box/,
+      /produced"\] \[title="Steel Ingot"\]/,
+    ],
+  ],
+  [
+    'unknown-material-resolution',
+    [
+      /data-yield-shared-roll/,
+      /data-history-unattributed\] \+ \[data-history-items="produced"/,
+      /:not\(:has\(\[data-yield-entry="unknown-ruby"\]\.is-cleared\)\)/,
+    ],
+  ],
+  [
+    'settled-zero',
+    [
+      /data-journal-verdict="failed"/,
+      /barren-iron-ore"\]\.is-missed/,
+      /:not\(:has\(\[data-yield-entry\]\.is-cleared\)\)/,
+    ],
+  ],
+  [
+    'uncertain-awards',
+    [
+      /data-effect-phase="applied"\] \[data-list-row\]/,
+      /data-effect-phase="applying"\] \[data-list-row\]/,
+      /data-journal-recovery-evidence\] ~ \[data-journal-history-detail\] \[data-journal-guidance\]/,
+    ],
+  ],
   ['fizzle', [/data-history-summary="none"/, /title="Quicksilver"/, /img\.fab-medallion-img/]],
-  ['salvage', [/data-history-items="produced"\] \+ \[data-journal-fact\]/, /produced"\] \[data-list-row\] ~ \[data-list-row\]/, /:not\(:has\(\[data-history-items="consumed"\]\)\)/]],
+  [
+    'salvage',
+    [
+      /data-history-items="produced"\] \+ \[data-journal-fact\]/,
+      /produced"\] \[data-list-row\] ~ \[data-list-row\]/,
+      /:not\(:has\(\[data-history-items="consumed"\]\)\)/,
+    ],
+  ],
 ];
 
 test('the history-data witnesses name their defining evidence on the selected record', () => {
@@ -943,7 +992,8 @@ test('the history-data witnesses name their defining evidence on the selected re
     73
   );
   assert.equal(
-    VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-')).length,
+    VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'))
+      .length,
     10
   );
 });
@@ -3191,7 +3241,9 @@ test('adding one run state to labRunStates selects only the cases that render it
 });
 
 test('an unattributable labRunStates patch widens to every player-window case, by union', () => {
-  const helper = labRunStatesFile.lineOf('function stageBrowserRun(context, recipe, pastCheck = null) {');
+  const helper = labRunStatesFile.lineOf(
+    'function stageBrowserRun(context, recipe, pastCheck = null) {'
+  );
   const importLine = labRunStatesFile.lineOf("} from './labJournalPrototype.js';");
   // Derived, not listed: every player case, so one added tomorrow is covered unmapped.
   const players = publishableCases()
@@ -3208,7 +3260,10 @@ test('an unattributable labRunStates patch widens to every player-window case, b
   }
 
   const withState = new Set(
-    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([helper, ...runStateLines('paused')]))
+    selectedIds(
+      [LAB_RUN_STATES_PATH],
+      labRunStatesFile.patches([helper, ...runStateLines('paused')])
+    )
   );
   for (const id of [...players, ...casesOfRunState('paused')]) {
     assert.ok(withState.has(id), `the union dropped "${id}"`);
@@ -3488,11 +3543,7 @@ test('a region-attributed input widens by union too, and so does a straddling hu
   // shared code and therefore inside no region at all.
   const journal = fileAt(fileDeclaring('  ...journalBlindRunCases(),'));
   const spread = journal.lineOf('  ...journalBlindRunCases(),');
-  assert.equal(
-    journal.source[spread - 2],
-    '  }),',
-    'the line above the spread must close a case'
-  );
+  assert.equal(journal.source[spread - 2], '  }),', 'the line above the spread must close a case');
   const closedCase = caseIdByLineIn(journal.path).get(spread - 1);
   assert.ok(closedCase, 'the line above the spread must be inside a parsed case region');
 
@@ -3744,7 +3795,7 @@ test('every case file opens its array exactly once, on the line the selector par
   }
 });
 
-test('a patch inside any case file attributes to that file\'s own case, and nothing else', () => {
+test("a patch inside any case file attributes to that file's own case, and nothing else", () => {
   const attributed = new Set();
   for (const { path, cases } of VIEW_LAB_CASE_FILES) {
     const file = fileAt(path);
@@ -3970,7 +4021,8 @@ test('a registry change OUTSIDE a case literal selects surface coverage', () => 
 test('a comment-only registry change selects one frame — not 157, and not none', () => {
   // A comment cannot change a pixel, so widening to a twenty-minute capture for a typo fix is the
   // cost this narrowing exists to remove.
-  const COMMENT = "    // Reached the way the smoke reaches it, by clicking the system row's identity.";
+  const COMMENT =
+    "    // Reached the way the smoke reaches it, by clicking the system row's identity.";
   const file = fileAt(fileDeclaring(COMMENT));
   assert.deepEqual(selectedIds([file.path], file.patches([file.lineOf(COMMENT)])), [
     FALLBACK_CASE_ID,
@@ -6187,7 +6239,11 @@ test('every unit the shell extracted selects the shell\u2019s own case set', () 
   const expected = ids(shell);
   // NON-VACUITY: the shell selects a real, large case set, so an empty answer cannot pass.
   assert.ok(expected.length > 40, `the shell selects only ${expected.length} cases`);
-  assert.deepEqual(ids(extracted), expected, 'the page header no longer reaches the shell\u2019s views');
+  assert.deepEqual(
+    ids(extracted),
+    expected,
+    'the page header no longer reaches the shell\u2019s views'
+  );
   for (const path of extracted) {
     assert.deepEqual(ids([path]), expected, `${path} alone selects a different set`);
   }

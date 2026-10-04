@@ -967,7 +967,11 @@ export const CASES = Object.freeze([
       smokeLabels: [],
       reaches: 'beyond',
       query: { system: 'lab-smithing', resultRowState: 'reward-craft' },
-      steps: [...REWARD_RESULTS_STEPS],
+      // At the floor, the help line's wrap is what the frame is for.
+      steps: [
+        ...REWARD_RESULTS_STEPS,
+        ...(position ? [{ selector: '[data-recipe-knowledge-hint]', scroll: true }] : []),
+      ],
       expectView: 'recipe-edit',
       // A knowledge row draws its help line, and the bounty rolls and opens its body.
       expectSelector:
@@ -977,7 +981,8 @@ export const CASES = Object.freeze([
         containerSelector: '.manager-recipe-ingredient-set-groups',
         // The component row, the one with nothing beneath it, stays on one line.
         oneLineRows: `${RESULT_ROWS}:not(:has([data-recipe-reward-body], [data-recipe-knowledge-hint]))`,
-        alignedLeft: `${RESULT_ROWS} .manager-recipe-option-kind`,
+        // A kind slot grown past the others by a longer kind word pushes its name field out.
+        alignedLeft: `${RESULT_ROWS} .manager-recipe-option-name-field`,
         // "Recipe knowledge" reads whole in its kind slot, never cut to an ellipsis.
         unclipped: `${RESULT_ROWS} [data-recipe-option-kind] .fabricate-select-value`,
       },
@@ -993,7 +998,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Recipe edit results, a currency reward with no description',
     smokeLabels: [],
     reaches: 'beyond',
-    query: { system: 'lab-smithing', resultRowState: 'reward-kinds' },
+    query: { system: 'lab-smithing', resultRowState: 'reward-craft' },
     steps: [
       ...REWARD_RESULTS_STEPS,
       { selector: '[data-recipe-reward-label]', fill: '' },
@@ -1014,7 +1019,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Recipe edit results, a currency reward with what it is called and why',
     smokeLabels: [],
     reaches: 'beyond',
-    query: { system: 'lab-smithing', resultRowState: 'reward-kinds' },
+    query: { system: 'lab-smithing', resultRowState: 'reward-craft' },
     steps: [...REWARD_RESULTS_STEPS, { selector: '[data-recipe-reward-body]', scroll: true }],
     expectView: 'recipe-edit',
     expectSelector: `${BOUNTY_ROW} [data-recipe-reward-closing]:has-text("The player sees: Guild bounty · ")`,
@@ -1034,10 +1039,61 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-action-menu-panel.manager-recipe-result-menu:has(.manager-action-menu-heading) ' +
       '[role="menu"][aria-labelledby] [data-recipe-add="result-knowledge"]',
-    expectContained: [{ container: '.fabricate-manager', target: '.manager-recipe-result-menu' }],
+    // The menu opens from the adder's start edge, over the list it adds to and never the nav rail.
+    expectLayout: {
+      containerSelector: '.manager-recipe-results-section',
+      oneLineRows: `${RESULT_ROWS}:not(:has([data-recipe-reward-body], [data-recipe-knowledge-hint]))`,
+      alignedLeft: '[data-recipe-add="result-item"], .manager-recipe-result-menu',
+    },
+    expectContained: [
+      { container: '.manager-recipe-results-section', target: '.manager-recipe-result-menu' },
+    ],
     expectCenterHit: '.manager-recipe-result-menu [data-recipe-add="result-currency"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [...REWARD_SOURCES, ...ANCHORED_POPOVER_SOURCES],
+  }),
+  // A knowledge result on a Smithing whose learned recipes no player sees: drawn read-only, saying why.
+  managerCase({
+    id: 'manager-recipe-edit-results-learning-off',
+    label: 'Manager — Recipe edit results, a knowledge reward where learning is not observable',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-kinds' },
+    steps: [
+      ...REWARD_RESULTS_STEPS,
+      { selector: '[data-recipe-knowledge-hint="learning-off"]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '[data-recipe-result-item]:has([data-recipe-knowledge-disabled]) ' +
+      '[data-recipe-knowledge-hint="learning-off"]',
+    expectNoHorizontalOverflow: '.manager-recipe-ingredient-set-groups',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...REWARD_SOURCES],
+  }),
+  // A knowledge result teaching a recipe Smithing no longer holds: named missing, with its remove.
+  managerCase({
+    id: 'manager-recipe-edit-results-missing-recipe',
+    label: 'Manager — Recipe edit results, a knowledge reward whose recipe is gone',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-missing' },
+    steps: [
+      ...REWARD_RESULTS_STEPS,
+      {
+        selector:
+          '[data-recipe-result-item]:has([data-recipe-option-missing]) [data-recipe-knowledge-hint]',
+        scroll: true,
+      },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '[data-recipe-result-item]:has([data-recipe-option-missing="sm-r-retired-lore"]) ' +
+      '[data-recipe-remove="result-item"]',
+    expectCenterHit:
+      '[data-recipe-result-item]:has([data-recipe-option-missing]) [data-recipe-remove="result-item"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...REWARD_SOURCES],
   }),
   managerCase({
     id: 'manager-multistep-disable-confirm',
@@ -1096,6 +1152,28 @@ export const CASES = Object.freeze([
     expectView: 'recipe-edit',
     // The stage row's Edit link sits in the requirement row's trailing controls (issue 1516).
     expectCenterHit: '[data-recipe-result-row] [data-recipe-result-edit]',
+    expectLayout: STAGE_RESULT_GEOMETRY,
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  // A progressive set's adder appends an unnamed stage, whose name field takes focus (issue 1773).
+  managerCase({
+    id: 'manager-recipe-edit-results-progressive-adder',
+    label: 'Manager — Recipe edit results progressive, a stage added',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-grind"]' },
+      { selector: '#recipe-tab-results' },
+      { selector: '[data-recipe-set] [data-recipe-add="result-item"]' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector: `${STAGE_ROWS} [data-recipe-option-search]:focus`,
     expectLayout: STAGE_RESULT_GEOMETRY,
     kinds: ['manager', 'recipes'],
     sourceMatches: [
