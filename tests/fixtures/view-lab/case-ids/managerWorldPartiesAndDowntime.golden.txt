@@ -20,3 +20,5 @@ manager-world-downtime-test-companion-installed
 manager-world-downtime-test-companion-chrome
 manager-world-downtime-test-companion-rollup
 manager-world-downtime-test-companion-tab-navigation
+manager-world-downtime-narrow-settings
+manager-world-downtime-tracking-described

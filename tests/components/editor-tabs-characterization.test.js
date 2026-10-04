@@ -93,11 +93,15 @@ const SCENARIOS = Object.freeze({
 });
 
 /**
- * The stated reduction: Svelte's empty `<!---->` anchors and its `svelte-<hash>` scoping classes
- * are compile artefacts rather than rendered contract, so both are dropped before comparing.
+ * The stated reduction: Svelte's empty `<!---->` anchors, its `svelte-<hash>` scoping classes and
+ * the whitespace it keeps after the tablist, ahead of the description block, are compile artefacts
+ * rather than rendered contract, so all three are dropped before comparing.
  */
 function characterize(target) {
-  return target.innerHTML.replaceAll('<!---->', '').replaceAll(/ ?\bsvelte-[a-z0-9]+\b/g, '');
+  return target.innerHTML
+    .replaceAll('<!---->', '')
+    .replaceAll(/ ?\bsvelte-[a-z0-9]+\b/g, '')
+    .trimEnd();
 }
 
 async function renderAll() {

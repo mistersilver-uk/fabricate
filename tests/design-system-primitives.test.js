@@ -355,6 +355,16 @@ test('(a) the older overrides still name the frame that renders their state', ()
       'the one caller whose tab entries carry no icon, so the only frame that draws the ' +
         'glyph-less strip',
     ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-world-downtime-tracking-described',
+      'the frame that draws the premium padlock and the wide strip`s description above its own tab',
+    ],
+    [
+      'src/ui/svelte/components/EditorTabs.svelte',
+      'manager-world-downtime-narrow-settings',
+      'the frame that draws the strip wrapped, with its last tab`s description at the card`s end',
+    ],
   ];
   for (const [file, caseId, because] of expectations) {
     assert.ok(
