@@ -353,53 +353,59 @@ describe('1516 ActionMenu trigger snippet, heading and item tone', () => {
     hostHarness.remount();
   });
 
-  it('a headed menu keeps the keyboard contract', async () => {
-    const target = await hostHarness.mount({ ...props(), heading: 'Accept instead' });
-    const doc = target.ownerDocument;
-    keydown(hostTrigger(target), 'ArrowDown');
-    await flushRender();
-    assert.ok(doc.activeElement === enabledItems(doc)[0], 'ArrowDown opens onto the first item');
-    keydown(doc.activeElement, 'ArrowDown');
-    assert.ok(doc.activeElement === enabledItems(doc)[1], 'ArrowDown steps through the list');
-    keydown(doc.activeElement, 'End');
-    assert.ok(doc.activeElement === enabledItems(doc).at(-1), 'End jumps to the last item');
-    keydown(doc.activeElement, 'Tab');
-    await flushRender();
-    assert.ok(!panel(doc), 'Tab closes the menu');
-    assert.ok(doc.activeElement === hostTrigger(target), 'and returns focus to the trigger');
-    hostHarness.remount();
-  });
+  /** Mount the host, run `body`, and tear down even when it fails, so no panel outlives its test. */
+  async function withHost(hostProps, body) {
+    const target = await hostHarness.mount(hostProps);
+    try {
+      await body(target, target.ownerDocument);
+    } finally {
+      hostHarness.remount();
+    }
+  }
+
+  it('a headed menu keeps the keyboard contract', () =>
+    withHost({ ...props(), heading: 'Accept instead' }, async (target, doc) => {
+      keydown(hostTrigger(target), 'ArrowDown');
+      await flushRender();
+      assert.ok(doc.activeElement === enabledItems(doc)[0], 'ArrowDown opens onto the first item');
+      keydown(doc.activeElement, 'ArrowDown');
+      assert.ok(doc.activeElement === enabledItems(doc)[1], 'ArrowDown steps through the list');
+      keydown(doc.activeElement, 'End');
+      assert.ok(doc.activeElement === enabledItems(doc).at(-1), 'End jumps to the last item');
+      keydown(doc.activeElement, 'Tab');
+      await flushRender();
+      assert.ok(!panel(doc), 'Tab closes the menu');
+      assert.ok(doc.activeElement === hostTrigger(target), 'and returns focus to the trigger');
+    }));
 
   it('a click anywhere in the panel stops at it, heading and padding included', async () => {
     for (const heading of ['Accept instead', '']) {
-      const target = await hostHarness.mount({ ...props(), heading });
-      hostTrigger(target).click();
-      await flushRender();
-      const doc = target.ownerDocument;
-      const panelRoot = doc.querySelector('.fabricate-action-menu-panel');
-      const escaped = [];
-      const listen = () => escaped.push(heading);
-      doc.body.addEventListener('click', listen);
-      for (const node of [panelRoot, panelRoot.querySelector('.manager-action-menu-heading')]) {
-        node?.dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
-      }
-      doc.body.removeEventListener('click', listen);
-      assert.deepEqual(escaped, [], `no click escapes the panel (heading "${heading}")`);
-      hostHarness.remount();
+      await withHost({ ...props(), heading }, async (target, doc) => {
+        hostTrigger(target).click();
+        await flushRender();
+        const panelRoot = doc.querySelector('.fabricate-action-menu-panel');
+        const escaped = [];
+        const listen = () => escaped.push(heading);
+        doc.body.addEventListener('click', listen);
+        for (const node of [panelRoot, panelRoot.querySelector('.manager-action-menu-heading')]) {
+          node?.dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
+        }
+        doc.body.removeEventListener('click', listen);
+        assert.deepEqual(escaped, [], `no click escapes the panel (heading "${heading}")`);
+      });
     }
   });
 
   it('choosing an item returns focus to the caller’s own trigger', async () => {
     const chosen = [];
-    const target = await hostHarness.mount(props(chosen));
-    hostTrigger(target).click();
-    await flushRender();
-    const doc = target.ownerDocument;
-    enabledItems(doc)[1].click();
-    await flushRender();
-    assert.deepEqual(chosen, ['middle']);
-    assert.ok(doc.activeElement === hostTrigger(target), 'focus comes back to the caller’s button');
-    hostHarness.remount();
+    await withHost(props(chosen), async (target, doc) => {
+      hostTrigger(target).click();
+      await flushRender();
+      enabledItems(doc)[1].click();
+      await flushRender();
+      assert.deepEqual(chosen, ['middle']);
+      assert.ok(doc.activeElement === hostTrigger(target), 'focus comes back to the caller’s button');
+    });
   });
 
   it('an item’s tone is a class beside its danger modifier', async () => {
