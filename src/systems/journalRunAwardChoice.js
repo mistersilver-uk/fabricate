@@ -1,23 +1,17 @@
 /**
- * The `chooseAward` command's own rules at the journal-run edge (issue 1773): its payload shape,
- * the authorization that replaces the crafting source-owner check, and the dismissal it blocks.
- * A resumed settle sends its persisted `requestId`, which the command service keeps, because the
- * executor resumes a planned settle only under the request that planned it.
+ * `chooseAward` at the journal-run edge (issue 1773): its payload, its authorization and the
+ * dismissal it blocks. A resumed settle re-sends its own `requestId`, under which alone it resumes.
  */
 import { holdsUnsettledAwardChoice, isUnsettledChoice } from './choiceGroupAward.js';
 
 const list = (value) => (Array.isArray(value) ? value : []);
 const validText = (value) => typeof value === 'string' && value.trim() !== '';
 
-/** A `chooseAward` payload names one choice and lists alternative ids; nothing else is read. */
 export const validAwardChoicePayload = (payload) =>
   validText(payload?.choiceId) && Array.isArray(payload.picks) && payload.picks.every(validText);
 
-/**
- * `chooseAward`'s authorization once the sender is the actor's owner or a GM: `true`, or the
- * refusal for a run that is not a crafting run or a choice already settled. The settle's own
- * request is never refused here, so its replay answers the committed outcome.
- */
+/** After the owner-or-GM check: refuse a non-crafting run or a settled choice, but never the
+ *  settle's own request, so its replay answers the committed outcome. */
 export function authorizeAwardChoice({ run, request }) {
   if (request?.runType !== 'crafting') return { success: false, reason: 'unsupported-operation' };
   if (run?.awardChoiceJournal?.requestId === request.requestId) return true;
@@ -30,10 +24,7 @@ export function authorizeAwardChoice({ run, request }) {
   return true;
 }
 
-/**
- * Why a terminal run cannot be dismissed, or `null`: it still owes a pick, unless its settle is
- * awaiting recovery, which nothing in the Journal can finish.
- */
+/** A run still owing a pick is not dismissible, unless its settle awaits recovery. */
 export function awardChoiceDismissalRefusal(run) {
   if (!holdsUnsettledAwardChoice(run)) return null;
   if (run?.awardChoiceJournal?.status === 'recoveryRequired') return null;

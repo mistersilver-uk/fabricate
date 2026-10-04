@@ -91,7 +91,6 @@
         <RequirementChooser
           slots={[awardSlot(choice, picks, localize)]}
           {readOnly}
-          ariaLabel={localize('FABRICATE.App.Journal.AwardChoice.GroupLabel')}
           onChoose={(_slot, alternative) => choose(choice, alternative)}
         />
         {#if choice.resume}<p class="run-award-choice-note">
@@ -123,9 +122,10 @@
       </section>
     {/each}
     {#if choices.length === 0}
-      <Kicker as="h3" tabindex="-1" data-keyboard-focus="true" data-award-claimed="">
-        {localize('FABRICATE.App.Journal.AwardChoice.Claimed')}
-      </Kicker>
+      <!-- The focus target after the last settle: the heading naming what was claimed. -->
+      <div class="run-award-claimed" tabindex="-1" data-keyboard-focus="true" data-award-claimed>
+        <Kicker as="h3">{localize('FABRICATE.App.Journal.AwardChoice.Claimed')}</Kicker>
+      </div>
     {/if}
   </div>{/if}
 

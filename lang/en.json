@@ -1492,11 +1492,6 @@
         },
         "CheckChanged": "This roll's details changed while you were deciding. Check them and roll again.",
         "AwardChoice": {
-          "GroupLabel": "Rewards to choose from",
-          "SlotName": "Your reward",
-          "SlotLabel": "Your reward: {state}",
-          "SlotOpen": "not chosen yet",
-          "SlotChosen": "{count} chosen",
           "ChooseOne": "Choose one reward",
           "ChooseUpTo": "Choose up to {count} rewards",
           "ChooseUpToRolled": "Choose up to {count} rewards — rolled {rolled} on {formula}",

@@ -259,10 +259,9 @@ export function createJournalStore({ services } = {}) {
     return runCommand(run, 'setCompletionMode', { completionMode });
   }
 
-  // A settle names the picks, and a resumed one re-sends the request its plan was made under.
-  async function chooseAward(run, { choiceId, picks, requestId = null } = {}) {
-    return runCommand(run, 'chooseAward', { choiceId, picks: [...(picks ?? [])] }, requestId);
-  }
+  // A resumed settle re-sends the request its plan was made under (issue 1773).
+  const chooseAward = (run, { choiceId, picks, requestId = null } = {}) =>
+    runCommand(run, 'chooseAward', { choiceId, picks: [...(picks ?? [])] }, requestId);
 
   async function setSelection(run, selection) {
     return runCommand(run, 'setSelection', {
@@ -301,18 +300,11 @@ export function createJournalStore({ services } = {}) {
         payload: payload ?? {},
         ...(requestId && { requestId }),
       });
-      // A DISMISSED prompt is a refusal that carries `cancelled`, and nothing happened, so
-      // there is nothing to re-read. A CANCEL command answers `{success: true, cancelled: true}`
-      // for the run it just cancelled — which is a change, and the most disruptive one the
-      // Journal has. Returning here for it skipped the refresh below, leaving the view on the
-      // listing this command's own actor write had triggered mid-flight, while the execution
-      // claim was still held: every other run frozen at `claim-held` against a claim that had
-      // since been released, unfixable without reloading Foundry (issue 1648, M25).
+      // A DISMISSED prompt changed nothing, so nothing is re-read; a CANCEL also answers
+      // `cancelled`, as `success: true`, and must reach the refresh below (issue 1648, M25).
       if (result?.success === false && result?.cancelled === true) return;
-      // Two different `success: false` results. A REFUSAL carries `reason` and no `message`
-      // (which recorded an EMPTY command error and toasted nothing); a resolved failed check
-      // is an OUTCOME the run's own history records, so it raises no command error and never
-      // takes the generic craft error's "Nothing was consumed" promise.
+      // A REFUSAL carries `reason` and no `message`; a resolved failed check is an OUTCOME the
+      // run's history records, raising no command error and no "Nothing was consumed" promise.
       const outcome = isResolvedFailureOutcome(result);
       const refused = result?.success === false && !outcome;
       let message = safeCommandMessage(result?.message);

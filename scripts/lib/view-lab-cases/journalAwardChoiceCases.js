@@ -1,7 +1,7 @@
 /**
  * The Journal's award face (issue 1773): a finished craft that owes the player a pick of up to two
  * rewards, one already known and so disabled with its reason, at both widths, at the ceiling, under
- * a darker palette, on the Active list, and once settled.
+ * another palette, on the Active list, and once settled.
  */
 
 import { JOURNAL_SOURCES } from './caseConstants.js';
@@ -19,7 +19,6 @@ const PICK = (id) => ({ selector: TILE(id) });
 const AWARD_SOURCES = Object.freeze([
   JOURNAL_SOURCES,
   /^src\/ui\/svelte\/apps\/journal\/(?:RunAwardChoice\.svelte|runStateNotice\.js)$/,
-  /^src\/ui\/svelte\/components\/RequirementChooser\.svelte$/,
   /^src\/ui\/presenters\/(?:awardChoiceRows|runAwardChoiceProjection)\.js$/,
   /^src\/systems\/(?:awardChoiceSettle|journalRunAwardChoice)\.js$/,
 ]);
@@ -52,6 +51,8 @@ export function journalAwardChoiceCases() {
         '[data-journal-detail]:has([data-journal-award-pending="true"]) [data-award-face]' +
         OPEN_STATE,
       expectCenterHit: TILE('ingot'),
+      // The face under another palette, its disabled tile and its reason legible there too.
+      themeVariants: ['hearth-herb'],
     }),
     owedCase({
       id: 'player-journal-award-choice-ceiling',
@@ -72,13 +73,6 @@ export function journalAwardChoiceCases() {
       steps: [{ selector: '[data-award-face]', scroll: true }],
       expectSelector: OPEN_FACE,
       kinds: ['player', 'journal', 'responsive'],
-    }),
-    owedCase({
-      id: 'player-journal-award-choice-dark',
-      label: 'Player Journal — the award face under the darkest palette',
-      theme: 'foundry-native',
-      steps: [PICK('ingot')],
-      expectSelector: `${FACE}:has(${TILE('ingot')}[aria-pressed="true"])`,
     }),
     owedCase({
       id: 'player-journal-list-award-pending',

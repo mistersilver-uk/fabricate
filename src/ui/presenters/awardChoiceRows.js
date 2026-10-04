@@ -17,7 +17,6 @@ const UNCLAIMABLE_KEYS = Object.freeze({
 const UNCLAIMABLE_OTHER = 'FABRICATE.App.Journal.AwardChoice.Unclaimable.other';
 
 const list = (value) => (Array.isArray(value) ? value : []);
-const key = (name) => `FABRICATE.App.Journal.AwardChoice.${name}`;
 
 /** The sentence an unclaimable alternative's tile states, for any blocker the settle can name. */
 export const unclaimableText = (reason, localize) =>
@@ -49,10 +48,12 @@ export function nextAwardPicks(choice, picks, alternativeId) {
 
 /** The Well's kicker: one reward, or up to N with a rolled N stated as its roll. */
 export function awardKicker(choice, localize) {
-  if (choice.awardStrategy === 'anyOne') return localize(key('ChooseOne'));
+  if (choice.awardStrategy === 'anyOne')
+    return localize('FABRICATE.App.Journal.AwardChoice.ChooseOne');
   const { formula } = choice.countRoll ?? {};
-  if (!formula) return localize(key('ChooseUpTo'), { count: choice.ceiling });
-  return localize(key('ChooseUpToRolled'), {
+  if (!formula)
+    return localize('FABRICATE.App.Journal.AwardChoice.ChooseUpTo', { count: choice.ceiling });
+  return localize('FABRICATE.App.Journal.AwardChoice.ChooseUpToRolled', {
     count: choice.ceiling,
     rolled: choice.count,
     formula,
@@ -61,11 +62,13 @@ export function awardKicker(choice, localize) {
 
 /** What confirming claims: the one pick by name, the count, or a settle with nothing to claim. */
 export function confirmLabel(choice, picks, localize) {
-  if (claimableIds(choice).length === 0) return localize(key('Forfeit'));
-  if (picks.length === 0) return localize(key('ClaimNone'));
-  if (picks.length > 1) return localize(key('ClaimMany'), { count: picks.length });
+  if (claimableIds(choice).length === 0)
+    return localize('FABRICATE.App.Journal.AwardChoice.Forfeit');
+  if (picks.length === 0) return localize('FABRICATE.App.Journal.AwardChoice.ClaimNone');
+  if (picks.length > 1)
+    return localize('FABRICATE.App.Journal.AwardChoice.ClaimMany', { count: picks.length });
   const picked = list(choice.alternatives).find((alternative) => alternative.id === picks[0]);
-  return localize(key('ClaimOne'), { name: picked?.name ?? '' });
+  return localize('FABRICATE.App.Journal.AwardChoice.ClaimOne', { name: picked?.name ?? '' });
 }
 
 /** Whether confirming would send a settle the command can accept. */
@@ -83,7 +86,10 @@ export function awardSlot(choice, picks, localize) {
       id: alternative.id,
       name: alternative.name,
       label: pip
-        ? localize(key('TileLabel'), { name: alternative.name, amount: pip })
+        ? localize('FABRICATE.App.Journal.AwardChoice.TileLabel', {
+            name: alternative.name,
+            amount: pip,
+          })
         : alternative.name,
       art: alternative.img ?? '',
       icon: RESULT_KIND_GLYPHS[alternative.kind] ?? 'fas fa-box',
@@ -100,7 +106,10 @@ export function awardSlot(choice, picks, localize) {
     kind: 'award',
     name: awardKicker(choice, localize),
     status: atCeiling
-      ? localize(key('Ceiling'), { picked: picks.length, count: choice.ceiling })
+      ? localize('FABRICATE.App.Journal.AwardChoice.Ceiling', {
+          picked: picks.length,
+          count: choice.ceiling,
+        })
       : '',
     alternatives,
   };
