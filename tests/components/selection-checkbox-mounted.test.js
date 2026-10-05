@@ -74,7 +74,9 @@ describe('SelectionCheckbox', () => {
       decorative: true,
       checked: true,
       ariaLabel: 'Ignored',
-      onChange: (checked) => changes.push(checked),
+      onChange: (checked) => {
+        changes.push(checked);
+      },
     });
 
     assert.equal(input(target), null, 'no real control');

@@ -60,9 +60,13 @@
 
 {#snippet showAllFooter()}
   <div class="journal-kind-footer">
-    <Button role="ghost" fullWidth data-journal-kind-show-all=""
+    <Button
+      role="ghost"
+      fullWidth
+      data-journal-kind-show-all=""
       disabled={shown.length === RUN_KINDS.length}
-      onclick={showAll}>
+      onclick={showAll}
+    >
       <i class="fas fa-xmark" aria-hidden="true"></i>
       {localize('FABRICATE.App.Journal.Filters.Kind.ShowAll')}
     </Button>
