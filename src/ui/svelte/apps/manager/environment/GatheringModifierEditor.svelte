@@ -18,7 +18,10 @@
   import { tick } from 'svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import Field from '../../../components/Field.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import RuleRow from '../../../components/RuleRow.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localizeOr } from '../../../util/localizeOr.js';
@@ -182,8 +185,8 @@
       <span aria-hidden="true">%</span>
     </label>
   {/snippet}
-  <section
-    class="fabricate-card manager-drop-editor-condition-modifier-card"
+  <InspectorCard
+    class="manager-drop-editor-condition-modifier-card"
     {...hook('conditionModifiers', kind)}
   >
     <header class="manager-character-modifier-row-card-header">
@@ -220,10 +223,8 @@
           {/each}
         </select>
       </label>
-      <button
-        type="button"
-        class="fabricate-icon-button"
-        aria-label={localizeOr(
+      <IconButton
+        ariaLabel={localizeOr(
           'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
           'Add modifier'
         )}
@@ -241,7 +242,7 @@
         onclick={() => onAddConditionModifier(kind, pickerSelection)}
       >
         <i class="fas fa-plus" aria-hidden="true"></i>
-      </button>
+      </IconButton>
     </div>
     <div class="manager-condition-modifier-row-list">
       {#each attachedModifiers as modifier (modifier.id)}
@@ -274,7 +275,7 @@
         {/if}
       {/each}
     </div>
-  </section>
+  </InspectorCard>
 {/each}
 
 {#snippet boundsRow(ref)}
@@ -298,7 +299,7 @@
   </div>
 {/snippet}
 
-<section class="fabricate-card manager-character-modifier-row-card" {...hook('characterModifiers')}>
+<InspectorCard class="manager-character-modifier-row-card" {...hook('characterModifiers')}>
   <header class="manager-character-modifier-row-card-header">
     <div class="manager-character-modifier-row-card-heading">
       <h3 class="manager-card-title">
@@ -415,45 +416,36 @@
               >
             </select>
           </label>
-          <button
-            type="button"
-            class="fabricate-icon-button is-danger manager-character-modifier-row-reference-delete"
-            aria-label={localizeOr(
+          <IconButton
+            class="is-danger manager-character-modifier-row-reference-delete"
+            ariaLabel={localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
               'Delete character modifier reference'
             )}
             onclick={() => onDeleteCharacterModifier(ref.id)}
           >
             <i class="fas fa-trash" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </header>
         {@render boundsRow(ref)}
         <div class="manager-character-modifier-override-row">
-          <button
-            type="button"
-            class={`fabricate-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
-            aria-pressed={hasOverride}
-            aria-label={localizeOr(
+          <StatusToggle
+            on={hasOverride}
+            ariaLabel={localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
               'Override?'
             )}
+            label={hasOverride
+              ? localizeOr(
+                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn',
+                  'Overridden'
+                )
+              : localizeOr(
+                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
+                  'Override?'
+                )}
             onclick={() => onSetCharacterModifierOverride(ref, !hasOverride, libraryEntry)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true">
-              <span class="manager-status-toggle-knob"></span>
-            </span>
-            <span class="manager-status-toggle-label">
-              {hasOverride
-                ? localizeOr(
-                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn',
-                    'Overridden'
-                  )
-                : localizeOr(
-                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
-                    'Override?'
-                  )}
-            </span>
-          </button>
+          />
         </div>
         {#if hasOverride}
           <p class="manager-muted manager-character-modifier-override-hint">
@@ -495,4 +487,4 @@
       />
     {/each}
   </div>
-</section>
+</InspectorCard>

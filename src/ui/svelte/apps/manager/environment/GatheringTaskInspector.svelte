@@ -12,6 +12,7 @@
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import GatheringModifierEditor from './GatheringModifierEditor.svelte';
   import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -84,7 +85,7 @@
 
 {#if task}
   {#if !editing}
-    <section class="fabricate-card" data-gathering-task-inspector>
+    <InspectorCard data-gathering-task-inspector="">
       <div class="manager-inspector-title-row is-hero-large">
         <img class="manager-recipe-preview" src={gatheringTaskImage(task)} alt="" />
         <div class="manager-inspector-copy">
@@ -109,9 +110,9 @@
         {truncateDescription(task.description) ||
           text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
       </p>
-    </section>
+    </InspectorCard>
 
-    <section class="fabricate-card">
+    <InspectorCard>
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Environment.Tasks.Details', 'Gathering task details')}
       </h3>
@@ -149,9 +150,9 @@
           >
         </div>
       </div>
-    </section>
+    </InspectorCard>
 
-    <section class="fabricate-card" data-task-drops-summary>
+    <InspectorCard data-task-drops-summary="">
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Environment.Tasks.DropsSummary', 'Drops summary')}
       </h3>
@@ -177,9 +178,9 @@
           {/each}
         </div>
       {/if}
-    </section>
+    </InspectorCard>
 
-    <section class="fabricate-card manager-task-environment-usage-card" data-task-environment-usage>
+    <InspectorCard class="manager-task-environment-usage-card" data-task-environment-usage="">
       <h3 class="manager-card-title">
         {text(
           'FABRICATE.Admin.Manager.Environment.Tasks.UsedInEnvironmentsCard',
@@ -209,13 +210,13 @@
           {/each}
         </div>
       {/if}
-    </section>
+    </InspectorCard>
   {/if}
 
   {#if editing}
     {#if (editingTask?.resolutionMode || 'd100') === 'd100' && selectedDrop}
       <div class="manager-drop-inspector-stack" data-gathering-task-drop-inspector>
-        <section class="fabricate-card manager-drop-editor-header-card">
+        <InspectorCard class="manager-drop-editor-header-card">
           <h3 class="manager-card-title">
             {text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected drop rule')}
           </h3>
@@ -258,12 +259,12 @@
               <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')}</span>
             </Button>
           </div>
-        </section>
+        </InspectorCard>
 
         <div class="manager-drop-inspector-divider" aria-hidden="true"></div>
 
         <div class="manager-drop-inspector-scroll">
-          <section class="fabricate-card manager-drop-editor-card">
+          <InspectorCard class="manager-drop-editor-card">
             <div class="manager-drop-editor-values">
               <label
                 class="fabricate-field manager-drop-rate-editor"
@@ -320,7 +321,7 @@
                 />
               </label>
             </div>
-          </section>
+          </InspectorCard>
 
           <GatheringModifierEditor
             subject="drop"
@@ -366,14 +367,14 @@
         </div>
       </div>
     {:else if (editingTask?.resolutionMode || 'd100') === 'd100'}
-      <section class="fabricate-card" data-gathering-task-drop-inspector>
+      <InspectorCard data-gathering-task-drop-inspector="">
         <h3 class="manager-card-title">
           {text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected drop rule')}
         </h3>
         <p class="manager-muted">
           {text('FABRICATE.Admin.Manager.Environment.Tasks.NoDrops', 'No drops have been added.')}
         </p>
-      </section>
+      </InspectorCard>
     {/if}
   {/if}
 {:else}
