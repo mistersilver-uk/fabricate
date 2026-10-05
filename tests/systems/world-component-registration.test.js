@@ -289,6 +289,20 @@ describe('adoption, decided before the id is minted', () => {
   });
 });
 
+describe('adoption never follows an id alone', () => {
+  it('ignores a registered row whose id a foreign entity already holds', () => {
+    const rows = { [OTHER_SYSTEM]: [row('comp-ash', 'Item.ash')], [SYSTEM]: [] };
+    const adopted = adoptedWorldComponentId({
+      entities: [entity('comp-ash', 'Item.unrelated')],
+      registrations: [{ systemId: OTHER_SYSTEM, componentId: 'comp-ash', added: false }],
+      rowsOf: (systemId) => rows[systemId],
+      systemId: SYSTEM,
+      record: { registeredItemUuid: 'Item.ash' },
+    });
+    assert.equal(adopted, null, 'that row becomes no entity at the flush, so nothing adopts it');
+  });
+});
+
 describe('the flush', () => {
   function world(initial, rows) {
     const settings = makeScopeSettings(initial);

@@ -18,6 +18,10 @@ import {
 } from '../../utils/sourceUuid.js';
 
 import { baseCollaborators, COMPONENT_FACTS, RECIPE_ITEM_FACTS } from './collaborators.js';
+import {
+  adoptedWorldComponentId,
+  flushWorldComponentRegistrations,
+} from './worldComponentRegistration.js';
 
 /** This cluster's `io` bag: the base thunks plus the manager members these bodies reach. */
 export function itemSourcesCollaborators(manager) {
@@ -42,6 +46,9 @@ export function itemSourcesCollaborators(manager) {
       manager._findRecipeItemDefinitionForSource(system, snapshot, source),
     scopeBasis: (system) => manager._scopeBasis(system),
     addItemFromUuid: (...args) => manager.addItemFromUuid(...args),
+    componentScopeStore: () => manager._resolveComponentScopeStore(),
+    flushWorldComponentRegistrations: (registrations) =>
+      manager.flushWorldComponentRegistrations(registrations),
     salvageNormalizationContext: (system) => manager._salvageNormalizationContext(system),
     normalizeComponent: (item, options) => manager._normalizeComponent(item, options),
     normalizeRecipeItemDefinition: (entry, usedIds) =>
@@ -325,11 +332,67 @@ export async function resolveImportedComponentSourceData(itemUuid, source = null
   };
 }
 
+const componentRowsOf = (io) => (systemId) => io.getSystem(systemId)?.components ?? []; // ratchet-exempt(world-scope): writer
+
+/** A run's world-component registrations, written in one `fabricate.componentScope` save. */
+export function flushImportRegistrations(io, registrations) {
+  return flushWorldComponentRegistrations({
+    store: io.componentScopeStore(),
+    registrations,
+    rowsOf: componentRowsOf(io),
+  });
+}
+
+/** The array one import records its registration into, or `null` when it registers nothing: an
+ * Item embedded in an actor, or an unpersisted call whose owner passed no array to flush. */
+function registrationsFor(source, options) {
+  if (source?.isEmbedded) return null;
+  if (options.registrations) return options.registrations;
+  return options.persist === false ? null : [];
+}
+
+/** `{ id }` naming the World Component a new record adopts, or `{}` to mint its own id. */
+function adoptedIdentity(io, system, registrations, record) {
+  const store = registrations ? io.componentScopeStore() : null;
+  if (!store) return {};
+  const id = adoptedWorldComponentId({
+    entities: store.listEntities(),
+    registrations,
+    rowsOf: componentRowsOf(io),
+    systemId: system.id,
+    record,
+  });
+  return id ? { id } : {};
+}
+
+function withRegistrationError(result, flushed) {
+  return flushed?.error ? { ...result, worldRegistrationError: flushed.error } : result;
+}
+
+/** One exit of `addItemFromUuid`: the `craftingSystems` write when this call owns it, then the
+ * row's registration, flushed here unless a batch owner passed `options.registrations`. A rejected
+ * save throws before anything registers; a rejected scope write is a `worldRegistrationError`. */
+async function settleImport(io, system, options, registrations, result) {
+  if (result.action !== 'skipped' && options.persist !== false) {
+    await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
+  }
+  if (!registrations) return result;
+  registrations.push({
+    systemId: system.id,
+    componentId: result.item.id,
+    added: result.action === 'added',
+  });
+  if (registrations === options.registrations) return result;
+  return withRegistrationError(result, await io.flushWorldComponentRegistrations(registrations));
+}
+
 /**
- * Import (or refresh) a single component from a source Item uuid.
+ * Import (or refresh) a single component from a source Item uuid, registering it as a World
+ * Component the system holds (`### Component scope` requirement 6).
  *
- * @param {{persist?: boolean}} [options] `persist: false` lets a batch caller such as
- *   `addItemsFromPack` issue one `save()` for many items; nothing else changes.
+ * @param {{persist?: boolean, registrations?: object[]}} [options] `persist: false` lets a batch
+ *   owner issue one `save()` for many items; `registrations` is the array that owner later hands
+ *   to `flushWorldComponentRegistrations`.
  */
 export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
   io.assertGM('add component from uuid');
@@ -340,6 +403,8 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
     itemUuid,
     (documentName) => `Cannot add non-Item document (${documentName}) as a crafting component`
   );
+  const registrations = registrationsFor(source, options);
+  const settle = (result) => settleImport(io, system, options, registrations, result);
 
   const nextSourceData = await io.resolveImportedComponentSourceData(itemUuid, source);
   // The component claiming the source's own uuid wins over one claiming only its compendium
@@ -373,9 +438,8 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
     const existingRoleKey = io.componentRoleFlagKey(system.id);
     if (existingRoleKey) await io.stampSourceIdentity(source, existingRoleKey, existing.id);
 
-    if (unchanged) {
-      return { item: existing, action: 'skipped', sourceFallbacks: nextSnapshot.sourceFallbacks };
-    }
+    const sourceFallbacks = nextSnapshot.sourceFallbacks;
+    if (unchanged) return settle({ item: existing, action: 'skipped', sourceFallbacks });
 
     existing.name = nextSnapshot.name;
     existing.img = nextSnapshot.img;
@@ -386,17 +450,14 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
     // Indexed fields rewritten in place (issue 1076).
     advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
 
-    if (options.persist !== false) await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
-    return { item: existing, action: 'updated', sourceFallbacks: nextSnapshot.sourceFallbacks };
+    return settle({ item: existing, action: 'updated', sourceFallbacks });
   }
 
   // No match: create a new component. A `_normalizeSystem` bypass site (issue 1359): same basis,
   // same helper, `Set|null`; see `_scopeBasis`.
   const { essenceIds: validEssenceIds } = io.scopeBasis(system);
   const item = io.normalizeComponent(
-    {
-      ...nextSnapshot,
-    },
+    { ...nextSnapshot, ...adoptedIdentity(io, system, registrations, nextSnapshot) },
     { validEssenceIds, ...io.salvageNormalizationContext(system) }
   );
 
@@ -405,11 +466,11 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
   advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
   const addedRoleKey = io.componentRoleFlagKey(system.id);
   if (addedRoleKey) await io.stampSourceIdentity(source, addedRoleKey, item.id);
-  if (options.persist !== false) await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
-  return { item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks };
+  return settle({ item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks });
 }
 
-/** Bulk-import every Item document of a compendium pack through `addItemFromUuid`.
+/** Bulk-import every Item document of a compendium pack through `addItemFromUuid`, with one
+ * `craftingSystems` write and then one flush of the run's world registrations.
  * @returns {Promise<{added: number, updated: number, skipped: number, total: number,
  *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>}>} */
 export async function addItemsFromPack(io, systemId, packId) {
@@ -430,10 +491,12 @@ export async function addItemsFromPack(io, systemId, packId) {
   // Items mutate memory only (`persist: false`) and one `save()` below flushes the batch (issue
   // 1086); `dirty` keeps an all-skipped re-drop from writing.
   let dirty = false;
+  const registrations = [];
+  let flushed;
   try {
     for (const item of items) {
       const uuid = item.uuid || `Compendium.${packId}.${item.id}`;
-      const result = await io.addItemFromUuid(systemId, uuid, { persist: false });
+      const result = await io.addItemFromUuid(systemId, uuid, { persist: false, registrations });
       if (result.action === 'added' || result.action === 'updated') {
         counts[result.action] += 1;
         dirty = true;
@@ -444,9 +507,12 @@ export async function addItemsFromPack(io, systemId, packId) {
     // In `finally`, so items imported before a throw still persist; named, because every item
     // went into this one system (issue 1078).
     if (dirty) await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
+    // After the save and never gated on `dirty`: a rejected save has thrown past this line, and
+    // an all-skipped run may still register a component that has no World Component.
+    flushed = await io.flushWorldComponentRegistrations(registrations);
   }
 
-  return { ...counts, total: items.length, sourceFallbacks };
+  return withRegistrationError({ ...counts, total: items.length, sourceFallbacks }, flushed);
 }
 
 /** Replace a component's source Item link and return fallback metadata when the dropped Item's

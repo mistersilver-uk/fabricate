@@ -58,6 +58,7 @@ import {
   addItemFromUuid,
   addItemsFromPack,
   addRecipeItemFromUuid,
+  flushImportRegistrations,
   itemSourcesCollaborators,
   migrateLegacyRecipeItems,
   refreshComponentMetadataForUpdatedItem,
@@ -273,6 +274,11 @@ export class CraftingSystemManager {
   /** The injected character-libraries store, given as the store or a lazy getter. */
   _resolveCharacterLibrariesStore() {
     return _resolveStoreSeam(this._characterLibrariesStore);
+  }
+
+  /** The world component scope store behind its seam, or `null` when none is readable. */
+  _resolveComponentScopeStore() {
+    return _resolveStoreSeam(this._componentScopeStore);
   }
 
   /** The Valid Id Basis for one system's reference pruning, `null` for each set not known to be
@@ -1502,6 +1508,13 @@ export class CraftingSystemManager {
 
   async addItemsFromPack(systemId, packId) {
     return addItemsFromPack(itemSourcesCollaborators(this), systemId, packId);
+  }
+
+  /** Write the world-component registrations a batch owner collected through `addItemFromUuid`'s
+   * `registrations` option, in one `fabricate.componentScope` save, after its own save resolved.
+   * @returns {Promise<{registered: number, error: Error|null}>} */
+  async flushWorldComponentRegistrations(registrations) {
+    return flushImportRegistrations(itemSourcesCollaborators(this), registrations);
   }
 
   async refreshComponentMetadataForUpdatedItem(item, changes = {}) {

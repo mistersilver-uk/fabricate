@@ -92,7 +92,11 @@ export function hasRealFolderGroups(groups) {
 // entire `craftingSystems` world setting and replicates it to every client, so the per-item write
 // this used to issue made a folder import quadratic in corpus size. Both collaborator calls run
 // with `persist: false` and this function owns the single terminal write.
-// `save` is optional-chained so a synchronous-storing mock manager stays a valid injection.
+// The run owns its world-component registrations: every import records into one array, flushed
+// once after that write and not gated on `dirty`, since an all-skipped run may still register a
+// component that has no World Component. A rejected flush is reported as `worldRegistrationError`.
+// `save` and the flush are optional-chained so a synchronous-storing mock manager stays a valid
+// injection.
 export async function applyFolderImportDecisions(systemManager, systemId, decisions) {
   let added = 0;
   let updated = 0;
@@ -102,6 +106,8 @@ export async function applyFolderImportDecisions(systemManager, systemId, decisi
   // A run whose every item is already present AND whose folders carry no category or tags mutates
   // nothing, so it writes nothing.
   let dirty = false;
+  const registrations = [];
+  let flushed;
   try {
     for (const decision of decisions || []) {
       const itemUuids = Array.isArray(decision.itemUuids) ? decision.itemUuids : [];
@@ -110,6 +116,7 @@ export async function applyFolderImportDecisions(systemManager, systemId, decisi
         total += 1;
         const result = await systemManager.addItemFromUuid(systemId, itemUuid, {
           persist: false,
+          registrations,
         });
         if (result.action === 'added') added += 1;
         else if (result.action === 'updated') updated += 1;
@@ -137,8 +144,11 @@ export async function applyFolderImportDecisions(systemManager, systemId, decisi
     // `finally`, not a trailing statement: an item throwing part-way through must still persist
     // what was already committed, which the per-item writes gave for free. The error propagates.
     if (dirty) await systemManager.save?.();
+    flushed = await systemManager.flushWorldComponentRegistrations?.(registrations);
   }
-  return { added, updated, skipped, total, sourceFallbacks };
+  const summary = { added, updated, skipped, total, sourceFallbacks };
+  if (flushed?.error) summary.worldRegistrationError = flushed.error;
+  return summary;
 }
 
 function packFolderParentId(packFolder) {

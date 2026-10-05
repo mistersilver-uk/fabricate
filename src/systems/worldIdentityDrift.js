@@ -6,13 +6,13 @@
  * read union already resolves every divergence safely. It repairs and writes nothing, and the
  * migration's own output must report zero entries. Not named after a mirror: a copy kept in sync
  * is unimplementable, as the writer set cannot be enumerated.
- *
  * In-system writers: `CraftingSystemManager`'s `createItem`, `addItemFromUuid`,
  * `replaceItemSource`, `updateItem`, `applyBulkEditToComponents`, `addRecipeItemFromUuid` and
  * `refreshComponentMetadataForUpdatedItem`, bound unconditionally to the `updateItem` hook.
- * Snapshot writers: the world entry editors, through `worldScopeActions.updateEntity`. The
- * in-system list is NOT PR 2's "five mutation-time bypass sites", which answers the basis concern.
- * Contract: `data-models/spec.md` § Scoped Entity Definitions requirement 15.
+ * Snapshot writers: the world entry editors, through `worldScopeActions.updateEntity`, and a
+ * component import, through `flushWorldComponentRegistrations`. The in-system list is
+ * NOT PR 2's "five mutation-time bypass sites", which answers the basis concern. Contract:
+ * `data-models/spec.md` § Scoped Entity Definitions requirement 15.
  */
 
 import { isPlainObject } from '../utils/scalars.js';

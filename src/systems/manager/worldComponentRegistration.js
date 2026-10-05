@@ -29,16 +29,25 @@ function rowById(rows, id) {
   return arrayOrEmpty(rows).find((row) => row?.id === id) ?? null;
 }
 
+/** Rows keyed by id, first-wins as `rowById` reads them. */
+function rowsById(rows) {
+  const index = new Map();
+  for (const row of arrayOrEmpty(rows)) if (!index.has(row?.id)) index.set(row?.id, row);
+  return index;
+}
+
 /** The rows a run has registered that no roster entity stands for yet: each becomes an entity at
- * the flush, so adoption treats it as one. */
+ * the flush, so adoption treats it as one. Each system's rows are indexed once per call. */
 function pendingEntities(entities, registrations, rowsOf) {
   const known = new Set(entities.map((entity) => entity?.id));
+  const indexed = new Map();
   const pending = [];
-  for (const registration of arrayOrEmpty(registrations)) {
-    if (known.has(registration.componentId)) continue;
-    const row = rowById(rowsOf(registration.systemId), registration.componentId);
+  for (const { systemId, componentId } of arrayOrEmpty(registrations)) {
+    if (known.has(componentId)) continue;
+    if (!indexed.has(systemId)) indexed.set(systemId, rowsById(rowsOf(systemId)));
+    const row = indexed.get(systemId).get(componentId);
     if (!row) continue;
-    known.add(row.id);
+    known.add(componentId);
     pending.push(row);
   }
   return pending;

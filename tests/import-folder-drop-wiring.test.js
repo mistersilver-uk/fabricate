@@ -413,3 +413,48 @@ test('the app folder drop delegates to applyFolderImportDecisions and does not l
     'only the single-item drop may call addItemFromUuid directly'
   );
 });
+
+// (e) world-component registrations (issue 2218): the run owns one array, handed to every import
+// and flushed once after the run's write.
+
+const TWO_ITEMS = [{ itemUuids: ['Item.a', 'Item.b'], category: '', addTags: [] }];
+
+test('folder import commit — a manager with no registration flush stays a valid injection', async () => {
+  const mock = {
+    addItemFromUuid: async (_systemId, uuid) => ({ action: 'added', item: { id: `mock-${uuid}` } }),
+    applyBulkEditToComponents: async () => ({ updated: 0 }),
+  };
+
+  assert.deepEqual(await applyFolderImportDecisions(mock, 'sys1', TWO_ITEMS), {
+    added: 2,
+    updated: 0,
+    skipped: 0,
+    total: 2,
+    sourceFallbacks: [],
+  });
+});
+
+test('folder import commit — one registrations array reaches every import and is flushed once, after the write', async () => {
+  const log = [];
+  const arrays = new Set();
+  const mock = {
+    addItemFromUuid: async (_systemId, uuid, options) => {
+      arrays.add(options.registrations);
+      options.registrations.push(uuid);
+      return { action: 'added', item: { id: `mock-${uuid}` } };
+    },
+    applyBulkEditToComponents: async () => ({ updated: 0 }),
+    save: async () => {
+      log.push('save');
+    },
+    flushWorldComponentRegistrations: async (registrations) => {
+      log.push(['flush', [...registrations]]);
+      return { registered: registrations.length, error: null };
+    },
+  };
+
+  await applyFolderImportDecisions(mock, 'sys1', TWO_ITEMS);
+
+  assert.equal(arrays.size, 1, 'every import of the run records into the same array');
+  assert.deepEqual(log, ['save', ['flush', ['Item.a', 'Item.b']]]);
+});
