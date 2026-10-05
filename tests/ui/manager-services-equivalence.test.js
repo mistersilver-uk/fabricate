@@ -393,25 +393,41 @@ describe('the manager shell services bag', () => {
   });
 
   it('reports an import failure as a toast and a system import failure as a throw', async () => {
+    const brokenStore = { refresh: async () => { throw new Error('refresh blew up'); } };
     const world = buildManagerWorld();
-    world.adminStore = null;
+    world.adminStore = brokenStore;
     const journal = await withManager(constructShell, world, async ({ services }) => {
       await services.renderImportDialog('sys-1');
       return [...world.journal];
     });
     assert.ok(
       journal.some(([channel, message]) => channel === 'notify.error' && String(message).startsWith('Import failed')),
-      'a null admin store inside renderImportDialog\'s try must surface as an Import failed toast'
+      'a failing refresh inside renderImportDialog\'s try must surface as an Import failed toast'
     );
 
     const second = buildManagerWorld({ importFile: fakeImportFile() });
-    second.adminStore = null;
+    second.adminStore = brokenStore;
     await withManager(constructShell, second, async ({ services }) => {
       await assert.rejects(
         () => services.renderSystemImportDialog(),
-        'renderSystemImportDialog refreshes outside its try, so a null store throws out of the service'
+        /refresh blew up/,
+        'renderSystemImportDialog refreshes outside its try, so a failing refresh throws out of the service'
       );
     });
+  });
+
+  it('lets an import land quietly once its manager has closed', async () => {
+    const world = buildManagerWorld({ importFile: fakeImportFile() });
+    world.adminStore = null;
+    const journal = await withManager(constructShell, world, async ({ services }) => {
+      await services.renderImportDialog('sys-1');
+      assert.equal(await services.renderSystemImportDialog(), null);
+      return [...world.journal];
+    });
+    assert.ok(
+      !journal.some(([channel]) => channel === 'notify.error'),
+      'closing the manager nulls its store, which is not a failed import'
+    );
   });
 
   it('survives a world whose actor collection is neither iterable nor a Collection', async () => {
