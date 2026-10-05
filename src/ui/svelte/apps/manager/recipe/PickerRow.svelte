@@ -1,5 +1,4 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): PickerRow is promoted to a manager-only primitive at target, because the recipe ingredient card and the result card now both draw it (issue 1516) -->
 <!--
   The one requirement row: a kind plate, a kind select, a name field that is a search until it is
   named and a pill after, an amount, and the caller's trailing controls. Its anatomy is specified in

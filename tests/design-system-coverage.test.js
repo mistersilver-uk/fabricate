@@ -724,6 +724,9 @@ const UNDOCUMENTED_ROWS = [
   // Issue 1707's gathering modifier panel: no specimen names a condition-and-character editor.
   'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
+  // Issue 1773's second caller of the requirement row's amount slot, the choice group header's N:
+  // the specimen draws the amount as part of `<PickerRow>`, not as an entry of its own.
+  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
   // Issue 1648 reuses these domain authoring compositions across crafting and gathering.
   // The manifest records their new shared membership and why no generic library entry applies.
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',

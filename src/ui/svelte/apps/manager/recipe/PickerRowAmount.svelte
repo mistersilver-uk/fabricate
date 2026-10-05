@@ -1,5 +1,4 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): a part of `PickerRow`, whose amount slot a result choice group's header reuses for its N (issue 1773) -->
 <!--
   The amount slot of a `PickerRow`: a stepper, or behind a Fixed | Rolled toggle a roll expression.
   It renders a fragment into the row's trailing controls and owns no wrapper element.
