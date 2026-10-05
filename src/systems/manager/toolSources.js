@@ -48,7 +48,10 @@ function findToolForUpsert(tools, data, snapshot, source, flagKey) {
     if (byId) return byId;
   }
   const durableId = flagKey ? getFabricateFlag(source, flagKey, null) : null;
-  return findRegisteredDefinition(tools, snapshot, source, [durableId]);
+  // A tool is not matched through a compendium source the snapshot records only as an alias,
+  // which is one that no longer resolves.
+  const claimed = [snapshot?.registeredItemUuid, snapshot?.originItemUuid].filter(Boolean);
+  return findRegisteredDefinition(tools, snapshot, source, [durableId], claimed);
 }
 
 function sourceFlagState(source, flagKey) {

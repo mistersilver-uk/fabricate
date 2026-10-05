@@ -15,6 +15,7 @@ import {
   getOwnSourceUuids,
   normalizeMatchName,
   settleCompendiumClaim,
+  storedMatchName,
 } from '../../utils/sourceUuid.js';
 
 import { baseCollaborators, COMPONENT_FACTS, RECIPE_ITEM_FACTS } from './collaborators.js';
@@ -193,13 +194,15 @@ export async function addRecipeItemFromUuid(io, systemId, itemUuid) {
     existing.img = snapshot.img;
     existing.description = snapshot.description;
     existing.originItemUuid = snapshot.originItemUuid;
-    // An origin move releases no claim the registration still lists (issue 2217).
-    if (
-      (snapshot.aliasItemUuids || []).includes(previousSourceUuid) &&
-      !getItemMatchUuids(existing).includes(previousSourceUuid)
-    ) {
-      existing.aliasItemUuids = [...(existing.aliasItemUuids || []), previousSourceUuid];
+    // An origin move releases no claim the registration still lists, and no alias repeats the
+    // origin or the registered uuid (issue 2217).
+    const aliases = new Set(existing.aliasItemUuids || []);
+    if ((snapshot.aliasItemUuids || []).includes(previousSourceUuid)) {
+      aliases.add(previousSourceUuid);
     }
+    aliases.delete(existing.originItemUuid);
+    aliases.delete(existing.registeredItemUuid);
+    existing.aliasItemUuids = [...aliases];
     // Indexed fields changed at constant length, invisible to the `definitionIndex` rule.
     advanceDefinitionRevision(system.recipeItemDefinitions);
 
@@ -249,11 +252,6 @@ function resolveImportedSourceData(itemUuid, source = null) {
   const currentUuid = references[0] || null;
   const canonicalUuid = (isClone ? null : getCompendiumSourceUuid(source)) || currentUuid;
   return { currentUuid, canonicalUuid, references, isClone };
-}
-
-/** A document's stored name, normalized (the prepared one on an index entry or a plain record). */
-function storedMatchName(document) {
-  return normalizeMatchName(document?._source?.name ?? document?.name);
 }
 
 /** Whether a non-clone source is a derivative of its resolved compendium source (issue 2217): its

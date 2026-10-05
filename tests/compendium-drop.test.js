@@ -549,13 +549,21 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
     }]
   }]);
 
-  globalThis.fromUuid = async () => ({
-    documentName: 'Item',
-    name: 'Updated Iron Ore',
-    img: 'ore2.png',
-    system: { description: { value: '<p>Smelts into sturdy ingots.</p>' } },
-    _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
-  });
+  // Resolved per uuid, and the entry carries the Item's name, so the Item is no derivative and
+  // only the re-registration rule keeps the compendium source out.
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'Compendium.source.items.iron-ore') {
+      return { documentName: 'Item', name: 'Updated Iron Ore' };
+    }
+    if (uuid !== 'Compendium.world.pack.item-a') return null;
+    return {
+      documentName: 'Item',
+      name: 'Updated Iron Ore',
+      img: 'ore2.png',
+      system: { description: { value: '<p>Smelts into sturdy ingots.</p>' } },
+      _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
+    };
+  };
 
   const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-a');
 
@@ -1277,12 +1285,12 @@ test('refreshComponentMetadataForUpdatedItem — updates component image when th
 const REFRESH_SIBLINGS = [
   ['a derivative', { uuid: 'Item.ore-derivative' }],
   ['a sidebar duplicate', { uuid: 'Item.ore-duplicate', duplicateSource: 'Item.world-copy' }],
-  ['an unregistered world copy', { uuid: 'Item.ore-second-copy' }],
+  ['an unregistered world copy', { uuid: 'Item.ore-second-copy', registered: false }],
   ['an actor-owned copy', { uuid: 'Actor.actor-1.Item.ore-copy' }]
 ];
 
-for (const [label, { uuid, duplicateSource = null }] of REFRESH_SIBLINGS) {
-  test(`refreshComponentMetadataForUpdatedItem — editing ${label} refreshes its own component and not the one claiming its compendium source`, async () => {
+for (const [label, { uuid, duplicateSource = null, registered = true }] of REFRESH_SIBLINGS) {
+  test(`refreshComponentMetadataForUpdatedItem — editing ${label} refreshes only a component claiming its own uuid, never the one claiming its compendium source`, async () => {
     const mgr = buildManager([{
       id: 'sys1',
       name: 'System One',
@@ -1295,7 +1303,9 @@ for (const [label, { uuid, duplicateSource = null }] of REFRESH_SIBLINGS) {
           registeredItemUuid: 'Item.world-copy',
           originItemUuid: 'Compendium.source.items.iron-ore'
         },
-        { id: 'comp-own', name: 'Old Name', img: 'icons/old.webp', registeredItemUuid: uuid }
+        ...(registered
+          ? [{ id: 'comp-own', name: 'Old Name', img: 'icons/old.webp', registeredItemUuid: uuid }]
+          : [])
       ]
     }]);
     const description = '<p>Reworked.</p>';
@@ -1312,17 +1322,40 @@ for (const [label, { uuid, duplicateSource = null }] of REFRESH_SIBLINGS) {
     );
 
     const [ore, own] = mgr.getSystem('sys1').components;
-    assert.equal(result.updated, 1);
+    assert.equal(result.updated, registered ? 1 : 0);
     assert.deepEqual(
       { name: ore.name, img: ore.img, description: ore.description },
       { name: 'Iron Ore', img: 'icons/ore.webp', description: 'Dull grey ore.' }
     );
+    if (!registered) return;
     assert.deepEqual(
       { name: own.name, img: own.img, description: own.description },
       { name: 'Reworked Ore', img: 'icons/reworked.webp', description: 'Reworked.' }
     );
   });
 }
+
+test('refreshComponentMetadataForUpdatedItem — an edit to an Item the component claims only as an alias refreshes it', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-herb',
+      name: 'Herb',
+      registeredItemUuid: 'Item.new',
+      originItemUuid: 'Item.new',
+      aliasItemUuids: ['Item.old']
+    }]
+  }]);
+
+  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+    { uuid: 'Item.old', name: 'Renamed' },
+    { name: 'Renamed' }
+  );
+
+  assert.equal(result.updated, 1);
+  assert.equal(mgr.getSystem('sys1').components[0].name, 'Renamed');
+});
 
 test('refreshComponentMetadataForUpdatedItem — updates component description for direct source UUID match', async () => {
   const mgr = buildManager([{

@@ -447,6 +447,158 @@ describe('a re-registration neither adds nor releases a compendium-source claim'
   }
 });
 
+describe('a recipe item keeps the entry claim through an origin move', () => {
+  const register = KINDS[1].register;
+
+  /** A definition registered from a derivative before the gate: its origin is the entry. */
+  function preGateWorld(documents) {
+    return world({
+      documents,
+      recipeItemDefinitions: [
+        {
+          id: 'def-fire',
+          name: 'Scroll of fire',
+          registeredItemUuid: 'Item.scroll-fire',
+          originItemUuid: ENTRY_UUID,
+        },
+      ],
+    });
+  }
+
+  it('moves to its own uuid and keeps the entry as an alias while the entry does not resolve', async () => {
+    const scroll = worldScroll('fire');
+    const { manager } = preGateWorld([scroll]);
+
+    const result = await register(manager, scroll.uuid);
+
+    assert.equal(result.action, 'updated');
+    assert.equal(result.item.originItemUuid, scroll.uuid);
+    assert.deepEqual(result.item.aliasItemUuids, [ENTRY_UUID]);
+  });
+
+  it('stores no alias equal to its own origin, across a same-name copy joining and leaving', async () => {
+    const scroll = worldScroll('fire');
+    const copy = worldScroll('copy', { name: ENTRY_NAME });
+    const { manager, system } = preGateWorld([entry(), scroll, copy]);
+    await register(manager, scroll.uuid);
+
+    const joined = await register(manager, copy.uuid);
+    assert.equal(joined.item.originItemUuid, ENTRY_UUID);
+    assert.deepEqual(joined.item.aliasItemUuids, [], 'the origin is not also an alias');
+
+    const third = await register(manager, scroll.uuid);
+    assert.equal(third.item.id, 'def-fire');
+    assert.equal(third.item.originItemUuid, scroll.uuid);
+    assert.deepEqual(third.item.aliasItemUuids, [ENTRY_UUID]);
+    assert.equal(system().recipeItemDefinitions.length, 1);
+  });
+});
+
+describe('the legacy recipe-item scalar at find-existing', () => {
+  const register = KINDS[1].register;
+  const definition = (id) => ({
+    id,
+    name: 'Ledger',
+    registeredItemUuid: `Item.gone-${id}`,
+    originItemUuid: `Item.gone-${id}`,
+  });
+
+  it('a source carrying only the legacy scalar resolves to the definition it names', async () => {
+    const ledger = item({
+      uuid: 'Item.ledger',
+      name: 'Ledger',
+      flags: { fabricate: { fabricate: { recipeItemDefinitionId: 'def-legacy' } } },
+    });
+    const { manager, system } = world({
+      documents: [ledger],
+      recipeItemDefinitions: [definition('def-legacy')],
+    });
+
+    const result = await register(manager, ledger.uuid);
+
+    assert.equal(result.item.id, 'def-legacy');
+    assert.equal(system().recipeItemDefinitions.length, 1);
+  });
+
+  it('the per-system leaf wins over a legacy scalar naming another definition', async () => {
+    const ledger = item({
+      uuid: 'Item.ledger',
+      name: 'Ledger',
+      flags: {
+        fabricate: {
+          fabricate: {
+            recipeItemDefinitionId: 'def-legacy',
+            roles: { sys1: { recipeItemDefinitionId: 'def-leaf' } },
+          },
+        },
+      },
+    });
+    const { manager, system } = world({
+      documents: [ledger],
+      recipeItemDefinitions: [definition('def-legacy'), definition('def-leaf')],
+    });
+
+    const result = await register(manager, ledger.uuid);
+
+    assert.equal(result.item.id, 'def-leaf');
+    assert.equal(system().recipeItemDefinitions.length, 2);
+  });
+});
+
+describe('an unresolvable shared entry', () => {
+  const unresolved = () => ['fire', 'frost', 'storm'].map((id) => worldScroll(id));
+
+  it('three tools whose shared entry no longer resolves stay three tools', async () => {
+    const scrolls = unresolved();
+    const { manager, system } = world({ documents: scrolls });
+
+    assert.deepEqual(
+      await registerAll(
+        KINDS[2].register,
+        manager,
+        scrolls.map((scroll) => scroll.uuid)
+      ),
+      ['added', 'added', 'added']
+    );
+    assert.equal(system().tools.length, 3);
+  });
+
+  it('a tool registered from the entry does not absorb an Item whose recorded entry is broken', async () => {
+    const scroll = worldScroll('fire');
+    const { manager, system } = world({
+      documents: [scroll],
+      tools: [
+        {
+          id: 'tool-entry',
+          name: ENTRY_NAME,
+          registeredItemUuid: ENTRY_UUID,
+          originItemUuid: ENTRY_UUID,
+        },
+      ],
+    });
+
+    assert.equal((await KINDS[2].register(manager, scroll.uuid)).action, 'added');
+    assert.equal(system().tools.length, 2);
+  });
+
+  for (const { kind, library, register } of KINDS.slice(0, 2)) {
+    it(`three ${kind}s sharing it still merge, the declared residual`, async () => {
+      const scrolls = unresolved();
+      const { manager, system } = world({ documents: scrolls });
+
+      assert.deepEqual(
+        await registerAll(
+          register,
+          manager,
+          scrolls.map((scroll) => scroll.uuid)
+        ),
+        ['added', 'updated', 'updated']
+      );
+      assert.equal(system()[library].length, 1);
+    });
+  }
+});
+
 describe('a withheld compendium claim reports no broken-source fallback', () => {
   it('re-importing an own-keyed component whose entry no longer resolves warns of nothing', async () => {
     const scroll = worldScroll('fire');
@@ -544,7 +696,7 @@ describe('a durable leaf at find-existing', () => {
             id: 'def-linked',
             name: ENTRY_NAME,
             registeredItemUuid: 'Item.elsewhere',
-            originItemUuid: 'Item.elsewhere',
+            originItemUuid: 'Item.older',
           },
         ],
       });
@@ -553,6 +705,73 @@ describe('a durable leaf at find-existing', () => {
 
       assert.equal(result.item.id, 'def-linked');
       assert.equal(system()[library].length, 1);
+      assert.equal(result.item.originItemUuid, ENTRY_UUID);
+      assert.deepEqual(result.item.aliasItemUuids, [], 'a re-link keeps no origin it left');
+    });
+
+    it(`a source whose entry no longer resolves re-links to the ${kind} its leaf names`, async () => {
+      const scroll = worldScroll('fire', { flags: leaf(role, 'def-entry') });
+      const { manager, system } = world({ documents: [scroll], [library]: [entryDefinition] });
+
+      const result = await register(manager, scroll.uuid);
+
+      assert.equal(result.item.id, 'def-entry');
+      assert.equal(system()[library].length, 1);
+    });
+
+    it(`a clone with no compendium source whose leaf names the original's ${kind} registers as a new one`, async () => {
+      const clone = item({
+        uuid: 'Item.original-copy',
+        name: 'Original',
+        duplicateSource: 'Item.original',
+        flags: leaf(role, 'def-original'),
+      });
+      const { manager, system } = world({
+        documents: [clone],
+        [library]: [
+          {
+            id: 'def-original',
+            name: 'Original',
+            registeredItemUuid: 'Item.original',
+            originItemUuid: 'Item.original',
+          },
+        ],
+      });
+
+      const result = await register(manager, clone.uuid);
+
+      assert.equal(result.action, 'added');
+      assert.equal(system()[library].length, 2);
+      assert.equal(stamped(clone, role), result.item.id);
+    });
+
+    it(`a renamed world copy whose leaf names the ${kind} carrying its name stays on it`, async () => {
+      const packUuid = 'Compendium.kit.books.Item.book';
+      const book = item({ uuid: packUuid, name: 'Book', pack: 'kit.books' });
+      const copy = item({
+        uuid: 'Item.my-book',
+        name: 'My Book',
+        compendiumSource: packUuid,
+        flags: leaf(role, 'def-book'),
+      });
+      const { manager, system } = world({
+        documents: [book, copy],
+        [library]: [
+          {
+            id: 'def-book',
+            name: 'My Book',
+            registeredItemUuid: packUuid,
+            originItemUuid: packUuid,
+          },
+        ],
+      });
+
+      const result = await register(manager, copy.uuid);
+
+      assert.notEqual(result.action, 'added');
+      assert.equal(result.item.id, 'def-book');
+      assert.equal(system()[library].length, 1);
+      assert.equal(stamped(copy, role), 'def-book');
     });
 
     it(`a derivative already registered as the ${kind} its leaf names stays on it`, async () => {

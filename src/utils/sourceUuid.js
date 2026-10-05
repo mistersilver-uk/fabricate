@@ -52,6 +52,11 @@ export function normalizeMatchName(name) {
     .toLowerCase();
 }
 
+/** A document's stored name, normalized (the prepared one on an index entry or a plain record). */
+export function storedMatchName(document) {
+  return normalizeMatchName(document?._source?.name ?? document?.name);
+}
+
 /** The uuids a registration source owns: the one it is registered from, its document's, and for a
  * pack document the type-less spelling `addItemsFromPack` registers. */
 export function getOwnSourceUuids(registeredItemUuid, source) {
@@ -69,41 +74,44 @@ function claimsAny(definition, uuids) {
   return uuids.some((uuid) => held.includes(uuid));
 }
 
-// A clone, or a derivative: a source whose recorded compendium source the resolved `snapshot`
-// leaves out. Either keys on its own uuid alone (issue 2217).
-function isOwnKeyedSource(source, snapshot) {
+// Whether a durable id naming `named` is an inherited marker (issue 2217): `named` claims none of
+// the uuids in `own`, and the source is a clone, or a derivative (its compendium source is one
+// `snapshot` leaves out) whose stored name `named` does not carry. A clone's name is not read.
+function isInheritedMarker(named, source, snapshot, own) {
+  if (claimsAny(named, own)) return false;
   if (getDuplicateSourceUuid(source)) return true;
   const compendiumUuid = getCompendiumSourceUuid(source);
-  return !!compendiumUuid && !getItemMatchUuids(snapshot).includes(compendiumUuid);
+  if (!compendiumUuid || getItemMatchUuids(snapshot).includes(compendiumUuid)) return false;
+  const name = storedMatchName(source);
+  return !name || name !== normalizeMatchName(named.name);
 }
 
-/**
- * The definition a registration source already has, by find-existing precedence (issue 2217): a
- * durable id its flags carry, then a claim on its own uuid, then any reference `snapshot` claims.
- * A clone's or derivative's durable id naming a definition that claims none of its own uuids is
- * an inherited marker and is passed over.
- */
-export function findRegisteredDefinition(definitions, snapshot, source, durableIds = []) {
+/** The definition a registration source already has (issue 2217): a durable id its flags carry,
+ * then a claim on its own uuid, then any reference in `claimed`, by default all `snapshot` claims.
+ * A durable id is skipped when `isInheritedMarker` holds for the definition it names. */
+export function findRegisteredDefinition(
+  definitions,
+  snapshot,
+  source,
+  durableIds = [],
+  claimed = getItemMatchUuids(snapshot)
+) {
   const own = getOwnSourceUuids(snapshot?.registeredItemUuid, source);
-  const ownKeyed = isOwnKeyedSource(source, snapshot);
   for (const id of durableIds) {
     if (id == null) continue;
     const named = definitions.find((definition) => String(definition?.id) === String(id));
-    if (named && (!ownKeyed || claimsAny(named, own))) return named;
+    if (named && !isInheritedMarker(named, source, snapshot, own)) return named;
   }
   return (
     definitions.find((definition) => claimsAny(definition, own)) ||
-    definitions.find((definition) => claimsAny(definition, getItemMatchUuids(snapshot))) ||
+    definitions.find((definition) => claimsAny(definition, claimed)) ||
     null
   );
 }
 
-/**
- * A re-registration neither adds nor releases a compendium-source claim (issue 2217). When
- * `existing` already claims the source's own uuid, a claim it lacks is withheld from `snapshot`
- * whatever the source's name now says, and one it holds stays as an alias once the origin moves
- * off it. Any other pairing answers `snapshot` unchanged.
- */
+/** A re-registration neither adds nor releases a compendium-source claim (issue 2217): when
+ * `existing` claims the source's own uuid, a claim it lacks is withheld from `snapshot` and one it
+ * holds stays as an alias once the origin moves off it. Any other pairing answers `snapshot`. */
 export function settleCompendiumClaim(snapshot, existing, source) {
   const compendiumUuid = getDuplicateSourceUuid(source) ? null : getCompendiumSourceUuid(source);
   const own = getOwnSourceUuids(snapshot?.registeredItemUuid, source);
