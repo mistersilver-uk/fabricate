@@ -1318,9 +1318,9 @@ export const CASES = Object.freeze([
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
-    // The set states that a stage offers no choice, and no stage converts (issue 1773).
+    // The roll-budget strip states that no stage offers a choice, and no stage converts (issue 1773).
     expectSelector:
-      '[data-recipe-set]:has([data-recipe-progressive-note]):not(:has(.manager-recipe-or-trigger))',
+      '[data-recipe-tab="results"]:has([data-recipe-info-strip]):not(:has(.manager-recipe-or-trigger))',
     // The stage row's Edit link sits in the requirement row's trailing controls (issue 1516).
     expectCenterHit: '[data-recipe-result-row] [data-recipe-result-edit]',
     expectLayout: STAGE_RESULT_GEOMETRY,

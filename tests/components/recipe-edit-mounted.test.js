@@ -2990,6 +2990,12 @@ describe('RecipeEditView (mounted)', () => {
     const results = target.querySelector('[data-recipe-section="results"]');
     const card = reorderCard(target);
     assert.ok(strip && results && card);
+    // …and it is the one place a progressive recipe says a stage offers no choice (issue 1773).
+    assert.match(strip.textContent, /so no stage offers a choice of reward/);
+    const saying = [...target.querySelectorAll('.manager-callout')].filter((callout) =>
+      /choice of reward/.test(callout.textContent)
+    );
+    assert.equal(saying.length, 1, 'said once, never again per set');
     assert.ok(
       card.compareDocumentPosition(strip) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
       'the info strip follows the reorder card'

@@ -3196,7 +3196,7 @@
           "ResultsIntroCheck": "Each result set is produced on a matching crafting-check success tier.",
           "ResultsIntroIngredients": "The ingredient set the crafter uses selects the result set.",
           "ResultsIntroSimple": "One ingredient set produces one result set.",
-          "ResultsProgressiveInfo": "Roll budget flows down the list · each stage consumes its difficulty before the next is produced",
+          "ResultsProgressiveInfo": "Roll budget flows down the list · each stage consumes its difficulty before the next is produced, so no stage offers a choice of reward",
           "AllowPlayerResultReorderTitle": "Allow player result re-ordering",
           "AllowPlayerResultReorderSub": "Players may set their own stage order for this recipe, which is remembered and used every time they craft it.",
           "AllowPlayerResultReorderToggle": "Allow player result re-ordering",
@@ -3252,8 +3252,7 @@
             "RangeFraction": "Its range must run between whole numbers.",
             "RangeGlyph": "Selection roll range",
             "RangeOverlap": "Its range overlaps the range of {name}.",
-            "ConvertHint": "Offer another reward in place of this one.",
-            "ProgressiveNote": "Progressive awards every stage the roll affords, in order, so a stage offers no choice of reward."
+            "ConvertHint": "Offer another reward in place of this one."
           },
           "ResultSetEmptyHint": "Add an item this recipe produces.",
           "ToolsSection": "Tools",

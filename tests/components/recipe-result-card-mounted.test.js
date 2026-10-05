@@ -574,15 +574,6 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     assert.ok(!stage.target.querySelector('.manager-recipe-or-trigger'));
   });
 
-  it('states once per progressive set that a stage offers no choice, as a callout', async () => {
-    const stage = await mountGroup({ id: 's1', componentId: 'cmp-herb' }, { progressive: true });
-    const notes = stage.target.querySelectorAll('[data-recipe-progressive-note]');
-    assert.equal(notes.length, 1);
-    assert.match(notes[0].textContent, /every stage the roll affords/);
-    harness.remount();
-    const flat = await mountGroup({ id: 'r1', componentId: 'cmp-herb', quantity: 1 });
-    assert.ok(!flat.target.querySelector('[data-recipe-progressive-note]'));
-  });
 
   it('switches to rolled writing no ranges and no expression, and its rows gain range cells', async () => {
     const { target, groups } = await mountGroup(PLAYER_GROUP);

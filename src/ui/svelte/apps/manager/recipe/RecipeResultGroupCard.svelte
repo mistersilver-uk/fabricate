@@ -16,7 +16,6 @@
 -->
 <script>
   import { localizeOr } from '../../../util/localizeOr.js';
-  import Callout from '../../../components/Callout.svelte';
   import { isChoiceGroup } from '../../../../../utils/choiceGroupShape.js';
   import ChoiceGroup from './ChoiceGroup.svelte';
   import PickerRow from './PickerRow.svelte';
@@ -317,17 +316,6 @@
         >
       {/if}
     </div>
-  {/if}
-
-  {#if progressive && recipeSurface}
-    <Callout
-      icon="fas fa-list-ol"
-      text={localizeOr(
-        'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.ProgressiveNote',
-        'Progressive awards every stage the roll affords, in order, so a stage offers no choice of reward.'
-      )}
-      data-recipe-progressive-note
-    />
   {/if}
 
   {#if results.length === 0 && !isTerminalStep}

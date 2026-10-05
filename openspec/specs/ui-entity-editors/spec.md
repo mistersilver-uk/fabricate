@@ -386,7 +386,7 @@ An adder that names nothing cannot leak a disabled essence, so the adders gate o
 
 A recipe's flat reward row carries the `or…` control, headed **"Add an alternative"**, immediately before its remove; choosing a kind converts the row IN PLACE into a choice group whose first alternative is the row's own pick and whose second is an empty row of that kind, and focus moves to that row's name field.
 The group keeps the row's id, and it opens on **Any one of** with the player choosing, writing no setting of its own.
-A gathering task's result, a salvage result and a progressive stage carry no convert control, and a progressive set states once, in a callout above its stages, that progressive awards every stage the roll affords, so a stage offers no choice of reward.
+A gathering task's result, a salvage result and a progressive stage carry no convert control, and the results tab's standing roll-budget strip on a progressive system adds that no stage offers a choice of reward.
 
 The group's header is one `role="group"` described by its help line, and its first line reads left to right as one sentence:
 
