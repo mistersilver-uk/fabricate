@@ -30,17 +30,26 @@ function entry(overrides = {}) {
   return item({ uuid: ENTRY_UUID, name: ENTRY_NAME, pack: 'kit.templates', ...overrides });
 }
 
+/** A document of the scroll pack, shaped as core shapes one: a four-part uuid, `id` and `pack`. */
+function packedScroll(id, overrides = {}) {
+  return item({
+    id,
+    uuid: `Compendium.${SCROLL_PACK}.Item.${id}`,
+    name: `Scroll of ${id}`,
+    pack: SCROLL_PACK,
+    compendiumSource: ENTRY_UUID,
+    ...overrides,
+  });
+}
+
 /** Three pack entries built from the one template, each renamed into a different scroll. */
 function packedScrolls() {
-  return ['fire', 'frost', 'storm'].map((id) =>
-    item({
-      id,
-      uuid: `Compendium.${SCROLL_PACK}.${id}`,
-      name: `Scroll of ${id}`,
-      pack: SCROLL_PACK,
-      compendiumSource: ENTRY_UUID,
-    })
-  );
+  return ['fire', 'frost', 'storm'].map((id) => packedScroll(id));
+}
+
+/** The spelling of a pack document's uuid without the document-type segment. */
+function typelessUuid(document) {
+  return `Compendium.${document.pack}.${document.id}`;
 }
 
 /** A world Item built from the template: a derivative unless `name` is the entry's own. */
@@ -53,12 +62,15 @@ function worldScroll(id, overrides = {}) {
   });
 }
 
-/** A real manager over one normalized system, resolving exactly `documents` by uuid. */
+/** A real manager over one normalized system, resolving exactly `documents` by uuid; a pack
+ * document resolves under both spellings of its uuid, as it does in core. */
 function world({ documents = [], packs = [], ...libraries } = {}) {
-  const { manager } = createHarness({
-    packs,
-    resolve: Object.fromEntries(documents.map((document) => [document.uuid, document])),
-  });
+  const resolve = {};
+  for (const document of documents) {
+    resolve[document.uuid] = document;
+    if (document.pack && document.id) resolve[typelessUuid(document)] = document;
+  }
+  const { manager } = createHarness({ packs, resolve });
   manager.systems.set(
     'sys1',
     manager._normalizeSystem({ id: 'sys1', name: 'System', ...libraries })
@@ -564,4 +576,151 @@ describe('a durable leaf at find-existing', () => {
       assert.equal(system()[library].length, 2);
     });
   }
+});
+
+describe('a pack Item owns both spellings of its uuid', () => {
+  const ENTRY_COMPONENT = {
+    id: 'comp-entry',
+    name: ENTRY_NAME,
+    registeredItemUuid: ENTRY_UUID,
+    originItemUuid: ENTRY_UUID,
+  };
+  const stampedComponentId = (document) =>
+    document.flags.fabricate?.fabricate.roles.sys1.componentId;
+
+  /** A world holding the scroll pack and the entry's own component, listed first. */
+  function packWorld(components = []) {
+    const scrolls = packedScrolls();
+    const built = world({
+      documents: [entry(), ...scrolls],
+      packs: [makePack(SCROLL_PACK, { documents: scrolls })],
+      components: [ENTRY_COMPONENT, ...components],
+    });
+    return { ...built, scrolls };
+  }
+
+  /** The component a pack document was registered as before both spellings were read. */
+  function typelessComponent(document) {
+    return {
+      id: `comp-${document.id}`,
+      name: document.name,
+      registeredItemUuid: typelessUuid(document),
+      originItemUuid: typelessUuid(document),
+    };
+  }
+
+  it('editing a bulk-imported entry refreshes its component', async () => {
+    const { manager, system, scrolls } = packWorld();
+    await manager.addItemsFromPack('sys1', SCROLL_PACK);
+    const [fire] = scrolls;
+    fire.name = 'Scroll of embers';
+
+    const result = await manager.refreshComponentMetadataForUpdatedItem(fire, { name: fire.name });
+
+    assert.equal(result.updated, 1);
+    assert.deepEqual(
+      system().components.map((component) => component.name),
+      [ENTRY_NAME, 'Scroll of embers', 'Scroll of frost', 'Scroll of storm']
+    );
+  });
+
+  it('Repair Item Data stamps a bulk-registered derivative with its own component id', async () => {
+    const { manager, system, scrolls } = packWorld();
+    await manager.addItemsFromPack('sys1', SCROLL_PACK);
+
+    await manager.repairItemData();
+
+    for (const scroll of scrolls) {
+      const own = system().components.find((component) => component.name === scroll.name);
+      assert.equal(stampedComponentId(scroll), own.id, `${scroll.uuid} carries its own id`);
+    }
+  });
+
+  it('a single drop of the document uuid after a bulk import adds nothing, and neither route moves the registered uuid', async () => {
+    const { manager, system, scrolls } = packWorld();
+    await manager.addItemsFromPack('sys1', SCROLL_PACK);
+
+    for (const scroll of scrolls) {
+      const result = await manager.addItemFromUuid('sys1', scroll.uuid);
+      assert.equal(result.action, 'skipped', scroll.uuid);
+    }
+    const again = await manager.addItemsFromPack('sys1', SCROLL_PACK);
+
+    assert.equal(again.skipped, 3);
+    assert.equal(system().components.length, 4);
+    assert.deepEqual(
+      system()
+        .components.slice(1)
+        .map((component) => component.registeredItemUuid),
+      scrolls.map((scroll) => scroll.uuid)
+    );
+  });
+
+  const SPELLINGS = [
+    ['type-less', typelessUuid],
+    ['four-part', (document) => document.uuid],
+  ];
+  for (const [spelling, uuidOf] of SPELLINGS) {
+    it(`a component registered under the type-less spelling is found by an import of the ${spelling} uuid`, async () => {
+      const fire = packedScroll('fire');
+      const { manager, system } = world({
+        documents: [entry(), fire],
+        components: [ENTRY_COMPONENT, typelessComponent(fire)],
+      });
+
+      const result = await manager.addItemFromUuid('sys1', uuidOf(fire));
+
+      assert.equal(result.item.id, 'comp-fire');
+      assert.equal(system().components.length, 2);
+    });
+  }
+
+  it('a component registered under the type-less spelling is found by a bulk import', async () => {
+    const { manager, system } = packWorld(packedScrolls().map(typelessComponent));
+
+    const summary = await manager.addItemsFromPack('sys1', SCROLL_PACK);
+
+    assert.equal(summary.added, 0);
+    assert.deepEqual(
+      system().components.map((component) => component.id),
+      ['comp-entry', 'comp-fire', 'comp-frost', 'comp-storm']
+    );
+  });
+
+  it('a component registered under the type-less spelling is refreshed and repaired as it stands', async () => {
+    const { manager, scrolls } = packWorld(packedScrolls().map(typelessComponent));
+    const [fire] = scrolls;
+    fire.name = 'Scroll of embers';
+
+    const refreshed = await manager.refreshComponentMetadataForUpdatedItem(fire, {
+      name: fire.name,
+    });
+    await manager.repairItemData();
+
+    assert.equal(refreshed.updated, 1);
+    assert.deepEqual(scrolls.map(stampedComponentId), ['comp-fire', 'comp-frost', 'comp-storm']);
+  });
+
+  it('a component registered under the four-part uuid, listed after the entry component, is found by the type-less uuid', async () => {
+    const copy = packedScroll('blank', { name: ENTRY_NAME });
+    const { manager, system } = world({
+      documents: [entry(), copy],
+      components: [
+        ENTRY_COMPONENT,
+        {
+          id: 'comp-copy',
+          name: ENTRY_NAME,
+          registeredItemUuid: copy.uuid,
+          originItemUuid: copy.uuid,
+        },
+      ],
+    });
+    const entryBefore = structuredClone(system().components[0]);
+
+    const result = await manager.addItemFromUuid('sys1', typelessUuid(copy));
+
+    assert.equal(result.item.id, 'comp-copy');
+    assert.equal(system().components.length, 2);
+    assert.deepEqual(system().components[0], entryBefore);
+  });
 });

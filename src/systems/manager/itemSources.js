@@ -506,8 +506,8 @@ export async function refreshComponentMetadataForUpdatedItem(io, item, changes =
 
   // The edited Item's own uuid only: its compendium and duplicate sources name sibling Items,
   // whose components must not receive this edit (issue 2217).
-  const itemUuid = typeof item?.uuid === 'string' ? item.uuid.trim() : '';
-  if (!itemUuid) return { updated: 0 };
+  const ownUuids = getOwnSourceUuids(item?.uuid, item);
+  if (ownUuids.length === 0) return { updated: 0 };
 
   const nextName = refreshName ? item?.name || changes.name || 'Unnamed Item' : null;
   const nextImg = refreshImg ? item?.img || changes.img || 'icons/svg/item-bag.svg' : null;
@@ -522,7 +522,7 @@ export async function refreshComponentMetadataForUpdatedItem(io, item, changes =
   for (const system of io.systems().values()) {
     const components = Array.isArray(system.components) ? system.components : []; // ratchet-exempt(world-scope): writer
     for (const component of components) {
-      if (!getItemMatchUuids(component).includes(itemUuid)) continue;
+      if (getItemMatchUuids(component).every((ref) => !ownUuids.includes(ref))) continue;
 
       let changed = false;
       if (refreshName && component.name !== nextName) {

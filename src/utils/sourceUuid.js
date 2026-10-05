@@ -52,11 +52,15 @@ export function normalizeMatchName(name) {
     .toLowerCase();
 }
 
-/** The uuids a registration source owns: the one it is registered from, then its document's. */
+/** The uuids a registration source owns: the one it is registered from, its document's, and for a
+ * pack document the type-less spelling `addItemsFromPack` registers. */
 export function getOwnSourceUuids(registeredItemUuid, source) {
   const refs = [];
   pushUniqueReference(refs, registeredItemUuid);
   pushUniqueReference(refs, source?.uuid);
+  if (source?.pack && source.id && !source.parent) {
+    pushUniqueReference(refs, `Compendium.${source.pack}.${source.id}`);
+  }
   return refs;
 }
 

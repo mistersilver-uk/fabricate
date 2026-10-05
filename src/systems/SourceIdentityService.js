@@ -185,7 +185,7 @@ function resolveSourceRepairOwner(item, kind) {
   const claimedBy = (refs) =>
     kind.definitions.find((def) => kind.refExtractor(def).some((ref) => refs.includes(ref))) ||
     null;
-  const byOwnUuid = claimedBy(getOwnSourceUuids(item?.uuid));
+  const byOwnUuid = claimedBy(getOwnSourceUuids(item?.uuid, item));
   if (byOwnUuid || getDuplicateSourceUuid(item)) return byOwnUuid;
   return claimedBy(getItemIdentityReferences(item));
 }
