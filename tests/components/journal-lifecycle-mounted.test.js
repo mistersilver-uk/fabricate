@@ -1641,6 +1641,17 @@ describe('Journal versioned lifecycle (mounted)', () => {
         }
       }
       assertCaseWitness(mounted.target, capture);
+      // Issue 1644, asserted outright: happy-dom matches `:has(A B)` without B, so the case's own
+      // selector cannot see a missing bolt here. One run qualifies; every other state draws none.
+      const bolts = mounted.target.querySelectorAll('[data-run-completes-as-time-passes]');
+      assert.equal(bolts.length, state === 'waiting-auto-completes' ? 1 : 0, `${suffix} bolts`);
+      if (bolts.length === 1) {
+        assert.equal(bolts[0].closest('[data-run-id]').dataset.runId, selectedId);
+        assert.equal(
+          bolts[0].getAttribute('aria-label'),
+          english.FABRICATE.App.Journal.WorldClock.CompletesAsTimePasses
+        );
+      }
       if (HISTORY_DATA_WITNESS[state]) {
         HISTORY_DATA_WITNESS[state](mounted.target, {
           // An alchemy attempt names no recipe: the whole roster is protected text.
