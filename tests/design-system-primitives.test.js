@@ -123,6 +123,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites.
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ListRow.svelte',
+  // Issue 1782: the log list, on the journal's Finished list with a failed and a selected entry.
+  'src/ui/svelte/components/LogList.svelte',
   // Issue 1506: the app's ONE art tile, after it absorbed both crafting thumbnails. ONE frame,
   // because one STATE is what neither representative frame reaches: a TINTED glyph-chip tile.
   'src/ui/svelte/components/Medallion.svelte',
@@ -267,8 +269,9 @@ test('the inputs every property below quantifies over are alive', () => {
   // 17 when `ChoiceGroup` joined at one caller (issue 1516).
   // 18 as of issue 1782: `StageBars`, whose one importer is `RunProgress`; 19 with `RuleSentence`,
   // whose one importer is `RuleRow`. 18 when issue 1773 moved the requirement chooser out, and 17
-  // when it moved `ChoiceGroup` out.
-  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
+  // when it moved `ChoiceGroup` out; 18 with `LogList`, whose one importer is the journal's
+  // `HistoryList`.
+  assert.equal(NOT_A_PRIMITIVE.length, 18, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,

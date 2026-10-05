@@ -88,7 +88,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte',
     'src/ui/svelte/apps/journal/ActiveRunsList.svelte',
-    'src/ui/svelte/apps/journal/HistoryRow.svelte',
+    'src/ui/svelte/components/LogList.svelte',
     'src/ui/svelte/apps/journal/HistoryList.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
@@ -309,8 +309,12 @@ describe('JournalView mounted behavior', () => {
     await settle();
     const rows = [...target.querySelectorAll('[data-history-run-id]')];
     assert.equal(rows.length, 4);
+    const finished = target.querySelector('.journal-history-list');
+    assert.equal(finished.getAttribute('aria-label'), 'FABRICATE.App.Journal.History.Title', 'the Finished list is named');
+    assert.ok(rows.every((row) => row.getAttribute('role') === 'button'), 'each Finished entry opens through a button');
+    assert.equal(finished.querySelectorAll(':scope > [role="listitem"]').length, 4, 'one listitem per entry');
     assert.equal(target.querySelectorAll('[data-pagination-compact]').length, 2);
-    assert.ok(!target.querySelector('[data-history-quantity], .journal-history-meta .manager-chip'));
+    assert.ok(!target.querySelector('[data-history-quantity], .fab-log-list-meta .manager-chip'));
     assert.deepEqual(rows.map((row) => row.querySelector('[data-history-outcome]')?.getAttribute('data-history-outcome')),
       ['succeeded', 'failed', 'cancelled', 'unknown']);
     assert.ok(rows.every((row) => row.querySelector('[data-history-outcome]')?.getAttribute('aria-label')));
@@ -449,6 +453,55 @@ describe('JournalView mounted behavior', () => {
     target.querySelector('[data-journal-dismiss]').click();
     assert.deepEqual(calls.dismiss, [run]);
     assert.deepEqual(calls.select, []);
+  });
+
+  it('presses exactly the Finished entry whose run key is selected, even among equal ids', async () => {
+    const first = makeSucceededRun({ id: 'same', key: 'history-first' });
+    const second = makeSucceededRun({ id: 'same', key: 'history-second' });
+    const { store } = makeJournal({
+      historyPageItems: [first, second], historyCount: 2, selectedRunKey: 'history-second',
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    const pressed = [...target.querySelectorAll('[data-history-run-id]')]
+      .map((row) => row.getAttribute('aria-pressed'));
+    assert.deepEqual(pressed, ['false', 'true'], 'the run key, not the shared id, picks the row');
+  });
+
+  it('refuses to select a Finished run that has no id', async () => {
+    const run = makeSucceededRun({ id: '', key: 'history-idless' });
+    const { store, calls } = makeJournal({ historyPageItems: [run], historyCount: 1 });
+    const target = await harness.mount({ services: makeServices(store) });
+    const row = target.querySelector(':scope .journal-history-list [role="button"]');
+    row.click();
+    row.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    assert.deepEqual(calls.select, [], 'an id-less run is not opened');
+  });
+
+  it('tones only a failed Finished row as danger, and names its dismiss control by the run', async () => {
+    const failed = makeSucceededRun({
+      id: 'f', key: 'f', status: 'failed', derivedStatus: 'failed', names: { title: 'Cracked Vial', subtitle: '' },
+    });
+    const done = makeSucceededRun({ id: 's', key: 's' });
+    const { store } = makeJournal({ historyPageItems: [failed, done], historyCount: 2 });
+    const target = await harness.mount({ services: makeServices(store) });
+    const [failedItem, doneItem] = target.querySelectorAll(':scope .journal-history-list > [role="listitem"]');
+    assert.ok(failedItem.firstElementChild.classList.contains('is-danger'));
+    assert.ok(!doneItem.firstElementChild.classList.contains('is-danger'));
+    assert.match(
+      target.querySelector('[data-journal-dismiss="f"]').getAttribute('aria-label'),
+      /Cracked Vial/,
+      'the dismiss control is named by the run it dismisses'
+    );
+  });
+
+  it('falls back to the default bag art for a Finished run with no image', async () => {
+    const run = makeSucceededRun({ img: '' });
+    const { store } = makeJournal({ historyPageItems: [run], historyCount: 1 });
+    const target = await harness.mount({ services: makeServices(store) });
+    assert.match(
+      target.querySelector(':scope .journal-history-list img').getAttribute('src'),
+      /icons\/svg\/item-bag\.svg$/
+    );
   });
 
   it('uses the shared action bar for primary, pause, completion preference, and armed cancellation', async () => {

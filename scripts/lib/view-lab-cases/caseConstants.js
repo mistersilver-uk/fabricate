@@ -8,7 +8,7 @@ export const MANAGER = 'fabricate-crafting-system-manager';
 
 // Only the recomposed Journal's reachable render surfaces claim its frames.
 export const JOURNAL_SOURCES =
-  /^src\/ui\/svelte\/apps\/journal\/(?:(?:ActionsPanel|ActiveRunsList|HistoricalRunDetail|HistoryList|HistoryRow|JournalFactRow|JournalListShell|JournalView|RunCard|RunDetail|StepDetails|ThisRun|TimeRemainingBox)\.svelte|(?:journalRunStatus|historyPresentation)\.js)$/;
+  /^src\/ui\/svelte\/apps\/journal\/(?:(?:ActionsPanel|ActiveRunsList|HistoricalRunDetail|HistoryList|JournalFactRow|JournalListShell|JournalView|RunCard|RunDetail|StepDetails|ThisRun|TimeRemainingBox)\.svelte|(?:journalRunStatus|historyPresentation)\.js)$/;
 
 /** The three GM canvas windows (issue 1520). */
 export const CANVAS_BROWSER = 'fabricate-interactable-browser';
