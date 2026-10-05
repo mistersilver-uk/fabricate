@@ -3250,6 +3250,7 @@
             "RangeHigh": "Highest roll selecting {name}",
             "RangeInverted": "Its lowest roll is above its highest.",
             "RangeFraction": "Its range must run between whole numbers.",
+            "RangeGlyph": "Selection roll range",
             "RangeOverlap": "Its range overlaps the range of {name}.",
             "ConvertHint": "Offer another reward in place of this one.",
             "ProgressiveNote": "Progressive awards every stage the roll affords, in order, so a stage offers no choice of reward."

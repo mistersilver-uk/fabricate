@@ -9578,6 +9578,12 @@
   font-size: 0.74rem;
 }
 
+/* A requirement row's invalid message, in the danger text at the row's small size: the amount slot's, a choice group header's and a range cell's alike. */
+.fabricate-manager .manager-recipe-option-invalid {
+  color: var(--fab-danger-text);
+  font-size: 0.66rem;
+}
+
 /* The invalid message hangs on a second line under the toggle, after the remove: `order` moves non-focusable text only, so tab order and `aria-describedby` are unchanged. `contain: inline-size` gives it no intrinsic width and the negative end margin cancels the gap it would add, so the controls keep a valid row's width. */
 .fabricate-manager .manager-recipe-option-controls:has(> .manager-recipe-option-invalid) {
   flex-wrap: wrap;
@@ -9685,9 +9691,20 @@
   }
 }
 
-/* A choice group's members wrap the same way against their own list, which a rolled member's range cell widens, so under the width one line needs the range cell leads the second line, before the toggle (issue 1773). */
+/* A choice group's members wrap the same way, against their own list, because a rolled member's range cell widens the row: under the width one line needs, the second line holds the toggle, the amount and then the range cell (issue 1773). */
 .fabricate-manager .manager-recipe-result-group-members {
   container: fabricate-result-members / inline-size;
+}
+
+/* A member's range problem spans the row rather than the controls' column: the controls step aside so the message is a row item, which `order` puts last. */
+.fabricate-manager .manager-recipe-result-group-members > .is-result:has(> .manager-recipe-option-controls > [data-recipe-range-problem]) > .manager-recipe-option-controls {
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+  display: contents;
+}
+
+.fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > [data-recipe-range-problem] {
+  order: 6;
+  margin-inline-end: 0;
 }
 
 @container fabricate-result-members (max-width: 760px) {
@@ -9714,12 +9731,12 @@
     order: 1;
   }
 
-  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > .manager-recipe-range-cell {
-    order: 3;
+  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > :is(.manager-recipe-option-divider, .manager-recipe-range-cell) {
+    order: 5;
   }
 
   .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > .manager-recipe-option-invalid {
-    order: 5;
+    order: 6;
     margin-inline-end: 0;
   }
 }
@@ -9781,7 +9798,8 @@
   background: var(--fab-danger-soft);
 }
 
-.fabricate-manager .manager-recipe-range-dash {
+.fabricate-manager .manager-recipe-range-dash,
+.fabricate-manager .manager-recipe-range-glyph {
   color: var(--fab-text-subtle);
 }
 

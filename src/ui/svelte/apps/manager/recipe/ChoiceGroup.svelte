@@ -218,7 +218,10 @@
   });
 
   const rolled = $derived(chooserOf(group) === 'rolled');
-  const problems = $derived(rolled ? rangeProblems(members) : []);
+  // The ladder's problems as of the last committed bound: a bound being typed keeps the ones
+  // stated before it, so a half-typed number does not flash an overlap.
+  let held = $state(null);
+  const problems = $derived(held ?? (rolled ? rangeProblems(members) : []));
   const nameOf = (entry) =>
     offer.catalogue?.[entry?.kind ?? 'component']?.find((item) => item.id === toValue(entry).id)
       ?.label || localizeOr('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
@@ -280,7 +283,11 @@
       range={entry?.selectionRange}
       name={nameOf(entry)}
       problem={problemText(problems[index])}
-      onChange={(range) => updateMember(index, withRange(entry, range))}
+      onChange={(range) => {
+        held ??= problems;
+        updateMember(index, withRange(entry, range));
+      }}
+      onCommit={() => (held = null)}
     />
   {/snippet}
   <PickerRow

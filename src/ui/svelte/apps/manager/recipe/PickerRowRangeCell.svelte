@@ -1,8 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  A rolled choice group alternative's range cell: the lowest and the highest selection roll that
-  award it, as two inline number fields in the row's convert slot, with the cell's problem on a line
-  of its own after the row's controls. It renders a fragment into a `PickerRow`'s `trailing`.
+  A rolled choice group alternative's range cell: after the row's divider, a d20 glyph and the
+  lowest and the highest selection roll that award it, as two inline number fields in the row's
+  convert slot, with the cell's problem on a line of its own after the row's controls. It renders a
+  fragment into a `PickerRow`'s `trailing`.
 
   Props:
   | prop | values | default | contract |
@@ -15,6 +16,8 @@
 
   Callbacks:
   - `onChange(range)` — `{ from, to }` on every edit, a cleared end being `null`.
+  - `onCommit()` — a field's `change` or `blur`: the typed bound is final, so its problem may be
+    stated.
 
   Rest spread:
   - `{...rest}` lands on the cell, written after `class`.
@@ -35,6 +38,7 @@
     disabled = false,
     class: className = '',
     onChange = () => {},
+    onCommit = () => {},
     ...rest
   } = $props();
 
@@ -57,11 +61,20 @@
   }
 </script>
 
+<span class="manager-recipe-option-divider" aria-hidden="true"></span>
 <span
   class={['manager-recipe-range-cell', className].filter(Boolean).join(' ')}
   data-recipe-range-cell
   {...rest}
 >
+  <i
+    class="fas fa-dice-d20 manager-recipe-range-glyph"
+    aria-hidden="true"
+    title={localizeOr(
+      'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.RangeGlyph',
+      'Selection roll range'
+    )}
+  ></i>
   {#each FIELDS as [end, key, fallback], index (end)}
     {#if index > 0}<span class="manager-recipe-range-dash" aria-hidden="true">–</span>{/if}
     <Field as="label" class="manager-recipe-range-field">
@@ -75,6 +88,8 @@
         data-recipe-range={end}
         {...invalidAttrs}
         oninput={(event) => write(end, event.currentTarget.value)}
+        onchange={() => onCommit()}
+        onblur={() => onCommit()}
       />
     </Field>
   {/each}
@@ -84,10 +99,3 @@
     >{problem}</span
   >
 {/if}
-
-<style>
-  .manager-recipe-option-invalid {
-    color: var(--fab-danger-text);
-    font-size: 0.66rem;
-  }
-</style>

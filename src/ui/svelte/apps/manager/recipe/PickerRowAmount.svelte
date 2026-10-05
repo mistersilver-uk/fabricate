@@ -191,10 +191,3 @@
 {:else}
   {@render stepper()}
 {/if}
-
-<style>
-  .manager-recipe-option-invalid {
-    color: var(--fab-danger-text);
-    font-size: 0.66rem;
-  }
-</style>

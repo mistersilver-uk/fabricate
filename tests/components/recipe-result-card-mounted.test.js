@@ -87,6 +87,12 @@ async function choose(input) {
   await settle();
 }
 
+/** A field's `change`, which commits what was typed. */
+async function commit(field) {
+  field.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+  await settle();
+}
+
 async function type(field, text) {
   field.focus();
   field.value = text;
@@ -687,11 +693,43 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
       members(target)[0].querySelector('[data-recipe-range-problem]').id
     );
 
-    await type(members(target)[1].querySelector('[data-recipe-range="from"]'), '25');
+    const second = members(target)[1].querySelector('[data-recipe-range="from"]');
+    await type(second, '25');
+    assert.deepEqual(
+      members(target).map(problem),
+      [
+        'Its range overlaps the range of Pure Water.',
+        'Its range overlaps the range of Mountain Herb.',
+      ],
+      'a bound being typed states nothing new'
+    );
+    await commit(second);
     assert.deepEqual(members(target).map(problem), [
       undefined,
       'Its lowest roll is above its highest.',
     ]);
+  });
+
+  it('draws the cell after a divider under a titled d20, and writes the end each field names', async () => {
+    const { target, groups } = await mountGroup({
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      alternatives: [
+        { id: 'a', componentId: 'cmp-herb', quantity: 1, selectionRange: { from: 1, to: 10 } },
+        { id: 'b', componentId: 'cmp-water', quantity: 1, selectionRange: { from: 11, to: 20 } },
+      ],
+    });
+    const cell = members(target)[0].querySelector('[data-recipe-range-cell]');
+    assert.ok(cell.previousElementSibling.classList.contains('manager-recipe-option-divider'));
+    const glyph = cell.querySelector('.fa-dice-d20');
+    assert.equal(glyph.getAttribute('aria-hidden'), 'true');
+    assert.equal(glyph.getAttribute('title'), 'Selection roll range');
+
+    await type(cell.querySelector('[data-recipe-range="to"]'), '12');
+    const range = () => groups.at(-1).results[0].alternatives[0].selectionRange;
+    assert.deepEqual(range(), { from: 1, to: 12 }, 'the highest roll writes `to`');
+    await type(cell.querySelector('[data-recipe-range="from"]'), '');
+    assert.deepEqual(range(), { from: null, to: 12 }, 'a cleared end is no end, not 0');
   });
 
   it('marks a range with a fractional end invalid, saying why', async () => {
