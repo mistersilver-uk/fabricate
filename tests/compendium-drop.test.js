@@ -565,7 +565,10 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
   assert.equal(result.item.name, 'Updated Iron Ore');
   assert.equal(result.item.img, 'ore2.png');
   assert.equal(result.item.description, 'Smelts into sturdy ingots.');
-  assert.equal(result.item.originItemUuid, 'Compendium.source.items.iron-ore');
+  // The component claimed only the Item's own uuid, and a re-registration adds no
+  // compendium-source claim (issue 2217).
+  assert.equal(result.item.originItemUuid, 'Compendium.world.pack.item-a');
+  assert.deepEqual(result.item.aliasItemUuids, []);
   // System should still have only one item
   assert.equal(mgr.getSystem('sys1').components.length, 1);
 

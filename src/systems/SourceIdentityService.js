@@ -5,6 +5,7 @@
  */
 import { FABRICATE_FLAG_NAMESPACE, getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import {
+  findRegisteredDefinition,
   getDuplicateSourceUuid,
   getItemIdentityReferences,
   getItemMatchUuids,
@@ -151,30 +152,18 @@ export async function autoStampToolSources(io) {
   });
 }
 
-/** The definition a registered source maps to. A non-clone's durable flag wins even over a
- * drifted `originItemUuid`, the per-system leaf (issue 567) before the legacy scalar; a clone's
- * inherited flag is ignored, so a duplicate becomes its own definition (issue 555). */
+/** The definition a registered source maps to. Its durable flag wins even over a drifted
+ * `originItemUuid`, the per-system leaf (issue 567) before the legacy scalar; a clone's or a
+ * derivative's inherited flag is passed over, so it becomes its own definition (issues 555, 2217). */
 export function findRecipeItemDefinitionForSource(io, system, snapshot, source) {
   const definitions = Array.isArray(system.recipeItemDefinitions)
     ? system.recipeItemDefinitions
     : [];
-  if (!getDuplicateSourceUuid(source)) {
-    const roleFlagKey = io.recipeItemRoleFlagKey(system.id);
-    const roleId = roleFlagKey ? getFabricateFlag(source, roleFlagKey, null) : null;
-    if (roleId) {
-      const byRole = definitions.find((def) => def.id === roleId);
-      if (byRole) return byRole;
-    }
-    const flagId = getFabricateFlag(source, 'recipeItemDefinitionId', null);
-    if (flagId) {
-      const byFlag = definitions.find((def) => def.id === flagId);
-      if (byFlag) return byFlag;
-    }
-  }
-  // The snapshot's refs are already clone-gated, so a duplicate cannot match the original.
-  const claimed = new Set(getItemMatchUuids(snapshot));
-  if (claimed.size === 0) return null;
-  return definitions.find((def) => getItemMatchUuids(def).some((ref) => claimed.has(ref))) || null;
+  const roleFlagKey = io.recipeItemRoleFlagKey(system.id);
+  return findRegisteredDefinition(definitions, snapshot, source, [
+    roleFlagKey ? getFabricateFlag(source, roleFlagKey, null) : null,
+    getFabricateFlag(source, 'recipeItemDefinitionId', null),
+  ]);
 }
 
 // The one definition of this system with the name, `'ambiguous'` for two or more, else `null`;

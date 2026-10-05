@@ -11,7 +11,9 @@ import {
   getDuplicateSourceUuid,
   getItemIdentityReferences,
   getItemMatchUuids,
+  getOwnSourceUuids,
   normalizeMatchName,
+  settleCompendiumClaim,
 } from '../../utils/sourceUuid.js';
 
 import { baseCollaborators, COMPONENT_FACTS, RECIPE_ITEM_FACTS } from './collaborators.js';
@@ -167,8 +169,9 @@ export async function addRecipeItemFromUuid(io, systemId, itemUuid) {
   // runs and the item resolves through the legacy scalar and raw references.
   const roleFlagKey = io.recipeItemRoleFlagKey(system.id);
 
-  const snapshot = await io.buildRecipeItemSourceSnapshot(itemUuid, source);
-  const existing = io.findRecipeItemDefinitionForSource(system, snapshot, source);
+  const resolved = await io.buildRecipeItemSourceSnapshot(itemUuid, source);
+  const existing = io.findRecipeItemDefinitionForSource(system, resolved, source);
+  const snapshot = settleCompendiumClaim(resolved, existing, source);
   if (existing) {
     const unchanged =
       existing.name === snapshot.name &&
@@ -189,6 +192,13 @@ export async function addRecipeItemFromUuid(io, systemId, itemUuid) {
     existing.img = snapshot.img;
     existing.description = snapshot.description;
     existing.originItemUuid = snapshot.originItemUuid;
+    // An origin move releases no claim the registration still lists (issue 2217).
+    if (
+      (snapshot.aliasItemUuids || []).includes(previousSourceUuid) &&
+      !getItemMatchUuids(existing).includes(previousSourceUuid)
+    ) {
+      existing.aliasItemUuids = [...(existing.aliasItemUuids || []), previousSourceUuid];
+    }
     // Indexed fields changed at constant length, invisible to the `definitionIndex` rule.
     advanceDefinitionRevision(system.recipeItemDefinitions);
 
@@ -331,12 +341,15 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
   );
 
   const nextSourceData = await io.resolveImportedComponentSourceData(itemUuid, source);
-  const existing = io.findComponentBySourceReferences(system, nextSourceData.references);
-  const nextSnapshot = await io.buildComponentSourceSnapshot(
-    itemUuid,
-    source,
+  // The component claiming the source's own uuid wins over one claiming only its compendium
+  // source (issue 2217).
+  const existing =
+    io.findComponentBySourceReferences(system, getOwnSourceUuids(itemUuid, source)) ||
+    io.findComponentBySourceReferences(system, nextSourceData.references);
+  const nextSnapshot = settleCompendiumClaim(
+    await io.buildComponentSourceSnapshot(itemUuid, source, existing, nextSourceData),
     existing,
-    nextSourceData
+    source
   );
   if (existing) {
     const nextFallbacks = io.buildFallbackSourceReferences(

@@ -9,6 +9,7 @@ import {
   FABRICATE_FLAG_NAMESPACE,
 } from '../../config/flags.js';
 import { Tool } from '../../models/Tool.js';
+import { findRegisteredDefinition, settleCompendiumClaim } from '../../utils/sourceUuid.js';
 
 import { baseCollaborators, TOOL_FACTS } from './collaborators.js';
 
@@ -47,16 +48,7 @@ function findToolForUpsert(tools, data, snapshot, source, flagKey) {
     if (byId) return byId;
   }
   const durableId = flagKey ? getFabricateFlag(source, flagKey, null) : null;
-  if (durableId) {
-    const byDurableId = tools.find((entry) => String(entry?.id) === String(durableId));
-    if (byDurableId) return byDurableId;
-  }
-  const refs = new Set([snapshot?.registeredItemUuid, snapshot?.originItemUuid].filter(Boolean));
-  return (
-    tools.find((entry) =>
-      [entry?.registeredItemUuid, entry?.originItemUuid].some((ref) => refs.has(ref))
-    ) || null
-  );
+  return findRegisteredDefinition(tools, snapshot, source, [durableId]);
 }
 
 function sourceFlagState(source, flagKey) {
@@ -168,9 +160,10 @@ export async function upsertTool(io, systemId, data = {}, { itemUuid } = {}) {
   const flagKey = io.toolRoleFlagKey(system.id);
   const hasSourceRequest = typeof itemUuid === 'string' && !!itemUuid.trim();
   const source = hasSourceRequest ? await resolveToolSourceItem(itemUuid.trim()) : null;
-  const snapshot = source ? await io.buildToolSourceSnapshot(itemUuid.trim(), source) : null;
+  const resolved = source ? await io.buildToolSourceSnapshot(itemUuid.trim(), source) : null;
   const tools = Array.isArray(system.tools) ? system.tools : []; // ratchet-exempt(world-scope): writer
-  const existing = findToolForUpsert(tools, data, snapshot, source, flagKey);
+  const existing = findToolForUpsert(tools, data, resolved, source, flagKey);
+  const snapshot = settleCompendiumClaim(resolved, existing, source);
   // The Valid Id Basis `_normalizeSystem` uses (issue 1308), via the same helper: this site
   // bypasses `_normalizeSystem`, and a real-but-empty Set here would strip every tool's
   // prerequisites in a healthy migrated world.

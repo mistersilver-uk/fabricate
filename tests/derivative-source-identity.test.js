@@ -332,3 +332,164 @@ describe('replacing a component source', () => {
     );
   });
 });
+
+describe('a re-registration neither adds nor releases a compendium-source claim', () => {
+  const ENTRY_DEFINITION = {
+    id: 'def-entry',
+    name: ENTRY_NAME,
+    registeredItemUuid: ENTRY_UUID,
+    originItemUuid: ENTRY_UUID,
+  };
+
+  for (const { kind, library, register } of KINDS) {
+    it(`a ${kind} registered from a derivative before the gate moves to its own uuid and keeps the entry`, async () => {
+      const scroll = worldScroll('fire');
+      const copy = worldScroll('copy', { name: ENTRY_NAME });
+      const { manager, system } = world({
+        documents: [entry(), scroll, copy],
+        [library]: [
+          {
+            id: 'def-fire',
+            name: scroll.name,
+            registeredItemUuid: scroll.uuid,
+            originItemUuid: ENTRY_UUID,
+          },
+        ],
+      });
+
+      const again = await register(manager, scroll.uuid);
+      assert.equal(again.action, 'updated');
+      assert.equal(again.item.id, 'def-fire');
+      assert.equal(again.item.originItemUuid, scroll.uuid);
+      assert.deepEqual(again.item.aliasItemUuids, [ENTRY_UUID]);
+
+      const merged = await register(manager, copy.uuid);
+      assert.equal(merged.action, 'updated', 'a same-name copy still joins the definition');
+      assert.equal(merged.item.id, 'def-fire');
+      assert.equal(system()[library].length, 1);
+    });
+
+    const ENTRY_STATES = [
+      ['resolves', (scroll) => [entry(), scroll]],
+      ['no longer resolves', (scroll) => [scroll]],
+    ];
+    for (const [state, documentsFor] of ENTRY_STATES) {
+      it(`a ${kind} from a derivative renamed to the entry name stays on its own uuid while the entry ${state}`, async () => {
+        const scroll = worldScroll('fire', { name: ENTRY_NAME });
+        const { manager, system } = world({
+          documents: documentsFor(scroll),
+          [library]: [
+            ENTRY_DEFINITION,
+            {
+              id: 'def-fire',
+              name: 'Scroll of fire',
+              registeredItemUuid: scroll.uuid,
+              originItemUuid: scroll.uuid,
+            },
+          ],
+        });
+        const entryBefore = structuredClone(system()[library][0]);
+
+        const result = await register(manager, scroll.uuid);
+
+        assert.equal(result.item.id, 'def-fire');
+        const [entryDefinition, fireDefinition] = system()[library];
+        assert.deepEqual(entryDefinition, entryBefore, 'the definition claiming the entry is untouched');
+        assert.deepEqual(getItemMatchUuids(fireDefinition), [scroll.uuid]);
+        assert.equal(system()[library].length, 2);
+      });
+    }
+  }
+});
+
+describe('a durable leaf at find-existing', () => {
+  const leaf = (role, id) => ({ fabricate: { fabricate: { roles: { sys1: { [role]: id } } } } });
+  const stamped = (document, role) => document.flags.fabricate.fabricate.roles.sys1[role];
+  const LEAVES = [
+    { ...KINDS[1], role: 'recipeItemDefinitionId' },
+    { ...KINDS[2], role: 'toolId' },
+  ];
+
+  for (const { kind, library, register, role } of LEAVES) {
+    const entryDefinition = {
+      id: 'def-entry',
+      name: ENTRY_NAME,
+      registeredItemUuid: ENTRY_UUID,
+      originItemUuid: ENTRY_UUID,
+    };
+
+    it(`a derivative whose inherited leaf names the entry's ${kind} registers as a new one`, async () => {
+      const scroll = worldScroll('fire', { flags: leaf(role, 'def-entry') });
+      const { manager, system } = world({
+        documents: [entry(), scroll],
+        [library]: [entryDefinition],
+      });
+
+      const result = await register(manager, scroll.uuid);
+
+      assert.equal(result.action, 'added');
+      assert.notEqual(result.item.id, 'def-entry');
+      assert.equal(system()[library].length, 2);
+      assert.equal(stamped(scroll, role), result.item.id, 'the leaf is overwritten with its own id');
+    });
+
+    it(`a clone whose inherited leaf names the entry's ${kind} registers as a new one`, async () => {
+      const clone = worldScroll('blank-copy', {
+        name: ENTRY_NAME,
+        duplicateSource: 'Item.scroll-blank',
+        flags: leaf(role, 'def-entry'),
+      });
+      const { manager, system } = world({
+        documents: [entry(), clone],
+        [library]: [entryDefinition],
+      });
+
+      const result = await register(manager, clone.uuid);
+
+      assert.equal(result.action, 'added');
+      assert.equal(system()[library].length, 2);
+      assert.equal(stamped(clone, role), result.item.id);
+    });
+
+    it(`a copy that is neither still re-links to the ${kind} its leaf names`, async () => {
+      const copy = worldScroll('copy', { name: ENTRY_NAME, flags: leaf(role, 'def-linked') });
+      const { manager, system } = world({
+        documents: [entry(), copy],
+        [library]: [
+          {
+            id: 'def-linked',
+            name: ENTRY_NAME,
+            registeredItemUuid: 'Item.elsewhere',
+            originItemUuid: 'Item.elsewhere',
+          },
+        ],
+      });
+
+      const result = await register(manager, copy.uuid);
+
+      assert.equal(result.item.id, 'def-linked');
+      assert.equal(system()[library].length, 1);
+    });
+
+    it(`a derivative already registered as the ${kind} its leaf names stays on it`, async () => {
+      const scroll = worldScroll('fire', { flags: leaf(role, 'def-fire') });
+      const { manager, system } = world({
+        documents: [entry(), scroll],
+        [library]: [
+          entryDefinition,
+          {
+            id: 'def-fire',
+            name: scroll.name,
+            registeredItemUuid: scroll.uuid,
+            originItemUuid: scroll.uuid,
+          },
+        ],
+      });
+
+      const result = await register(manager, scroll.uuid);
+
+      assert.equal(result.item.id, 'def-fire');
+      assert.equal(system()[library].length, 2);
+    });
+  }
+});
