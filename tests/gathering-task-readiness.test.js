@@ -6,6 +6,7 @@ import {
   TASK_NAME_TARGET,
   gatheringTaskReadiness,
   gatheringTaskValidation,
+  rowDetailOf,
 } from '../src/ui/svelte/apps/manager/gathering-task/gatheringTaskReadiness.js';
 
 import { createStore } from './helpers/manager/managerStoreFake.js';
@@ -228,6 +229,50 @@ describe('gatheringTaskValidation', () => {
       validation.warnings.map((entry) => [entry.id, entry.title]),
       [['routedTiers', 'Define outcome tiers in the gathering check before routing result sets.']]
     );
+  });
+
+  it('titles a warning row by its check name and puts the sentence in its detail', () => {
+    const rows = (context) =>
+      gatheringTaskValidation(context, text)
+        .groups.flatMap((group) => group.rows)
+        .filter((entry) => entry.status === 'warn');
+    assert.deepEqual(
+      rows({ task: { name: 'Ore' }, mode: 'routed', routedOutcomeTiers: [] }).map((entry) => [
+        entry.title,
+        entry.detail,
+      ]),
+      [
+        [
+          'The gathering check defines outcome tiers',
+          'Define outcome tiers in the gathering check before routing result sets.',
+        ],
+      ]
+    );
+    const [reward] = rows({
+      task: { name: 'Ore', dropRows: [{ componentId: 'c' }, { componentId: 'c' }] },
+      mode: 'd100',
+    });
+    assert.equal(reward.title, 'Each component has one drop row');
+    assert.match(reward.detail, /^Multiple drop rows use this component/);
+  });
+
+  it('strips the internal task id from a store message shown as a row detail', () => {
+    const errors = [
+      'Task "hb-task-slowbloom" check tier "Abundant" requires one result group',
+      'Task "Ore" result group "Ore" requires a result',
+    ];
+    const validation = gatheringTaskValidation(
+      { task: { name: 'Ore' }, mode: 'routed', validation: { valid: false, errors } },
+      text
+    );
+    assert.deepEqual(
+      validation.groups
+        .flatMap((group) => group.rows)
+        .filter((entry) => entry.status === 'block')
+        .map((entry) => entry.detail),
+      ['Check tier "Abundant" requires one result group', 'Result group "Ore" requires a result']
+    );
+    assert.equal(rowDetailOf('Needs a thing'), 'Needs a thing', 'no prefix, no change');
   });
 
   it('reads a clean task as all clear, with no marks, no notice and no View on a pass', () => {

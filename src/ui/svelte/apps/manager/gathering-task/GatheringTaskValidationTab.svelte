@@ -23,7 +23,12 @@
     warn: text('FABRICATE.Admin.Manager.Validation.StatusWarn', 'Warning'),
     block: text('FABRICATE.Admin.Manager.Environment.Tasks.Validation.StatusBlock', 'Blocks save'),
   }}
-  hookAttrs={{ root: { 'data-gathering-task-validation': '' } }}
+  hookAttrs={{
+    root: {
+      'data-gathering-task-validation': '',
+      'aria-label': text('FABRICATE.Admin.Manager.Environment.Tasks.Tabs.Validation', 'Validation'),
+    },
+  }}
   rowDataAttr="data-gathering-task-validation-check"
   viewDataAttr="data-gathering-task-validation-view"
   {onSelectIssue}

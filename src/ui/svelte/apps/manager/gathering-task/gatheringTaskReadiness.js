@@ -31,6 +31,16 @@ function hasRepeatedComponent(dropRows) {
   return new Set(ids).size < ids.length;
 }
 
+/**
+ * A store message as a row detail: the store leads with `Task "<id>"`, an internal id that tells the
+ * author nothing on the task's own screen, so it is dropped and the sentence re-capitalised. The
+ * store's own text is untouched, because other consumers and tests pin it.
+ */
+export function rowDetailOf(message) {
+  const stripped = String(message ?? '').replace(/^Task "[^"]*" +/, '');
+  return stripped === message ? stripped : stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
+
 /** The tab a failing row routes to, `{ id, labelKey, label, icon }`, or null. */
 export function gatheringTaskIssueTab(id) {
   return GROUPS.find((group) => group.id === id) ?? null;
@@ -213,6 +223,11 @@ function addressOf(row) {
     : { target: 'results' };
 }
 
+function detailOf(row, fail) {
+  if (row.status === 'warn') return fail;
+  return row.status === 'block' && row.id !== 'name' ? rowDetailOf(row.message) : '';
+}
+
 /**
  * Everything the editor draws from one readiness: the surface's counts, grouped rows and verdict,
  * the Validation tab's marks, and the Results notices — the blocking count and the warning rows.
@@ -226,8 +241,9 @@ export function gatheringTaskValidation(context, text) {
       id: row.id,
       group: row.group,
       status: row.status,
-      title: row.status === 'pass' ? pass : fail,
-      detail: row.status === 'block' && row.id !== 'name' ? row.message : '',
+      // A warning is titled by its check name (the passing copy), with its sentence as the detail.
+      title: row.status === 'block' ? fail : pass,
+      detail: detailOf(row, fail),
       ...addressOf(row),
     };
   });
@@ -248,6 +264,9 @@ export function gatheringTaskValidation(context, text) {
       counts.warnings > 0 && { label: String(counts.warnings), tone: 'warning' },
     ].filter(Boolean),
     blockingNotice: resultsBlocking > 0 ? blockingNoticeTitle(text, resultsBlocking) : '',
-    warnings: presented.filter((row) => row.status === 'warn'),
+    // The Results notice reads the sentence: its title is the warning's detail.
+    warnings: presented
+      .filter((row) => row.status === 'warn')
+      .map((row) => ({ ...row, title: row.detail })),
   };
 }

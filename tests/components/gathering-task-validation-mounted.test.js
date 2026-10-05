@@ -62,6 +62,11 @@ describe('GatheringTaskValidationTab', () => {
       validation: { valid: true, errors: [] },
     });
     assert.ok(Boolean(root.querySelector('[data-gathering-task-validation]')), 'the editor hook');
+    assert.equal(
+      root.querySelector('[data-gathering-task-validation]').getAttribute('aria-label'),
+      'Validation',
+      'the root is a named region'
+    );
     assert.deepEqual(
       [...root.querySelectorAll(':scope [data-validation-group]')].map(
         (group) => group.dataset.validationGroup
@@ -85,6 +90,13 @@ describe('GatheringTaskValidationTab', () => {
       rewardRules: { rewardSelectionMode: 'highestRankedDrop' },
     });
     assert.deepEqual(rows().at(-1), ['rewardRule', 'warn', 'Warning']);
+    const warned = root.querySelector('[data-gathering-task-validation-check="rewardRule"]');
+    assert.match(warned.textContent, /Each component has one drop row/, 'titled by its check name');
+    assert.match(
+      warned.textContent,
+      /Multiple drop rows use this component/,
+      'the sentence is the detail'
+    );
     assert.equal(verdict(), 'warn');
     assert.match(root.textContent, /Saves with warnings/);
     assert.deepEqual(railCounts(root), rowStatusTally(root), 'the counts are the rows');
@@ -105,7 +117,8 @@ describe('GatheringTaskValidationTab', () => {
     ]);
     assert.equal(verdict(), 'block');
     assert.match(root.textContent, /Cannot be saved/);
-    assert.match(root.textContent, /check tier "Rich" needs one result group/, 'the Save`s reason');
+    assert.match(root.textContent, /Check tier "Rich" needs one result group/, 'the Save`s reason');
+    assert.doesNotMatch(root.textContent, /Task "x"/, 'the internal task id is not shown');
     assert.deepEqual(railCounts(root), { passing: 1, warnings: 0, blocking: errors.length });
     assert.deepEqual(railCounts(root), rowStatusTally(root), 'the counts are the rows');
 

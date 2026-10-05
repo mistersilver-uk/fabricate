@@ -6,7 +6,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `tabs` / `activeTab` / `onSelect(tabId)` | `{ id, icon, labelKey, label }[]` / string / function | `[]` / `''` / no-op | The tabs in render order, where `labelKey` is looked up and `label` is the English fallback, and a tab with no `icon` draws no glyph; the current tab; and the selection callback. The strip holds no selection state. |
-  | tab `ariaLabelKey` / `ariaLabel` | key / English fallback | absent | The tab's accessible name, which MUST contain its visible label; absent writes no `aria-label`. |
+  | tab `ariaLabelKey` / `ariaLabel` | key / English fallback | absent | The tab's accessible name, which MUST contain its visible label; absent writes no `aria-label`, except on the `validation` tab, whose toned counts are named here (see Invariants). |
   | tab `tooltipKey` / `tooltip` | key / English fallback | absent | The tab's description: a `role="tooltip"` sibling after the tablist, named by the tab's `aria-describedby` and placed above its tab, start-aligned to it, clamped inside the caller's nearest positioned ancestor. |
   | tab `tierGated` | boolean | `false` | Draws the premium padlock after the label; the tab stays focusable and selectable. |
   | `badges` | per tab id: one mark, or an array of them | `{}` | A mark is a plain value, or `{ vehicle, label, tone, name, class, suppressZero }`. `tone` ∈ neutral/success/positive/warning/danger and applies to the CHIP; `name` is the accessible name, REQUIRED by any mark that renders no readable text; `class` is one modifier class appended to `badgeClass` on the chip only; `suppressZero` defaults true. A tab may carry more than one mark, because a section can be both authored and unready at once. |
@@ -39,6 +39,10 @@
   - `positive` IS `Chip`'s OWN SPELLING of the success family, passed through rather than folded
     into `success`. THE STRIP IS ROOTED AT `fabricate-tabs`, written ahead of whatever
     `containerClass` carries, per `openspec/specs/design-system/spec.md`.
+  - A VALIDATION TAB'S COUNTS ARE NAMED, NOT LEFT TO COLOUR. The `validation` tab carrying issue marks toned
+    danger or warning, none of which carries its own `name`, takes the accessible name "Validation, 2 blocking,
+    1 warning" on its button; the marks' DOM and the strip's pixels do not change. A tab that sets its own
+    `ariaLabel`, or any mark that names itself, keeps that name.
   - The tab stop is `activeTab`, or the first tab when it names none; `aria-selected` stays bound to
     `activeTab`. The hovered tab's description shows, else the focused tab's, and Escape hides it
     until that tab is next hovered or focused — pinned by `tests/components/editor-tabs-capabilities.test.js`.
@@ -219,6 +223,41 @@
     );
   }
 
+  const SEVERITY_KEYS = {
+    danger: ['TabBlockingOne', 'TabBlockingOther', '{count} blocking', '{count} blocking'],
+    warning: ['TabWarningOne', 'TabWarningOther', '{count} warning', '{count} warnings'],
+  };
+
+  // The Validation tab's toned counts as words, so severity is not carried by colour alone.
+  function severityName(tab) {
+    if (tab.id !== 'validation' || tab.ariaLabel || tab.ariaLabelKey) return undefined;
+    const marks = markList(tab);
+    if (marks.length === 0 || marks.some((mark) => mark.name !== '')) return undefined;
+    const parts = [];
+    for (const mark of marks) {
+      const keys = mark.vehicle === 'issue' ? SEVERITY_KEYS[mark.tone] : undefined;
+      const count = Number(mark.label);
+      if (!keys || !Number.isFinite(count)) return undefined;
+      const [oneKey, otherKey, oneText, otherText] = keys;
+      const one = count === 1;
+      parts.push(
+        localizeOr(
+          `FABRICATE.Admin.Manager.Validation.${one ? oneKey : otherKey}`,
+          one ? oneText : otherText,
+          { count }
+        )
+      );
+    }
+    return localizeOr('FABRICATE.Admin.Manager.Validation.TabNameWithIssues', '{label}, {issues}', {
+      label: localizeOr(tab.labelKey, tab.label),
+      issues: parts.join(', '),
+    });
+  }
+
+  function tabName(tab) {
+    return optionalText(tab.ariaLabelKey, tab.ariaLabel) ?? severityName(tab);
+  }
+
   function buttonAttributes(tab) {
     if (!tabDataAttr) return {};
     return { [tabDataAttr]: tab.id };
@@ -285,7 +324,7 @@
       class={`${buttonClass} ${activeTab === tab.id ? 'is-active' : ''} ${isDangerTab(tab) ? 'is-danger' : ''}`}
       aria-selected={activeTab === tab.id}
       aria-controls={activePanelOnly && activeTab !== tab.id ? undefined : `${panelStem}-${tab.id}`}
-      aria-label={optionalText(tab.ariaLabelKey, tab.ariaLabel)}
+      aria-label={tabName(tab)}
       aria-describedby={isDescribed(tab) ? `${tooltipStem}-${tab.id}` : undefined}
       tabindex={tabStop === tab.id ? 0 : -1}
       data-keyboard-focus="true"
