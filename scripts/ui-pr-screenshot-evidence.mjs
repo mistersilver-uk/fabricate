@@ -360,8 +360,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-component-edit-difficulty',
     label: 'Manager component editor — staged progressive difficulty control',
     smokeLabels: ['manager-component-edit-difficulty'],
-    // The difficulty control rehomed from the deleted ComponentDifficultyInspector into
-    // ComponentEditView's body, and from there into its own card (issue 1522).
+    // The staged difficulty control is ComponentDifficultyCard, which ComponentEditView renders.
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/component\/ComponentDifficultyCard\.svelte$/,
