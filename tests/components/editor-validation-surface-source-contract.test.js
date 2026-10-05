@@ -284,6 +284,7 @@ test('the sites hooking the row action are the two producers and the shell, and 
   assert.deepEqual(
     withHook,
     [
+      'src/ui/svelte/apps/manager/component/ComponentRulesValidationTab.svelte',
       'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
       'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
@@ -295,7 +296,8 @@ test('the sites hooking the row action are the two producers and the shell, and 
       'surface only through it, and then the environment tab, whose adoption made this prop ' +
       'ordinary rather than a recipe-editor habit. That last one is the ' +
       'arrival the previous wording said was welcome; its hook value carries the `data-` prefix ' +
-      'because the surface uses the prop as the WHOLE attribute name. This pin is here so that ' +
+      'because the surface uses the prop as the WHOLE attribute name. Issue 1522 added the ' +
+      'Component Rules tab, whose rows route to its Rules tab. This pin is here so that ' +
       'a further arrival is a deliberate edit rather than something a reviewer has to notice.'
   );
   assert.deepEqual(
