@@ -1,12 +1,32 @@
+<!-- ratchet-exempt(design-system): promoted on its third importer at issue 1644; its band chip and row yields disagree with the specimen, so the row arrives at target -->
 <!-- Authored outcome bands preview possible yields, never confirmed historical awards. -->
+<!--
+  `reachedId` marks the ONE tier whose `ids` (else its `id`) contain it, the first such tier only,
+  with a `reachedLabel` pill. A band is optional. Each tier, its band chip, its pill and each yield
+  take per-item `props`; the root takes `class` and a rest spread.
+-->
 <script>
   import Chip from './Chip.svelte';
   import ListRow from './ListRow.svelte';
 
-  let { tiers = [], emptyTierText = '', label = '', hint = '' } = $props();
+  let {
+    tiers = [],
+    emptyTierText = '',
+    label = '',
+    hint = '',
+    reachedId = null,
+    reachedLabel = '',
+    class: extraClass = '',
+    ...rest
+  } = $props();
+
+  const tierIds = (tier) => (Array.isArray(tier.ids) && tier.ids.length > 0 ? tier.ids : [tier.id]);
+  const reachedIndex = $derived(
+    reachedId == null ? -1 : tiers.findIndex((tier) => tierIds(tier).includes(reachedId))
+  );
 </script>
 
-<section class="fab-outcome-ladder" data-outcome-ladder>
+<section class={['fab-outcome-ladder', extraClass]} {...rest} data-outcome-ladder>
   {#if label || hint}
     <header class="fab-outcome-heading">
       {#if label}<span class="fab-outcome-kicker">{label}</span>{/if}
@@ -15,25 +35,47 @@
   {/if}
   <div class="fab-outcome-tiers">
     {#each tiers as tier, index (tier.id || `${tier.name}-${index}`)}
+      {@const isReached = index === reachedIndex}
       <article
+        {...tier.props}
         class="fab-outcome-tier"
         class:is-failure={tier.fail === true}
+        class:is-reached={isReached}
         data-outcome-tier={tier.id || index}
+        data-outcome-rolled={isReached ? 'true' : undefined}
       >
         <header class="fab-outcome-tier-heading">
           <i class={tier.fail ? 'fas fa-circle-xmark' : 'fas fa-circle-check'} aria-hidden="true"
           ></i>
           <span class="fab-outcome-tier-name">{tier.name}</span>
-          <Chip density="list" mono tone={tier.fail ? 'danger' : 'neutral'}>{tier.band}</Chip>
+          {#if isReached}
+            <!-- ratchet-exempt(design-system): per-item props carry the caller's data-* hook onto the pill -->
+            <Chip
+              {...tier.reachedProps}
+              density="list"
+              tone="accent"
+              icon="fas fa-circle"
+              data-outcome-reached>{reachedLabel}</Chip
+            >
+          {/if}
+          {#if tier.band}
+            <!-- ratchet-exempt(design-system): per-item props carry the caller's data-* hook onto the band -->
+            <Chip {...tier.bandProps} density="list" mono tone={tier.fail ? 'danger' : 'neutral'}
+              >{tier.band}</Chip
+            >
+          {/if}
         </header>
         <div class="fab-outcome-yields">
           {#each tier.yields ?? [] as item, itemIndex (item.id || `${item.name}-${itemIndex}`)}
+            <!-- ratchet-exempt(design-system): per-item props carry the caller's data-* hook onto the row -->
             <ListRow
+              {...item.props}
               name={item.name}
               art={item.art ?? item.img ?? ''}
               icon={item.icon || 'fas fa-box'}
               tint={item.tint || ''}
               quantity={item.quantity}
+              detail={item.detail ?? ''}
             />
           {:else}
             <span class="fab-outcome-empty" data-outcome-empty
@@ -82,6 +124,11 @@
 
   .fab-outcome-tier.is-failure {
     border-color: var(--fab-danger-border);
+  }
+
+  /* Two signals, never colour alone: the accent edge and the pill. */
+  .fab-outcome-tier.is-reached {
+    border-color: var(--fab-accent-border);
   }
 
   .fab-outcome-tier-heading {
