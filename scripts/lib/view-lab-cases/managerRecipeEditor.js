@@ -48,6 +48,22 @@ const REWARD_SOURCES = Object.freeze([
 ]);
 const BOUNTY_ROW = '[data-recipe-result-item]:has([data-recipe-reward-body])';
 
+/** A result choice group's box, by its group id (issue 1773). */
+const RESULT_GROUP = (id) => `[data-recipe-result-group="${id}"]`;
+/** What only some cells draw: N, repeats and a member's range cell. */
+const CELL_CONTROLS =
+  '[data-recipe-group-count], [data-recipe-group-repeats], [data-recipe-range-cell]';
+/** Convert the `n`th flat row of the set matching `set` through its `or…`, adding `kind`. */
+const CONVERT_ROW = (set, n, kind) => [
+  { selector: `${set} ${RESULT_ROW(n)} .manager-recipe-or-trigger` },
+  { selector: `.manager-recipe-or-menu [data-recipe-add="alternative-${kind}"]` },
+];
+const GROUP_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+  /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
+]);
+
 /** A progressive stage list's row geometry, its name field held at the row's stated minimum. */
 const STAGE_ROWS = '[data-recipe-result-row] [data-recipe-result-item]';
 const STAGE_RESULT_GEOMETRY = Object.freeze({
@@ -1073,6 +1089,112 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'recipes'],
     sourceMatches: [...REWARD_SOURCES, ...ANCHORED_POPOVER_SOURCES],
   }),
+  // Result choice groups (issue 1773): a reward row converted through its `or…` opens on any one
+  // of with the player choosing, and draws no N, no repeats and no range cell.
+  managerCase({
+    id: 'manager-recipe-edit-results-group-player-anyone',
+    label: 'Manager — Recipe edit results, a reward row converted into a choice the player makes',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-craft' },
+    steps: [...REWARD_RESULTS_STEPS, ...CONVERT_ROW('[data-recipe-set]', 1, 'currency')],
+    expectView: 'recipe-edit',
+    expectSelector:
+      `[data-recipe-result-group]:not(:has(${CELL_CONTROLS})) ` +
+      '[data-recipe-group-chooser="playerChooses"] input:checked',
+    expectCenterHit: '[data-recipe-result-group] [data-recipe-group-chooser="rolled"]',
+    expectNoHorizontalOverflow: '[data-recipe-result-group]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...GROUP_SOURCES],
+  }),
+  // Up to two, the player choosing among an ingot, a bounty and a recipe: N, and no repeats.
+  managerCase({
+    id: 'manager-recipe-edit-results-group-player-upto',
+    label: 'Manager — Recipe edit results, a choice of up to two rewards the player makes',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-group' },
+    steps: [
+      ...REWARD_RESULTS_STEPS,
+      { selector: RESULT_GROUP('sm-r-horseshoe-reward'), scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      `${RESULT_GROUP('sm-r-horseshoe-reward')}:not(:has([data-recipe-group-repeats], ` +
+      '[data-recipe-range-cell])) [data-recipe-group-count]',
+    expectNoHorizontalOverflow: RESULT_GROUP('sm-r-horseshoe-reward'),
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...GROUP_SOURCES],
+  }),
+  // One of two by a d6 ladder: the selection line and a range cell per member, and no N.
+  managerCase({
+    id: 'manager-recipe-edit-results-group-rolled-anyone',
+    label: 'Manager — Recipe edit results, one reward of two decided by a roll',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-group-rolled' },
+    steps: [
+      ...REWARD_RESULTS_STEPS,
+      { selector: RESULT_GROUP('sm-r-horseshoe-draw'), scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      `${RESULT_GROUP('sm-r-horseshoe-draw')}:not(:has([data-recipe-group-count])) ` +
+      '[data-recipe-result-member] [data-recipe-range="to"]',
+    expectCenterHit: `${RESULT_GROUP('sm-r-horseshoe-draw')} [data-recipe-range="from"]`,
+    expectNoHorizontalOverflow: RESULT_GROUP('sm-r-horseshoe-draw'),
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...GROUP_SOURCES],
+  }),
+  // Up to two of three by roll, repeats allowed: the one cell drawing every control, and at the
+  // declared floor, where the chooser takes a line of its own.
+  ...[
+    { suffix: '', position: null },
+    { suffix: '-narrow', position: { width: 1024, height: 640 } },
+  ].map(({ suffix, position }) =>
+    managerCase({
+      id: `manager-recipe-edit-results-group-rolled-upto-repeats${suffix}`,
+      label: `Manager — Recipe edit results, up to two rewards by roll with repeats${suffix ? ', at the declared floor' : ''}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-smithing', resultRowState: 'reward-group-rolled' },
+      steps: [
+        ...REWARD_RESULTS_STEPS,
+        { selector: `${RESULT_GROUP('sm-r-horseshoe-draws')} [data-recipe-group-repeats]` },
+        { selector: RESULT_GROUP('sm-r-horseshoe-draws'), scroll: true },
+      ],
+      expectView: 'recipe-edit',
+      expectSelector:
+        `${RESULT_GROUP('sm-r-horseshoe-draws')}:has([data-recipe-group-selection]) ` +
+        '[data-recipe-group-repeats="repeats"]',
+      expectCenterHit: `${RESULT_GROUP('sm-r-horseshoe-draws')} [data-recipe-group-repeats]`,
+      expectNoHorizontalOverflow: RESULT_GROUP('sm-r-horseshoe-draws'),
+      ...(position && { position }),
+      kinds: ['manager', 'recipes', ...(position ? ['responsive'] : [])],
+      sourceMatches: [...GROUP_SOURCES],
+    })
+  ),
+  // A failed check's reserved set holds a choice group on the same terms as any other set.
+  managerCase({
+    id: 'manager-recipe-edit-results-group-failure-role',
+    label: 'Manager — Recipe edit results, a choice group in the failed-check set',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="al-r-elixir"]' },
+      { selector: '#recipe-tab-results' },
+      ...CONVERT_ROW('[data-recipe-set].is-reserved', 1, 'component'),
+      { selector: '[data-recipe-set].is-reserved [data-recipe-group-chooser="rolled"]' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '[data-recipe-set].is-reserved [data-recipe-result-group] [data-recipe-range-cell]',
+    expectNoHorizontalOverflow: '[data-recipe-set].is-reserved',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...GROUP_SOURCES],
+  }),
   // A knowledge result on a Smithing whose learned recipes no player sees: drawn read-only, saying why.
   managerCase({
     id: 'manager-recipe-edit-results-learning-off',
@@ -1196,6 +1318,9 @@ export const CASES = Object.freeze([
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
+    // The set states that a stage offers no choice, and no stage converts (issue 1773).
+    expectSelector:
+      '[data-recipe-set]:has([data-recipe-progressive-note]):not(:has(.manager-recipe-or-trigger))',
     // The stage row's Edit link sits in the requirement row's trailing controls (issue 1516).
     expectCenterHit: '[data-recipe-result-row] [data-recipe-result-edit]',
     expectLayout: STAGE_RESULT_GEOMETRY,
