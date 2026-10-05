@@ -1377,7 +1377,7 @@
           "Paused": "This run is paused. Its countdown stays frozen until you resume; it cannot complete while paused. Nothing it has already spent is returned, and the choices it has made stay made.",
           "Crafting": "This is a crafting run. Begin each step to lock its choices and consume its materials, then roll its crafting check once the step's time has passed; the run completes (or fails) when the final step resolves.",
           "CraftingSingleStep": "This is a crafting run. Its materials were consumed when it started. Once its time gate has passed, finish crafting to roll its crafting check — the run completes (or fails) on that result.",
-          "CraftingNoCheck": "This crafting run has no check. Begin each step to lock its choices and consume its materials, then trigger it once its time has passed; the run completes after the final step.",
+          "CraftingNoCheck": "This crafting run has no check. Begin each step to lock its choices and consume its materials. Once a step's time has passed it completes on its own if the run is set to, or you can complete it yourself. The run finishes after the final step.",
           "CraftingSingleStepNoCheck": "This crafting run has no check. Its materials were consumed when it started. Once its time gate has passed, finish crafting to complete the run.",
           "Gathering": "This is a gathering run. It resolves automatically as world time advances — no action is needed from you.",
           "GatheringManual": "This gathering run waits for you when a step is ready. Once its time gate has passed, use the available action to resolve it.",
