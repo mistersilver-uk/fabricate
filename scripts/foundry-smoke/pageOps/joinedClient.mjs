@@ -79,16 +79,35 @@ export async function openJoinedClient(
   }
 }
 
-/** Resolve once the GM page paints a frame again, so a closed client's load is known to be over. */
+/**
+ * Resolve once the GM page is foreground and answering again: a joined page took the foreground,
+ * and Chromium runs no animation frame for a background page, so it is brought back first. The
+ * probe is a task round trip, not a frame, and it also requires the game to be ready and its
+ * socket connected, which is what a starved or dropped GM page would fail.
+ */
 export async function awaitPageResponsive(page, timeout = 30_000) {
   let timer;
   const expiry = new Promise((_resolve, reject) => {
     timer = setTimeout(
-      () => reject(new Error(`the GM page painted no frame in ${timeout}ms`)),
+      () => reject(new Error(`the GM page did not answer in ${timeout}ms`)),
       timeout
     );
   });
-  const painted = page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
-  painted.catch(() => {});
-  await Promise.race([painted, expiry]).finally(() => clearTimeout(timer));
+  const answered = (async () => {
+    await page.bringToFront();
+    return await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            const { game } = globalThis;
+            resolve({ ready: game?.ready === true, connected: game?.socket?.connected === true });
+          }, 0);
+        })
+    );
+  })();
+  answered.catch(() => {});
+  const state = await Promise.race([answered, expiry]).finally(() => clearTimeout(timer));
+  if (!state.ready || !state.connected) {
+    throw new Error(`the GM page answered but is not playable: ${JSON.stringify(state)}`);
+  }
 }

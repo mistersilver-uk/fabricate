@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  awaitPageResponsive,
   disableCanvasBeforeLoad,
   openJoinedClient,
 } from '../scripts/foundry-smoke/pageOps/joinedClient.mjs';
@@ -79,5 +80,35 @@ describe('the joined smoke client', () => {
     const stored = new Map();
     disableCanvasBeforeLoad({ setItem: (key, value) => stored.set(key, value) });
     assert.equal(JSON.parse(stored.get('core.noCanvas')), true);
+  });
+
+  describe('the GM page check after the client closes', () => {
+    const gmPage = (log, answer) => ({
+      bringToFront: async () => {
+        log.push('bringToFront');
+      },
+      evaluate: async () => {
+        log.push('evaluate');
+        return answer();
+      },
+    });
+
+    it('brings the GM page to the front before it asks, since a background page paints nothing', async () => {
+      const log = [];
+      await awaitPageResponsive(gmPage(log, () => ({ ready: true, connected: true })));
+      assert.deepStrictEqual(log, ['bringToFront', 'evaluate']);
+    });
+
+    it('fails a GM page that answers but has lost its game or socket', async () => {
+      await assert.rejects(
+        () => awaitPageResponsive(gmPage([], () => ({ ready: true, connected: false }))),
+        /not playable/
+      );
+    });
+
+    it('fails a GM page that never answers', async () => {
+      const hung = gmPage([], () => new Promise(() => {}));
+      await assert.rejects(() => awaitPageResponsive(hung, 50), /did not answer in 50ms/);
+    });
   });
 });
