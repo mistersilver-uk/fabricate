@@ -1387,6 +1387,12 @@ Current GM editor behavior:
 - Expanded override panels contain per-environment override fields only; Gathering Task fields remain edited in their library surface.
 - Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager widths.
 - The scene link is authored on the Overview tab's Linked scene card: a Scene drop links or replaces it, a visible Unlink clears it, and a link whose scene no longer resolves reads as missing.
+- Gathering Task authoring is a tabbed editor — Overview (identity, task resolution mode, nodes), Requirements (availability, stamina, check modifiers, check override, required tools), Results — whose d100 Results tab alone keeps the selected-drop rail.
+  While the results validation has errors, the Results tab carries a `danger` issue mark (`EditorTabs` `badges`, vehicle `issue`), labelled with the error count and named by the notice's title, so a blocking issue is visible from every tab; each Results warning adds a `warning` mark named by its notice.
+  The editor's tab bar is fixed, as the recipe and environment editors' are: the tab bar and the page notice position sit above the tab panel, and the tab panel is the scroller.
+  At the manager's stacking width, a d100 task's Results tab stacks its drop rail beneath the editor without moving the nav, so a tab switch never moves the tab bar.
+  A legacy Progressive task's Results tab renders `EmptyState`, saying its results are not authored here and pointing to Overview's resolution card.
+  Each list's search, page, page size and tag picks survive a tab switch, and an open availability menu closes with its tab.
 - Gathering Task authoring includes identity, image, description, enabled state, task-level time/weather availability gates, search/pagination for ordered d100 drop rows, unresolved drop-zone rows, inline chance/quantity controls, modifier summaries, selected-drop inspector editing, and final chance preview.
   D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
 - Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.

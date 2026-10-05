@@ -16,7 +16,11 @@ import {
   trackCount,
 } from '../helpers/fullWidthRoute.js';
 
-import { SIDE_RAIL_ROUTES, readSideRailGeometry } from './manager-layout-side-rail-fixtures.js';
+import {
+  SIDE_RAIL_ROUTES,
+  gatheringTaskEditor,
+  readSideRailGeometry,
+} from './manager-layout-side-rail-fixtures.js';
 import { compareStrings, css } from './manager-layout-shared.js';
 
 const LADDER = [1212, 1121, 1120, 1000, 880, 832, 831, 700, 600];
@@ -102,6 +106,50 @@ for (const route of SIDE_RAIL_ROUTES) {
     );
   });
 }
+
+// A tab switch never moves the gathering task editor's tab bar (issue 1522): on a d100 task's
+// Results tab the drop rail stacks beneath the editor rather than restacking the whole manager.
+test('the gathering task editor`s tab bar holds still between Overview and a d100 task`s Results', async () => {
+  const TAB_BAR = '[role="tablist"]';
+  const read = (results, options) =>
+    readSideRailGeometry(
+      {
+        id: 'gathering-task-edit',
+        rootAttributes: results
+          ? 'data-manager-view="gathering-task-edit"'
+          : 'data-manager-view="gathering-task-edit" data-gathering-task-layout="results"',
+        main: gatheringTaskEditor({ results }),
+        owner: { wide: '.manager-editor-tab-panel' },
+      },
+      { ...options, boxes: [TAB_BAR, '.manager-inspector'] }
+    );
+  for (const options of [{ width: 1000 }, { width: 880, collapsed: true }, { width: 1212 }]) {
+    const tag = `${options.width}px${options.collapsed ? ' collapsed' : ''}`;
+    const overview = await read(false, options);
+    const results = await read(true, options);
+    const bar = results.boxes[TAB_BAR];
+    assert.deepEqual(
+      { top: bar.top, left: bar.left, height: bar.height },
+      {
+        top: overview.boxes[TAB_BAR].top,
+        left: overview.boxes[TAB_BAR].left,
+        height: overview.boxes[TAB_BAR].height,
+      },
+      `${tag}: the tab bar does not move on Results`
+    );
+    assert.deepEqual(results.rail, overview.rail, `${tag}: nor does the rail`);
+    if (options.width > 1120) continue;
+    assert.deepEqual(bar, overview.boxes[TAB_BAR], `${tag}: nor change its width`);
+    const inspector = results.boxes['.manager-inspector'];
+    assert.ok(inspector.top >= results.main.bottom - 1, `${tag}: the drop rail sits under it`);
+    assert.equal(inspector.left, results.main.left, `${tag}: in the content track`);
+    assert.ok(Math.abs(inspector.bottom - results.body.bottom) <= 1, `${tag}: to the body bottom`);
+    assert.ok(
+      results.ownerScroll.scrollHeight > results.ownerScroll.clientHeight,
+      `${tag}: and the tab panel still scrolls`
+    );
+  }
+});
 
 // ── The membership guard: the side-rail set is derived from the sheet, not listed ─────────────
 
@@ -218,16 +266,10 @@ test('the shared side-rail rail reset and band body rule name exactly the routes
     'every side-rail route bounds its body row in the band, except the three that own theirs'
   );
 
-  // The two scroll-owner restorations, exactly: gathering's is scoped to its result-group layout.
+  // The one scroll-owner restoration, exactly: the gathering task editor's panel scrolls itself.
   const restorations = band
     .filter((rule) => selectorsOf(rule).some((selector) => selector.endsWith(' .manager-main')))
     .filter((rule) => ['hidden auto', 'auto'].includes(declaration(rule.declarations, 'overflow')))
     .flatMap(selectorsOf);
-  assert.deepEqual(
-    sorted(restorations),
-    sorted([
-      `${compound('recipe-edit')} .manager-main`,
-      `${compound('gathering-task-edit')}[data-gathering-task-layout="results"] .manager-main`,
-    ])
-  );
+  assert.deepEqual(sorted(restorations), [`${compound('recipe-edit')} .manager-main`]);
 });

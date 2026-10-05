@@ -103,7 +103,20 @@ export default {
     // "Selected Drop Rule" only renders when a drop row is selected (the `selectedDrop` branch of
     // `environment/GatheringTaskInspector.svelte`) and its i18n value is now "Selected Drop", so it
     // isn't asserted here.
-    for (const expected of ['Task Identity', 'Task Availability', 'Drop Rules']) {
+    // Each heading on its own tab (issue 1522), ending back on Overview for the normal capture.
+    const openTaskTab = async (tab) => {
+      await page.locator(`.fabricate-manager [data-gathering-task-tab="${tab}"]`).first().click();
+      await page
+        .locator(`.fabricate-manager [data-gathering-task-panel="${tab}"]`)
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+    };
+    for (const [tab, expected] of [
+      ['requirements', 'Task Availability'],
+      ['results', 'Drop Rules'],
+      ['overview', 'Task Identity'],
+    ]) {
+      await openTaskTab(tab);
       if ((await page.locator('.fabricate-manager').filter({ hasText: expected }).count()) === 0) {
         throw new Error(`Manager gathering task editor is missing "${expected}".`);
       }
@@ -113,6 +126,8 @@ export default {
       label: 'manager-gathering-task-editor-normal',
     });
 
+    // The stacked frame is the Results tab, whose drop rail stacks beneath the editor (issue 1522).
+    await openTaskTab('results');
     await captureStableManagerView(ctx, {
       width: 1000,
       height: 720,

@@ -173,9 +173,14 @@ const CONVERTED_BATCHES = Object.freeze([
         file: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
         sites: 4,
       }),
+      // 3 sites in the task editor until issue 1522 split it: the stamina add and the two drop adds.
       Object.freeze({
-        file: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
-        sites: 3,
+        file: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskStaminaCard.svelte',
+        sites: 1,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskDropsCard.svelte',
+        sites: 2,
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/AccessTabView.svelte', sites: 2 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/BooksScrollsView.svelte', sites: 2 }),
@@ -1104,11 +1109,12 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    48,
+    49,
     // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), one for the
-    // salvage DC card's move into `CheckOverrideField` (issue 2005), and one for the salvage adds'
-    // split across two files (issue 1522); the site total above is unchanged by those.
-    'across 48 components'
+    // salvage DC card's move into `CheckOverrideField` (issue 2005), and one each for the salvage
+    // adds' and the gathering task adds' splits across two files (issue 1522); the site total above
+    // is unchanged by those.
+    'across 49 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the

@@ -26,11 +26,11 @@ const RAW_SEARCH_ALLOWLIST = Object.freeze([
       '2157), so the label is where the source writes it and not where it renders.',
   }),
   Object.freeze({
-    path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+    path: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskComponentBrowserCard.svelte',
     sites: 1,
     why:
       'The component TAG search, which writes a `.manager-tag-suggestions` list inside its label ' +
-      'and swaps the glyph to `fa-tags`. Its three siblings in the same file converted; this one ' +
+      'and swaps the glyph to `fa-tags`. Its three siblings in the task editor converted; this one ' +
       'is a typeahead combobox, which `design-system` adjudicates as not a picker, so it is an ' +
       'adjudicated opt-out rather than deferred work. The open list is portalled out of the label ' +
       'to the application root (issue 2157).',

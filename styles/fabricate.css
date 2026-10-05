@@ -11195,15 +11195,14 @@
 }
 
 .fabricate-manager .manager-gathering-task-edit-view {
-  display: grid;
-
-  /* Rows size to each card (cards that need a fixed height — required-tools, component-browser, drops — set their own `height`). */
-  grid-auto-rows: auto;
+  /* The recipe editor's structure (issue 1522): a fixed tab bar and page notice over the tab panel, which shrinks to the space left and is the one scroller. */
+  display: flex;
+  flex-direction: column;
   gap: var(--fab-space-3);
   min-height: 0;
   min-width: 0;
   padding: var(--fab-space-4);
-  overflow: auto;
+  overflow: hidden;
 }
 
 /* `[type="range"]` is excluded for the same reason `.manager-drop-editor-card` excludes it: a range input is drawn by the chance slider, which paints its own 6px track and a coloured fill BEHIND the input and relies on the input itself being transparent (issue 883). Both legs lost their `select` token at issue 1510, when this editor's seven selects became `<Select>` triggers: the rungs paint the box and neither element-typed leg could reach a `<button>` anyway. The requirement row states its own formula and search boxes, so both legs leave them alone (issue 1516). */
@@ -12038,23 +12037,6 @@
 
 .fabricate-manager .manager-task-drop-footer .manager-pagination-summary {
   display: none;
-}
-
-.fabricate-manager .manager-warning-band {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-warning-border);
-  border-radius: 8px;
-  color: var(--fab-text);
-  background: var(--fab-warning-soft);
-}
-
-.fabricate-manager .manager-warning-band.is-formula {
-  justify-content: flex-start;
-  background: var(--fab-overlay-light-035);
 }
 
 .fabricate-manager .manager-gathering-task-drops-table {
@@ -13488,14 +13470,35 @@
     overflow: hidden;
   }
 
-  /* The two editors whose main is their scroller get back the overflow the shared `.manager-main` and gathering-view overrides above take from them (issue 1976). */
+  /* The recipe editor's main is its scroller, so it gets back the overflow the shared `.manager-main` override above takes from it (issue 1976). */
   .fabricate-manager[data-manager-view="recipe-edit"] .manager-main {
     overflow: hidden auto;
   }
 
-  .fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"]
-    .manager-main {
-    overflow: auto;
+  /* A d100 task's Results tab keeps the side rail and stacks its drop rail beneath the editor, so a tab switch never moves the nav or the tab bar (issue 1522). */
+  .fabricate-manager[data-manager-view="gathering-task-edit"]:not([data-gathering-task-layout])
+    .manager-body {
+    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) fit-content(40%);
+    overflow: hidden;
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"]:not([data-gathering-task-layout])
+    .manager-body.is-rail-collapsed {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"]:not([data-gathering-task-layout])
+    .manager-rail {
+    grid-row: 1 / -1;
+    max-height: none;
+    border-right: 1px solid var(--fab-border);
+    border-bottom: 0;
+  }
+
+  .fabricate-manager[data-manager-view="gathering-task-edit"]:not([data-gathering-task-layout])
+    .manager-inspector {
+    grid-column: 2;
   }
 }
 

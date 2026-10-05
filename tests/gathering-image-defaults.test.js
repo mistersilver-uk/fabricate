@@ -71,7 +71,7 @@ describe('gathering default-image fallback sites use the shared constants', () =
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte'
   ];
   const taskConsumers = [
-    'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+    'src/ui/svelte/apps/manager/gathering-task/GatheringTaskOverviewTab.svelte',
     'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte',
     'src/ui/svelte/apps/manager/gatheringDisplay.js',
     'src/ui/svelte/apps/gathering/GatheringTaskRow.svelte',

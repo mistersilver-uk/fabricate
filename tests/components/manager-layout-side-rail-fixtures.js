@@ -55,6 +55,21 @@ function worldLibrary(pageClass, announcement) {
   return `<main class="manager-main">${live}<div class="${pageClass}">${TALL}</div></main>`;
 }
 
+/**
+ * The gathering task editor (issue 1522): a fixed tab bar over its scrolling tab panel and, on a
+ * d100 task's Results tab, the drop rail's aside after it.
+ */
+export function gatheringTaskEditor({ results = false } = {}) {
+  const aside = results
+    ? `<aside class="manager-inspector"><div class="manager-drop-inspector-stack">${TALL}</div></aside>`
+    : '';
+  return (
+    '<main class="manager-main manager-gathering-task-edit-view" data-gathering-task-editor>' +
+    '<div class="fabricate-tabs manager-editor-tabs" role="tablist"><button class="manager-editor-tab-button" role="tab">Overview</button><button class="manager-editor-tab-button" role="tab">Requirements</button><button class="manager-editor-tab-button" role="tab">Results</button></div>' +
+    `<div class="manager-editor-tab-panel" role="tabpanel">${TALL}</div></main>${aside}`
+  );
+}
+
 function vocabularyShell(mainAttributes) {
   return hashed(
     `<main ${mainAttributes}><div class="manager-vocabulary-shell">` +
@@ -152,11 +167,8 @@ export const SIDE_RAIL_ROUTES = Object.freeze([
   {
     id: 'gathering-task-edit',
     rootAttributes: 'data-manager-view="gathering-task-edit" data-gathering-task-layout="results"',
-    main:
-      '<main class="manager-main manager-gathering-task-edit-view" data-gathering-task-editor>' +
-      `<section class="manager-task-core-card">${TALL}</section>` +
-      '<section class="manager-task-core-card">Results</section></main>',
-    owner: { wide: 'main.manager-gathering-task-edit-view' },
+    main: gatheringTaskEditor(),
+    owner: { wide: '.manager-editor-tab-panel' },
   },
   {
     id: 'world-currency',
@@ -266,20 +278,29 @@ function sideRailMarkup(route, { width, height, collapsed }) {
  * Render one side-rail route inside a real Manager root and read its geometry.
  *
  * @param {object} route One {@link SIDE_RAIL_ROUTES} entry.
- * @param {{ width: number, height?: number, collapsed?: boolean }} options `height` is the
- * Manager's own, so a 720px window is 686.
+ * @param {{ width: number, height?: number, collapsed?: boolean, boxes?: string[] }} options
+ * `height` is the Manager's own, so a 720px window is 686; `boxes` are further selectors to measure.
  * @returns {Promise<object>} boxes, scroll state and rail borders, and the catalogue list's state
  */
-export async function readSideRailGeometry(route, { width, height = 686, collapsed = false }) {
+export async function readSideRailGeometry(
+  route,
+  { width, height = 686, collapsed = false, boxes = [] }
+) {
   const page = await sideRailPage({ width: width + 40, height: Math.max(720, height + 34) });
   await page.setContent(sideRailMarkup(route, { width, height, collapsed }));
   return page.evaluate(
-    ({ owner, catalogue }) => {
+    ({ owner, catalogue, extra }) => {
       const at = (selector) => document.querySelector(selector);
       const box = (selector) => {
         const value = at(selector)?.getBoundingClientRect();
         return value
-          ? { top: value.top, bottom: value.bottom, width: value.width, height: value.height }
+          ? {
+              top: value.top,
+              bottom: value.bottom,
+              left: value.left,
+              width: value.width,
+              height: value.height,
+            }
           : null;
       };
       const scroll = (selector) => {
@@ -296,6 +317,7 @@ export async function readSideRailGeometry(route, { width, height = 686, collaps
       const ownerSelector = stacked ? owner.stacked : owner.wide;
       const railStyle = getComputedStyle(at('.manager-rail'));
       return {
+        boxes: Object.fromEntries(extra.map((selector) => [selector, box(selector)])),
         stacked,
         ownerSelector,
         bodyTracks: tracks('.manager-body'),
@@ -316,7 +338,7 @@ export async function readSideRailGeometry(route, { width, height = 686, collaps
           : null,
       };
     },
-    { owner: route.owner, catalogue: Boolean(route.catalogue) }
+    { owner: route.owner, catalogue: Boolean(route.catalogue), extra: boxes }
   );
 }
 

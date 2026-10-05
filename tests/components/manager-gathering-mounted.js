@@ -55,6 +55,12 @@ const { mountManager } = createManagerMounts({
   },
 });
 
+/** Open one of the gathering task editor's tabs (issue 1522), as a GM's click on its strip does. */
+async function openTaskTab(tab) {
+  target.querySelector(`[data-gathering-task-tab="${tab}"]`).click();
+  await settleRouteExit();
+}
+
 /** Register this route’s cases in `manager-mounted.test.js`’s one describe. */
 export function registerGatheringCases() {
   before(async () => {
@@ -269,6 +275,7 @@ export function registerGatheringCases() {
     const saved = calls.findLast((call) => call[0] === 'updateGatheringLibraryTask');
     assert.deepEqual(saved.slice(1, 3), ['smithing', 'task-forge'], 'saved on the new system');
 
+    await openTaskTab('results');
     target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
     await settle();
     const search = target.querySelector('[data-gathering-drop-character-modifier-search] input');
@@ -546,6 +553,7 @@ export function registerGatheringCases() {
     gatheringSubitem('Tasks').click();
     await settleRouteExit();
     await openEditor('task', 'task-herbs');
+    await openTaskTab('results');
     const rows = () =>
       Array.from(target.querySelectorAll('.manager-gathering-task-drop-row')).map((node) =>
         node.getAttribute('data-gathering-task-drop-id')
@@ -612,6 +620,7 @@ export function registerGatheringCases() {
     assert.ok(inspector().textContent.includes('High Day, Clear Sky'), 'the availability chip');
 
     await openEditor('task', 'task-herbs');
+    await openTaskTab('results');
     const stack = inspector().querySelector('.manager-drop-inspector-stack');
     assert.equal(
       stack.querySelector('img.manager-recipe-preview').getAttribute('src'),
@@ -647,11 +656,184 @@ export function registerGatheringCases() {
   it('keeps the drop inspector to a task that rolls d100', async () => {
     await openTasks({ taskResolutionMode: 'progressive' });
     await openEditor('task', 'task-herbs');
+    assert.ok(!target.querySelector('aside.manager-inspector'), 'Overview is full width');
+    await openTaskTab('results');
     assert.ok(Boolean(target.querySelector('.manager-inspector')), 'a progressive task keeps the aside');
     assert.ok(
       !target.querySelector('.manager-inspector [data-gathering-task-drop-inspector]'),
       'but it draws no drop inspector'
     );
+  });
+
+  // Only a d100 task's Results tab keeps the rail, whose drop editor is the declared leaf, and the
+  // tab is the shell's: it returns to Overview when the route or the task changes (issue 1522).
+  it('keeps the drop rail to a d100 task`s Results tab, and reopens the next task on Overview', async () => {
+    await openTasks();
+    await openEditor('task', 'task-herbs');
+    const manager = () => target.querySelector('.fabricate-manager');
+    const selectedTab = () =>
+      target.querySelector('[data-gathering-task-tab][aria-selected="true"]')?.dataset
+        .gatheringTaskTab;
+    for (const tab of ['overview', 'requirements']) {
+      await openTaskTab(tab);
+      assert.equal(selectedTab(), tab, `${tab} opens`);
+      assert.equal(manager().dataset.gatheringTaskLayout, 'results', `${tab} is full width`);
+      assert.ok(!target.querySelector('aside.manager-inspector'), `${tab} draws no rail`);
+    }
+    await openTaskTab('results');
+    assert.equal(manager().dataset.gatheringTaskLayout, undefined, 'Results keeps its track');
+    assert.ok(
+      Boolean(
+        target.querySelector(':scope aside.manager-inspector [data-gathering-task-drop-inspector]')
+      ),
+      'the rail holds the selected-drop editor'
+    );
+
+    // A save keeps the tab; leaving and re-entering, even the same task, opens on Overview.
+    target.querySelector('[data-gathering-add-drop="toolbar"]').click();
+    await settleRouteExit();
+    headerSaveButton(target).click();
+    await settleRouteExit();
+    assert.equal(selectedTab(), 'results', 'Save keeps the tab');
+    for (const task of ['task-herbs', 'task-cavern']) {
+      target.querySelector('[data-gathering-task-back]').click();
+      await settleRouteExit();
+      await openEditor('task', task);
+      assert.equal(selectedTab(), 'overview', `${task} reopens on Overview`);
+      assert.ok(!target.querySelector('aside.manager-inspector'), 'with no rail');
+    }
+  });
+
+  it('keeps the drop table`s page across a tab round trip', async () => {
+    const dropRows = Array.from({ length: 7 }, (_, index) => ({
+      id: `drop-trip-${index + 1}`,
+      componentId: 'c1',
+      quantity: 1,
+      dropRate: 10,
+      enabled: true,
+    }));
+    await openTasks({ taskDropRows: dropRows });
+    await openEditor('task', 'task-herbs');
+    await openTaskTab('results');
+    const page = () =>
+      target.querySelector(':scope .manager-task-drops-card [data-pagination-page]').textContent.trim();
+    target.querySelector(':scope .manager-task-drops-card [data-pagination-next]').click();
+    await settleRouteExit();
+    assert.equal(page(), 'Page 2 of 2');
+    await openTaskTab('overview');
+    await openTaskTab('results');
+    assert.equal(page(), 'Page 2 of 2', 'the page survives the round trip');
+    assert.ok(Boolean(target.querySelector('[data-gathering-task-drop-id="drop-trip-6"]')));
+  });
+
+  // Every list state the view owns, each set away from its default on its own tab (issue 1522).
+  const DROPS = '.manager-task-drops-card';
+  const BROWSER = '[data-gathering-task-component-browser]';
+  const TOOLS = '[data-gathering-task-required-tools]';
+  const pageOf = (card) => target.querySelector(`${card} [data-pagination-page]`).textContent.trim();
+  const pageSizeOf = (card) => selectTriggerText(target, `${card} [data-pagination-size]`);
+  const pressIn = async (selector) => {
+    target.querySelector(selector).click();
+    await settleRouteExit();
+  };
+  const TAB_SURVIVING_STATES = [
+    {
+      state: 'pageSize',
+      tab: 'results',
+      set: () => chooseSelectOption(target, `${DROPS} [data-pagination-size]`, 10),
+      read: () => pageSizeOf(DROPS),
+      expected: '10',
+    },
+    {
+      state: 'componentPageIndex',
+      tab: 'results',
+      set: () => pressIn(`${BROWSER} [data-pagination-next]`),
+      read: () => pageOf(BROWSER),
+      expected: 'Page 2 of 2',
+    },
+    {
+      state: 'componentPageSize',
+      tab: 'results',
+      set: () => chooseSelectOption(target, `${BROWSER} [data-pagination-size]`, 9),
+      read: () => pageSizeOf(BROWSER),
+      expected: '9',
+    },
+    {
+      state: 'selectedComponentTags',
+      tab: 'results',
+      set: async () => {
+        setInputValue(target.querySelector(':scope [data-gathering-component-tag-search] input'), 'moon');
+        await settleRouteExit();
+        await pressIn('[data-gathering-component-tag-suggestion="moon"]');
+      },
+      read: () =>
+        [...target.querySelectorAll('[data-gathering-component-tag-pill]')]
+          .map((pill) => pill.dataset.gatheringComponentTagPill)
+          .join(','),
+      expected: 'moon',
+    },
+    {
+      state: 'toolPageIndex',
+      tab: 'requirements',
+      set: () => pressIn(`${TOOLS} [data-pagination-next]`),
+      read: () => pageOf(TOOLS),
+      expected: 'Page 2 of 2',
+    },
+    {
+      state: 'toolPageSize',
+      tab: 'requirements',
+      set: () => chooseSelectOption(target, `${TOOLS} [data-pagination-size]`, 9),
+      read: () => pageSizeOf(TOOLS),
+      expected: '9',
+    },
+  ];
+
+  it('keeps every list state the view owns across a tab round trip', async () => {
+    await openTasks({
+      extendedComponentCards: true,
+      taskDropRows: Array.from({ length: 12 }, (_, index) => ({
+        id: `drop-trip-${index + 1}`,
+        componentId: 'c1',
+        quantity: 1,
+        dropRate: 10,
+        enabled: true,
+      })),
+      gatheringLibraryTools: Array.from({ length: 8 }, (_, index) => ({
+        id: `tool-${index}`,
+        label: `Tool ${index}`,
+        enabled: true,
+        componentId: 'c1',
+      })),
+    });
+    await openEditor('task', 'task-herbs');
+    for (const { state, tab, set, read, expected } of TAB_SURVIVING_STATES) {
+      await openTaskTab(tab);
+      await set();
+      await settleRouteExit();
+      assert.equal(read(), expected, `precondition: ${state} is set`);
+      await openTaskTab('overview');
+      await openTaskTab(tab);
+      assert.equal(read(), expected, `${state} survives the round trip`);
+    }
+  });
+
+  // The one piece of editor state that does NOT survive a tab switch: an open menu is transient.
+  it('closes an open availability menu when its tab is left', async () => {
+    await openTasks();
+    await openEditor('task', 'task-herbs');
+    await openTaskTab('requirements');
+    const trigger = () =>
+      target.querySelector(':scope [data-gathering-task-field="biomes"] .manager-condition-menu-button');
+    await pressIn('[data-gathering-task-field="biomes"] .manager-condition-menu-button');
+    assert.equal(trigger().getAttribute('aria-expanded'), 'true', 'precondition: the menu opens');
+    await openTaskTab('overview');
+    assert.ok(
+      !document.querySelector('[data-gathering-task-availability-option]'),
+      'its portaled panel leaves with the tab'
+    );
+    await openTaskTab('requirements');
+    assert.equal(trigger().getAttribute('aria-expanded'), 'false', 'and it is shut on return');
+    assert.ok(!document.querySelector('[data-gathering-task-availability-option]'));
   });
 
   it('shows the economy cards the system economy turns on', async () => {
@@ -664,8 +846,9 @@ export function registerGatheringCases() {
     });
     await settleRouteExit();
     await openEditor('task', 'task-herbs');
-    assert.ok(Boolean(target.querySelector('[data-gathering-task-stamina]')), 'stamina');
     assert.ok(Boolean(target.querySelector('[data-gathering-task-nodes]')), 'resource nodes');
+    await openTaskTab('requirements');
+    assert.ok(Boolean(target.querySelector('[data-gathering-task-stamina]')), 'stamina');
   });
 
   it('deletes the editing gathering task from the editor toolbar and returns to the task browser', async () => {
@@ -742,6 +925,7 @@ export function registerGatheringCases() {
     target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click();
     await tick();
     flushSync();
+    await openTaskTab('results');
 
     const results = target.querySelector('[data-gathering-task-results="straight"]');
     const adder = results.querySelector('[data-recipe-add="result-item"]');
@@ -815,30 +999,35 @@ export function registerGatheringCases() {
     await tick();
     flushSync();
 
-    const modeGroup = target.querySelector('[data-gathering-task-resolution-mode]');
-    assert.ok(modeGroup, 'the task editor exposes its own resolution-mode control');
+    // The mode is an Overview control and the results a Results card (issue 1522).
+    const modeInput = (mode) =>
+      target.querySelector(`[data-gathering-task-resolution-mode] input[value="${mode}"]`);
+    assert.ok(modeInput('d100'), 'the task editor exposes its own resolution-mode control');
     assert.equal(
-      modeGroup.querySelector('input[value="d100"]').checked,
+      modeInput('d100').checked,
       true,
       'a task mode is independent of the legacy progressive economy mode'
     );
+    assert.ok(!target.querySelector('.manager-inspector'), 'Overview is full width under d100');
+    await openTaskTab('results');
     assert.ok(target.querySelector('[data-gathering-task-drops-table]'));
     assert.ok(!target.querySelector('[data-gathering-task-results]'));
     assert.ok(target.querySelector('.manager-inspector'), 'd100 keeps the drop inspector');
     assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, undefined);
 
-    const straight = modeGroup.querySelector('input[value="straight"]');
+    await openTaskTab('overview');
+    const straight = modeInput('straight');
     straight.checked = true;
     straight.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
+    await openTaskTab('results');
     assert.ok(target.querySelector('[data-gathering-task-results="straight"]'));
     assert.ok(target.querySelector('[data-recipe-result-item]'));
     assert.ok(target.textContent.includes('Iron Ore'), 'straight results are visible after acting');
     assert.ok(!target.querySelector('[data-gathering-task-drops-table]'));
-    assert.equal(
-      target.querySelector('.manager-inspector'),
-      null,
+    assert.ok(
+      !target.querySelector('.manager-inspector'),
       'Direct suppresses the entire unused inspector'
     );
     assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'results');
@@ -853,17 +1042,16 @@ export function registerGatheringCases() {
       'inactive d100 rows do not keep their inspector active'
     );
 
-    const routed = target.querySelector(
-      '[data-gathering-task-resolution-mode] input[value="routed"]'
-    );
+    await openTaskTab('overview');
+    const routed = modeInput('routed');
     routed.checked = true;
     routed.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
+    await openTaskTab('results');
     assert.ok(target.querySelector('[data-gathering-task-results="routed"]'));
-    assert.equal(
-      target.querySelector('.manager-inspector'),
-      null,
+    assert.ok(
+      !target.querySelector('.manager-inspector'),
       'Check suppresses the entire unused inspector'
     );
     assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'results');
@@ -904,6 +1092,7 @@ export function registerGatheringCases() {
       true,
       'saved task mode reloads into the selector'
     );
+    await openTaskTab('results');
     assert.ok(target.textContent.includes('Iron Ore'));
     assert.ok(target.textContent.includes('Coal'));
   });
@@ -1010,6 +1199,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('results');
 
     const knownDropIds = new Set(
       Array.from(target.querySelectorAll('[data-gathering-task-drop-id]')).map(
@@ -1163,6 +1353,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('results');
 
     const browser = target.querySelector('[data-gathering-task-component-browser]');
     const dropsCard = target.querySelector('.manager-task-drops-card');
@@ -1349,6 +1540,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('results');
 
     const footer = target.querySelector('.manager-task-component-browser-footer');
     const sizeSelect = () => footer.querySelector('[data-pagination-size]');
@@ -1455,6 +1647,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('results');
 
     const fourModifierRow = target.querySelector(
       '[data-gathering-task-drop-id="drop-four-modifiers"]'
@@ -1510,6 +1703,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('results');
 
     function assertRenderedRarityRows(rows) {
       for (const [id, dropRate, tierClass, color] of rows) {
@@ -1565,6 +1759,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('results');
 
     const dropRulesCard = target.querySelector('.manager-task-drops-card');
     assert.ok(target.querySelector('[data-gathering-task-drop-id="drop-page-1"]'));
@@ -1620,6 +1815,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('results');
 
     const table = target.querySelector('[data-gathering-task-drops-table]');
     assert.ok(
@@ -1699,6 +1895,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('results');
 
     const table = target.querySelector('[data-gathering-task-drops-table]');
     assert.equal(
@@ -1760,6 +1957,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('requirements');
 
     const section = target.querySelector('[data-gathering-task-required-tools]');
     assert.ok(section, 'required tools section should render in the task editor');
@@ -1877,6 +2075,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('requirements');
 
     const section = target.querySelector('[data-gathering-task-required-tools]');
     assert.ok(section, 'the required tools section renders');
@@ -1931,6 +2130,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('requirements');
 
     const section = target.querySelector('[data-gathering-task-required-tools]');
     const stalePill = section.querySelector(
@@ -2026,6 +2226,7 @@ export function registerGatheringCases() {
       .click();
     await tick();
     flushSync();
+    await openTaskTab('requirements');
 
     const section = target.querySelector('[data-gathering-task-required-tools]');
     const initialCards = section.querySelectorAll('[data-gathering-task-required-tools-card]');
@@ -2148,6 +2349,7 @@ export function registerGatheringCases() {
   ]) {
     it(`${kind} availability restores field-sized empties after pointer and keyboard selection`, async () => {
       await openEditor([], {});
+      if (kind === 'task') await openTaskTab('requirements');
       for (const field of ['biomes', 'timeOfDay', 'weather']) {
         const host = target.querySelector(`[data-gathering-${kind}-field="${field}"]`);
         const trigger = host.querySelector('.manager-condition-menu-button');
@@ -2486,6 +2688,7 @@ export function registerGatheringCases() {
   it('adds and steps a drop condition modifier on the selected drop row', async () => {
     const calls = [];
     await openDirtyGatheringTaskEditor(calls, {});
+    await openTaskTab('results');
     target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
     await settleSaveAttempt();
 
@@ -2553,6 +2756,7 @@ export function registerGatheringCases() {
   it('persists a drop count typed into the selected drop inspector', async () => {
     const calls = [];
     await openDirtyGatheringTaskEditor(calls, {});
+    await openTaskTab('results');
     target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
     await settleSaveAttempt();
 
@@ -2637,6 +2841,7 @@ export function registerGatheringCases() {
         { id: 'mod-herb-lore', label: 'Herb Lore', expression: '@skills.med.total' },
       ],
     });
+    await openTaskTab('results');
     target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
     await settleSaveAttempt();
 
@@ -2711,6 +2916,7 @@ export function registerGatheringCases() {
     target.querySelector(`[data-gathering-${kind}-id="${id}"] [aria-label="Edit ${name}"]`).click();
     await settleSaveAttempt();
     if (subject === 'drop') {
+      await openTaskTab('results');
       target.querySelector('[data-gathering-task-drop-id="drop-herb"]').click();
       await settleSaveAttempt();
     }

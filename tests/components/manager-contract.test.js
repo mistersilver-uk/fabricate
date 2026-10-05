@@ -217,6 +217,25 @@ const GATHERING_RULE_STEPPER =
 const ENVIRONMENTS_BROWSER = 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
 const GATHERING_ECONOMY = 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
 const GATHERING_TASK_EDIT = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
+// The task editor's tabs and cards (issue 1522).
+const taskPart = (name) => `src/ui/svelte/apps/manager/gathering-task/GatheringTask${name}.svelte`;
+const GATHERING_TASK_PARTS = Object.freeze(
+  [
+    'EditorTabs',
+    'OverviewTab',
+    'NodesCard',
+    'RequirementsTab',
+    'AvailabilityCard',
+    'StaminaCard',
+    'CheckOverrideCard',
+    'RequiredToolsCard',
+    'ResultsTab',
+    'ComponentBrowserCard',
+    'DropsCard',
+    'DropRow',
+    'Card',
+  ].map(taskPart)
+);
 const GATHERING_TASKS_BROWSER = 'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte';
 const MODIFIER_LIBRARY_ROW = 'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte';
 const SCOPED_VALIDATION_TAB = 'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte';
@@ -1043,7 +1062,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'authors straight, d100 and routed on each task, all three selectable',
-    { file: GATHERING_TASK_EDIT, constant: 'resolutionModeOptions' },
+    { file: taskPart('OverviewTab'), constant: 'resolutionModeOptions' },
     {
       property: [
         ['value', 'straight'],
@@ -1058,7 +1077,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'reuses the shared radio cards for the task mode, and patches the task, not the event',
-    { file: GATHERING_TASK_EDIT, fn: 'setTaskResolutionMode' },
+    { file: taskPart('OverviewTab'), fn: 'setTaskResolutionMode' },
     { callsWith: [['onUpdateTask', 'mode']], keys: ['resolutionMode'] }
   );
 
@@ -1970,91 +1989,111 @@ describe('CraftingSystemManager source contract', () => {
     ],
   });
 
-  // The editor is one page, not a tab strip, and the drop table is the row itself rather than a
-  // row plus a responsive duplicate of every one of its labels.
-  defineStructureContract('authors a gathering task on one page', GATHERING_TASK_EDIT, {
-    renders: ['ChanceSlider', 'RadioCardGroup'],
-    names: [
-      'pageSize',
-      'showRewardRuleNotice',
-      'dragDrop',
-      'availableConditionOptions',
-      'selectedConditionOptions',
-      'dropRateTierColor',
+  // The editor is three tabs over one panel (issue 1522), and the drop table is the row itself
+  // rather than a row plus a responsive duplicate of every one of its labels.
+  defineStructureContract('authors a gathering task across three tabs', GATHERING_TASK_EDIT, {
+    renders: [
+      'GatheringTaskEditorTabs',
+      'GatheringTaskOverviewTab',
+      'GatheringTaskRequirementsTab',
+      'GatheringTaskResultsTab',
     ],
-    calls: [
-      'onClearDropComponent',
-      'onDropComponentMouseDown',
-      'onComponentDragStart',
-      'dropRateTierClass',
-      'onQuantityInput',
-      'onQuantityKeydown',
-      'onPickImagePath',
-      'onAddToolReference',
-      'onRemoveToolReference',
-    ],
-    callsWith: [['onImportDrop', 'rowId']],
+    names: ['pageSize', 'showRewardRuleNotice'],
+    writes: ['data-gathering-task-editor', 'data-gathering-task-panel'],
+  });
+  defineStructureContract('draws the task identity on Overview', taskPart('OverviewTab'), {
+    renders: ['RadioCardGroup', 'GatheringTaskNodesCard'],
+    calls: ['onPickImagePath'],
+    writes: ['data-gathering-task-core-editor'],
+    spellsExactly: ['manager-task-media-column'],
+  });
+  defineStructureContract('gates a task on availability', taskPart('AvailabilityCard'), {
+    names: ['availableConditionOptions', 'selectedConditionOptions'],
+    writes: ['data-gathering-task-availability', 'data-gathering-task-availability-pill'],
+    spellsExactly: ['data-gathering-task-availability-option'],
+    namesNo: ['selectedCondition'],
+    attributesNo: [['type', 'checkbox']],
+  });
+  defineStructureContract('requires tools from the library', taskPart('RequiredToolsCard'), {
+    calls: ['onAddToolReference', 'onRemoveToolReference'],
+    writes: ['data-gathering-task-required-tools'],
+    spellsExactly: ['manager-task-required-tools-card'],
+  });
+  defineStructureContract('browses components to drag', taskPart('ComponentBrowserCard'), {
+    calls: ['onComponentDragStart'],
     writes: [
-      'data-gathering-task-editor',
-      'data-gathering-task-core-editor',
-      'data-gathering-task-availability',
-      'data-gathering-task-availability-pill',
       'data-gathering-task-component-browser',
       'data-gathering-task-component-grid',
       'data-gathering-component-card',
       'data-gathering-component-name-search',
       'data-gathering-component-tag-search',
-      'data-gathering-task-drops-table',
+    ],
+    spellsExactly: [
+      'manager-selected-tag-pill',
+      'manager-task-component-browser-card',
+      'manager-task-component-grid',
+      'manager-task-component-card-grip',
+    ],
+  });
+  defineStructureContract('tables the drop rules', taskPart('DropsCard'), {
+    renders: ['GatheringTaskDropRow'],
+    writes: ['data-gathering-task-drops-table', 'data-gathering-task-drop-count'],
+    spellsExactly: ['manager-task-drop-controls', 'manager-task-drop-footer'],
+  });
+  defineStructureContract('draws a drop rule as one row', taskPart('DropRow'), {
+    renders: ['ChanceSlider'],
+    names: [
+      'dragDrop',
+      'dropRateTierColor',
+      'onDropComponentMouseDown',
+      'onQuantityInput',
+      'onQuantityKeydown',
+    ],
+    calls: ['onClearDropComponent', 'dropRateTierClass'],
+    callsWith: [['onImportDrop', 'row']],
+    writes: [
       'data-gathering-task-drop-component-cell',
       'data-gathering-task-drop-chance-cell',
-      'data-gathering-task-drop-count',
-      'data-gathering-task-required-tools',
       'oncontextmenu',
     ],
     attributes: [['inputmode', 'numeric']],
     spells: ['manager-drop-cell', 'manager-drop-component-cell', 'manager-drop-quantity-cell'],
     spellsExactly: [
-      'manager-selected-tag-pill',
-      'data-gathering-task-availability-option',
-      'manager-task-drop-controls',
-      'manager-task-drop-footer',
-      'manager-task-component-browser-card',
-      'manager-task-component-grid',
-      'manager-task-component-card-grip',
-      'manager-task-media-column',
-      'manager-task-required-tools-card',
       'manager-drop-modifier-pill',
       'manager-drop-modifier-list',
       'manager-drop-modifier-overflow',
       '[1-9][0-9]{0,2}',
     ],
-    // The one-page editor's absences: no tab strip, no raw internal id, no duplicate back
-    // control, no native single-select availability, no row-level quick actions, no responsive
-    // label duplicates.
-    namesNo: ['selectedCondition'],
-    attributesNo: [['type', 'checkbox']],
-    spellsExactlyNo: ['FABRICATE.Admin.Manager.Environment.Tasks.TaskId'],
-    writesNo: ['data-gathering-task-drop-actions', 'data-gathering-task-drop-row-number'],
-    spellsNo: [
-      'manager-task-editor-tabs',
-      'Internal ID',
-      'BackToLibrary',
-      'Tasks.SelectDrop',
-      'EditDrop',
-      'manager-labeled-cell manager-drop-component-cell',
-      'manager-labeled-cell manager-drop-rate-cell',
-      'QuantityShortHint',
-    ],
   });
+  // The editor's absences, file by file: no raw internal id, no duplicate back control, no
+  // row-level quick actions, no responsive label duplicates, no hand-rolled tab strip, and no
+  // roleless warning band, whose strips are notices and callouts now.
+  for (const file of [GATHERING_TASK_EDIT, ...GATHERING_TASK_PARTS]) {
+    defineStructureContract(`keeps the task editor's absences in ${file}`, file, {
+      spellsExactlyNo: ['FABRICATE.Admin.Manager.Environment.Tasks.TaskId'],
+      writesNo: ['data-gathering-task-drop-actions', 'data-gathering-task-drop-row-number'],
+      spellsNo: [
+        'manager-warning-band',
+        'manager-task-editor-tabs',
+        'Internal ID',
+        'BackToLibrary',
+        'Tasks.SelectDrop',
+        'EditDrop',
+        'manager-labeled-cell manager-drop-component-cell',
+        'manager-labeled-cell manager-drop-rate-cell',
+        'QuantityShortHint',
+      ],
+    });
+  }
 
   // Asserted where it is decided rather than over the whole file: a managed-component drop
   // resets the row's identity and enables it.
   defineStructureContract(
     'resets a drop row identity when a managed component lands on it',
-    { file: GATHERING_TASK_EDIT, fn: 'handleDropZoneDrop' },
+    { file: taskPart('DropRow'), fn: 'handleDropZoneDrop' },
     {
       compares: ['FabricateManagedComponent'],
-      callsWith: [['onUpdateDrop', 'rowId']],
+      callsWith: [['onUpdateDrop', 'row']],
       reads: ['data.componentId'],
       keys: ['componentId', 'itemUuid', 'systemItemId', 'name', 'enabled'],
     }

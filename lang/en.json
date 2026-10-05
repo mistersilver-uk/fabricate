@@ -4639,7 +4639,17 @@
               "MatchCount": "{count} matching sets",
               "Empty": "No result sets yet",
               "EmptyHint": "Add a named set for each gathering-check tier that can produce results.",
-              "AddSet": "Add result set"
+              "AddSet": "Add result set",
+              "ValidationBlocksSaveOne": "1 result issue blocks save",
+              "ValidationBlocksSave": "{count} result issues block save",
+              "ProgressiveTitle": "Results are not authored here",
+              "ProgressiveHint": "This legacy Progressive task keeps its own results. Choose another mode in the Gathering resolution card on Overview to author results here."
+            },
+            "Tabs": {
+              "Label": "Gathering task sections",
+              "Overview": "Overview",
+              "Requirements": "Requirements",
+              "Results": "Results"
             },
             "Name": "Name",
             "Description": "Description",

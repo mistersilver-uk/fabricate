@@ -826,19 +826,27 @@ export function registerRailCases() {
     // manager root's own `Search character modifiers to add` box is NOT one of them — it is the
     // shell's modifier picker, a different surface with a different owner, and asserting on it
     // here would have measured something this component does not control.
+    // Each on the tab that draws it (issue 1522), so the terms also cross a tab switch.
     const EDITOR_SEARCHES = [
-      'Search component names',
-      'Search component tags',
-      'Search drop rules',
-      'Search tools by name',
+      ['Search component names', 'results'],
+      ['Search component tags', 'results'],
+      ['Search drop rules', 'results'],
+      ['Search tools by name', 'requirements'],
     ];
-    for (const label of EDITOR_SEARCHES) {
+    const openTab = async (tab) => {
+      target.querySelector(`[data-gathering-task-tab="${tab}"]`).click();
+      await tick();
+      flushSync();
+    };
+    for (const [label, tab] of EDITOR_SEARCHES) {
+      await openTab(tab);
       typeIntoSearch(label, 'zzz');
     }
     await tick();
     flushSync();
-    for (const label of EDITOR_SEARCHES) {
-      assert.equal(searchValue(label), 'zzz', `${label} took the term`);
+    for (const [label, tab] of EDITOR_SEARCHES) {
+      await openTab(tab);
+      assert.equal(searchValue(label), 'zzz', `${label} took the term and kept it across tabs`);
     }
 
     target.querySelector('[data-gathering-task-back]').click();
@@ -848,7 +856,8 @@ export function registerRailCases() {
     await tick();
     flushSync();
 
-    for (const label of EDITOR_SEARCHES) {
+    for (const [label, tab] of EDITOR_SEARCHES) {
+      await openTab(tab);
       assert.equal(
         searchValue(label),
         '',
