@@ -53,13 +53,21 @@ const ROWS = {
  */
 const FAILING = {
   category: null,
-  essences: { mode: 'routed', salvage: salvage([KNOWN]), said: 'Component rules' },
-  salvageResults: { mode: 'routed', salvage: salvage([]), said: 'Component rules' },
-  salvageResultRules: { mode: 'routed', salvage: salvage([GONE]), said: 'Component rules' },
+  essences: {
+    mode: 'routed',
+    salvage: salvage([KNOWN]),
+    said: 'Component rules — Essence contribution',
+  },
+  salvageResults: { mode: 'routed', salvage: salvage([]), said: 'Component rules — Salvage' },
+  salvageResultRules: {
+    mode: 'routed',
+    salvage: salvage([GONE]),
+    said: 'Component rules — Salvage',
+  },
   salvageRouting: {
     mode: 'routed',
     salvage: salvage([KNOWN], { Success: 'grp-1' }),
-    said: 'Component rules',
+    said: 'Component rules — Failure',
   },
   progressiveDc: {
     mode: 'progressive',
@@ -156,6 +164,8 @@ describe('ComponentEditView — each validation row reaches the control that fix
       flushSync();
       const region = target.querySelector('[data-component-issue-announcement]');
       assert.equal(region.textContent.trim(), fixture.said);
+      assert.equal(region.getAttribute('role'), 'status', 'a polite status region');
+      assert.equal(region.getAttribute('aria-live'), 'polite');
       harness.remount();
     });
   }
@@ -164,6 +174,74 @@ describe('ComponentEditView — each validation row reaches the control that fix
     const target = await openValidation(FAILING.salvageRouting);
     await activateRow(target, 'salvageRouting');
     assert.equal(document.activeElement.getAttribute('data-salvage-route'), 'Failure');
+    harness.remount();
+  });
+
+  it('falls back to the Rules panel and says only the route when the control is not rendered', async () => {
+    // The DC row renders (salvage on, progressive) but the difficulty card is gated off.
+    const target = await harness.mount(
+      props('progressive', salvage([KNOWN]), { showDifficulty: false })
+    );
+    target.querySelector('[data-component-edit-tab="validation"]').click();
+    flushSync();
+    assert.ok(renderedRows(target).includes('progressiveDc'), 'the DC row still renders');
+    await activateRow(target, 'progressiveDc');
+    const panel = target.querySelector('[data-component-edit-panel="rules"]');
+    assert.ok(Boolean(panel), 'routed');
+    assert.equal(
+      target.querySelector('[data-validation-target="component-progressive-dc"]'),
+      null,
+      'and the control is absent'
+    );
+    assertIs(document.activeElement, panel, 'so the panel holds focus');
+    await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
+    flushSync();
+    const region = target.querySelector('[data-component-issue-announcement]');
+    assert.equal(region.textContent.trim(), 'Component rules');
+    harness.remount();
+  });
+
+  it('lands on the essences card while the essences are locked to the world map', async () => {
+    const target = await harness.mount(
+      props('routed', salvage([KNOWN]), {
+        systemId: 'sys-1',
+        scope: {
+          entries: [
+            {
+              id: 'comp-1',
+              defaults: { essences: {} },
+              systems: [{ systemId: 'sys-1', member: true, inherited: { essences: true } }],
+            },
+          ],
+        },
+      })
+    );
+    target.querySelector('[data-component-edit-tab="validation"]').click();
+    flushSync();
+    await activateRow(target, 'essences');
+    const card = target.querySelector('[data-validation-target="component-essences"]');
+    assert.ok(Boolean(card), 'the card renders');
+    assertIs(document.activeElement, card, 'and holds focus');
+    harness.remount();
+  });
+
+  it('draws the Validation tab badge at the worst severity and omits it when all pass', async () => {
+    const badgeOf = (target) =>
+      target.querySelector('[data-component-edit-tab-badge="validation"]');
+    const blocking = await openValidation(FAILING.salvageResults);
+    assert.equal(badgeOf(blocking)?.getAttribute('data-badge-tone'), 'danger');
+    assert.equal(badgeOf(blocking).textContent.trim(), '1');
+    harness.remount();
+    const warning = await openValidation(FAILING.essences);
+    assert.equal(badgeOf(warning)?.getAttribute('data-badge-tone'), 'warning');
+    assert.equal(badgeOf(warning).textContent.trim(), '1');
+    harness.remount();
+    const passing = await harness.mount(
+      props('routed', salvage([KNOWN]), {
+        essenceOptions: [{ id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 }],
+      })
+    );
+    assert.equal(badgeOf(passing), null, 'nothing to flag, no badge');
     harness.remount();
   });
 

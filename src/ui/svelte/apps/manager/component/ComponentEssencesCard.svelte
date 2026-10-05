@@ -16,6 +16,9 @@
   // stays unfiltered — it is the sole source `buildComponentEditorUpdates` rebuilds essences from.
   import { visibleEssenceOptions } from '../../../../model/essenceValidation.js';
 
+  // The card's heading names it, so a validation landing here speaks its destination.
+  const headingId = $props.id();
+
   let {
     text,
     format,
@@ -51,13 +54,14 @@
   class="manager-component-rules-card"
   data-component-edit-section="essences"
   data-validation-target="component-essences"
+  aria-labelledby={`${headingId}-essences-title`}
   tabindex="-1"
   data-keyboard-focus="true"
 >
   <div class="manager-component-rules-card-head">
     <i class="fas fa-flask-vial manager-component-rules-card-glyph is-info" aria-hidden="true"></i>
     <div>
-      <h3>
+      <h3 id={`${headingId}-essences-title`}>
         {text('FABRICATE.Admin.Manager.Component.EssencesEdit.Title', 'Essence contribution')}
       </h3>
       <p class="manager-component-rules-card-sub">

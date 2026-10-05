@@ -93,4 +93,50 @@ describe('ComponentRulesValidationTab', () => {
     assert.deepEqual(calls, [['select', 'rules', 'component-essences']]);
     harness.remount();
   });
+  const BLOCKING = {
+    category: 'general',
+    salvageFeatureEnabled: true,
+    salvageEnabled: true,
+    resultCount: 0,
+  };
+  const WARNING_ONLY = { category: 'general', essencesOffered: true, essenceTotal: 0 };
+  const ALL_PASS = { category: 'general', essencesOffered: true, essenceTotal: 1 };
+
+  it('badges the Validation tab at the worst severity, and not at all when everything passes', () => {
+    const blocking = componentRulesValidationPresentation(BLOCKING, cardFormat);
+    assert.deepEqual(blocking.badge, {
+      count: blocking.counts.blocking,
+      label: String(blocking.counts.blocking),
+      tone: 'danger',
+    });
+    assert.ok(blocking.counts.blocking > 0);
+    const warning = componentRulesValidationPresentation(WARNING_ONLY, cardFormat);
+    assert.deepEqual(warning.badge, {
+      count: warning.counts.warnings,
+      label: String(warning.counts.warnings),
+      tone: 'warning',
+    });
+    assert.ok(warning.counts.warnings > 0 && warning.counts.blocking === 0);
+    assert.equal(componentRulesValidationPresentation(ALL_PASS, cardFormat).badge, null);
+  });
+
+  for (const [status, context, icon] of [
+    ['block', BLOCKING, 'fa-circle-xmark'],
+    ['warn', WARNING_ONLY, 'fa-triangle-exclamation'],
+    ['pass', ALL_PASS, 'fa-circle-check'],
+  ]) {
+    it(`paints the ${status} hero with ${icon}`, async () => {
+      const target = await harness.mount({
+        text: cardText,
+        format: cardFormat,
+        systemLabel: 'Smithing',
+        validation: componentRulesValidationPresentation(context, cardFormat),
+      });
+      const summary = target.querySelector('[data-editor-validation-summary]');
+      assert.equal(summary.dataset.editorValidationSummary, status);
+      const classes = [...summary.querySelector('i').classList];
+      assert.ok(classes.includes(icon), `${status} wears ${icon}; got ${classes.join(' ')}`);
+      harness.remount();
+    });
+  }
 });

@@ -103,7 +103,9 @@
   <div class="manager-component-rules-card-head">
     <i class="fas fa-recycle manager-component-rules-card-glyph is-accent" aria-hidden="true"></i>
     <div>
-      <h3>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Title', 'Salvage')}</h3>
+      <h3 id={`${instanceId}-salvage-title`}>
+        {text('FABRICATE.Admin.Manager.Component.SalvageEditor.Title', 'Salvage')}
+      </h3>
       <p class="manager-component-rules-card-sub">
         {format(
           'FABRICATE.Admin.Manager.Component.SalvageEditor.Hint',
@@ -210,6 +212,7 @@
     as="div"
     data-salvage-result-groups=""
     data-validation-target="component-salvage-results"
+    aria-labelledby={`${instanceId}-salvage-title`}
     tabindex="-1"
     data-keyboard-focus="true"
   >

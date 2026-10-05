@@ -264,7 +264,7 @@ test('every call site that hooks a count also reports it', () => {
   );
 });
 
-test('the sites hooking the row action are the two producers and the shell, and none restates its name', () => {
+test('the sites hooking the row action are exactly the listed tabs, and none restates its name', () => {
   // `viewDataAttr` is the surface's one-caller hook prop.
   const rendered = Object.keys(SOURCES)
     .map((file) => [file, surfaceAttributeNames(file)])

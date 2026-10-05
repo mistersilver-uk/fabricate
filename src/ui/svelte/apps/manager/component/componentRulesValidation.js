@@ -146,11 +146,14 @@ export function componentRulesValidation(context = {}) {
 
 /**
  * The Validation tab's badge, in the shape `EditorTabs` takes: the worst severity's count, or none.
+ * `label` is what `EditorTabs` draws: a mark with neither `label` nor `value` is not drawable.
  * An early-return chain rather than a nested ternary, which SonarCloud reports as S3358.
  */
 function validationBadge(counts) {
-  if (counts.blocking > 0) return { count: counts.blocking, tone: 'danger' };
-  if (counts.warnings > 0) return { count: counts.warnings, tone: 'warning' };
+  if (counts.blocking > 0)
+    return { count: counts.blocking, label: String(counts.blocking), tone: 'danger' };
+  if (counts.warnings > 0)
+    return { count: counts.warnings, label: String(counts.warnings), tone: 'warning' };
   return null;
 }
 
