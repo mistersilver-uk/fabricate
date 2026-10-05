@@ -45,6 +45,7 @@ describe('Rail', () => {
     assert.equal(rail.getAttribute('role'), 'group', 'a labelled section is never a region');
     const kicker = rail.firstElementChild;
     assert.ok(kicker.classList.contains('fab-rail-label'), 'the kicker opens the section');
+    assert.equal(kicker.tagName, 'P', 'the kicker is a paragraph, never a heading');
     assert.equal(kicker.textContent, 'Source');
     assert.ok(labelOf(rail) === kicker, 'the kicker names the group');
     assert.ok(!rail.hasAttribute('aria-label'), 'one naming route, never two');

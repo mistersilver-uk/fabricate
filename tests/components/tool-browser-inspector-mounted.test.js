@@ -81,6 +81,29 @@ describe('the system Tool Rules inspector (issue 1373)', () => {
     );
   });
 
+  it('draws an ADOPTED Tool as two named rail groups, rules then inheritance (issue 1782)', async () => {
+    const target = await harness.mount({
+      tool: MEMBER_TOOL,
+      managedItems: [{ id: 'c1', name: 'Iron Ore' }],
+      systemName: 'Mythwright Forge',
+    });
+    const sections = [...target.querySelectorAll('.fab-rail')];
+    assert.deepEqual(
+      sections.map((section) => section.dataset.toolInspectorSection),
+      ['rules', 'inheritance']
+    );
+    assert.deepEqual(
+      sections.map((section) => [
+        section.getAttribute('role'),
+        document.querySelector(`[id="${section.getAttribute('aria-labelledby')}"]`)?.textContent,
+      ]),
+      [
+        ['group', 'Effective rules here'],
+        ['group', 'Inheritance'],
+      ]
+    );
+  });
+
   it('describes an UNADOPTED world Tool instead of going empty, and offers the adoption', async () => {
     const adds = [];
     const worldEdits = [];

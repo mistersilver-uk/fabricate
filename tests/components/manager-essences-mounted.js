@@ -305,6 +305,18 @@ export function registerEssencesCases() {
       ),
       [null, null, 'Source', 'Usage']
     );
+    // The hero is the rail's own unlabelled section, and the on-craft section is named by the
+    // system it describes (issue 1782).
+    assert.equal(
+      named(target.querySelector('.fab-rail[data-essence-browser-inspector]')),
+      null,
+      'the hero stays an unnamed section'
+    );
+    assert.equal(
+      named(target.querySelector('.fab-rail[data-essence-section="oncraft"]')),
+      'On craft in Alchemy',
+      'the on-craft section is a group named for its system'
+    );
     assert.ok(
       target.querySelector(
         '[data-essence-section="source"] .manager-essence-source-drop-zone .essence-source-trigger'
