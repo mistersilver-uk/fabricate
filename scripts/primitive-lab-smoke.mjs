@@ -4,7 +4,7 @@
  * unless every catalogued row mounted with no console error, page error, Fabricate warning or
  * failed request. Maintainer-run: it refuses without a chrome harvest, which CI does not have.
  */
-import { dirname, join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
@@ -21,6 +21,7 @@ import {
   cataloguePaths,
   describeMountFailure,
   emptyCatalogueMessage,
+  startLabServer,
 } from './lib/primitiveLabSmoke.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,33 +40,6 @@ const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--force-color
 /** Sized for a cold Vite optimiser building the whole module graph; a warm run takes seconds. */
 const READY_TIMEOUT_MS = 120_000;
 const NAVIGATION_TIMEOUT_MS = 150_000;
-
-/** Opaque, because `eslint-plugin-import-x` crashes on Vite's exports map (see the View Lab CLI). */
-const VITE_SPECIFIER = 'vite';
-
-/**
- * Start the lab's Vite server on port 0 and report the URL it actually bound, so a parallel
- * worktree's server on the configured port can never answer.
- *
- * @returns {Promise<{baseUrl: string, close: () => Promise<void>}>} The server handle.
- */
-async function startLabServer() {
-  const { createServer } = await import(VITE_SPECIFIER);
-  const server = await createServer({
-    configFile: join(ROOT, 'tests/view-lab/vite.config.js'),
-    server: { port: 0, strictPort: false },
-  });
-  await server.listen();
-  const resolved = server.resolvedUrls?.local?.[0];
-  if (!resolved) {
-    await server.close();
-    throw new Error(
-      'the lab server reported no local URL, so there is nothing to open. `resolvedUrls` is ' +
-        'populated by `listen()`; an empty one means the server bound nothing.'
-    );
-  }
-  return { baseUrl: resolved.replace(/\/$/, ''), close: () => server.close() };
-}
 
 /**
  * Collect console errors, page errors, failed requests and `Fabricate |` warnings — each listener
@@ -134,7 +108,7 @@ async function run() {
   console.log(`using harvested Foundry ${cache.version} chrome`);
   console.log(`expecting ${expected.length} catalogued specimens`);
 
-  const server = await startLabServer();
+  const server = await startLabServer(ROOT);
   const browser = await chromium.launch({ args: LAUNCH_ARGS });
   try {
     const context = await browser.newContext(BROWSER_CONTEXT);

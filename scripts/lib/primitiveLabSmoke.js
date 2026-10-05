@@ -1,8 +1,7 @@
 /**
- * The Primitive Lab smoke's browser-free half (issue 1487): the catalogue reader, the expected
- * count, the mounted-set comparison and the page attribute contract. `scripts/primitive-lab-smoke.mjs`
- * owns the server, the browser and the exit code, because `unicorn/no-exports-in-scripts` forbids
- * a CLI that is also a module.
+ * What `lab:check` and `lab:parity` share (issue 1487): the catalogue reader, the expected count,
+ * the mounted-set comparison, the page attribute contract and the lab server. Each CLI owns its
+ * browser and exit code, because `unicorn/no-exports-in-scripts` forbids a CLI that is a module.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -13,16 +12,19 @@ export const LAB_PAGE_PATH = '/tests/view-lab/primitives.html';
 /** The query the smoke navigates with; `mount.js` refuses any other mode. */
 export const MOUNT_ALL_QUERY = 'mount=all';
 
-/** Present on `<body>` only once every specimen has settled. ABSENT is "still working". */
+/** Present on `<body>` only once every specimen has settled; absent means still working. */
 export const READY_ATTRIBUTE = 'data-primitive-lab-ready';
 
 /** Present on `<body>` when the boot itself failed; its value is the reason. */
 export const ERROR_ATTRIBUTE = 'data-primitive-lab-error';
 
-/** The count of specimens that mounted, published on `<body>`. Compared by EQUALITY. */
+/** The count of specimens that mounted, published on `<body>`, compared by equality. */
 export const MOUNTED_ATTRIBUTE = 'data-primitive-lab-mounted';
 
-/** Carried by each mounted specimen's root, valued with the catalogue row's `path`. */
+/**
+ * Carried by each specimen's `<iframe>`, valued with its row's `path`. On the iframe, because
+ * `page.evaluate` reads only the top document, never a specimen's own realm.
+ */
 export const SPECIMEN_ATTRIBUTE = 'data-primitive-lab-specimen';
 
 /** The attribute as a constant selector, so `unicorn/require-css-escape` sees nothing dynamic. */
@@ -139,9 +141,37 @@ export function describeMountFailure({ expected, mounted, reported }) {
   if (miscounted.length > 0) {
     lines.push(
       `mounted a different number of times than catalogued: ${miscounted.join('; ')}. A path ` +
-        'drawn in many places is expected; one drawn in FEWER places than the catalogue claims is ' +
+        'drawn in many places is expected; one drawn in fewer places than the catalogue claims is ' +
         'a drawing that was replaced by nothing, or a specimen that mounted outside the document.'
     );
   }
   return lines.join('\n  ');
+}
+
+/** Opaque, because `eslint-plugin-import-x` crashes on Vite's exports map (see the View Lab CLI). */
+const VITE_SPECIFIER = 'vite';
+
+/**
+ * Start the lab's Vite server on port 0 and report the URL it actually bound, so a parallel
+ * worktree's server on the configured port can never answer.
+ *
+ * @param {string} root Absolute repository root.
+ * @returns {Promise<{baseUrl: string, close: () => Promise<void>}>} The server handle.
+ */
+export async function startLabServer(root) {
+  const { createServer } = await import(VITE_SPECIFIER);
+  const server = await createServer({
+    configFile: path.join(root, 'tests/view-lab/vite.config.js'),
+    server: { port: 0, strictPort: false },
+  });
+  await server.listen();
+  const resolved = server.resolvedUrls?.local?.[0];
+  if (!resolved) {
+    await server.close();
+    throw new Error(
+      'the lab server reported no local URL, so there is nothing to open. `resolvedUrls` is ' +
+        'populated by `listen()`; an empty one means the server bound nothing.'
+    );
+  }
+  return { baseUrl: resolved.replace(/\/$/, ''), close: () => server.close() };
 }

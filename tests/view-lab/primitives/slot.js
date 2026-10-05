@@ -22,7 +22,9 @@ export function readSlotBox(row) {
   const declared = row.slot;
   if (declared === undefined) return null;
   if (declared === null || typeof declared !== 'object' || Array.isArray(declared)) {
-    throw new TypeError('`slot` must be an object of CSS pixel sizes, e.g. {"height": 320}');
+    throw new TypeError(
+      '`slot` must be an object of CSS pixel sizes, e.g. {"width": 300, "height": 320}'
+    );
   }
   const box = {};
   for (const [key, value] of Object.entries(declared)) {
@@ -85,7 +87,7 @@ export function describeCollapsedSlot(row, frame) {
   return (
     `${row.spec} / ${row.path}: its boxed slot measured ` +
     `${Math.round(rect.width)}x${Math.round(rect.height)}. ` +
-    'A `.fabricate-manager` is an inline-size CONTAINER, so it is sized as if it had no ' +
+    'A `.fabricate-manager` is an inline-size container, so it is sized as if it had no ' +
     "contents and cannot shrink-wrap its specimen: check the row's `slot` declaration."
   );
 }

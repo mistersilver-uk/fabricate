@@ -16,11 +16,15 @@ import {
   formatParityReport,
   PARITY_PROPERTIES,
 } from './lib/primitiveLabParity.js';
+import {
+  ERROR_ATTRIBUTE,
+  LAB_PAGE_PATH,
+  READY_ATTRIBUTE,
+  SPECIMEN_ATTRIBUTE,
+  startLabServer,
+} from './lib/primitiveLabSmoke.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-
-const LAB_PAGE_PATH = '/tests/view-lab/primitives.html';
-const READY_ATTRIBUTE = 'data-primitive-lab-ready';
 
 const REFERENCE_PATH = join(ROOT, 'openspec/specs/design-system/library.html');
 
@@ -32,29 +36,6 @@ const READY_TIMEOUT_MS = 240_000;
 
 /** Time to let web fonts and any transition finish settling once the page reports ready. */
 const SETTLE_MS = 3000;
-
-/** Opaque, because `eslint-plugin-import-x` crashes on Vite's exports map (see the View Lab CLI). */
-const VITE_SPECIFIER = 'vite';
-
-/**
- * Start the Primitive Lab's Vite server on port 0, never a parallel worktree's configured port.
- *
- * @returns {Promise<{baseUrl: string, close: () => Promise<void>}>} The server handle.
- */
-async function startLabServer() {
-  const { createServer } = await import(VITE_SPECIFIER);
-  const server = await createServer({
-    configFile: join(ROOT, 'tests/view-lab/vite.config.js'),
-    server: { port: 0, strictPort: false },
-  });
-  await server.listen();
-  const resolved = server.resolvedUrls?.local?.[0];
-  if (!resolved) {
-    await server.close();
-    throw new Error('the lab server reported no local URL; `resolvedUrls` is empty after listen()');
-  }
-  return { baseUrl: resolved.replace(/\/$/, ''), close: () => server.close() };
-}
 
 /**
  * Walk `<main>` in the page, collecting a position-keyed style snapshot of every element except
@@ -122,7 +103,7 @@ async function snapshot(browser, url, waitForLabReady) {
     );
     const failure = await page.evaluate(
       (attribute) => globalThis.document.body.getAttribute(attribute),
-      'data-primitive-lab-error'
+      ERROR_ATTRIBUTE
     );
     if (failure)
       throw new Error(`the lab reported an error before parity could be measured: ${failure}`);
@@ -133,9 +114,6 @@ async function snapshot(browser, url, waitForLabReady) {
   await page.close();
   return data;
 }
-
-/** The identity marker on each specimen `<iframe>` — same literal `mount.js` writes. */
-const SPECIMEN_ATTRIBUTE = 'data-primitive-lab-specimen';
 
 /**
  * Measure every specimen's iframe against the component's own root inside it — not the wrapper
@@ -199,7 +177,7 @@ async function run() {
   const cache = resolveChromeCache(ROOT);
   if (!cache) throw new Error(missingChromeMessage(ROOT));
 
-  const server = await startLabServer();
+  const server = await startLabServer(ROOT);
   const browser = await chromium.launch();
   try {
     const reference = await snapshot(browser, pathToFileURL(REFERENCE_PATH).href, false);

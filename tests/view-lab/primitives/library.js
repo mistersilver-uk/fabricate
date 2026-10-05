@@ -13,9 +13,6 @@ export const PAGE_CLASS = 'pl-library';
 /** The class on each injected live slot, and the `@scope` limit the library's rules stop at. */
 export const LIVE_CLASS = 'pl-live';
 
-/** A primitive name as the library writes it; the same shape `designLibrary.js` matches. */
-const NAME_PATTERN = /<([A-Z][A-Za-z\d]*)>/g;
-
 /**
  * Fetch the library, and hand back the nodes and the stylesheet that draw it.
  *
@@ -89,11 +86,6 @@ export function unitsOf(block) {
     if (caption) units.set(normalize(caption.textContent), unit);
   }
   return units;
-}
-
-/** Every `<Name>` in a decoded string, in order, angle brackets stripped. */
-export function namesIn(source) {
-  return [...source.matchAll(NAME_PATTERN)].map((match) => match[1]);
 }
 
 /** Collapse whitespace the way both the library and a catalogue row spell it. */
