@@ -508,8 +508,9 @@ export const CASES = Object.freeze([
         mode === 'selector'
           ? '[data-gathering-task-resolution-mode]'
           : `[data-gathering-task-results="${mode}"]`,
-      // The editor's own main, not the body, scrolls below the 1120px rung (issue 1976).
-      expectScrollable: 'main.manager-gathering-task-edit-view',
+      // The editor's own main, not the body, scrolls below the 1120px rung (issue 1976). Overview
+      // overflows it; a Results tab holding one result card does not (issue 1522).
+      expectScrollable: mode === 'selector' ? 'main.manager-gathering-task-edit-view' : undefined,
       kinds: ['manager', 'environments', 'responsive'],
       sourceMatches: [
         GATHERING_ROUTE_MODEL_PATTERN,

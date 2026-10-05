@@ -887,8 +887,9 @@ test('the side-rail band cases name the scroller that owns their overflow', () =
   const scrollers = {
     'manager-recipe-edit-step-narrow': 'main.manager-recipe-edit-main',
     'manager-gathering-task-editor-selector-narrow': 'main.manager-gathering-task-edit-view',
-    'manager-gathering-task-editor-straight-narrow': 'main.manager-gathering-task-edit-view',
-    'manager-gathering-task-editor-routed-narrow': 'main.manager-gathering-task-edit-view',
+    // A Results tab of one result card fits the window, so only Overview overflows (issue 1522).
+    'manager-gathering-task-editor-straight-narrow': undefined,
+    'manager-gathering-task-editor-routed-narrow': undefined,
     'world-tool-catalogue-stacked': '.manager-scoped-list-layout',
   };
   for (const [id, scroller] of Object.entries(scrollers)) {
