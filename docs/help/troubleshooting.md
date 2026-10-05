@@ -510,6 +510,39 @@ It does not reach unlinked token copies that were never saved as world actors, o
 
 ---
 
+## Every Item I Import Updates the Same Component
+
+**Symptom:** You import several different items, such as spell scrolls of the same level, and each one updates the component the first one created.
+You end up with one component carrying the last item's name and image, and matching every one of those items.
+
+**Cause:** The items were built from the same compendium entry and then changed into something else.
+Older versions treated them all as copies of that entry.
+Fabricate now tells a copy of an entry from something built from it by name: a copy that keeps the entry's name is the same thing, and a differently named one is its own component, recipe item, or tool.
+
+**Fix for a component that is already merged:**
+
+1. Open the Crafting Admin panel and find the merged component.
+2. Delete that component.
+3. Import the items again, by dropping them or by using the bulk import.
+   Each one now creates its own component.
+4. Re-add the component to any recipes that used the merged one.
+
+{: .note }
+> **Repair Item Data does not un-merge a component.**
+> A merged component keeps matching every item it absorbed until you delete it and import the items again.
+
+**Things to know:**
+
+- A renamed copy of a compendium entry is registered as its own component and does not claim the entry.
+  An item a player drags straight from the compendium does not match it, so hand out copies from the item you registered.
+- Items whose shared compendium entry can no longer be found, because the pack is missing or disabled, still merge until the pack is restored.
+- Editing an item's name, image, or description refreshes only the component linked to that item.
+
+**See also:** [Adding Components]({% link components/index.md %}#adding-components) covers importing items.
+[Repairing Item Data](#repairing-item-data) covers the maintenance action for copies players already hold.
+
+---
+
 ## An Item Stopped Contributing an Essence After Updating
 
 **Symptom:** After updating Fabricate, one particular item no longer counts towards an essence requirement, while other copies of the same component still do.

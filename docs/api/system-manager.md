@@ -324,12 +324,18 @@ GM only.
 
 Returns a result object that indicates whether the item was newly created, updated, or already up to date, so callers can show appropriate notifications.
 
-The method resolves both the dropped item's live UUID and its canonical source UUID (via `_stats.compendiumSource`, with `flags.core.sourceId` as a legacy fallback) before deciding what to do.
+The method resolves the dropped item's live UUID and, when the item is a copy of a compendium entry, its canonical source UUID (via `_stats.compendiumSource`, with `flags.core.sourceId` as a legacy fallback) before deciding what to do.
+An item that was built from a compendium entry and given a different name is its own item: its compendium source is not used to find or claim a component, and it creates a separate component.
+A copy that keeps the entry's name still matches the component registered from that entry.
+A sidebar duplicate is likewise matched only by its own UUID.
+If the compendium source does not resolve, the name cannot be compared and items sharing that source still merge until the pack is restored.
 If the canonical source UUID no longer resolves, Fabricate stores the live dropped item UUID as the component's primary source and keeps the broken canonical UUID in `aliasItemUuids`.
 A component can claim a full source-reference chain through `registeredItemUuid`, `originItemUuid`, and `aliasItemUuids`.
 
 1. **Claimed source chain.**
-   An existing component already claims either the dropped live UUID, the canonical source UUID, or a fallback UUID in the same chain.
+   An existing component already claims the dropped live UUID or, for a copy that keeps the entry's name, the canonical source UUID or a fallback UUID in the same chain.
+   A component that claims the dropped live UUID is preferred over one that claims only the compendium source.
+   Re-adding an item never changes which compendium entry its component claims.
    Fabricate refreshes the component in place and returns `action: "updated"` when metadata or stored references changed, or `action: "skipped"` when nothing changed.
 2. **Unclaimed source chain.**
    No component claims any of those references, so a new component is created and `action` is `"added"`.
@@ -374,7 +380,8 @@ Hooks.once('fabricate.ready', async () => {
 Imports all Item documents from a compendium pack into the system as components.
 GM only.
 
-Each item is processed via `addItemFromUuid()`, so the same source-chain deduplication rules apply: items already registered by the same live UUID or canonical source UUID are updated or skipped in place, and only unclaimed source chains create new components.
+Each item is processed via `addItemFromUuid()`, so the same source-chain deduplication rules apply: items already registered by the same live UUID, or by a copy of the same compendium entry that keeps the entry's name, are updated or skipped in place, and only unclaimed source chains create new components.
+A pack item and a single drop of the same entry land on the same component.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
@@ -416,6 +423,7 @@ Registers a single Foundry Item document directly as a first-class [Tool]({% lin
 GM only.
 
 The Item does not need to be imported as a component first.
+Tool registration follows the same name-based rule as components: an item built from a compendium entry and renamed becomes its own tool instead of updating one registered from the same entry.
 The new tool carries its own source references and a name/image display snapshot captured from the Item, and `componentId` is `null`.
 The method stamps the durable tool identity flag (`flags.fabricate.roles[systemId].toolId`) on the source Item so future copies are recognised.
 An Item that is already a managed component can also be registered as a tool this way, in which case the Item carries both the component and tool role flags.
