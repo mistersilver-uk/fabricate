@@ -1177,10 +1177,13 @@ export function registerToolsCases() {
       inspector.querySelector('[data-tool-inspector-rule="bonus"]').textContent,
       /Adds @prof/
     );
-    // TWO REGIONS, EACH WITH ONE HEADING (issue 1373). This asserted ONE.
+    // TWO REGIONS, EACH WITH ONE HEADING (issue 1373). This asserted ONE. Each is a rail
+    // section named by its heading (issue 1782).
     assert.deepEqual(
-      Array.from(inspector.querySelectorAll('.manager-tool-inspector-section-kicker')).map((node) =>
-        node.textContent.trim()
+      Array.from(inspector.querySelectorAll('.fab-rail[role="group"]')).map((section) =>
+        document
+          .querySelector(`[id="${section.getAttribute('aria-labelledby')}"]`)
+          ?.textContent.trim()
       ),
       ['Effective rules here', 'Inheritance'],
       'one heading names the resolved rules, a second names where each of them came from'

@@ -139,6 +139,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1518: the pager, on the player frames that draw its persistent and threshold forms.
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  // Issue 1782: the inspector rail section, on a frame of each of its three inspectors.
+  'src/ui/svelte/components/Rail.svelte',
   // Issue 1518: the requirement chooser, on the frame that opens it on a choice slot.
   'src/ui/svelte/components/RequirementChooser.svelte',
   // Issue 1512: the product's ONE row disclosure, promoted on its second importer. Its frame is the
@@ -257,8 +259,8 @@ test('the inputs every property below quantifies over are alive', () => {
   // `RuleRow` on its two; 76 once issue 1521 folded the explainer card onto the callout's `items`;
   // 77 with `SetPicker` on its two; 78 as of issue 1773: the requirement chooser, on the award face;
   // 79 when issue 1521 built `InfoStrip` on its two importers, the check card and the stamina pool;
-  // 80 with `ArtPicker` on its four (issue 1522).
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 80, 'the shipped primitive set changed size');
+  // 80 with `ArtPicker` on its four (issue 1522); 81 with `Rail` on its three inspectors.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 81, 'the shipped primitive set changed size');
   // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
   // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;
   // 17 when `ChoiceGroup` joined at one caller (issue 1516).

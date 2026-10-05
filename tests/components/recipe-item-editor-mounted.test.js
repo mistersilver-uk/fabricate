@@ -119,6 +119,8 @@ const harness = createMountedComponentHarness({
     // listed above via the `SELECT_COMPILED_MODULES` spread.
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
+    // The preview rail's two sections (issue 1782).
+    'src/ui/svelte/components/Rail.svelte',
     'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',
@@ -179,6 +181,20 @@ describe('RecipeItemEditor (mounted)', () => {
       'the player access badge renders'
     );
     assert.ok(root.querySelector('[data-recipe-item-rules]'), 'effective rules render');
+    // Each is a rail section named by its kicker (issue 1782).
+    const rail = root.querySelector('[data-recipe-item-rail]');
+    const sections = [...rail.querySelectorAll(':scope > .fab-rail')];
+    assert.deepEqual(
+      sections.map((section) =>
+        document.querySelector(`[id="${section.getAttribute('aria-labelledby')}"]`)?.textContent
+      ),
+      ['How players see it', 'Effective rules']
+    );
+    assert.ok(sections[0].contains(preview), 'the preview sits in the first section');
+    assert.ok(
+      sections[1].contains(root.querySelector('[data-recipe-item-rules]')),
+      'and the rules in the second'
+    );
   });
 
   // AC13 (issue 675). The preview renders the REAL player component.

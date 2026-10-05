@@ -22,6 +22,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
+  'src/ui/svelte/components/Rail.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
   'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
@@ -187,20 +188,24 @@ const listScreen = (rows = SIX_ROWS) => `
           <div><h2>Smith's Hammer</h2><span class="manager-chip is-positive">Enabled here</span></div>
         </div>
         <p class="manager-muted">A hammer.</p>
-        <p class="manager-kicker manager-tool-inspector-section-kicker" data-probe="section-kicker">Effective rules here</p>
-        <div class="manager-tool-inspector-rules">
-          <div class="manager-icon-fact-row is-tiled is-rule" data-tool-inspector-rule="breakage" data-probe="rule-row">
-            <i class="fas fa-hourglass-half"></i>
-            <span><strong data-probe="rule-title">8% break</strong><small data-probe="rule-subtitle">Tracked per copy</small></span>
+        <section class="fab-rail" role="group" aria-labelledby="rules-kicker" data-probe="section">
+          <p class="fab-rail-label" id="rules-kicker" data-probe="section-kicker">Effective rules here</p>
+          <div class="manager-tool-inspector-rules">
+            <div class="manager-icon-fact-row is-tiled is-rule" data-tool-inspector-rule="breakage" data-probe="rule-row">
+              <i class="fas fa-hourglass-half"></i>
+              <span><strong data-probe="rule-title">8% break</strong><small data-probe="rule-subtitle">Tracked per copy</small></span>
+            </div>
           </div>
-        </div>
-        <p class="manager-kicker manager-tool-inspector-section-kicker">Inheritance</p>
-        <div class="manager-tool-inspector-inheritance" data-tool-inspector-inheritance>
-          <div class="manager-tool-inspector-inherit-row" data-probe="inherit-row" data-tool-inspector-inherit="breakage">
-            <span data-probe="inherit-label">Breakage</span>
-            <span class="manager-chip is-info" data-probe="inherit-pill">Inherited</span>
+        </section>
+        <section class="fab-rail" role="group" aria-labelledby="inheritance-kicker">
+          <p class="fab-rail-label" id="inheritance-kicker">Inheritance</p>
+          <div class="manager-tool-inspector-inheritance" data-tool-inspector-inheritance>
+            <div class="manager-tool-inspector-inherit-row" data-probe="inherit-row" data-tool-inspector-inherit="breakage">
+              <span data-probe="inherit-label">Breakage</span>
+              <span class="manager-chip is-info" data-probe="inherit-pill">Inherited</span>
+            </div>
           </div>
-        </div>
+        </section>
         <div class="manager-tool-inspector-routes">
           <button type="button" class="fabricate-button fab-manager-button" data-tool-inspector-edit-world="t1" data-probe="edit-world"><i class="fas fa-globe" data-probe="edit-world-glyph"></i><span>Edit the world Tool</span></button>
         </div>
@@ -282,6 +287,7 @@ const READ_PROBES = () =>
           rowGap: style.rowGap,
           padding: `${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
           minWidth: style.minWidth,
+          marginBottom: style.marginBottom,
           width: Math.round(box.width),
           height: Math.round(box.height),
           fractionalHeight: box.height,
@@ -861,6 +867,14 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
       assert.equal(measured[probe].color, resolved.subtle, `${probe} is the subtle ink`);
       assert.notEqual(measured[probe].letterSpacing, 'normal', `${probe} is tracked`);
     }
+    // A rail section keeps the card's own rhythm and a flush kicker (issue 1782).
+    // ITS KICKER IS THE MANAGER EYEBROW the panel's own head draws, property for property, so a
+    // converted kicker cannot drift from the `.manager-kicker` it replaced.
+    for (const property of ['fontSize', 'fontWeight', 'letterSpacing', 'lineHeight', 'color']) {
+      assert.equal(measured['section-kicker'][property], measured.kicker[property], property);
+    }
+    assert.equal(measured.section.rowGap, '14px', 'kicker to body at the card rhythm');
+    assert.equal(measured['section-kicker'].marginBottom, '0px', 'and its kicker sits flush');
 
     // `proto:2559-2562` — the rules inset RECESSES below the aside now that the aside has
     // moved up a rung. It had been painted lighter than its own container.

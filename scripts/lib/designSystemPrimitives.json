@@ -639,6 +639,14 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "Issue 1522 builds the control the art requirement and the world-asset-path requirement both name: identity art drawn as a picture with a pencil at rest, a dashed empty slot, a locked `role=\"img\"` with a padlock, and an optional visible clear, the stored path never rendered. The caller's `onPick` opens Foundry's picker, so the primitive imports nothing. Four importers over six render sites: `apps/manager/recipe/RecipeOverviewTab.svelte`, `apps/manager/GatheringTaskEditView.svelte` (the identity art and the depleted-marker art with its clear), `apps/manager/GatheringEventEditView.svelte` and `apps/manager/environment/EnvironmentOverviewTab.svelte` (editable, and locked to a linked scene). Scoped `shared`: its rules are its own scoped style, so it paints wherever it is mounted, though every caller today is a manager editor. It retired the `manager-task-image-picker` sheet family. Every filled and locked state keeps that family's geometry; the depleted marker's empty state is a planned move to the dashed slot, and its filled state differs only inside the raster art. Its broad-signal override names the frames that draw each state, the event's art among them."
+    },
+    {
+      "path": "src/ui/svelte/components/Rail.svelte",
+      "library": "<Rail>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1782 builds the specified inspector rail SECTION: a bare column at `--fab-space-2`, opened by the manager's eyebrow when it takes a `label`, which then names it as a `group`; unlabelled it is an unnamed `<section>`, never a `region`. It is one section of a right-hand inspector column, never the column itself, `ManagerNavRail`'s `.manager-rail-block` or `AppRail`. Three importers: `apps/manager/essences/EssenceBrowserInspector.svelte` (seven sections, three of them labelled, each a hand-written column at that gap), `apps/manager/tools/ToolBrowserInspector.svelte` (its Effective rules and Inheritance groups, kicker-and-body pairs that sat bare in the tool card and keep its 14px rhythm and flush kicker through a caller rule) and `apps/manager/RecipeItemEditor.svelte` (its two preview-rail sections, a column at that gap whose kickers keep their own size and tracking through a caller rule). `shipped`: the specimen was re-derived to the essence inspector, the exemplar, so no converted frame moves. Scoped `shared`: its family is rooted at `fab-rail`, the class it writes, in its own scoped block, so it paints wherever it is mounted. Its broad-signal override names a frame of each inspector."
     }
   ],
   "notAPrimitive": [
