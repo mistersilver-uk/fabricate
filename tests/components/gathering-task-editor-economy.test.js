@@ -169,7 +169,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
 
   it('puts the swap-image picker inline with the title/hint', () => {
     // Title/hint and the image sit on one row. The picker, its clear button and the right-click
-    // clear are ACTED in `gathering-task-editor-stepper-mounted.test.js` (issue 1522).
+    // clear are acted in `gathering-task-editor-stepper-mounted.test.js` (issue 1522).
     const rowIdx = editorSource.indexOf('manager-task-depleted-row');
     const copyIdx = editorSource.indexOf('manager-task-depleted-copy');
     const imageColIdx = editorSource.indexOf('data-gathering-task-depleted-image-column');

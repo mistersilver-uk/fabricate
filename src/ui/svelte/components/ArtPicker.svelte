@@ -5,7 +5,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `art` / `alt` | resolved image path / string | `''` | Falsy `art` draws the empty slot. |
+  | `art` / `alt` | resolved image path / string | `''` | Falsy `art` draws the empty slot. `alt` never names the control: an unnamed button withholds it. |
   | `ariaLabel` | pre-localized string | `''` | The pick button's name. |
   | `onPick` / `disabled` | function / boolean | no-op / `false` | The pick button's handler and its native `disabled`. |
   | `onClear` / `clearLabel` | function / string | `null` / `''` | A visible text button under filled art, rendered only when both are set. |
@@ -66,7 +66,7 @@
       {...pickProps}
     >
       {#if art}
-        <img src={art} {alt} />
+        <img src={art} alt={ariaLabel ? alt : ''} />
         <i class="fas fa-pen" aria-hidden="true"></i>
       {/if}
     </button>

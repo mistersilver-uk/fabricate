@@ -2229,6 +2229,8 @@ describe('RecipeEditView (mounted)', () => {
     );
     const button = target.querySelector('button[data-recipe-field="img"]');
     assert.ok(button, 'the editable picker button renders even when linked');
+    assert.equal(button.getAttribute('aria-label'), 'Choose recipe image');
+    assert.equal(button.disabled, false, 'a host with a file picker can open it');
     assert.ok(button.querySelector('.fa-pen'), 'shows the edit (pen) affordance, not a lock');
     assert.ok(
       button.querySelector('img').getAttribute('src').includes('potion-tube-corked-red'),
@@ -2299,6 +2301,25 @@ describe('RecipeEditView (mounted)', () => {
       'the patch carries the chosen image path'
     );
     editHarness.remount();
+  });
+
+  it('disables the recipe art while saving and when the host has no file picker', async () => {
+    const pick = async () => 'icons/picked.webp';
+    for (const [overrides, why] of [
+      [{ onPickImagePath: pick, saving: true }, 'while a save is in flight'],
+      [{ onPickImagePath: null }, 'without a file picker'],
+    ]) {
+      const patches = [];
+      const target = await editHarness.mount(
+        identityProps({ ...overrides, onUpdateRecipe: (patch) => patches.push(patch) })
+      );
+      const button = target.querySelector('button[data-recipe-field="img"]');
+      assert.equal(button.disabled, true, `the recipe art is disabled ${why}`);
+      button.click();
+      await flushRender();
+      assert.equal(patches.length, 0, `and a click ${why} writes nothing`);
+      editHarness.remount();
+    }
   });
 
   it('renders the single-step ingredient/results/tools sections on their tabs', async () => {

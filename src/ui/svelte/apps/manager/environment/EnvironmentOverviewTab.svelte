@@ -211,6 +211,7 @@
         <div class="manager-task-core-grid">
           <div class="manager-task-media-column">
             <ArtPicker
+              data-scene-locked-image={isSceneLinked ? '' : undefined}
               art={(isSceneLinked && linkedSceneImage) ||
                 environment.img ||
                 DEFAULT_GATHERING_ENVIRONMENT_IMG}
