@@ -25,7 +25,7 @@ const {
 } = await import('../src/config/settings.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js');
-const { createServices, makeSystem } = await import('./helpers/adminStoreServices.js');
+const { createServices, makeRecipe, makeSystem } = await import('./helpers/adminStoreServices.js');
 
 function makeManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
@@ -423,4 +423,26 @@ test('admin production reporting reads only the active gathering result source',
   assert.deepEqual(producers('legacy-drop').map(entry => entry.id), ['task-legacy']);
   assert.deepEqual(producers('inactive-drop'), []);
   assert.deepEqual(producers('inactive-result'), []);
+});
+
+test('admin production reporting counts a component a recipe offers only as an alternative', async () => {
+  const choice = {
+    id: 'cg',
+    alternatives: [
+      { id: 'a', componentId: 'ingot', quantity: 1 },
+      { id: 'b', componentId: 'gem', quantity: 1 }
+    ]
+  };
+  const recipe = makeRecipe({ id: 'r-either', resultGroups: [{ id: 'g', results: [choice] }] });
+  const scope = makeWorldScopeStoreFake(['ingot', 'gem'].map(id => ({ id, name: id })));
+  const services = createServices(makeSystem(), [recipe], [], {
+    getComponentScopeStore: () => scope.store
+  });
+  const store = createAdminStore(services);
+
+  await store.selectSystem('sys1');
+  const entries = get(store.viewState).worldScope.component.entries;
+  const gem = entries.find(entry => entry.id === 'gem');
+  assert.deepEqual(gem?.producedBy?.map(entry => entry.id), ['r-either']);
+  assert.equal(gem?.recipeCount, 1, 'an alternative alone is a reference the delete guard sees');
 });

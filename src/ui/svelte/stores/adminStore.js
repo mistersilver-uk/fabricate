@@ -71,6 +71,7 @@ import {
   normalizeNullableSuccesses,
 } from '../../../systems/normalize/checkEvaluation.js';
 import { Result } from '../../../models/Result.js';
+import { awardedResults } from '../../../utils/choiceGroupShape.js';
 import { Tool } from '../../../models/Tool.js';
 import { classifyModeChange } from '../../../systems/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
@@ -3208,12 +3209,9 @@ export function createAdminStore(services) {
           addOption(required, option);
         }
       }
-      for (const group of Array.isArray(holder?.resultGroups) ? holder.resultGroups : []) {
-        for (const result of Array.isArray(group?.results) ? group.results : []) {
-          addOption(produced, result);
-        }
-      }
-      for (const result of Array.isArray(holder?.results) ? holder.results : []) {
+      const groups = Array.isArray(holder?.resultGroups) ? holder.resultGroups : [];
+      const results = [...groups.map((group) => group?.results), holder?.results].flat();
+      for (const result of results.filter(Boolean).flatMap(awardedResults)) {
         addOption(produced, result);
       }
     }
