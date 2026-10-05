@@ -10,6 +10,7 @@ player-crafting-roll-prompt-over-attribute
 player-crafting-roll-prompt-under-compact
 player-crafting-check-descriptor-under-resolved
 player-crafting-check-descriptor-under-unresolved
+player-crafting-check-formula-unresolved
 player-crafting-check-unrollable-status
 player-crafting-roll-result-under-pass
 player-crafting-roll-result-under-fail
@@ -29,6 +30,7 @@ player-crafting-roll-prompt-count-zero
 player-crafting-check-count
 player-crafting-roll-prompt-light
 player-gathering-events
+player-gathering-economy-strip
 player-gathering-task-ready
 player-gathering-after-success
 player-gathering-chat-card-event

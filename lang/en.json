@@ -972,7 +972,7 @@
           "Optional": "Optional",
           "Mandatory": "Required",
           "NoFormula": "No roll formula is configured for this check.",
-          "FormulaUnresolved": "This check can't be resolved to a number for the selected character.",
+          "FormulaUnresolved": "This check's formula can't be resolved to a number for the selected character.",
           "TargetLine": "Target {target} · {comparison}",
           "StayAtOrUnder": "stay at or under",
           "StayUnder": "stay under",
@@ -1786,7 +1786,8 @@
           "StaminaCost": "Stamina cost",
           "StaminaCostOnly": "Costs {cost} stamina",
           "StaminaCostWithPool": "Costs {cost} stamina (you have {current}/{max})",
-          "StaminaPool": "Stamina: {current}/{max}",
+          "StaminaKicker": "Stamina",
+          "StaminaPool": "{current}/{max}",
           "StaminaPoolNone": "No stamina pool set"
         }
       },

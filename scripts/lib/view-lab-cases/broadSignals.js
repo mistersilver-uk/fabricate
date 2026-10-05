@@ -298,6 +298,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The surface that reports something that just happened (issue 1505), on two callers.
   'src/ui/svelte/components/Notice.svelte': Object.freeze(['player-inventory-bulk-report']),
+  // The strip of current values (issue 1521): the check card's badge, target and source facts, its
+  // formula fact over the danger notice, and the gathering stamina pool under its kicker.
+  'src/ui/svelte/components/InfoStrip.svelte': Object.freeze([
+    'player-crafting-check-descriptor-under-resolved',
+    'player-crafting-check-formula-unresolved',
+    'player-gathering-economy-strip',
+  ]),
   // The standing statement (issue 1505), widened onto its specimen and re-authored at 15 importing files.
   'src/ui/svelte/components/Callout.svelte': Object.freeze([
     'manager-tool-parity-04-requirements-1280x720',

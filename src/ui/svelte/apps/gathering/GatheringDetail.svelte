@@ -37,6 +37,7 @@
   import GatheringEventsPanel from './GatheringEventsPanel.svelte';
   import LinkedScene from './LinkedScene.svelte';
   import Notice from '../../components/Notice.svelte';
+  import InfoStrip from '../../components/InfoStrip.svelte';
 
   let {
     environment = null,
@@ -79,16 +80,25 @@
   const uid = $props.id();
   const blindReasonId = `${uid}-blind-reason`;
 
-  // System limitation flags + (when stamina enabled) the actor's pool, surfaced
-  // as a strip beneath the header. Both flags off shows nothing; both on shows
-  // both items. Blind environments keep the node legend generic (per-task counts
-  // are redacted in the rows themselves).
+  // System limitation flags + (when stamina enabled) the actor's pool. The pool is the one fact of
+  // an info strip beneath the header, and the node legend a muted line after it; with stamina off no
+  // strip renders. Blind environments keep the legend generic (per-task counts are redacted in rows).
   const staminaEnabled = $derived(env?.staminaEnabled === true);
   const nodesEnabled = $derived(env?.nodesEnabled === true);
   const staminaPool = $derived(env?.staminaPool ?? null);
   const hasStaminaPool = $derived(
     staminaEnabled && staminaPool && staminaPool.current != null && staminaPool.max != null
   );
+  const staminaFact = $derived({
+    icon: 'fas fa-bolt',
+    value: hasStaminaPool
+      ? localize('FABRICATE.App.Gathering.Detail.StaminaPool', {
+          current: staminaPool.current,
+          max: staminaPool.max,
+        })
+      : localize('FABRICATE.App.Gathering.Detail.StaminaPoolNone'),
+    props: { 'data-gathering-stamina-pool': hasStaminaPool ? '' : 'none' },
+  });
 
   const biomeTags = $derived(Array.isArray(env?.biomeTags) ? env.biomeTags : []);
   const danger = $derived(
@@ -216,36 +226,18 @@
       </p>
     </header>
 
-    {#if staminaEnabled || nodesEnabled}
-      <section
-        class="gathering-detail-economy"
-        data-gathering-economy-strip
+    {#if staminaEnabled}
+      <InfoStrip
+        label={localize('FABRICATE.App.Gathering.Detail.StaminaKicker')}
+        facts={[staminaFact]}
+        data-gathering-economy-strip=""
         data-economy-mode={env?.economyMode ?? 'none'}
-      >
-        {#if staminaEnabled}
-          <span class="gathering-detail-economy-item">
-            <i class="fas fa-bolt" aria-hidden="true"></i>
-            {#if hasStaminaPool}
-              <span data-gathering-stamina-pool
-                >{localize('FABRICATE.App.Gathering.Detail.StaminaPool', {
-                  current: staminaPool.current,
-                  max: staminaPool.max,
-                })}</span
-              >
-            {:else}
-              <span data-gathering-stamina-pool="none"
-                >{localize('FABRICATE.App.Gathering.Detail.StaminaPoolNone')}</span
-              >
-            {/if}
-          </span>
-        {/if}
-        {#if nodesEnabled}
-          <span class="gathering-detail-economy-item">
-            <i class="fas fa-mountain" aria-hidden="true"></i>
-            <span>{localize('FABRICATE.App.Gathering.Detail.NodesLegend')}</span>
-          </span>
-        {/if}
-      </section>
+      />
+    {/if}
+    {#if nodesEnabled}
+      <p class="gathering-detail-nodes-legend" data-gathering-nodes-legend>
+        {localize('FABRICATE.App.Gathering.Detail.NodesLegend')}
+      </p>
     {/if}
 
     {#if sceneBlocked}
@@ -407,34 +399,10 @@
     color: var(--fab-text);
   }
 
-  .gathering-detail-mode-hint {
+  .gathering-detail-mode-hint,
+  .gathering-detail-nodes-legend {
     margin: 0;
     font-size: 12px;
-    color: var(--fab-text-muted);
-  }
-
-  /* Environment safety readout: highest danger level + event-chance bar (or a
-     "safe" hint when there is no event chance). */
-  .gathering-detail-economy {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-2) var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-  }
-
-  .gathering-detail-economy-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--fab-text);
-  }
-
-  .gathering-detail-economy-item i {
     color: var(--fab-text-muted);
   }
 

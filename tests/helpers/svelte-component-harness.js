@@ -282,6 +282,16 @@ export const MARKS_AND_NOTICES_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Callout.svelte',
 ]);
 
+// The crafting check card's whole compiled closure: its strip, the strip's kicker and chip, and the
+// danger notice beneath it (issue 1521).
+export const CHECK_CARD_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/Chip.svelte',
+  'src/ui/svelte/components/Notice.svelte',
+  'src/ui/svelte/components/InfoStrip.svelte',
+  'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
+]);
+
 // THE SHARED PRIMITIVES THE PLAYER WINDOW'S TREES RENDER, as ONE closure (issue 1514).
 export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Callout.svelte',
@@ -305,6 +315,9 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/RequirementChooser.svelte',
   'src/ui/svelte/components/SlotTile.svelte',
   'src/ui/svelte/components/Well.svelte',
+  // The strip of current values the stamina pool and the check card draw (issue 1521), and its chip.
+  'src/ui/svelte/components/InfoStrip.svelte',
+  'src/ui/svelte/components/Chip.svelte',
 ]);
 
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
@@ -497,6 +510,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
   'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
+  // The check card is a strip of current values (issue 1521).
+  'src/ui/svelte/components/InfoStrip.svelte',
   'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
   // IoTable is the requirement surface's composition root (issue 917) and renders these; the
   // rail renders the shared chooser, which draws the shared slot tile.

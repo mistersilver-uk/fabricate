@@ -43,6 +43,11 @@ export async function seedRollPromptFixture(world, state) {
     await patchSimpleCheck(world, 'lab-smithing', { advantage: COUNT_ADVANTAGE[state] });
   }
   if (state === 'journal-bonus') await seedJournalBonus(world);
+  // Issue 1521: a formula naming a value the crafter lacks, and a smithing stamina pool of 6/10.
+  if (state === 'formula-unresolved') {
+    await patchSimpleCheck(world, 'lab-smithing', { rollFormula: '1d20 + @skills.missing.level' });
+  }
+  if (state === 'gathering-stamina') await seedSmithingStamina();
   if (Object.hasOwn(CHAT_CARD_STATES, state)) await seedChatCardState(world, state);
   if (Object.hasOwn(COUNT_RESULT_STATES, state)) await seedCountResult(world, state);
   if (Object.hasOwn(ADDITIONAL_DICE_PROMPT_STATES, state)) {
@@ -480,6 +485,18 @@ async function patchSimpleCheck(world, systemId, { advantage, ...patch }, chatOu
       ...system.craftingCheck,
       simple: { ...simple, ...patch, advantage: { ...simple.advantage, ...advantage } },
     },
+  });
+}
+
+/** Smithing keeps its node limit and gains a stamina pool every character seeds at 6 of 10. */
+async function seedSmithingStamina() {
+  const settings = globalThis.game.settings;
+  const config = settings.get('fabricate', 'gatheringConfig');
+  const slice = config.systems['lab-smithing'];
+  const economy = { ...slice.economy, stamina: { enabled: true, max: '10', start: '6' } };
+  await settings.set('fabricate', 'gatheringConfig', {
+    ...config,
+    systems: { ...config.systems, 'lab-smithing': { ...slice, economy } },
   });
 }
 
