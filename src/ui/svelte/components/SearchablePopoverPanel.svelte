@@ -15,6 +15,10 @@
     is the query field element, two-way because the parent's `inlineSearchTrigger` branch writes the
     same cell; `query` is the query value. `optionsList` is private — every reader of it moved here.
   - The compact presentation's rules root on this panel, so they live in this file's scoped block.
+  - The parent computes the one `status` (issue 1782): an error renders an alert and a wait with no
+    row a loading line, either replacing the list, while a refinement keeps the rows under
+    `aria-busy`. The header, query row and footer stay, so a footer commit is reachable in every
+    state, and the polite live region is mounted for the panel's whole life, changing only its text.
 -->
 <script>
   import { anchoredPopover } from '../actions/anchoredPopover.js';
@@ -45,6 +49,7 @@
     searchProps = {},
     filteredOptions = [],
     totalCount = 0,
+    status = null,
     groupedOptions = [],
     isGrouped = false,
     renderedOptions = [],
@@ -65,14 +70,22 @@
     chooseOption,
     optionIsSelected,
     close,
-    stop,
-    keepFocusOnHolder,
     popover = $bindable(null),
     search = $bindable(null),
     query = $bindable(''),
   } = $props();
 
   let optionsList = $state(null);
+
+  const FOCUSABLE_PANEL_CHROME = 'input, button, textarea, select, [href]';
+
+  function stop(event) {
+    event.stopPropagation();
+  }
+
+  function keepFocusOnHolder(event) {
+    if (!event.target?.closest?.(FOCUSABLE_PANEL_CHROME)) event.preventDefault();
+  }
 </script>
 
 <div
@@ -170,7 +183,7 @@
           class="manager-travel-popover-count"
           data-popover-filtered-count
           role="status"
-          aria-live="polite">{filteredCount}</span
+          aria-live="polite">{status?.replacesList ? '' : filteredCount}</span
         >
       {/if}
     </div>
@@ -188,7 +201,15 @@
 
   {#if header}{@render header(filteredOptions.length, totalCount)}{/if}
 
-  {#if filteredOptions.length > 0}
+  {#if status?.replacesList}
+    <div
+      class="manager-travel-popover-empty"
+      role={status.kind === 'error' ? 'alert' : undefined}
+      data-popover-status={status.kind}
+    >
+      <EmptyState note title={status.text} />
+    </div>
+  {:else if filteredOptions.length > 0}
     <div
       bind:this={optionsList}
       class={`manager-travel-popover-options ${listClass}`}
@@ -197,6 +218,7 @@
       aria-label={dialogNameAttribute}
       aria-labelledby={dialogNamedBy}
       aria-multiselectable={multiple ? 'true' : undefined}
+      aria-busy={status?.kind === 'refining' ? 'true' : undefined}
       data-picker-as={as}
       data-picker-columns={isGrid ? String(gridColumns) : undefined}
     >
@@ -230,7 +252,11 @@
     </div>
   {/if}
 
-  {#if footer}{@render footer()}{/if}
+  {#if footer}{@render footer({ close, failed: status?.kind === 'error' })}{/if}
+
+  <span class="visually-hidden" aria-live="polite" data-popover-live
+    >{status?.kind === 'loading' ? status.text : ''}</span
+  >
 </div>
 
 <style>
