@@ -6,7 +6,8 @@
  * `<body>` reports through three attributes `scripts/lib/primitiveLabSmoke.js` reads:
  * `data-primitive-lab-mounted` is the positive count of rows mounted, `data-primitive-lab-ready` is
  * absent until every iframe settles, and `data-primitive-lab-error` is present only on a failure.
- * Each iframe carries `data-primitive-lab-specimen` with its row's `path`.
+ * Each iframe carries `data-primitive-lab-specimen` with its row's `path`, on the `<iframe>` itself
+ * because the smoke's `page.evaluate` reads only this top document, never a specimen's realm.
  */
 import { CATALOGUE } from './catalogue.js';
 import { resolveSlots } from './inject.js';

@@ -191,19 +191,35 @@ function resolveAddress(address) {
 /** Every address with what it matched, resolved once. */
 const RESOLVED = catalogueAddresses().map((address) => ({ address, ...resolveAddress(address) }));
 
-test('the corpora every rule below quantifies over are alive', { todo: PHASE_16 }, () => {
+test('the corpora every rule below quantifies over are alive', () => {
   assert.ok(LIBRARY.blockCount > 0, 'the library parser found no spec-head block; the anchor died');
-  assert.equal(
-    LIBRARY.headingSections.length,
-    LIBRARY.headings.length,
-    'headingSections is positional against headings; the coverage rule below is scoped BY section'
-  );
   assert.ok(SPEC_BLOCKS.size > 40, `the live document yielded ${SPEC_BLOCKS.size} entries`);
   assert.ok(MANIFEST_ROWS.length > 50, `the manifest holds ${MANIFEST_ROWS.length} rows`);
   assert.ok(SHIPS_AS.size > 20, `only ${SHIPS_AS.size} manifest rows name a library entry`);
   assert.ok(
     SHIPPED_COMPONENTS.length > 100,
     `the component walk found ${SHIPPED_COMPONENTS.length} files, so it is not walking`
+  );
+});
+
+/**
+ * Fail on an assertion rather than a TypeError while the library's sections are underived.
+ *
+ * @param {{headingSections?: (string|null)[]}} library Parsed library facts.
+ */
+function requireSections(library) {
+  assert.ok(
+    Array.isArray(library.headingSections),
+    `parseDesignLibrary() derives no headingSections yet, which ${PHASE_16} adds`
+  );
+}
+
+test('the library derives a section for every heading', { todo: PHASE_16 }, () => {
+  requireSections(LIBRARY);
+  assert.equal(
+    LIBRARY.headingSections.length,
+    LIBRARY.headings.length,
+    'headingSections is positional against headings; the coverage rule below is scoped by section'
   );
 });
 
@@ -375,46 +391,90 @@ test('every prop name every shipped component declares is a name', () => {
 });
 
 /**
- * The library's naming entries with their enclosing section, zipped positionally.
+ * A library's naming entries with their enclosing section, zipped positionally.
  *
+ * @param {{headings: string[], headingSections: (string|null)[]}} library Parsed library facts.
  * @returns {{heading: string, section: string|null}[]} Naming entries, in document order.
  */
-function libraryEntries() {
-  return LIBRARY.headings
-    .map((heading, index) => ({ heading, section: LIBRARY.headingSections[index] }))
+function libraryEntries(library) {
+  requireSections(library);
+  return library.headings
+    .map((heading, index) => ({ heading, section: library.headingSections[index] }))
     .filter((entry) => primitiveNamesIn(entry.heading).length > 0);
+}
+
+/**
+ * The coverage rule: a shipped primitive named by an entry in a section any row resolves to needs
+ * a row standing it up under that entry. An unbuilt name keeps its drawing.
+ *
+ * @param {object} corpus `{library, catalogue, shipsAs}`, shaped as `LIBRARY`, `CATALOGUE`, `SHIPS_AS`.
+ * @returns {{catalogued: Set<string>, required: number, problems: string[]}} What it found.
+ */
+function uncoveredPrimitives({ library, catalogue, shipsAs }) {
+  const entries = libraryEntries(library);
+  const sectionOf = new Map(entries.map((entry) => [entry.heading, entry.section]));
+  const catalogued = new Set(
+    catalogue
+      .map((entry) => sectionOf.get(entry.row.spec))
+      .filter((section) => typeof section === 'string')
+  );
+  const standsUp = new Map();
+  for (const entry of catalogue) {
+    if (!standsUp.has(entry.row.spec)) standsUp.set(entry.row.spec, new Set());
+    standsUp.get(entry.row.spec).add(entry.row.path);
+  }
+  let required = 0;
+  const problems = [];
+  for (const { heading, section } of entries) {
+    if (!catalogued.has(section)) continue;
+    for (const name of primitiveNamesIn(heading)) {
+      const componentPath = shipsAs.get(`<${name}>`);
+      if (!componentPath) continue;
+      required += 1;
+      if (standsUp.get(heading)?.has(componentPath)) continue;
+      problems.push(
+        `the library's "${section}" section is catalogued, its entry ${heading} names ` +
+          `<${name}>, and ${componentPath} ships, but no row stands it up under that entry`
+      );
+    }
+  }
+  return { catalogued, required, problems };
+}
+
+/**
+ * The manifest rows whose library name no sectioned heading carries, which the coverage rule
+ * would stop requiring a specimen for.
+ *
+ * @param {object} corpus `{library, manifestRows}`, shaped as `LIBRARY` and `MANIFEST_ROWS`.
+ * @returns {string[]} One problem per such row.
+ */
+function unsectionedManifestRows({ library, manifestRows }) {
+  requireSections(library);
+  const sectioned = library.headings.filter((_, index) => library.headingSections[index] !== null);
+  return manifestRows
+    .filter((row) => row.library !== null)
+    .filter((row) => {
+      const name = row.library.slice(1, -1);
+      return !sectioned.some((heading) => primitiveNamesIn(heading).includes(name));
+    })
+    .map(
+      (row) =>
+        `${row.path} records library entry ${row.library}, which no sectioned ` +
+        '`div.spec-head > h4` names, so the coverage rule would stop requiring its specimen'
+    );
 }
 
 test(
   'every shipped primitive a catalogued section names has a live specimen',
   { todo: PHASE_16 },
   () => {
-    const entries = libraryEntries();
-    const sectionOf = new Map(entries.map((entry) => [entry.heading, entry.section]));
-    const catalogued = new Set(
-      CATALOGUE.map((entry) => sectionOf.get(entry.row.spec)).filter((section) => section !== null)
-    );
-    const standsUp = new Map();
-    for (const entry of CATALOGUE) {
-      if (!standsUp.has(entry.row.spec)) standsUp.set(entry.row.spec, new Set());
-      standsUp.get(entry.row.spec).add(entry.row.path);
-    }
+    const { catalogued, required, problems } = uncoveredPrimitives({
+      library: LIBRARY,
+      catalogue: CATALOGUE,
+      shipsAs: SHIPS_AS,
+    });
     assert.ok(catalogued.size > 0, 'no catalogue row resolves to a library section');
-
-    let required = 0;
-    for (const { heading, section } of entries) {
-      if (!catalogued.has(section)) continue;
-      for (const name of primitiveNamesIn(heading)) {
-        const componentPath = SHIPS_AS.get(`<${name}>`);
-        if (!componentPath) continue; // an unbuilt name keeps its drawing
-        required += 1;
-        assert.ok(
-          standsUp.get(heading)?.has(componentPath),
-          `the library's "${section}" section is catalogued, its entry ${heading} names ` +
-            `<${name}>, and ${componentPath} ships, but no row stands it up under that entry`
-        );
-      }
-    }
+    assert.deepEqual(problems, []);
     assert.ok(required > 5, `${required} shipped primitive(s) were required to have a specimen`);
   }
 );
@@ -423,25 +483,91 @@ test(
   'every library entry the manifest names sits under a library section',
   { todo: PHASE_16 },
   () => {
-    const sectioned = new Set(
-      LIBRARY.headings.filter((_, index) => LIBRARY.headingSections[index] !== null)
-    );
     const named = MANIFEST_ROWS.filter((row) => row.library !== null);
-    assert.ok(
-      named.length > 20,
-      `${named.length} rows name a library entry, so this has no domain`
+    assert.ok(named.length > 20, `${named.length} rows name a library entry, so this has no domain`);
+    assert.deepEqual(
+      unsectionedManifestRows({ library: LIBRARY, manifestRows: MANIFEST_ROWS }),
+      []
     );
-    for (const row of named) {
-      const name = row.library.slice(1, -1);
-      const entry = [...sectioned].find((heading) => primitiveNamesIn(heading).includes(name));
-      assert.ok(
-        entry,
-        `${row.path} records library entry ${row.library}, which no sectioned ` +
-          '`div.spec-head > h4` names, so the coverage rule would stop requiring its specimen'
-      );
-    }
   }
 );
+
+/** Two catalogued sections and one with no row, so the rules run live before Phase 16. */
+const SYNTHETIC_LIBRARY = Object.freeze({
+  headings: ['Controls', '<Button>', '<Chip> <Kicker>', '<Ghost>', '<Meter>'],
+  headingSections: ['controls', 'controls', 'marks', 'marks', 'structures'],
+});
+
+/** `<Ghost>` is unbuilt, so it ships as nothing. */
+const SYNTHETIC_SHIPS_AS = new Map(
+  ['Button', 'Chip', 'Kicker', 'Meter'].map((name) => [`<${name}>`, `src/${name}.svelte`])
+);
+
+/** A catalogue entry as `catalogueEntries()` shapes one. */
+function syntheticEntry(spec, name) {
+  return { row: { spec, path: `src/${name}.svelte` } };
+}
+
+const SYNTHETIC_CATALOGUE = Object.freeze([
+  syntheticEntry('<Button>', 'Button'),
+  syntheticEntry('<Chip> <Kicker>', 'Chip'),
+  syntheticEntry('<Chip> <Kicker>', 'Kicker'),
+]);
+
+test('the coverage rule requires every shipped name in a catalogued section, and only those', () => {
+  const corpus = { library: SYNTHETIC_LIBRARY, shipsAs: SYNTHETIC_SHIPS_AS };
+  assert.deepEqual(uncoveredPrimitives({ ...corpus, catalogue: SYNTHETIC_CATALOGUE }), {
+    catalogued: new Set(['controls', 'marks']),
+    required: 3,
+    problems: [],
+  });
+
+  // Mode 3, a removed row, reds as mode 4: a shipped name left with no specimen.
+  const removed = uncoveredPrimitives({
+    ...corpus,
+    catalogue: SYNTHETIC_CATALOGUE.filter((entry) => entry.row.path !== 'src/Kicker.svelte'),
+  });
+  assert.equal(removed.required, 3);
+  assert.equal(removed.problems.length, 1, removed.problems.join('\n'));
+  assert.match(removed.problems[0], /entry <Chip> <Kicker> names <Kicker>, and src\/Kicker\.svelte/);
+
+  const misfiled = uncoveredPrimitives({
+    ...corpus,
+    catalogue: [...SYNTHETIC_CATALOGUE.slice(0, 2), syntheticEntry('<Button>', 'Kicker')],
+  });
+  assert.equal(misfiled.problems.length, 1, 'a row under another entry stands nothing up here');
+});
+
+test('the section rule refuses a manifest name no sectioned heading carries', () => {
+  const rows = [
+    { path: 'src/Button.svelte', library: '<Button>' },
+    { path: 'src/Plain.svelte', library: null },
+  ];
+  assert.deepEqual(unsectionedManifestRows({ library: SYNTHETIC_LIBRARY, manifestRows: rows }), []);
+  const library = {
+    headings: [...SYNTHETIC_LIBRARY.headings, '<Orphan>'],
+    headingSections: [...SYNTHETIC_LIBRARY.headingSections, null],
+  };
+  const problems = unsectionedManifestRows({
+    library,
+    manifestRows: [
+      ...rows,
+      { path: 'src/Orphan.svelte', library: '<Orphan>' },
+      { path: 'src/Gone.svelte', library: '<Gone>' },
+    ],
+  });
+  assert.deepEqual(
+    problems.map((problem) => problem.split(' ', 1)[0]),
+    ['src/Orphan.svelte', 'src/Gone.svelte']
+  );
+});
+
+test('the section rules fail on an assertion, not a TypeError, while sections are underived', () => {
+  assert.throws(() => libraryEntries({ headings: ['<Button>'] }), {
+    name: 'AssertionError',
+    message: new RegExp(PHASE_16),
+  });
+});
 
 test('the catalogue directory holds nothing the lab cannot see', () => {
   const entries = readdirSync(path.join(REPO_ROOT, CATALOGUE_DIRECTORY), { withFileTypes: true });
@@ -461,23 +587,39 @@ test('the catalogue directory holds nothing the lab cannot see', () => {
 /** The smoke's half of the page contract: its attribute names decide the run. */
 const SMOKE_PATH = 'scripts/lib/primitiveLabSmoke.js';
 
+const MOUNT_PATH = 'tests/view-lab/primitives/mount.js';
+
 /** The page's half: the two files that write the attributes, read as text (neither loads in Node). */
 const PAGE_SOURCES = new Map(
-  ['tests/view-lab/primitives/mount.js', 'tests/view-lab/primitives/LiveSpecimen.svelte'].map(
-    (file) => [file, readFileSync(path.join(REPO_ROOT, file), 'utf8')]
-  )
+  [MOUNT_PATH, 'tests/view-lab/primitives/LiveSpecimen.svelte'].map((file) => [
+    file,
+    readFileSync(path.join(REPO_ROOT, file), 'utf8'),
+  ])
 );
 
+/** Drop comments, so prose naming an attribute cannot stand in for code that writes it. */
+function withoutComments(source) {
+  return source.replaceAll(/\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|^\s*\/\/.*$/gm, '');
+}
+
 /**
- * The page files that set an attribute — as a quoted literal or as `name={…}` — rather than only
- * mention it in prose, which a stale comment could satisfy.
+ * The page files that set an attribute: `setAttribute` given the literal or a constant bound to it,
+ * or a Svelte `name={…}`. A read, a declaration alone or a comment does not count.
  *
  * @param {string} attribute An attribute name.
  * @returns {string[]} The page files that set it.
  */
 function writersOf(attribute) {
   return [...PAGE_SOURCES]
-    .filter(([, source]) => source.includes(`'${attribute}'`) || source.includes(`${attribute}={`))
+    .filter(([, source]) => {
+      const code = withoutComments(source);
+      const bound = [...code.matchAll(new RegExp(String.raw`const (\w+) = '${attribute}';`, 'g'))];
+      const targets = [`'${attribute}'`, ...bound.map((match) => match[1])];
+      return (
+        code.includes(`${attribute}={`) ||
+        targets.some((target) => code.includes(`setAttribute(${target},`))
+      );
+    })
     .map(([file]) => file);
 }
 
@@ -505,11 +647,16 @@ test('every attribute the smoke decides on is written by the page', () => {
         `${[...PAGE_SOURCES.keys()].join(' nor ')} sets it, so the smoke would time out`
     );
   }
+  assert.ok(
+    writersOf(SPECIMEN_ATTRIBUTE).includes(MOUNT_PATH),
+    `the smoke reads \`${SPECIMEN_ATTRIBUTE}\` off the top document, so ${MOUNT_PATH} must set ` +
+      "it on each `<iframe>`; LiveSpecimen.svelte's copy sits in a realm the smoke never reads"
+  );
 
   // The smoke navigates with this query, and `mount.js` refuses every value it does not know.
   const [parameter, value, ...extra] = MOUNT_ALL_QUERY.split('=');
   assert.deepEqual(extra, [], `${MOUNT_ALL_QUERY} is not one \`parameter=value\` pair`);
-  const mountSource = PAGE_SOURCES.get('tests/view-lab/primitives/mount.js');
+  const mountSource = PAGE_SOURCES.get(MOUNT_PATH);
   for (const half of [parameter, value]) {
     assert.ok(
       mountSource.includes(`'${half}'`),
