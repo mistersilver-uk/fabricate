@@ -677,7 +677,7 @@ export function registerGatheringCases() {
     for (const tab of ['overview', 'requirements']) {
       await openTaskTab(tab);
       assert.equal(selectedTab(), tab, `${tab} opens`);
-      assert.equal(manager().dataset.gatheringTaskLayout, 'results', `${tab} is full width`);
+      assert.equal(manager().dataset.gatheringTaskLayout, 'full', `${tab} is full width`);
       assert.ok(!target.querySelector('aside.manager-inspector'), `${tab} draws no rail`);
     }
     await openTaskTab('results');
@@ -1030,7 +1030,7 @@ export function registerGatheringCases() {
       !target.querySelector('.manager-inspector'),
       'Direct suppresses the entire unused inspector'
     );
-    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'results');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'full');
     assert.ok(
       target
         .querySelector('[data-gathering-task-results-validation]')
@@ -1054,7 +1054,7 @@ export function registerGatheringCases() {
       !target.querySelector('.manager-inspector'),
       'Check suppresses the entire unused inspector'
     );
-    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'results');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'full');
     assert.deepEqual(
       Array.from(target.querySelectorAll('[data-gathering-routed-tier-status]')).map((row) => [
         row.dataset.gatheringRoutedTierStatus,

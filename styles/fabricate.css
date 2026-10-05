@@ -7255,7 +7255,7 @@
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body,
-.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"]
+.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"]
   .manager-body {
   grid-template-columns: 220px minmax(0, 1fr);
 }
@@ -7277,7 +7277,7 @@
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed,
-.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"]
+.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"]
   .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr);
 }
@@ -13453,7 +13453,7 @@
   .fabricate-manager[data-manager-view="knowledge"] .manager-body,
   .fabricate-manager[data-manager-view="component-edit"] .manager-body,
   .fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
-  .fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"]
+  .fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"]
     .manager-body,
   .fabricate-manager[data-manager-view="world-currency"] .manager-body,
   .fabricate-manager[data-manager-view="world-prerequisites"] .manager-body,
@@ -13593,7 +13593,7 @@
 .fabricate-manager[data-manager-view="world-downtime"] .manager-rail,
 .fabricate-manager[data-manager-view="component-edit"] .manager-rail,
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-rail,
-.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"]
+.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"]
   .manager-rail,
 .fabricate-manager[data-manager-view="world-currency"] .manager-rail,
 .fabricate-manager[data-manager-view="world-prerequisites"] .manager-rail,
