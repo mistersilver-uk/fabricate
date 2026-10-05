@@ -33,7 +33,8 @@ const { CraftingSystemManager } = await import('../src/systems/CraftingSystemMan
 const { createComponentScopeStore } = await import('../src/systems/worldScopeStores.js');
 const { applyFolderImportDecisions } = await import('../src/ui/svelte/util/importFolderGroups.js');
 const { projectWorldScopeEntity } = await import('../src/ui/svelte/stores/worldScopeProjection.js');
-const { createWorldScopeEntityActions } = await import('../src/ui/svelte/stores/worldScopeActions.js');
+const { createWorldScopeEntityActions } =
+  await import('../src/ui/svelte/stores/worldScopeActions.js');
 const { makeScopeSettings } = await import('./helpers/worldScopeCorpus.js');
 
 const FORGE = 'sys-forge';
@@ -174,7 +175,8 @@ const ROUTES = [
     route: 'single drop',
     run: async (manager, systemId, documents) => {
       let last;
-      for (const document of documents) last = await manager.addItemFromUuid(systemId, document.uuid);
+      for (const document of documents)
+        last = await manager.addItemFromUuid(systemId, document.uuid);
       return last;
     },
   },
@@ -189,7 +191,12 @@ const ROUTES = [
     route: 'folder import',
     run: (manager, systemId, documents, mapping = {}) =>
       applyFolderImportDecisions(manager, systemId, [
-        { itemUuids: documents.map((document) => document.uuid), category: '', addTags: [], ...mapping },
+        {
+          itemUuids: documents.map((document) => document.uuid),
+          category: '',
+          addTags: [],
+          ...mapping,
+        },
       ]),
   },
 ];
@@ -370,7 +377,9 @@ describe('importing again a component that has no World Component', () => {
       systems: [
         {
           id: FORGE,
-          components: [heldRow('world-ash', ash, ash.uuid, { category: 'Herbs', essences: { water: 1 } })],
+          components: [
+            heldRow('world-ash', ash, ash.uuid, { category: 'Herbs', essences: { water: 1 } }),
+          ],
         },
         { id: KITCHEN },
       ],
@@ -503,7 +512,10 @@ describe('one run, one registration per component', () => {
       persist: false,
       registrations,
     });
-    const actions = createWorldScopeEntityActions({ entityType: 'component', getStore: () => store });
+    const actions = createWorldScopeEntityActions({
+      entityType: 'component',
+      getStore: () => store,
+    });
     await actions.createEntity({ id: 'world-late', name: 'Authored meanwhile' });
 
     await manager.flushWorldComponentRegistrations(registrations);

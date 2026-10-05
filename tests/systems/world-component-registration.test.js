@@ -114,7 +114,11 @@ describe('the registration decision for one in-system record', () => {
       'originItemUuid',
       'registeredItemUuid',
     ]);
-    assert.notEqual(planned.entity.aliasItemUuids, record.aliasItemUuids, 'the alias list is a copy');
+    assert.notEqual(
+      planned.entity.aliasItemUuids,
+      record.aliasItemUuids,
+      'the alias list is a copy'
+    );
   });
 });
 
@@ -388,7 +392,10 @@ describe('the flush', () => {
       [SYSTEM]: [row('comp-ash', 'Item.ash')],
     });
     const registrations = [added('comp-ash')];
-    const actions = createWorldScopeEntityActions({ entityType: 'component', getStore: () => store });
+    const actions = createWorldScopeEntityActions({
+      entityType: 'component',
+      getStore: () => store,
+    });
     await actions.createEntity({ id: 'world-late', name: 'Authored meanwhile' });
 
     await flush(registrations);
