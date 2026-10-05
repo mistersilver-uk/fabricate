@@ -1483,6 +1483,20 @@ describe('the world Tool entry (issue 1373)', () => {
       );
     });
 
+    it('lights the replacement zone on dragover and clears it on an outside dragleave', async () => {
+      const target = await mountBreakage({ mode: 'replaceWith' });
+      const zone = target.querySelector('[data-tool-replacement-drop]');
+      assert.equal(zone.getAttribute('data-tool-replacement-drop'), 'idle');
+      zone.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }));
+      await tick();
+      assert.equal(zone.getAttribute('data-tool-replacement-drop'), 'over');
+      assert.ok(zone.classList.contains('is-over'), 'the over accent is drawn');
+      zone.dispatchEvent(new Event('dragleave', { bubbles: true, cancelable: true }));
+      await tick();
+      assert.equal(zone.getAttribute('data-tool-replacement-drop'), 'idle');
+      assert.ok(!zone.classList.contains('is-over'), 'and cleared');
+    });
+
     // THE DROP RESOLVES PURELY, against the option list the caller passed. Both Tool editors are
     // leaves holding no Foundry global, so this is the only answer available to them — and a
     // payload naming something world scope cannot address must write NOTHING rather than store
