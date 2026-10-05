@@ -41,6 +41,7 @@ export function itemSourcesCollaborators(manager) {
     findRecipeItemDefinitionForSource: (system, snapshot, source) =>
       manager._findRecipeItemDefinitionForSource(system, snapshot, source),
     scopeBasis: (system) => manager._scopeBasis(system),
+    addItemFromUuid: (...args) => manager.addItemFromUuid(...args),
     salvageNormalizationContext: (system) => manager._salvageNormalizationContext(system),
     normalizeComponent: (item, options) => manager._normalizeComponent(item, options),
     normalizeRecipeItemDefinition: (entry, usedIds) =>
@@ -406,6 +407,46 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
   if (addedRoleKey) await io.stampSourceIdentity(source, addedRoleKey, item.id);
   if (options.persist !== false) await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
   return { item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks };
+}
+
+/** Bulk-import every Item document of a compendium pack through `addItemFromUuid`.
+ * @returns {Promise<{added: number, updated: number, skipped: number, total: number,
+ *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>}>} */
+export async function addItemsFromPack(io, systemId, packId) {
+  io.assertGM('bulk import from compendium');
+  const system = io.getSystem(systemId);
+  if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+  const pack = globalThis.game?.packs?.get(packId);
+  if (!pack) throw new Error(`Compendium pack not found: ${packId}`);
+
+  const documents = await pack.getDocuments();
+  const items = documents.filter((d) => d.documentName === 'Item');
+
+  // No `_primeEnricherCache` here (issue 800): `getDocuments()` already cached this pack, and
+  // intra-pack references are the common case, so per-item priming mostly hits the cache.
+  const counts = { added: 0, updated: 0, skipped: 0 };
+  const sourceFallbacks = [];
+  // Items mutate memory only (`persist: false`) and one `save()` below flushes the batch (issue
+  // 1086); `dirty` keeps an all-skipped re-drop from writing.
+  let dirty = false;
+  try {
+    for (const item of items) {
+      const uuid = item.uuid || `Compendium.${packId}.${item.id}`;
+      const result = await io.addItemFromUuid(systemId, uuid, { persist: false });
+      if (result.action === 'added' || result.action === 'updated') {
+        counts[result.action] += 1;
+        dirty = true;
+      } else counts.skipped += 1;
+      if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
+    }
+  } finally {
+    // In `finally`, so items imported before a throw still persist; named, because every item
+    // went into this one system (issue 1078).
+    if (dirty) await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
+  }
+
+  return { ...counts, total: items.length, sourceFallbacks };
 }
 
 /** Replace a component's source Item link and return fallback metadata when the dropped Item's
