@@ -24,7 +24,11 @@ const BENCH_WITH_ESSENCES = [
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-alchemy-workbench-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES],
+  rawModules: [
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
+    'src/ui/svelte/actions/dragDrop.js'
+  ],
   compiledModules: [
     // The shared notice the last-brew banner composes (issue 1505) plus the tile and the label
     // the bench and the Produces heading draw (issue 1514), as ONE spread. A compiled component
@@ -52,6 +56,17 @@ describe('Workbench (mounted)', () => {
     const target = await harness.mount({ mode: 'empty', benchEmpty: true });
     assert.match(statusPill(target).getAttribute('data-alchemy-status'), /empty/);
     assert.equal(brewButton(target).disabled, true, 'empty mode disables Brew');
+  });
+
+  it('toggles the bench drag-over accent on dragover and dragleave', async () => {
+    const target = await harness.mount({ mode: 'empty', benchEmpty: true });
+    const bench = target.querySelector('[data-alchemy-dropzone]');
+    bench.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    assert.ok(bench.classList.contains('is-dragover'), 'dragover lights the bench');
+    bench.dispatchEvent(new Event('dragleave', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+    assert.ok(!bench.classList.contains('is-dragover'), 'dragleave clears it');
   });
 
   it('ready mode: status names the target and Brew is enabled', async () => {

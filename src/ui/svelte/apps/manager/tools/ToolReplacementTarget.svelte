@@ -35,6 +35,7 @@
   `''` and the card writes nothing, which is the honest answer for an unmanaged Item.
 -->
 <script>
+  import { dragDrop } from '../../../actions/dragDrop.js';
   import { localize } from '../../../util/foundryBridge.js';
   import IconButton from '../../../components/IconButton.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
@@ -66,19 +67,9 @@
     options.map((option) => ({ id: option.id, label: option.name, img: option.img }))
   );
 
-  /** Read a drag payload and choose the Component it names, if this scope has one. */
-  function handleDrop(event) {
-    event.preventDefault();
-    dragOver = false;
-    if (disabled) return;
-    let payload;
-    try {
-      payload = JSON.parse(event.dataTransfer?.getData('text/plain') || 'null');
-    } catch {
-      // A non-JSON drag names no Component, which is not an error to report.
-      payload = null;
-    }
-    const resolved = resolveDroppedComponentId(payload, options);
+  /** Choose the Component a parsed drag payload names, if this scope has one. */
+  function handleDrop(data) {
+    const resolved = resolveDroppedComponentId(data, options);
     if (resolved) onChoose(resolved);
   }
 </script>
@@ -144,21 +135,16 @@
   {:else}
     <!-- A DIV, NOT A BUTTON: the zone holds the picker trigger, and a button inside a button is
          the nested-button trap. The zone is a drop target and nothing else. -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="manager-tool-replacement-drop"
       class:is-over={dragOver}
       data-tool-replacement-drop={dragOver ? 'over' : 'idle'}
-      ondragover={(event) => {
-        event.preventDefault();
-        dragOver = true;
+      use:dragDrop={{
+        disabled,
+        activeClass: 'is-over',
+        onActiveChange: (active) => (dragOver = active),
+        onDrop: handleDrop,
       }}
-      ondragenter={(event) => {
-        event.preventDefault();
-        dragOver = true;
-      }}
-      ondragleave={() => (dragOver = false)}
-      ondrop={handleDrop}
     >
       <!-- The glyph the shipped `ItemDropZone` already draws in ITS empty face, so the two drop
            targets carry one mark. The design's own name is Font Awesome PRO, which
