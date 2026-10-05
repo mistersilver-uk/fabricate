@@ -619,6 +619,8 @@ export function registerGatheringCases() {
     return { ids, selectedId };
   }
 
+  // A lone row is also the editor's default selection, so this proves the empty state's add only;
+  // the next test proves an add selects the NEW row over another one.
   it('selects the first drop rule added from the empty drop table', async () => {
     const { ids, selectedId } = await openDropTable({ taskDropRows: [] });
     assert.deepEqual(ids(), [], 'the table opens empty');
@@ -626,6 +628,21 @@ export function registerGatheringCases() {
     await settleRouteExit();
     assert.equal(ids().length, 1, 'the empty state adds a row');
     assert.equal(selectedId(), ids()[0], 'and selects it, so the rail edits it next');
+  });
+
+  it('selects a drop rule added from the toolbar over the rule that was selected', async () => {
+    const row = (id) => ({ id, componentId: 'c1', quantity: 1, dropRate: 40, enabled: true });
+    const { ids, selectedId } = await openDropTable({
+      taskDropRows: [row('drop-a'), row('drop-b')],
+    });
+    target.querySelector('[data-gathering-task-drop-id="drop-b"]').click();
+    await settleRouteExit();
+    assert.equal(selectedId(), 'drop-b', 'precondition: another rule is selected');
+    target.querySelector('[data-gathering-add-drop="toolbar"]').click();
+    await settleRouteExit();
+    const added = ids().filter((id) => id !== 'drop-a' && id !== 'drop-b');
+    assert.equal(added.length, 1, 'the toolbar adds one rule');
+    assert.equal(selectedId(), added[0], 'and the rail moves to it');
   });
 
   it('keeps the selected drop selected when a rank rocker moves it', async () => {

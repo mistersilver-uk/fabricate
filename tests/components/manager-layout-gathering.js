@@ -871,10 +871,6 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop cells are divided by row hairlines, not vertical separators'
   );
   assert.ok(
-    css.includes('.fabricate-manager .manager-gathering-task-drops-table tr.is-drop-active {'),
-    'drop rows should expose a full-row active drop target state'
-  );
-  assert.ok(
     selectedDropRowBlock.includes('background: var(--fab-success-soft);') &&
       selectedDropBarBlock.includes('background: var(--fab-accent);') &&
       selectedDropBarBlock.includes('width: 3px;'),
@@ -1428,6 +1424,66 @@ test('a range input inside the gathering edit views stays transparent for the sl
   } finally {
     await context.close();
   }
+});
+
+// The data table paints a row's CELLS and clears the row behind them (issue 1782), so a row-level
+// ground never shows: the drop target must paint its cells, and hover must yield to selection.
+test('the drop table paints a drop-target row and keeps a hovered selected row selected', async () => {
+  const context = await openLayoutContext({ viewport: { width: 700, height: 300 } });
+  const page = await context.newPage();
+  try {
+    const row = (id, state) =>
+      `<tr id="${id}" class="fabricate-data-table-row ${state}">` +
+      '<th scope="row" class="fabricate-data-table-cell">Moss</th>' +
+      '<td class="fabricate-data-table-cell">1</td></tr>';
+    await page.setContent(
+      `<style>${css}</style>` +
+        '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
+        '<div class="manager-gathering-task-edit-view">' +
+        '<div class="fabricate-data-table is-selectable manager-task-drops-card manager-gathering-task-drops-table">' +
+        '<div class="fabricate-data-table-scroll"><table class="fabricate-data-table-table"><tbody>' +
+        `${row('plain', '')}${row('target', 'is-drop-active')}${row('chosen', 'is-selected')}` +
+        `${row('chosen-target', 'is-selected is-drop-active')}</tbody></table></div></div></div>` +
+        '<i id="soft" style="background: var(--fab-success-soft)"></i>' +
+        '<i id="raised" style="background: var(--fab-surface-raised)"></i></div>'
+    );
+    const ground = (selector) =>
+      page.evaluate((one) => getComputedStyle(document.querySelector(one)).backgroundColor, selector);
+    const soft = await ground('#soft');
+    const raised = await ground('#raised');
+    assert.notEqual(soft, raised, 'precondition: the two grounds are told apart');
+    assert.equal(await ground('#plain > td'), 'rgba(0, 0, 0, 0)', 'a plain row is unpainted');
+    for (const id of ['target', 'chosen-target']) {
+      assert.equal(await ground(`#${id} > td`), soft, `the ${id} row's cells take the drop ground`);
+    }
+    await page.hover('#plain > td');
+    assert.equal(await ground('#plain > td'), raised, 'precondition: hover paints a plain row');
+    await page.hover('#chosen > td');
+    assert.equal(await ground('#chosen > td'), soft, 'hover never repaints the selected row');
+  } finally {
+    await context.close();
+  }
+});
+
+// The count is the specimen's `k-count` (issue 1782): the sheet restates its declarations exactly.
+test('the data table count is the library specimen`s k-count', () => {
+  const declarations = (block) =>
+    block
+      .slice(block.indexOf('{') + 1, block.lastIndexOf('}'))
+      .split(';')
+      .map((one) => one.replaceAll(/\s+/g, ''))
+      .filter(Boolean)
+      .sort((left, right) => left.localeCompare(right));
+  const library = readFileSync(
+    resolve(__dirname, '../../openspec/specs/design-system/library.html'),
+    'utf8'
+  );
+  const specimen = library.match(/\.k-count\{[^}]*\}/)?.[0] ?? '';
+  assert.ok(specimen, 'the library still defines k-count');
+  assert.deepEqual(
+    declarations(blockFor('.fabricate-data-table .fabricate-data-table-count')),
+    declarations(specimen)
+  );
 });
 
 // The gathering task library's inspector rail stacks three cards.

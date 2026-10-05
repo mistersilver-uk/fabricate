@@ -4663,7 +4663,7 @@
   cursor: pointer;
 }
 
-.fabricate-data-table.is-selectable .fabricate-data-table-row:hover > .fabricate-data-table-cell {
+.fabricate-data-table.is-selectable .fabricate-data-table-row:not(.is-selected):hover > .fabricate-data-table-cell {
   background: var(--fab-surface-raised);
 }
 
@@ -12484,10 +12484,13 @@
   padding: var(--fab-space-1);
 }
 
-/* The row a drag hovers: the drop rules card's own drop target, set by its row action. */
+/* The row a drag hovers: the drop rules card's own drop target, set by its row action. Its cells take the ground, because the table's own rules paint a row's cells and clear the row behind them. */
 .fabricate-manager .manager-gathering-task-drops-table tr.is-drop-active {
   outline: 1px solid var(--fab-accent);
   outline-offset: -1px;
+}
+
+.fabricate-manager .manager-gathering-task-drops-table.fabricate-data-table .fabricate-data-table-row.is-drop-active > .fabricate-data-table-cell {
   background: var(--fab-success-soft);
 }
 

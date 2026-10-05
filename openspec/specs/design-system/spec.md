@@ -769,7 +769,7 @@ A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel
 A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.
 A rail section (`Rail`) is a `group` named by its kicker `label`, or an unnamed `<section>` when it has none, and never a `region`, because a column of named landmarks would bury the screen's own.
 A log list (`LogList`) is a `list` named by its required `ariaLabel`; an entry it opens is a button pressed while it is the selected entry, and an entry's outcome is an image named by its label, so an outcome is never told by colour alone.
-A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
+A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
@@ -1766,13 +1766,14 @@ A headed, paged table is the right shape only where a reader compares the same f
 A record carrying art, a status and actions is a list row, and forcing it into columns costs those affordances and buys nothing; the test is whether the columns would be worth sorting.
 
 A table states its record count in its heading rather than leaving it to be inferred from the pager, and scrolls horizontally inside its own container so the page never does.
-It closes with the standard pagination bar WHEN the record count can exceed a page; a table whose rows are bounded and few — an outcome-tier table, a craft’s inputs and outputs — carries no pager, and adding one to reach a uniform shape would be furniture.
+It closes with the standard pagination bar WHEN the record count can exceed a page; a table whose rows are bounded and few — a craft’s inputs and outputs — carries no pager, and adding one to reach a uniform shape would be furniture.
 A column header MUST NOT appear sortable unless sorting it is meaningful.
 An empty table keeps its heading and count, drops the header row, and says what would put a row in it.
 
 Its one implementation is `src/ui/svelte/components/DataTable.svelte`, the library's `<DataTable>`, whose `heading` and `count` are the table's visible `<caption>`; it closes with the shipped pager only when it pages and its count exceeds the smallest page.
-Issue 1782 converts two surfaces under maintainer ruling 3 (2026-09-19): the gathering task editor's drop rules, paged, searchable, selectable, ranked under highest-ranked rewards and a drop target per row, and the crafting detail's essence, tool and output groups, which are bounded and carry no pager.
-The crafting detail's ingredient rail stays the requirement chooser's, and the outcome-tier table is a ladder routed to `OutcomeLadder` rather than a table.
+Issue 1782 converts the gathering task editor's drop rules, paged, searchable, selectable, ranked under highest-ranked rewards and a drop target per row, and `IoTable`'s essence, tool and output groups in the crafting detail, which are bounded and carry no pager.
+The crafting detail's ingredient rail stays the requirement chooser's, and `OutcomeTierTable` is a ladder rather than a table, owned by issue 1644's `OutcomeLadder`.
+A table whose rows hold controls — the drop rules' chance sliders, count fields and rank rockers — keeps a taller row than the specimen's text rows, because its controls set the row's height.
 
 ### Requirement: Validation is one screen everywhere
 

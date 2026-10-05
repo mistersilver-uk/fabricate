@@ -1,8 +1,8 @@
 <!--
   The library's `<DataTable>`: records compared down columns, under a visible `<caption>` stating
   `heading` and `count`, with the shipped pager when `perPage` is set. A row is selected by a pointer
-  click on the `<tr>` (`selectedKey` + `onSelectRow`) and never focusable; the `cell` snippet's own
-  control is the keyboard path. `rowData(row)` spreads on each `<tr>` and `rowAction` runs on it.
+  click on the `<tr>` or by focus entering a control in it (`selectedKey` + `onSelectRow`), and is
+  never focusable itself. `rowData(row)` spreads on each `<tr>` and `rowAction` runs on it.
 -->
 <script>
   import EmptyState from './EmptyState.svelte';
@@ -64,11 +64,6 @@
       .filter(Boolean)
       .join(' ');
   }
-
-  function attributesOf(row) {
-    const map = rowData(row);
-    return map && typeof map === 'object' ? map : {};
-  }
 </script>
 
 {#snippet content(row, column, index)}
@@ -128,14 +123,15 @@
         {#if phase === 'rows'}
           {#each rows as row, index (rowKey(row, index))}
             {@const selected = selectedKey !== '' && rowKey(row, index) === selectedKey}
-            <!-- A pointer convenience only (issue 1512): the cell's own control is the keyboard path,
-                 and a focusable row is invisible to Foundry's `KeyboardManager#hasFocus`. -->
+            <!-- Never focusable (issue 1512): a focusable row is invisible to Foundry's
+                 `KeyboardManager#hasFocus`, so focus entering a cell's control selects it instead. -->
             <tr
-              {...attributesOf(row)}
+              {...rowData(row)}
               class="fabricate-data-table-row"
               class:is-selected={selected}
               use:rowAction={row}
               onclick={onSelectRow ? () => onSelectRow(row) : undefined}
+              onfocusin={onSelectRow && !selected ? () => onSelectRow(row) : undefined}
             >
               {#each columns as column (column.key)}
                 {#if column.rowHeader}

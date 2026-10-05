@@ -35,6 +35,12 @@ const OPEN_SLOWBLOOM_TASK = Object.freeze([
 ]);
 /** Blanks the task's name, the one Overview error the Validation tab can draw. */
 const BLANK_NAME = Object.freeze([{ selector: '[data-gathering-task-field="name"]', fill: '' }]);
+
+/** Select Slowbloom's drop through its component button: the row's centre is its chance slider. */
+const SELECT_SLOWBLOOM_DROP = Object.freeze({
+  selector:
+    '[data-gathering-task-drop-id="hb-slowbloom-drop"] [data-gathering-task-drop-component-cell] button',
+});
 const AVAILABLE_SPRING_ROW = '[data-section="available-to-add"] [data-record-id="hb-task-spring"]';
 /** A straight task's result rows; a step or a single-element check reads the first. */
 const STRAIGHT_RESULT = '[data-gathering-task-results="straight"] [data-recipe-result-item]';
@@ -1074,7 +1080,7 @@ export const CASES = Object.freeze([
           '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       taskTab('results'),
-      { selector: '[data-gathering-task-drop-id="hb-slowbloom-drop"]' },
+      SELECT_SLOWBLOOM_DROP,
       { selector: '[data-gathering-drop-condition-modifiers="biome"]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
@@ -1109,7 +1115,7 @@ export const CASES = Object.freeze([
           '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       taskTab('results'),
-      { selector: '[data-gathering-task-drop-id="hb-slowbloom-drop"]' },
+      SELECT_SLOWBLOOM_DROP,
       { selector: '[data-gathering-drop-condition-modifier-picker="biome"] button' },
       { selector: '[data-gathering-drop-condition-modifiers="biome"]', scroll: true },
     ],

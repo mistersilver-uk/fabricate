@@ -100,29 +100,30 @@
     if (pageIndex > 0 && pageIndex * pageSize >= filteredRows.length) pageIndex = 0;
   });
 
-  function handleDropZoneDrop(row, data) {
+  function handleDropZoneDrop(rowId, data) {
     if (data?.type === 'FabricateManagedComponent' && data.componentId) {
-      onUpdateDrop(row.id, {
+      onUpdateDrop(rowId, {
         componentId: data.componentId,
         itemUuid: '',
         systemItemId: '',
         name: '',
         enabled: true,
       });
-      onSelectDrop(row.id);
+      onSelectDrop(rowId);
       return;
     }
-    onImportDrop(row.id, data);
+    onImportDrop(rowId, data);
   }
 
-  // Each row is a drop zone; `update` rebinds it when the row object behind it changes.
+  // Each row is a drop zone. Its `<tr>` is keyed by the row's id, so the id it closes over never
+  // goes stale and a replaced row object needs no `update`, which would hand `dragDrop` the row.
   function dropZone(node, row) {
-    const options = (current) => ({
-      onDrop: (data) => handleDropZoneDrop(current, data),
+    const rowId = row.id;
+    const zone = dragDrop(node, {
+      onDrop: (data) => handleDropZoneDrop(rowId, data),
       activeClass: 'is-drop-active',
     });
-    const zone = dragDrop(node, options(row));
-    return { update: (next) => zone.update(options(next)), destroy: () => zone.destroy() };
+    return { destroy: () => zone.destroy() };
   }
 </script>
 

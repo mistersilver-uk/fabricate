@@ -167,6 +167,9 @@
           {/each}
         </ul>
       </Well>
+    {:else}
+      <!-- A group's amounts are its alternatives', so its own amount cell states none. -->
+      <span class="crafting-io-output-none" aria-hidden="true">—</span>
     {/if}
   {:else if column.key === 'name'}
     {@render identity(
@@ -284,6 +287,10 @@
   .crafting-io-essence-icon {
     flex: 0 0 auto;
     font-size: 14px;
+    color: var(--fab-text-muted);
+  }
+
+  .crafting-io-output-none {
     color: var(--fab-text-muted);
   }
 
