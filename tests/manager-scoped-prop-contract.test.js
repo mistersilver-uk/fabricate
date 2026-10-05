@@ -61,8 +61,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../../../utils/failureResultPolicy.js',
   '../../../../utils/recipeCategories.js',
   '../../../../utils/routedOutcomeKeywords.js',
-  // ADDED BY ISSUE 1373, and legitimately under the message below.
-  '../../../../utils/sourceReferenceUnion.js',
   '../../../managerExtensions.js',
   '../../../model/componentBrowserModel.js',
   '../../../model/componentBulkEditModel.js',
@@ -83,7 +81,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../util/announceAfterFocus.js',
   '../../util/componentEditor.js',
   '../../util/craftingImageDefaults.js',
-  '../../util/dropUtils.js',
   '../../util/foundryBridge.js',
   './AccessTabView.svelte',
   './BooksScrollsView.svelte',
@@ -186,6 +183,9 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './world/WorldCurrencyTab.svelte',
   './world/WorldModifiersTab.svelte',
   './world/WorldPrerequisitesTab.svelte',
+  // Added by issue 1721: the world corpus, entry editors and drop writes are their own unit, which
+  // took `dropUtils.js` and `sourceReferenceUnion.js` with them.
+  './worldScopeModel.svelte.js',
   'svelte',
 ]);
 

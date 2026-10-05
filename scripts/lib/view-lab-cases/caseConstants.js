@@ -43,6 +43,10 @@ export const GATHERING_ROUTE_MODEL_PATTERN =
 export const GATHERING_TASK_EDITOR_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/(?:GatheringTaskEditView\.svelte$|gathering-task\/)/;
 
+/** The world-scope model and the drop classification behind the world frames (issue 1721). */
+export const WORLD_SCOPE_MODEL_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/(worldScopeModel\.svelte|dropUuidClassification)\.js$/;
+
 /** The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010). */
 export const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/Recipe/,

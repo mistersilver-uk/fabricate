@@ -2,6 +2,7 @@
  * World scope: currency, prerequisites, modifiers, the component catalogue, the vocabulary and the essence catalogue.
  */
 
+import { WORLD_SCOPE_MODEL_PATTERN } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -236,6 +237,7 @@ export const CASES = Object.freeze([
       // Issue 1371 r8-cat: the frame is this screen too.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -339,6 +341,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -587,6 +590,7 @@ export const CASES = Object.freeze([
       // Categories screens, so this frame is claimed beside the three system ones.
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/vocabularyShell\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   // The catalogue's `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns.
@@ -665,6 +669,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
       /^src\/ui\/model\/scopedEntityListModel\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -701,6 +706,7 @@ export const CASES = Object.freeze([
       // The buffered-save seam (issue 1372): the header's Back and Save pair, and the draft leaf behind it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({

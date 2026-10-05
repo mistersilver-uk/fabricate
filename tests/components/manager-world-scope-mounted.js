@@ -26,10 +26,10 @@ import {
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries, setInputValue } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
+import { parseUuidDouble } from '../helpers/manager/parseUuidDouble.js';
 import {
   labCaseSelector,
   managerComponents,
-  parseUuidDouble,
   settle,
   settleBetweenTests,
   settleRouteExit,

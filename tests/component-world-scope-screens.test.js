@@ -154,6 +154,15 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
   defineStructureContract('ROUTE ENUMERATION: and neither does the gateway', ROOT, {
     comparedLiterals: [['currentView', ROUTE_TOKENS.filter((token) => token !== 'systems')]],
   });
+  defineStructureContract(
+    'ROUTE ENUMERATION: and the world-scope model tests only the entry routes',
+    `${MANAGER}/worldScopeModel.svelte.js`,
+    {
+      comparedLiterals: [
+        ['currentView', ['world-component-entry', 'world-essence-entry', 'world-tool-entry']],
+      ],
+    }
+  );
 });
 
 // AC-4, ONE DIRECTION ONLY: the component bundle spreads four keys and a screen legitimately
@@ -192,8 +201,16 @@ describe('the world component entry’s gateway-owned wires are pinned', () => {
     ROOT,
     {
       gives: [
-        { at: 'WorldComponentEntryPage', attribute: 'worldEssences', is: 'worldEssenceOptions' },
-        { at: 'WorldComponentCataloguePage', attribute: 'worldEssences', is: 'worldEssenceOptions' },
+        {
+          at: 'WorldComponentEntryPage',
+          attribute: 'worldEssences',
+          is: 'worldScope.worldEssenceOptions',
+        },
+        {
+          at: 'WorldComponentCataloguePage',
+          attribute: 'worldEssences',
+          is: 'worldScope.worldEssenceOptions',
+        },
         {
           at: 'WorldComponentCataloguePage',
           attribute: 'onOpenEntry',

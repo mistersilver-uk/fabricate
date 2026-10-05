@@ -5422,6 +5422,7 @@ function buildExpectViewPredicate() {
     'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js',
     'src/ui/svelte/apps/manager/gatheringDraftHandlers.svelte.js',
     'src/ui/svelte/apps/manager/gatheringModifierHandlers.svelte.js',
+    'src/ui/svelte/apps/manager/worldScopeModel.svelte.js',
   ]
     .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
     .join('\n');

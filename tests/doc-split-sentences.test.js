@@ -889,10 +889,23 @@ const RENAMED = [
       "The `{' '}` separators in `GatheringTaskInspector.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.",
     identifiers: [['`GatheringTaskInspector.svelte`', '`ExplainerCard.svelte`']],
   },
+  // Issue 1721 moved the embedded-uuid gate out of the manager root.
+  {
+    before:
+      "Keep the guard and say which build it is for, as `isEmbeddedItemUuid` in `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte` does; a reviewer reading only 14.365 source will otherwise flag it as unreachable (issue 1371).",
+    after:
+      "Keep the guard and say which build it is for, as `isEmbeddedItemUuid` in `src/ui/svelte/apps/manager/dropUuidClassification.js` does; a reviewer reading only 14.365 source will otherwise flag it as unreachable (issue 1371).",
+    identifiers: [
+      [
+        '`src/ui/svelte/apps/manager/dropUuidClassification.js`',
+        '`src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`',
+      ],
+    ],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 33;
+const RENAMED_COUNT = 34;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {

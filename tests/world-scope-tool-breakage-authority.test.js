@@ -136,9 +136,14 @@ describe('the UI readers are routed at ONE point: the selected-system projection
   // read off `selectedSystem` is no verdict: bump the count and say so. A read rooted anywhere
   // ELSE, a bracket spelling or an alias bound to the block is a screen re-defaulting on a raw
   // crafting system, and a destructure has no member read to tally, so no record may name the key.
+  // The shell is the root and the world-scope model it composes (issue 1721).
+  const SHELL = [
+    'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+    'src/ui/svelte/apps/manager/worldScopeModel.svelte.js',
+  ];
   defineStructureContract(
     'every tool-breakage read in the shell is the PUBLISHED projection',
-    'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+    SHELL,
     {
       propertyReads: [
         [
@@ -152,6 +157,9 @@ describe('the UI readers are routed at ONE point: the selected-system projection
       keysNo: ['toolBreakage'],
     }
   );
+  defineStructureContract('and the world-scope model reads none of it', SHELL[1], {
+    propertyReads: [['toolBreakage', []]],
+  });
 });
 
 test('the normalizer flip is absence-preserving and keeps a recognised token', async () => {

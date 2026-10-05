@@ -2,7 +2,11 @@
  * System scope: the essence browser, its bulk sets and the essence editor.
  */
 
-import { ANCHORED_POPOVER_SOURCES, BULK_DELETE_CARD_PATTERN } from './caseConstants.js';
+import {
+  ANCHORED_POPOVER_SOURCES,
+  BULK_DELETE_CARD_PATTERN,
+  WORLD_SCOPE_MODEL_PATTERN,
+} from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -25,6 +29,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({

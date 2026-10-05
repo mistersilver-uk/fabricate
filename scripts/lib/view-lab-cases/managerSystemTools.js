@@ -6,6 +6,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   TOOL_EDITOR_SHELL_MATCHES,
   TOOL_LIST_MATCHES,
+  WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
@@ -47,7 +48,7 @@ export const CASES = Object.freeze([
     ],
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [...TOOL_LIST_MATCHES],
+    sourceMatches: [...TOOL_LIST_MATCHES, WORLD_SCOPE_MODEL_PATTERN],
   }),
   managerCase({
     id: 'manager-tool-zero-state-empty-library-1280x720',
@@ -117,7 +118,7 @@ export const CASES = Object.freeze([
     ],
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [...TOOL_LIST_MATCHES],
+    sourceMatches: [...TOOL_LIST_MATCHES, WORLD_SCOPE_MODEL_PATTERN],
   }),
   managerCase({
     id: 'manager-tool-zero-state-membership-all-1280x720',

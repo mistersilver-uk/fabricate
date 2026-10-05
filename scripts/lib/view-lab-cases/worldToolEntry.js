@@ -6,6 +6,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   REQUIREMENT_SUGGESTION,
   TYPEAHEAD_COMBOBOX_SOURCE,
+  WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
@@ -45,6 +46,7 @@ export const CASES = Object.freeze([
       // The buffered-save seam (issue 1373), claimed by the second screen that renders it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({
