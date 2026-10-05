@@ -123,7 +123,8 @@ function bolts(stage) {
 
 test('the Journal projects the bolt from the same predicate, and never on a paused run', () => {
   for (const [label, code, overrides] of CASES) {
-    assert.deepEqual(bolts(fixture(overrides)), Array(2).fill(code === null), label);
+    const drawn = code === null;
+    assert.deepEqual(bolts(fixture(overrides)), [drawn, drawn], label);
   }
   const paused = fixture({ run: { pauseState: { pausedAt: 0, remainingSeconds: 60 } } });
   assert.equal(automaticStageBlocker(paused), null, 'a pause is not an automatic blocker');
