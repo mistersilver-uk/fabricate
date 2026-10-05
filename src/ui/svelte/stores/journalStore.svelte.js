@@ -1,15 +1,11 @@
 import { journalCommandRefusal, spentDiceNotice } from '../../presenters/additionalDicePrompt.js';
+import { RUN_KINDS, runActivityKind } from '../util/journalRunKinds.js';
 import { isResolvedFailureOutcome, resolvedFailureMessage } from '../util/journalRunReasons.js';
 
 import { createPageWindow } from './browseListing.svelte.js';
 
 const PAGE_SIZES = Object.freeze([4, 6, 12, 25]);
 const RECENT_TERMINAL_LIMIT = 3;
-/**
- * The four run kinds, in toggle order. The kind filter is the session-only subset of them shown;
- * every kind starts shown and nothing persists the set.
- */
-const RUN_KINDS = Object.freeze(['crafting', 'gathering', 'salvage', 'alchemy']);
 /**
  * The player-facing Active status tabs. `inProgress` selects BOTH projected statuses that wear
  * the merged `In progress` badge (issue 1648, D-029): before the merge there was no tab for
@@ -25,6 +21,7 @@ const ACTIVE_STATUS_MEMBERS = Object.freeze({
 });
 
 /**
+ * The kind filter is the session-only subset of `RUN_KINDS` shown, every kind at first.
  * Status counts use the union of the shown kinds before search, status filtering or paging.
  * Native run keys retain selected detail off-page or filtered out until removal/dismissal.
  */
@@ -577,7 +574,7 @@ function toggledKinds(kinds, kind) {
 }
 
 function matchesKind(kinds) {
-  return (run) => kinds.includes(activityKind(run));
+  return (run) => kinds.includes(runActivityKind(run));
 }
 
 function matchesSearch(query) {
@@ -623,10 +620,6 @@ function matchesActiveStatus(status) {
   if (status === 'all') return () => true;
   const members = ACTIVE_STATUS_MEMBERS[status] ?? [status];
   return (run) => members.includes(activeStatusOf(run));
-}
-
-function activityKind(run) {
-  return run?.activityKind ?? run?.runType ?? 'crafting';
 }
 
 function countActiveStatuses(runs) {

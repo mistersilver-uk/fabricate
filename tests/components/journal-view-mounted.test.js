@@ -47,7 +47,9 @@ const harness = createMountedComponentHarness({
     'src/utils/scalars.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
-    // The real store the kind toggles drive (issue 1518), and its raw closure.
+    // The run kinds the store filters by and the kind filter draws and counts (issue 1644).
+    'src/ui/svelte/util/journalRunKinds.js',
+    // The real store the kind filter drives (issue 1518), and its raw closure.
     'src/ui/presenters/additionalDicePrompt.js',
     'src/systems/additionalDiceReach.js',
     'src/utils/fillPlaceholders.js',
@@ -97,6 +99,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/RunDetail.svelte',
     'src/ui/svelte/apps/journal/RunAwardChoice.svelte',
     'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
+    // The run-type multi-select and the box its rows draw (issue 1644).
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/apps/journal/JournalKindFilter.svelte',
     'src/ui/svelte/apps/journal/JournalView.svelte',
   ],
   rootClass: 'fabricate-app',
@@ -247,6 +252,30 @@ const KIND_SUBSETS = Array.from({ length: 16 }, (_unused, mask) =>
   RUN_KINDS.filter((_kind, index) => mask & (1 << index))
 );
 
+const KIND_KEY = 'FABRICATE.App.Journal.Filters.Kind.';
+const kindTrigger = (target) =>
+  target.querySelector(':scope [data-journal-kind-filter] [data-journal-kind-trigger]');
+
+/** The run-type panel, opened from its trigger when it is shut; portaled to the app root. */
+function openKinds(target) {
+  if (kindTrigger(target).getAttribute('aria-expanded') !== 'true') {
+    kindTrigger(target).click();
+    flushSync();
+  }
+  const panel = target.querySelector(':scope .journal-kind-popover');
+  assert.ok(Boolean(panel), 'the run-type trigger opened its panel');
+  return panel;
+}
+
+const kindOption = (target, kind) =>
+  openKinds(target).querySelector(`[data-journal-kind-option="${kind}"]`);
+
+/** Ticks or unticks one kind's row, as a player does, and settles. */
+function chooseKind(target, kind) {
+  kindOption(target, kind).click();
+  flushSync();
+}
+
 async function mountHistory(run) {
   const { store } = makeJournal({
     historyPageItems: [run],
@@ -386,7 +415,7 @@ describe('JournalView mounted behavior', () => {
     const search = target.querySelector('[data-journal-search] input');
     search.value = 'herb';
     search.dispatchEvent(new Event('input', { bubbles: true }));
-    target.querySelector('[data-journal-kind-toggle="gathering"]').click();
+    chooseKind(target, 'gathering');
     target.querySelector('[data-journal-status-filter] input[value="ready"]').click();
     chooseSelectOption(target, '[data-journal-sort="active"]', 'newest');
     chooseSelectOption(target, '[data-journal-sort="history"]', 'oldest');
@@ -1093,7 +1122,7 @@ describe('JournalView mounted behavior', () => {
     assert.doesNotMatch(target.textContent, /selectedIngredientSetId/);
   });
 
-  describe('kind toggles through the real store', () => {
+  describe('the run-type multi-select through the real store', () => {
     let createJournalStore;
     before(async () => {
       ({ createJournalStore } = await harness.loadRuneModule(
@@ -1117,21 +1146,23 @@ describe('JournalView mounted behavior', () => {
 
     const shown = (target, attribute) =>
       [...target.querySelectorAll(`[${attribute}]`)].map((row) => row.getAttribute(attribute)).sort(byCodePoint);
-    const toggleOf = (target, kind) => target.querySelector(`[data-journal-kind-toggle="${kind}"]`);
+    const selectedOf = (target, kind) => kindOption(target, kind).getAttribute('aria-selected');
+    const summaryOf = (target) =>
+      kindTrigger(target).querySelector('.fabricate-select-value').textContent.trim();
 
-    /** Click the toggles whose state differs from `kinds`, then settle. */
+    /** Tick or untick the rows whose state differs from `kinds`, then settle. */
     async function showOnly(target, kinds) {
       for (const kind of RUN_KINDS) {
-        const pressed = toggleOf(target, kind).getAttribute('aria-pressed') === 'true';
-        if (pressed !== kinds.includes(kind)) toggleOf(target, kind).click();
+        const selected = selectedOf(target, kind) === 'true';
+        if (selected !== kinds.includes(kind)) chooseKind(target, kind);
       }
       await settle();
     }
 
-    it('shows the union of the pressed kinds, under every combination and with search', async () => {
+    it('shows the union of the ticked kinds, under every combination and with search', async () => {
       const { store, target, listing } = await mountStore();
       assert.deepEqual(
-        RUN_KINDS.map((kind) => toggleOf(target, kind).getAttribute('aria-pressed')),
+        RUN_KINDS.map((kind) => selectedOf(target, kind)),
         ['true', 'true', 'true', 'true'],
         'every kind starts shown'
       );
@@ -1158,7 +1189,7 @@ describe('JournalView mounted behavior', () => {
           );
           for (const kind of RUN_KINDS) {
             assert.equal(
-              toggleOf(target, kind).getAttribute('aria-pressed'),
+              selectedOf(target, kind),
               String(kinds.includes(kind)),
               `${label}: ${kind} reads its own state`
             );
@@ -1202,16 +1233,134 @@ describe('JournalView mounted behavior', () => {
       assert.doesNotMatch(plain, /Matching/u);
     });
 
-    it('names each kind toggle by a visible label that presses it', async () => {
+    it('names each option by its visible kind name, and the whole row ticks it', async () => {
       const { store, target } = await mountStore();
-      const toggle = toggleOf(target, 'gathering');
-      const label = target.querySelector(`label[for="${toggle.id}"]`);
-      assert.match(label.textContent, /Kind\.Gathering/u, 'the label is the kind name');
-      assert.ok(!toggle.hasAttribute('aria-labelledby'), 'named by the label, not by an id ref');
-      label.click();
+      const option = kindOption(target, 'gathering');
+      assert.equal(option.getAttribute('role'), 'option');
+      assert.match(
+        option.querySelector('.journal-kind-name').textContent,
+        /Kind\.Gathering/u,
+        'the row names its kind'
+      );
+      assert.ok(!option.hasAttribute('aria-label'), 'named by its own content, not a hidden string');
+      assert.ok(!option.hasAttribute('aria-labelledby'), 'and not by an id ref');
+      option.click();
       await settle();
-      assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'clicking the label toggles it');
+      assert.equal(selectedOf(target, 'gathering'), 'false', 'clicking the row unticks it');
       assert.ok(!store.kindFilter.includes('gathering'));
+    });
+
+    it('opens a multi-selectable list under a listbox trigger, with no query field', async () => {
+      const { target } = await mountStore();
+      const field = target.querySelector(':scope [data-journal-kind-filter]');
+      assert.ok(Boolean(field), 'the control keeps its data-journal-kind-filter hook');
+      assert.equal(field.dataset.journalKindShown, RUN_KINDS.join(' '));
+      assert.equal(target.querySelectorAll('[data-journal-kind-toggle]').length, 0);
+      const trigger = kindTrigger(target);
+      assert.equal(trigger.tagName, 'BUTTON');
+      assert.equal(trigger.getAttribute('aria-haspopup'), 'listbox');
+      assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+      assert.equal(trigger.dataset.keyboardFocus, 'true');
+      assert.ok(trigger.querySelector('i.fa-layer-group'), 'the trigger leads with the layers glyph');
+      assert.ok(trigger.querySelector('i.fa-chevron-down'), 'and trails a closed chevron');
+      assert.equal(summaryOf(target), `${KIND_KEY}All`, 'every kind shown reads as all of them');
+      assert.equal(
+        trigger.getAttribute('aria-label'),
+        `${KIND_KEY}Name:${JSON.stringify({ label: `${KIND_KEY}Label`, summary: `${KIND_KEY}All` })}`,
+        'named by the filter label plus its summary'
+      );
+
+      const panel = openKinds(target);
+      assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+      assert.ok(trigger.querySelector('i.fa-chevron-up'), 'the chevron flips while open');
+      assert.equal(panel.querySelectorAll('input').length, 0, 'four options need no search');
+      const list = panel.querySelector('[role="listbox"]');
+      assert.equal(list.getAttribute('aria-multiselectable'), 'true');
+      assert.equal(list.getAttribute('aria-label'), `${KIND_KEY}Label`);
+      assert.equal(trigger.getAttribute('aria-controls'), list.id);
+      const rows = [...list.querySelectorAll('[data-journal-kind-option]')];
+      assert.deepEqual(rows.map((row) => row.dataset.journalKindOption), RUN_KINDS, 'in label order');
+      assert.deepEqual(
+        rows.map((row) => row.querySelector('.journal-kind-glyph').classList[2]),
+        ['fa-hammer', 'fa-leaf', 'fa-recycle', 'fa-flask']
+      );
+      for (const row of rows) {
+        assert.equal(row.dataset.keyboardFocus, 'true');
+        const box = row.querySelector('.fab-selection-check');
+        assert.equal(box.getAttribute('aria-hidden'), 'true', 'the box only draws the row state');
+        assert.ok(box.classList.contains('is-checked'));
+      }
+      const showAll = panel.querySelector('[data-journal-kind-show-all]');
+      assert.equal(showAll.dataset.keyboardFocus, 'true');
+      assert.match(showAll.textContent, /Kind\.ShowAll/u);
+    });
+
+    it('filters both lists by two ticked kinds and summarises them in label order', async () => {
+      const { store, target } = await mountStore();
+      await showOnly(target, []);
+      assert.equal(summaryOf(target), `${KIND_KEY}None`);
+      chooseKind(target, 'salvage');
+      chooseKind(target, 'crafting');
+      await settle();
+      assert.equal(kindTrigger(target).getAttribute('aria-expanded'), 'true', 'the panel stays open');
+      assert.deepEqual([...store.kindFilter], ['crafting', 'salvage']);
+      assert.equal(summaryOf(target), `${KIND_KEY}Crafting, ${KIND_KEY}Salvage`, 'label order');
+      assert.match(kindTrigger(target).getAttribute('aria-label'), /Kind\.Crafting, .*Kind\.Salvage/u);
+      assert.deepEqual(shown(target, 'data-run-id'), ['a-craft', 'a-salvage']);
+      assert.deepEqual(shown(target, 'data-history-run-id'), ['h-craft', 'h-salvage']);
+      for (const kind of RUN_KINDS) {
+        const ticked = ['crafting', 'salvage'].includes(kind);
+        const row = kindOption(target, kind);
+        assert.equal(row.getAttribute('aria-selected'), String(ticked), `${kind} row state`);
+        assert.equal(row.querySelector('.fab-selection-check').classList.contains('is-checked'), ticked);
+      }
+    });
+
+    it('clears the filter from "Show all run types", so every kind shows again', async () => {
+      const { store, target, listing } = await mountStore();
+      await showOnly(target, ['salvage']);
+      openKinds(target).querySelector('[data-journal-kind-show-all]').click();
+      await settle();
+      assert.deepEqual([...store.kindFilter], RUN_KINDS);
+      assert.equal(summaryOf(target), `${KIND_KEY}All`);
+      assert.deepEqual(
+        shown(target, 'data-run-id'),
+        listing.activeRuns.map((run) => run.id).sort(byCodePoint)
+      );
+      assert.deepEqual(RUN_KINDS.map((kind) => selectedOf(target, kind)), ['true', 'true', 'true', 'true']);
+    });
+
+    it('counts each kind across both lists, before search and the kind filter narrow them', async () => {
+      const listing = kindListing();
+      listing.activeRuns.push(
+        makeCraftingRun({ id: 'a-craft-2', key: 'active-a-craft-2', activityKind: 'crafting' })
+      );
+      listing.history = listing.history.filter((run) => run.activityKind !== 'alchemy');
+      const { target } = await mountStore(listing);
+      const counts = () =>
+        RUN_KINDS.map((kind) =>
+          openKinds(target).querySelector(`[data-journal-kind-count="${kind}"]`).textContent.trim()
+        );
+      assert.deepEqual(counts(), ['3', '2', '2', '1']);
+      const search = target.querySelector(':scope [data-journal-search] input');
+      search.value = 'silver';
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      await showOnly(target, ['gathering']);
+      assert.deepEqual(counts(), ['3', '2', '2', '1'], 'the counts are the journal total, not the view');
+    });
+
+    it('closes on Escape and hands focus back to the trigger', async () => {
+      const { target } = await mountStore();
+      openKinds(target).querySelector('[data-journal-kind-show-all]').focus();
+      assert.ok(document.activeElement !== kindTrigger(target), 'focus starts inside the panel');
+      document.activeElement.dispatchEvent(
+        new globalThis.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+      await settle();
+      await settle();
+      assert.ok(!target.querySelector(':scope .journal-kind-popover'), 'the panel closed');
+      assert.equal(kindTrigger(target).getAttribute('aria-expanded'), 'false');
+      assert.ok(document.activeElement === kindTrigger(target), 'focus is back on the trigger');
     });
 
     it('draws the empty state for both lists when no kind is shown', async () => {

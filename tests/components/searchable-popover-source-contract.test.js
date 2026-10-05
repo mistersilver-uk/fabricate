@@ -139,6 +139,9 @@ const MULTI_SELECT_ADOPTERS = Object.freeze([
   // contents tab, the two files issue 1513 converted onto `multiple` and `stayOpen`, reach the
   // panel through it. No caller passes the gate ALONE since the contents tab became staged.
   'src/ui/svelte/components/SetPicker.svelte',
+  // The Journal's run-type filter (issue 1644): a multi-select over the four kinds by maintainer
+  // ruling 2026-10-05, applying each choice as it is made with no query field.
+  'src/ui/svelte/apps/journal/JournalKindFilter.svelte',
 ]);
 
 // The reader is probed rather than trusted: a pattern matching nothing makes the set-equality
