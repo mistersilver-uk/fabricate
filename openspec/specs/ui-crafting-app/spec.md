@@ -1005,7 +1005,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - A carrier's allocatable maximum is its `ownedUnits` — the units left AFTER the set's non-essence plan has claimed — never the raw stack quantity, so the stepper cannot allocate the player into an infeasible state.
   The pool composes the shared `EssencePool` with `capAtHeld`, so that cap holds after every requirement is met: the player may over-fund deliberately, up to the units owned.
 - A requirement's ratio reports what the allocation contributes over its `need`, as essence amounts, never the whole matching inventory; the bar stops at the need while the ratio states an over-funded pool as it is, `4 / 2`, as the library specimen does.
-  It is stated in words beneath the source list, one sentence per essence naming the surplus ("{essence}: {amount} more than required", the journal stage's own wording), and the consumption-plan panel states the same line; the sentence outlives the essence pool's replacement under issue 1644.
+  The surplus is stated in words beneath the source list, one sentence per essence ("{essence}: {amount} more than required", the journal stage's own wording), and the consumption-plan panel states the same line.
 - The **consumption-plan panel** states what the craft will spend before it is spent: one row per planned item with the quantity that item contributes, plus a pending line naming the requirements still to choose.
   That "still to choose" list is joined with the platform list formatter rather than an authored separator key, so the join is correct in every locale.
 - Legacy set-level essence requirements (`IngredientSet.essences`) are threshold-only and never consumed, so they cannot enter the pool.

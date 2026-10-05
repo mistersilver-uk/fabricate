@@ -46,6 +46,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/EssencePool.svelte': Object.freeze([
     'fabricate-journal-lifecycle-essence-shared',
     'player-crafting-essence-pool',
+    'player-crafting-essence-overshoot',
   ]),
   'src/ui/svelte/components/RunProgress.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',

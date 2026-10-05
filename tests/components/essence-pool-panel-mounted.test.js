@@ -102,6 +102,7 @@ describe('EssencePoolPanel mounted behavior', () => {
       text(panel.querySelector('.fab-essence-pool-kicker')),
       'Essence pool shared by 2 requirements'
     );
+    assert.ok(!panel.querySelector('.manager-empty.is-note'), 'carriers exist, so no empty note');
   });
 
   it('draws one carrier row for two meters, and one allocation counts toward both', async () => {
@@ -270,6 +271,94 @@ describe('EssencePoolPanel mounted behavior', () => {
       pool: { ...SHARED, carriers: SHARED.carriers.map((entry) => ({ ...entry, allocatedUnits: 0 })) },
     });
     assert.equal(cleared.querySelectorAll('[data-essence-picked]').length, 0);
+  });
+
+  it('lists only carriers that contribute an essence the set needs', async () => {
+    const target = await harness.mount({
+      pool: essencePool({
+        requirements: [requirement('radiant', 'Radiant', 2, 0)],
+        carriers: [
+          carrier('Item.dusk', 'Duskcrystal', 3, 0, { radiant: 2 }),
+          carrier('Item.coal', 'Coal', 15, 0, { ember: 1 }),
+          carrier('Item.ash', 'Ash', 4, 0, {}),
+        ],
+      }),
+    });
+    const listed = [...target.querySelectorAll('[data-essence-carrier]')].map(
+      (row) => row.dataset.essenceCarrier
+    );
+    assert.deepEqual(listed, ['Item.dusk']);
+    assert.ok(!target.querySelector('.manager-empty.is-note'));
+
+    const none = await harness.setProps({
+      pool: essencePool({
+        requirements: [requirement('radiant', 'Radiant', 2, 0)],
+        carriers: [carrier('Item.coal', 'Coal', 15, 0, { ember: 1 })],
+      }),
+    });
+    assert.equal(none.querySelectorAll('[data-essence-carrier]').length, 0);
+    assert.ok(none.querySelector('.manager-empty.is-note'), 'nothing useful is stated as empty');
+  });
+
+  it('adds fractional requirements naming one essence without binary drift', async () => {
+    const target = await harness.mount({
+      pool: essencePool({
+        requirements: [
+          requirement('radiant', 'Radiant', 0.1, 0.1),
+          { ...requirement('radiant', 'Radiant', 0.2, 0.2), groupId: 'g-radiant-2' },
+        ],
+        carriers: [carrier('Item.dusk', 'Duskcrystal', 5, 3, { radiant: 0.1 })],
+      }),
+    });
+    assert.deepEqual(totals(target), { radiant: '0.3 / 0.3' });
+    assert.deepEqual(states(target), [['radiant', 'met']]);
+    assert.ok(!target.querySelector('[data-essence-overshoot]'));
+  });
+
+  it('states a fractional surplus at its authored precision', async () => {
+    const target = await harness.mount({
+      pool: essencePool({
+        requirements: [requirement('radiant', 'Radiant', 0.2, 0.2)],
+        carriers: [carrier('Item.dusk', 'Duskcrystal', 5, 3, { radiant: 0.1 })],
+      }),
+    });
+    assert.equal(text(target.querySelector('[data-essence-overshoot="radiant"]')), 'Radiant: 0.1 more than required');
+  });
+
+  it('reads a requirement with nothing left to fund as met', async () => {
+    const target = await harness.mount({
+      pool: essencePool({ requirements: [requirement('radiant', 'Radiant', 0, 0)], carriers: [] }),
+    });
+    assert.deepEqual(states(target), [['radiant', 'met']]);
+  });
+
+  it('leaves the tint hook off an untinted requirement', async () => {
+    const target = await harness.mount({
+      pool: essencePool({ requirements: [requirement('radiant', 'Radiant', 2, 0)], carriers: [] }),
+    });
+    assert.ok(!target.querySelector('[data-essence-meter="radiant"]').hasAttribute('data-essence-meter-tint'));
+  });
+
+  it('multiplies a recap yield by the allocated units', async () => {
+    const [dusk, prism] = SHARED.carriers;
+    const target = await harness.mount({
+      pool: { ...SHARED, carriers: [{ ...dusk, allocatedUnits: 2 }, prism] },
+    });
+    const chips = [...target.querySelectorAll('[data-essence-picked="Item.dusk"] .essence-contribution')];
+    assert.deepEqual(chips.map(text), ['4 Radiant', '2 Shadow']);
+  });
+
+  it('mutes a recap essence the set does not require', async () => {
+    const [dusk, prism] = SHARED.carriers;
+    const target = await harness.mount({
+      pool: { ...SHARED, carriers: [dusk, { ...prism, allocatedUnits: 1 }] },
+    });
+    const chips = [...target.querySelectorAll('[data-essence-picked="Item.prism"] .essence-contribution')];
+    assert.deepEqual(chips.map(text), ['1 Radiant', '1 ember']);
+    assert.deepEqual(
+      chips.map((chip) => chip.classList.contains('is-required')),
+      [true, false]
+    );
   });
 
   it('disables every stepper when the rail is read-only', async () => {

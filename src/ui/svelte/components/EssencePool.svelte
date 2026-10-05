@@ -40,7 +40,7 @@
     const byEssence = new SvelteMap();
     for (const threshold of thresholds) {
       const pool = byEssence.get(threshold.essence) ?? { ...threshold, amount: 0, sources: [] };
-      pool.amount += Math.max(0, Number(threshold.amount) || 0);
+      pool.amount = exact(pool.amount + Math.max(0, Number(threshold.amount) || 0));
       pool.sources.push(...(threshold.sources ?? []));
       byEssence.set(threshold.essence, pool);
     }

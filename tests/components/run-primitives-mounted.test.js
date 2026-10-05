@@ -564,7 +564,7 @@ describe('run primitives mounted behavior', () => {
     assert.equal(radiantMeter.getAttribute('aria-labelledby'), head.id, 'and names the meter');
     assert.ok(!radiantMeter.querySelector('.visually-hidden'), 'no second copy of the name');
     assert.equal(radiantMeter.getAttribute('aria-valuetext'), '4 of 4', 'the caller words the reading');
-    const overshoot = target.querySelector('[data-essence-overshoot]');
+    const overshoot = target.querySelector('.fab-essence-overshoots');
     assert.match(overshoot.textContent, /shadow channelled is 1 over/u);
     assert.ok(
       target.querySelector('[data-essence-sources]').compareDocumentPosition(overshoot) & 4,
@@ -617,6 +617,35 @@ describe('run primitives mounted behavior', () => {
 
     const journal = await essenceHarness.mount(props(false));
     assert.equal(journal.querySelector('[data-allocation="ember"]').getAttribute('max'), '1', 'met freezes it');
+    essenceHarness.remount();
+  });
+
+  it('caps an unmet pool at the held count, not at allocation plus spare', async () => {
+    const target = await essenceHarness.mount({
+      thresholds: [
+        { essence: 'fire', amount: 10, sources: [{ id: 'ember', label: 'Ember', inputProps: { 'data-allocation': 'ember' } }] },
+      ],
+      allocation: { ember: 1 },
+      yield: () => 1,
+      spare: () => 2,
+      held: () => 5,
+      capAtHeld: true,
+    });
+    assert.equal(target.querySelector('[data-allocation="ember"]').getAttribute('max'), '5');
+    essenceHarness.remount();
+  });
+
+  it('adds fractional requirements for one essence before comparing', async () => {
+    const target = await essenceHarness.mount({
+      thresholds: [
+        { essence: 'fire', amount: 0.1, sources: [{ id: 'ember', label: 'Ember' }] },
+        { essence: 'fire', amount: 0.2, sources: [{ id: 'ember', label: 'Ember' }] },
+      ],
+      allocation: { ember: 3 },
+      yield: () => 0.1,
+    });
+    assert.equal(target.querySelector('[data-essence-total="fire"]').textContent.trim(), '0.3 / 0.3');
+    assert.ok(target.querySelector('[data-essence-total="fire"]').classList.contains('is-met'));
     essenceHarness.remount();
   });
 

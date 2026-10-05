@@ -26,9 +26,16 @@
   } = $props();
 
   const requirements = $derived(Array.isArray(pool?.requirements) ? pool.requirements : []);
-  const carriers = $derived(Array.isArray(pool?.carriers) ? pool.carriers : []);
+  const allCarriers = $derived(Array.isArray(pool?.carriers) ? pool.carriers : []);
+  // A listed carrier must contribute an essence the set needs; one that funds nothing here would
+  // read only "You own N" and leave the player unable to tell what it does.
+  const carriers = $derived(
+    allCarriers.filter((carrier) =>
+      requirements.some((requirement) => Number(carrier?.perUnit?.[requirement.essenceId]) > 0)
+    )
+  );
   const allocated = $derived(
-    carriers.filter((carrier) => Number(carrier?.allocatedUnits ?? 0) > 0)
+    allCarriers.filter((carrier) => Number(carrier?.allocatedUnits ?? 0) > 0)
   );
   const title = $derived(
     requirements.length === 1
@@ -56,6 +63,11 @@
     }))
   );
 
+  // Twelve significant digits absorb binary drift, matching the pool's own sums.
+  function exact(value) {
+    return Number(value.toPrecision(12));
+  }
+
   function meterState(delivered, need) {
     if (need <= 0 || delivered >= need) return 'met';
     return delivered > 0 ? 'partial' : 'short';
@@ -67,8 +79,8 @@
     const byEssence = new SvelteMap();
     for (const requirement of requirements) {
       const entry = byEssence.get(requirement.essenceId) ?? { requirement, need: 0, delivered: 0 };
-      entry.need += Number(requirement.need) || 0;
-      entry.delivered += Number(requirement.delivered) || 0;
+      entry.need = exact(entry.need + (Number(requirement.need) || 0));
+      entry.delivered = exact(entry.delivered + (Number(requirement.delivered) || 0));
       byEssence.set(requirement.essenceId, entry);
     }
     return [...byEssence.values()].map(({ requirement, need, delivered }) => {
