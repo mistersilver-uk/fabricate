@@ -1433,17 +1433,17 @@ test('the drop table paints a drop-target row and keeps a hovered selected row s
   const page = await context.newPage();
   try {
     const row = (id, state) =>
+      '<div class="fabricate-data-table is-selectable manager-task-drops-card manager-gathering-task-drops-table">' +
+      '<div class="fabricate-data-table-scroll"><table class="fabricate-data-table-table"><tbody>' +
       `<tr id="${id}" class="fabricate-data-table-row ${state}">` +
       '<th scope="row" class="fabricate-data-table-cell">Moss</th>' +
-      '<td class="fabricate-data-table-cell">1</td></tr>';
+      '<td class="fabricate-data-table-cell">1</td></tr></tbody></table></div></div>';
     await page.setContent(
       `<style>${css}</style>` +
         '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
         '<div class="manager-gathering-task-edit-view">' +
-        '<div class="fabricate-data-table is-selectable manager-task-drops-card manager-gathering-task-drops-table">' +
-        '<div class="fabricate-data-table-scroll"><table class="fabricate-data-table-table"><tbody>' +
         `${row('plain', '')}${row('target', 'is-drop-active')}${row('chosen', 'is-selected')}` +
-        `${row('chosen-target', 'is-selected is-drop-active')}</tbody></table></div></div></div>` +
+        `${row('chosen-target', 'is-selected is-drop-active')}</div>` +
         '<i id="soft" style="background: var(--fab-success-soft)"></i>' +
         '<i id="raised" style="background: var(--fab-surface-raised)"></i></div>'
     );

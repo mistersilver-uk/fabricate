@@ -2043,7 +2043,7 @@ describe('CraftingSystemManager source contract', () => {
   defineStructureContract('tables the drop rules', taskPart('DropsCard'), {
     renders: ['DataTable', 'GatheringTaskDropCell'],
     names: ['dragDrop', 'dropZone'],
-    callsWith: [['onImportDrop', 'row']],
+    callsWith: [['onImportDrop', 'rowId']],
     writes: ['data-gathering-task-drops-table', 'data-gathering-add-drop'],
     spellsExactly: ['manager-task-drop-controls', 'data-gathering-task-drop-id'],
   });
@@ -2099,7 +2099,7 @@ describe('CraftingSystemManager source contract', () => {
     { file: taskPart('DropsCard'), fn: 'handleDropZoneDrop' },
     {
       compares: ['FabricateManagedComponent'],
-      callsWith: [['onUpdateDrop', 'row']],
+      callsWith: [['onUpdateDrop', 'rowId']],
       reads: ['data.componentId'],
       keys: ['componentId', 'itemUuid', 'systemItemId', 'name', 'enabled'],
     }
