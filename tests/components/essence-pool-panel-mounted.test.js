@@ -304,8 +304,8 @@ describe('EssencePoolPanel mounted behavior', () => {
     const target = await harness.mount({
       pool: essencePool({
         requirements: [
-          requirement('radiant', 'Radiant', 0.1, 0.1),
-          { ...requirement('radiant', 'Radiant', 0.2, 0.2), groupId: 'g-radiant-2' },
+          requirement('radiant', 'Radiant', 0.1, 0.3),
+          { ...requirement('radiant', 'Radiant', 0.2, 0), groupId: 'g-radiant-2' },
         ],
         carriers: [carrier('Item.dusk', 'Duskcrystal', 5, 3, { radiant: 0.1 })],
       }),
@@ -325,9 +325,9 @@ describe('EssencePoolPanel mounted behavior', () => {
     assert.equal(text(target.querySelector('[data-essence-overshoot="radiant"]')), 'Radiant: 0.1 more than required');
   });
 
-  it('reads a requirement with nothing left to fund as met', async () => {
+  it('reads a requirement needing nothing as met, whatever it reports delivered', async () => {
     const target = await harness.mount({
-      pool: essencePool({ requirements: [requirement('radiant', 'Radiant', 0, 0)], carriers: [] }),
+      pool: essencePool({ requirements: [requirement('radiant', 'Radiant', 0, -1)], carriers: [] }),
     });
     assert.deepEqual(states(target), [['radiant', 'met']]);
   });
