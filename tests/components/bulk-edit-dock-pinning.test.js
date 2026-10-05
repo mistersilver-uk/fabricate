@@ -33,7 +33,7 @@ import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { chromium } from 'playwright';
+import { borrowBrowser } from '../helpers/layout-harness.js';
 // Same import path the mounted suites use for `flushSync`.
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -294,7 +294,7 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
       shell.teardown();
     }
 
-    const browser = await chromium.launch();
+    const browser = await borrowBrowser();
     try {
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
       await page.setContent(inspectorPage(rendered.markup), { waitUntil: 'load' });
@@ -321,7 +321,7 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
     // `margin-top`) and the delete wore the host button's 14px type on a 6px corner, wrapping the
     // system panel's `Remove 2 components from The Herbalist's Compendium…` to two lines. Both are
     // the SHELL's and the sheet's, so one measurement covers the world and the system panel alike.
-    const browser = await chromium.launch();
+    const browser = await borrowBrowser();
     try {
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
       // Spliced before the LAST `</div></section>`, which closes the dock and the panel.
@@ -511,7 +511,7 @@ describe('the bulk edit dock with a sibling card after the shell', () => {
       card.teardown();
     }
 
-    const browser = await chromium.launch();
+    const browser = await borrowBrowser();
     try {
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
       await page.setContent(inspectorPage(`${rendered.shell}${rendered.card}`), {

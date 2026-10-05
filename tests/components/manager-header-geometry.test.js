@@ -9,7 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { chromium } from 'playwright';
+import { borrowBrowser } from '../helpers/layout-harness.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -128,7 +128,7 @@ function pageAround(markup) {
  * @returns {Promise<object>}
  */
 async function measure(subtitle, title) {
-  const browser = await chromium.launch();
+  const browser = await borrowBrowser();
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     await page.setContent(pageFor(subtitle, title), { waitUntil: 'load' });
@@ -219,7 +219,7 @@ const CHIP_FACES = [
  * @returns {Promise<{chip: object, button: object}>} the computed geometry of the chip and button
  */
 async function measureCluster(markup) {
-  const browser = await chromium.launch();
+  const browser = await borrowBrowser();
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     await page.setContent(pageAround(markup), { waitUntil: 'load' });
