@@ -1847,7 +1847,7 @@ const HEADER_CENSUS = Object.freeze({
       "+ 3 a class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" data-premium-icons-ad-link=\"true\" href=\"https://www.patreon.com/c/mistersilver\" rel=\"noopener noreferrer\" target=\"_blank\" title=\"Opens Fabricate Premium on Patreon in a new tab\"",
       "+ 4 span | See Premium",
       "+ 4 i aria-hidden=\"true\" class=\"fas fa-arrow-up-right-from-square\"",
-      "+ 3 button aria-label=\"Hide Premium suggestion\" class=\"fabricate-icon-button is-size-24 is-ghost\" data-keyboard-focus=\"true\" data-premium-icons-ad-dismiss=\"true\" title=\"Hide Premium suggestion\" type=\"button\"",
+      "+ 3 button aria-label=\"Hide Premium suggestion\" class=\"fabricate-icon-button is-size-24 is-ghost\" data-keyboard-focus=\"true\" data-premium-icons-ad-dismiss=\"\" title=\"Hide Premium suggestion\" type=\"button\"",
       "+ 4 i aria-hidden=\"true\" class=\"fas fa-xmark\"",
       "+ 2 button class=\"fabricate-button fab-manager-button is-primary is-size-38\" data-component-add-from-catalogue=\"true\" data-keyboard-focus=\"true\" type=\"button\"",
       "- 3 span | Create",
@@ -1891,7 +1891,7 @@ const HEADER_CENSUS = Object.freeze({
       "+ 3 a class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" data-premium-icons-ad-link=\"true\" href=\"https://www.patreon.com/c/mistersilver\" rel=\"noopener noreferrer\" target=\"_blank\" title=\"Opens Fabricate Premium on Patreon in a new tab\"",
       "+ 4 span | See Premium",
       "+ 4 i aria-hidden=\"true\" class=\"fas fa-arrow-up-right-from-square\"",
-      "+ 3 button aria-label=\"Hide Premium suggestion\" class=\"fabricate-icon-button is-size-24 is-ghost\" data-keyboard-focus=\"true\" data-premium-icons-ad-dismiss=\"true\" title=\"Hide Premium suggestion\" type=\"button\"",
+      "+ 3 button aria-label=\"Hide Premium suggestion\" class=\"fabricate-icon-button is-size-24 is-ghost\" data-keyboard-focus=\"true\" data-premium-icons-ad-dismiss=\"\" title=\"Hide Premium suggestion\" type=\"button\"",
       "+ 4 i aria-hidden=\"true\" class=\"fas fa-xmark\"",
     ],
     "the world Component catalogue with the gate on and the advert dismissed: no group": [

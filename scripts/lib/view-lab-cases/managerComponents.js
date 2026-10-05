@@ -71,9 +71,10 @@ const SALVAGE_ROW_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/recipe\/(pickerRowKinds|resultRows)\.js$/,
 ]);
 
-/** Open the editor on a component and bring its salvage results into view. */
 /** Component Rules' header group, led by the Premium advert until it is dismissed. */
 const COMPONENT_RULES_ACTIONS = '[data-manager-view="components"] .manager-header-actions';
+
+/** Open the editor on a component and bring its salvage results into view. */
 
 const salvageSteps = (componentId) => [
   { selector: '#manager-nav-component-rules' },
@@ -127,6 +128,8 @@ export const CASES = Object.freeze([
     expectView: 'components',
     // The lab world opts into experimental features, so the Premium advert leads the header.
     expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-premium-icons-ad]:first-child`,
+    // Only the full face draws the subline.
+    expectVisible: '[data-premium-icons-ad] .manager-premium-icons-ad-subline',
     // Issue 1371 r13-list — the list opens on its first drawn row (maintainer ruling M14).
     expectContained: [
       {
@@ -183,6 +186,9 @@ export const CASES = Object.freeze([
     steps: [{ selector: '#manager-nav-component-rules' }],
     expectView: 'components',
     expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-premium-icons-ad]:first-child`,
+    // Drawn rather than withheld; the geometry test proves this face drops its subline.
+    expectVisible: '[data-premium-icons-ad]',
+    expectClick: '[data-premium-icons-ad-link]',
     expectContained: [
       { container: '.manager-header', target: '[data-component-add-from-catalogue]' },
     ],

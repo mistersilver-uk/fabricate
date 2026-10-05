@@ -199,6 +199,8 @@ export const CASES = Object.freeze([
     // and the Premium advert alone in the header group, since the lab world opts into experimental features (issue 2220).
     expectSelector:
       '.fabricate-manager:has([data-scoped-page="world-components"]) .manager-header-actions > [data-premium-icons-ad]:only-child',
+    // Only the advert's full face draws the subline.
+    expectVisible: '[data-premium-icons-ad] .manager-premium-icons-ad-subline',
     // The four leaves in the prototype's authored order, each proved to hold its own icon rather than merely to exist.
     expectContained: [
       {

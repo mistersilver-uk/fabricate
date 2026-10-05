@@ -4283,7 +4283,7 @@
   data-world-rules-tab={isWorldRulesRoute ? worldRulesTab : undefined}
 >
   <!--
-    The manager titlebar: a thin, always-present identity strip above the header.
+    The manager titlebar: a thin identity strip above the header, on the tool routes too (issue 1373).
   -->
   <div
     class="manager-titlebar"

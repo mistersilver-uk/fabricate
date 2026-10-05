@@ -102,7 +102,7 @@
     ariaLabel={hideLabel}
     title={hideLabel}
     onclick={dismiss}
-    data-premium-icons-ad-dismiss
+    data-premium-icons-ad-dismiss=""
   >
     <i class="fas fa-xmark" aria-hidden="true"></i>
   </IconButton>
@@ -140,11 +140,13 @@
     background-size: cover;
   }
 
+  /* The copy gives before the strip grows, so a long translation cannot squeeze the title. */
   .manager-premium-icons-ad-copy {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2xs);
     min-width: 0;
+    max-width: 15rem;
   }
 
   .manager-premium-icons-ad-heading {
@@ -154,6 +156,8 @@
   }
 
   .manager-premium-icons-ad-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--fab-text);
     font-size: 12.5px;
     font-weight: 600;
@@ -172,6 +176,8 @@
   }
 
   .manager-premium-icons-ad-subline {
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--fab-text-muted);
     font-size: 11px;
     white-space: nowrap;
