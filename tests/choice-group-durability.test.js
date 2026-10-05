@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { AwardChoiceSettler, memberUnclaimableReason } from '../src/systems/awardChoiceSettle.js';
+import { owesClaimablePick } from '../src/systems/choiceGroupAward.js';
 import { ActorPropertyCoinSpender } from '../src/systems/CoinSpenders.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 
@@ -294,4 +295,40 @@ test('1773: a bare Item alternative is judged through fromUuidSync without loadi
   } finally {
     Object.assign(globalThis, { fromUuidSync: saved });
   }
+});
+
+const pending = (...alternatives) => ({
+  choiceId: 'c',
+  alternatives: alternatives.map((id) => ({ id })),
+});
+const runOwing = (...choices) => ({ steps: [{ pendingAwardChoices: choices }] });
+
+test('1644: owing a claimable pick needs one claimable alternative of any owed choice', () => {
+  const only =
+    (...ids) =>
+    () =>
+    (member) =>
+      ids.includes(member.id) ? null : 'unitMissing';
+  assert.equal(owesClaimablePick(runOwing(pending('a', 'b')), only('b')), true, 'one of two');
+  assert.equal(
+    owesClaimablePick(runOwing(pending('a'), pending('b')), only('b')),
+    true,
+    'one choice'
+  );
+  assert.equal(owesClaimablePick(runOwing(pending('a', 'b')), only()), false, 'none claimable');
+  const settled = { ...pending('a'), settledAt: 5 };
+  assert.equal(owesClaimablePick(runOwing(settled), only('a')), false, 'a settled choice');
+});
+
+test('1644: claimability is asked only of a run that owes a pick', () => {
+  let asked = 0;
+  const claimability = () => {
+    asked += 1;
+    return () => null;
+  };
+  assert.equal(owesClaimablePick(runOwing(), claimability), false);
+  assert.equal(owesClaimablePick(runOwing({ ...pending('a'), settledAt: 5 }), claimability), false);
+  assert.equal(asked, 0, 'nothing owed, nothing asked');
+  assert.equal(owesClaimablePick(runOwing(pending('a')), claimability), true);
+  assert.equal(asked, 1);
 });

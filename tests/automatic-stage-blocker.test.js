@@ -176,3 +176,42 @@ test('the scan’s due rule drops only its clock when asked without a world time
   delete run.steps[0].timeGate;
   assert.equal(worldTimeDueStep(run), null, 'a stage with no gate is never the scan’s');
 });
+
+/** A two-stage run at stage 1, where `blocked` names the stage whose authored set takes inputs. */
+function twoStage(blocked) {
+  const stage = (id, ingredients) => ({
+    id,
+    toolIds: [],
+    ingredientSets: [{ id: 'set', ingredients }],
+  });
+  const stages = [stage('a', blocked === 0 ? [HERB] : []), stage('b', blocked === 1 ? [HERB] : [])];
+  const base = fixture();
+  return {
+    ...base,
+    recipe: { ...base.recipe, getExecutionSteps: () => stages },
+    run: {
+      ...base.run,
+      currentStepIndex: 1,
+      steps: [
+        { stepId: 'a' },
+        {
+          stepId: 'b',
+          timeGate: { availableAt: 60 },
+          selectionPlan: { selectedIngredientSetId: 'set' },
+        },
+      ],
+    },
+  };
+}
+
+test('the bolt reads the recipe stage at the run’s current index, not the first', () => {
+  assert.deepEqual(bolts(twoStage(0)), [true, true], 'only the first stage takes inputs');
+  assert.deepEqual(bolts(twoStage(1)), [false, false], 'the current stage takes inputs');
+});
+
+test('the bolt is withheld when the selected ingredient set does not exist', () => {
+  const missing = fixture({ selected: 'ghost' });
+  assert.deepEqual(bolts(missing), [false, false], 'a selection naming no set');
+  const setless = fixture({ sets: [] });
+  assert.deepEqual(bolts(setless), [false, false], 'a stage with no sets');
+});
