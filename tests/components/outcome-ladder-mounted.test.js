@@ -42,7 +42,11 @@ describe('OutcomeLadder reached tier and pass-through (issue 1644)', () => {
   after(() => ladder.teardown());
 
   it('marks the one tier whose merged ids contain the reached id', async () => {
-    const target = await ladder.mount({ tiers: TIERS, reachedId: 'standard', reachedLabel: 'Your roll' });
+    const target = await ladder.mount({
+      tiers: TIERS,
+      reachedId: 'standard',
+      reachedLabel: 'Your roll',
+    });
     const marked = reached(target);
     assert.deepEqual(tierIds(marked), ['flawed'], 'a merged id marks the row it was merged into');
     assert.equal(marked[0].getAttribute('data-outcome-rolled'), 'true');
@@ -53,7 +57,11 @@ describe('OutcomeLadder reached tier and pass-through (issue 1644)', () => {
   });
 
   it("falls back to a tier's own id when it carries no ids", async () => {
-    const target = await ladder.mount({ tiers: TIERS, reachedId: 'fine', reachedLabel: 'Your roll' });
+    const target = await ladder.mount({
+      tiers: TIERS,
+      reachedId: 'fine',
+      reachedLabel: 'Your roll',
+    });
     assert.deepEqual(tierIds(reached(target)), ['fine']);
   });
 
@@ -70,7 +78,11 @@ describe('OutcomeLadder reached tier and pass-through (issue 1644)', () => {
     ladder.remount();
     const unknown = await ladder.mount({ tiers: TIERS, reachedId: 'missing', reachedLabel: 'x' });
     assert.equal(reached(unknown).length, 0);
-    assert.equal(unknown.querySelectorAll('[data-outcome-tier]').length, 3, 'every tier still draws');
+    assert.equal(
+      unknown.querySelectorAll('[data-outcome-tier]').length,
+      3,
+      'every tier still draws'
+    );
   });
 
   it('draws a band chip only for a tier that has a band', async () => {
@@ -81,7 +93,9 @@ describe('OutcomeLadder reached tier and pass-through (issue 1644)', () => {
     ];
     const target = await ladder.mount({ tiers, emptyTierText: 'nothing' });
     const chips = (id) =>
-      target.querySelectorAll(`[data-outcome-tier="${id}"] .fab-outcome-tier-heading .manager-chip`);
+      target.querySelectorAll(
+        `[data-outcome-tier="${id}"] .fab-outcome-tier-heading .manager-chip`
+      );
     assert.equal(chips('banded').length, 1);
     assert.equal(chips('banded')[0].textContent.trim(), '14+');
     assert.equal(chips('bare').length, 0, 'a band-less tier draws no chip');
@@ -103,7 +117,10 @@ describe('OutcomeLadder reached tier and pass-through (issue 1644)', () => {
     const target = await ladder.mount({ tiers, reachedId: 'o1', reachedLabel: 'Your roll' });
     const tier = target.querySelector('[data-tier-hook="o1"]');
     assert.ok(tier?.matches('[data-outcome-tier="o1"].fab-outcome-tier'), 'tier props on the tier');
-    assert.ok(target.querySelector('.manager-chip[data-band-hook="10–20"]'), 'band props on its chip');
+    assert.ok(
+      target.querySelector('.manager-chip[data-band-hook="10–20"]'),
+      'band props on its chip'
+    );
     assert.ok(
       target.querySelector('.manager-chip[data-pill-hook][data-outcome-reached]'),
       "reached props on the tier's pill"
@@ -124,7 +141,9 @@ describe('OutcomeLadder reached tier and pass-through (issue 1644)', () => {
     });
     const root = target.querySelector('[data-outcome-ladder]');
     assert.equal(root.getAttribute('data-root-hook'), 'yes');
-    assert.ok(root.classList.contains('fab-outcome-ladder') && root.classList.contains('extra-ladder'));
+    assert.ok(
+      root.classList.contains('fab-outcome-ladder') && root.classList.contains('extra-ladder')
+    );
     assert.equal(target.querySelectorAll('button, input, select, a, [tabindex]').length, 0);
   });
 });

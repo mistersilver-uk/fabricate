@@ -1684,7 +1684,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       "each band is its tier's chip"
     );
     const award = ladder.querySelector(
-      '[data-inventory-salvage-outcome="o2"] [data-list-row][data-inventory-salvage-result="c2"]'
+      ':scope [data-inventory-salvage-outcome="o2"] [data-list-row][data-inventory-salvage-result="c2"]'
     );
     assert.equal(award?.querySelector('.fabricate-list-row-name').textContent, 'Iron Shard');
     assert.equal(award.querySelector('.fabricate-list-row-quantity').textContent, '×1');
@@ -1696,7 +1696,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       'each tier keeps its success hook'
     );
     assert.equal(
-      ladder.querySelector('[data-inventory-salvage-outcome="o1"] [data-outcome-empty]').textContent,
+      ladder.querySelector(':scope [data-inventory-salvage-outcome="o1"] [data-outcome-empty]')
+        .textContent,
       'FABRICATE.App.Inventory.Salvage.OutcomeAwardsNothing',
       'a tier with nothing says so'
     );

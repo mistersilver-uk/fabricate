@@ -556,7 +556,7 @@ describe('RecipeDetail mounted behavior', () => {
     );
     assert.equal(section.querySelectorAll('.fab-outcome-tier').length, 2, 'the rows are drawn');
     assert.equal(
-      section.querySelectorAll('.fab-outcome-tier-heading .manager-chip').length,
+      section.querySelectorAll(':scope .fab-outcome-tier-heading .manager-chip').length,
       0,
       'crafting tiers carry no band, so no chip'
     );
@@ -578,7 +578,7 @@ describe('RecipeDetail mounted behavior', () => {
   it('marks "Your roll" on the row a success outcome id was merged into', async () => {
     const target = await mountTiers(COLLAPSED, rolled('t-standard'));
     assert.deepEqual(rolledTiers(target), ['t-flawed'], 'exactly the row Standard merged into');
-    const pill = tierSection(target).querySelector('[data-outcome-rolled] [data-outcome-reached]');
+    const pill = tierSection(target).querySelector(':scope [data-outcome-rolled] [data-outcome-reached]');
     assert.equal(pill.textContent.trim(), 'FABRICATE.App.Crafting.Detail.YourRoll');
     harness.remount();
     const own = await mountTiers(COLLAPSED, rolled('t-master'));
