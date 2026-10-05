@@ -164,7 +164,7 @@ When the roll chooses, the header gains a **Selection** roll expression.
 It is rolled against the crafting character once for each award.
 Every alternative then shows a range cell with the lowest and highest roll that selects it.
 Ranges are whole numbers and may not overlap, but they may leave gaps.
-A roll that lands in a gap awards nothing.
+A roll that lands in a gap selects the alternative whose range starts highest below it, and a roll below every range selects the lowest, so a roll always selects an alternative.
 Fabricate marks a range that runs backwards, is a fraction or overlaps another alternative until you fix it.
 
 An **Up to N of** group that is rolled also offers **Unique** and **Repeats allowed**.
