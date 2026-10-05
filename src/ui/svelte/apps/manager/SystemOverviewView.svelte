@@ -75,6 +75,42 @@
       'IssueUnproducedOutcomeTier',
       'A check outcome produces no result set.',
     ],
+    missingTaughtRecipe: [
+      'IssueMissingTaughtRecipe',
+      'A result teaches a recipe that is no longer in this system.',
+    ],
+    choiceGroupInProgressive: [
+      'IssueChoiceGroupInProgressive',
+      'A result set holds a choice of rewards, which a progressive system cannot award.',
+    ],
+    choiceGroupTooFew: [
+      'IssueChoiceGroupTooFew',
+      'A choice of rewards holds fewer than two alternatives.',
+    ],
+    choiceGroupSettings: [
+      'IssueChoiceGroupSettings',
+      'A choice of rewards names a chooser or an award rule Fabricate does not recognise.',
+    ],
+    choiceGroupSelection: [
+      'IssueChoiceGroupSelection',
+      'A rolled choice of rewards has no selection roll that can be rolled.',
+    ],
+    choiceGroupRanges: [
+      'IssueChoiceGroupRanges',
+      'A rolled choice of rewards has a missing, backwards, fractional or overlapping range.',
+    ],
+    choiceGroupCount: [
+      'IssueChoiceGroupCount',
+      'An up-to choice of rewards does not say how many it awards.',
+    ],
+    alchemyResultSelection: [
+      'IssueAlchemyResultSelection',
+      'An alchemy recipe does not resolve to exactly one result set.',
+    ],
+    signatureCollision: [
+      'IssueSignatureCollision',
+      'The recipe shares its ingredient signature with another recipe.',
+    ],
     disabledIncomplete: [
       'IssueDisabledIncomplete',
       'The recipe is disabled and cannot be enabled until its gaps are fixed.',

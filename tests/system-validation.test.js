@@ -125,12 +125,11 @@ describe('evaluateSystemValidation — composition', () => {
       ],
     };
     const recipe = makeRecipe({ id: 'r-1', resultGroups: [{ id: 'rg', results: [choice] }] });
-    const codes = (resolutionMode) =>
-      evaluateSystemValidation(makeSystem({ resolutionMode }), { recipes: [recipe] }).issues.map(
-        (issue) => issue.code
-      );
-    assert.ok(codes('progressive').includes('choiceGroupInProgressive'));
-    assert.ok(!codes('simple').includes('choiceGroupInProgressive'));
+    const issues = (resolutionMode) =>
+      evaluateSystemValidation(makeSystem({ resolutionMode }), { recipes: [recipe] }).issues;
+    const flagged = issues('progressive').find(({ code }) => code === 'choiceGroupInProgressive');
+    assert.match(flagged?.message ?? '', /progressive system cannot award/, 'in its own words');
+    assert.ok(!issues('simple').some(({ code }) => code === 'choiceGroupInProgressive'));
   });
 
   it('surfaces the #431 routed warnings for a check-mode recipe (projection + routing context)', () => {
