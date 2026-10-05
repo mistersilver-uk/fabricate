@@ -324,9 +324,15 @@ let pagePromise;
 
 /** The one page every reading lays out on: `setContent` replaces its document, and none hovers. */
 async function sideRailPage(viewport) {
-  pagePromise ??= openLayoutContext({ viewport, deviceScaleFactor: 1 }).then((context) =>
-    context.newPage()
-  );
+  if (!pagePromise) {
+    pagePromise = openLayoutContext({ viewport, deviceScaleFactor: 1 }).then((context) =>
+      context.newPage()
+    );
+    // A failed open is not kept, so the next reading tries again rather than inheriting it.
+    pagePromise.catch(() => {
+      pagePromise = undefined;
+    });
+  }
   const page = await pagePromise;
   await page.setViewportSize(viewport);
   return page;

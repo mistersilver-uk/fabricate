@@ -14,7 +14,11 @@ import { viteDepCacheDir } from './vite-dep-cache-dir.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-/** One server per process, closed by this root hook; it caches transforms, never module instances. */
+/**
+ * One server per process, closed by this root hook; it caches transforms, never module instances.
+ * The hook is file-scoped, so a suite that boots inside a nested `describe` shares the same server:
+ * never start a second one.
+ */
 let serverPromise;
 
 // eslint-disable-next-line unicorn/no-top-level-side-effects -- a hook inside a test closes too soon

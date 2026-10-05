@@ -100,7 +100,12 @@ export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] })
      */
     async newPage(options = {}) {
       const key = JSON.stringify(options);
-      if (!contexts.has(key)) contexts.set(key, browser.newContext(options));
+      if (!contexts.has(key)) {
+        // A failed launch is not cached, so the next page tries again rather than inheriting it.
+        const pending = browser.newContext(options);
+        pending.catch(() => contexts.delete(key));
+        contexts.set(key, pending);
+      }
       return (await contexts.get(key)).newPage();
     },
   };

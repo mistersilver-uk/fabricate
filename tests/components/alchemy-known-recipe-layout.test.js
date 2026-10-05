@@ -73,8 +73,13 @@ async function measure(p, name, sig, winWidth = 1024) {
       return { left: Math.round(b.left), scrollW: node.scrollWidth, clientW: node.clientWidth };
     };
     const list = el('.alchemy-known-list');
+    const nameStyle = getComputedStyle(el('[data-probe-name]'));
     return {
-      name: rect(el('[data-probe-name]')),
+      name: {
+        ...rect(el('[data-probe-name]')),
+        overflow: nameStyle.overflow,
+        textOverflow: nameStyle.textOverflow,
+      },
       sig: rect(el('[data-probe-sig]')),
       list: { scrollW: list.scrollWidth, clientW: list.clientWidth },
     };
@@ -124,6 +129,9 @@ test('a genuinely long recipe name clips from the RIGHT with an ellipsis, never 
     // so text-overflow: ellipsis trims the RIGHT. The left edge never shifts (which is
     // what would reveal only a right-hand tail like "nom").
     assert.ok(long.name.scrollW > long.name.clientW, 'a long name overflows and is clipped');
+    // The overflow is clipped and marked: widths alone cannot tell a clip from a spill.
+    assert.equal(long.name.overflow, 'hidden', 'the long name is clipped, not spilled');
+    assert.equal(long.name.textOverflow, 'ellipsis', 'the clipped name ends in an ellipsis');
     assert.equal(long.name.left, before.name.left, 'the name stays left-anchored (clips right, not left)');
     assert.equal(long.name.clientW, before.name.clientW, 'the name column width is stable regardless of name length');
   } finally {
