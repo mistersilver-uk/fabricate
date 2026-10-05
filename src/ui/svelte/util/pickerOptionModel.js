@@ -1,6 +1,7 @@
 // The arithmetic behind a picker's option list: which rows survive the query, how they bucket, what
-// a cursor may index and the copy that counts or replaces them (issue 1719). Pure and mount-free,
-// so `tests/util/picker-option-model.test.js` is its whole test.
+// a cursor may index and the copy that counts or replaces them (issue 1719), plus the async source's
+// request order and the trigger snippet's spread (issue 1782). Mount-free, so
+// `tests/util/picker-option-model.test.js` is its whole test.
 
 // A leaf, but every importer's mounted harness must list this file in `rawModules`; one that does
 // not throws in `before()`, or hangs, reported either way as `# cancelled` rather than `# fail`.
@@ -84,4 +85,102 @@ export function pickerEmptiness({ total, matched, noMatchesText, emptyHint, empt
     message: filteredToNothing ? noMatchesText : emptyHint,
     body: filteredToNothing ? '' : emptyDetail,
   };
+}
+
+/** The state an async `source` starts each panel session from: no rows yet, and pending. */
+export const PENDING_SOURCE = Object.freeze({ rows: [], total: 0, pending: true, failed: false });
+
+/** A refinement's state: the rows and total the last answer settled stay listed, marked pending. */
+export function refiningSource(state) {
+  return { ...state, pending: true, failed: false };
+}
+
+/**
+ * A runner that settles only its LATEST request: `run(source, query, settle)` calls
+ * `source(query)` and hands `settle` the source state it resolved to, while a request that an
+ * earlier call started and a later call overtook settles nothing, however late it arrives; a call
+ * with no source starts nothing and so only retires every request still out.
+ */
+export function latestSourceRequest() {
+  let latest = 0;
+  return (source, query, settle) => {
+    const ticket = ++latest;
+    if (!source) return;
+    Promise.resolve()
+      .then(() => source(query))
+      .then(
+        (result) => ticket === latest && settle(sourceRows(result)),
+        () => ticket === latest && settle({ rows: [], total: 0, pending: false, failed: true })
+      );
+  };
+}
+
+/** A source's answer, an array or `{ options, total }`, as settled rows and the total they match within. */
+export function sourceRows(result) {
+  const rows = Array.isArray(result) ? result : (result?.options ?? []);
+  const total = Number.isFinite(result?.total) ? result.total : rows.length;
+  return { rows: Array.isArray(rows) ? rows : [], total, pending: false, failed: false };
+}
+
+/**
+ * The panel's one status: an error replaces the list, a wait replaces it only while no row is
+ * listed and otherwise marks the listed rows `refining`, and a settled list has none.
+ */
+export function pickerStatus({ failed, pending, rowCount, errorText, loadingText }) {
+  if (failed) return { kind: 'error', text: errorText, replacesList: true };
+  if (!pending) return null;
+  if (rowCount > 0) return { kind: 'refining', text: '', replacesList: false };
+  return { kind: 'loading', text: loadingText, replacesList: true };
+}
+
+/**
+ * The rows a panel lists, the total they match within and its one status: a `source`'s settled
+ * answer or `options` through `filterOptions`, and no row at all while a status replaces the list,
+ * so a row the panel is not showing can be neither chosen nor pointed at.
+ */
+export function listedOptions(state) {
+  const { source, remote, options, error, errorText, loadingText } = state;
+  const sourced = Boolean(source);
+  const rows = sourced ? remote.rows : state.filterOptions(options, state.query);
+  const candidates = Array.isArray(rows) ? rows : [];
+  const status = pickerStatus({
+    failed: Boolean(error) || (sourced && remote.failed),
+    pending: Boolean(state.loading) || (sourced && remote.pending),
+    rowCount: candidates.length,
+    errorText: error || errorText,
+    loadingText,
+  });
+  return {
+    rows: status?.replacesList ? [] : candidates,
+    total: sourced ? remote.total : options.length,
+    status,
+  };
+}
+
+const CALLER_OWNED_TRIGGER_KEYS = new Set(['disabled', 'aria-disabled']);
+
+/** The trigger attributes a `trigger` snippet may spread: no undefined value and no disabled pair, so the spread adds and never subtracts. */
+export function spreadableTriggerAttributes(attributes) {
+  const spreadable = {};
+  for (const [key, value] of Object.entries(attributes)) {
+    if (value === undefined || CALLER_OWNED_TRIGGER_KEYS.has(key)) continue;
+    spreadable[key] = value;
+  }
+  return spreadable;
+}
+
+/** What moving a membership from `before` to `after` adds and removes, each in its own list's order. */
+export function membershipChange(before, after) {
+  return {
+    added: after.filter((id) => !before.includes(id)),
+    removed: before.filter((id) => !after.includes(id)),
+  };
+}
+
+/** A staged change laid over the live membership, so a member that changed under it is kept. */
+export function stagedMembership(members, { added, removed }) {
+  return [
+    ...members.filter((id) => !removed.includes(id)),
+    ...added.filter((id) => !members.includes(id)),
+  ];
 }

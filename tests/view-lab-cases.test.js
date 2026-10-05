@@ -2746,6 +2746,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipe-edit-results-suggestions',
   'manager-recipe-edit-tag-picker',
   'manager-recipe-item-contents-picker',
+  'manager-recipe-item-contents-picker-staged',
   'manager-recipes-bulk-edit-check-tier',
   'manager-recipes-bulk-edit-picker',
   'manager-recipes-inspector-route-list',
@@ -6135,17 +6136,14 @@ test('the recipe-item contents cases open a definition the lab world holds, with
 
   assert.ok(
     linked > 0,
-    'manager-recipe-item-contents expects the LINKED list; with no membership `hb-book` draws ' +
-      'the `data-recipe-item-contents-empty` line, its expectSelector matches nothing, and the ' +
-      'capture fails WHOLE'
+    'manager-recipe-item-contents expects member TOKENS; with no membership `hb-book` draws ' +
+      'none, its expectSelector matches nothing, and the capture fails WHOLE'
   );
   assert.ok(
-    systemRecipes > linked,
-    'manager-recipe-item-contents-picker expects an OPENABLE trigger over a populated panel. ' +
-      '`RecipeItemContentsTab` passes `triggerAriaDisabled={linkable.length === 0}`, and the ' +
-      'primitive refuses to open on that flag exactly as it does on `disabled`, so a book ' +
-      `linking every recipe in its system (${linked} of ${systemRecipes}) leaves a trigger the ` +
-      'driver clicks to no effect and a panel that never opens'
+    systemRecipes > linked + 1,
+    'the staged and overflow contents cases each choose recipes `hb-book` does not link, and the ' +
+      `overflow case needs two of them; a book linking ${linked} of ${systemRecipes} leaves the ` +
+      'driver clicking options that stage a removal instead'
   );
 });
 

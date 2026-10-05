@@ -218,6 +218,7 @@ Six more satisfy it as of issue 1508: `Field` emits `fabricate-field`, `SearchFi
 None of the six portals anything either, so each needs exactly one root.
 Issue 1782 adds three instruments over the shared fill leaf: `Meter` emits `fab-meter`, `BandedBar` emits `fab-banded-bar` and `StageBars` emits `fab-stage-bars`, each on its own root element; none portals anything, so each needs one root, and each family is scoped to its component as the leaf's own is.
 The same issue adds the rule pair: `RuleRow` emits `fabricate-rule-row` on its own root and the rest of its `fabricate-rule-row-*` family beneath it, so the trigger card's head, body and sentence selectors that were rooted at `.fabricate-manager` under `manager-checks-trigger-*` are rooted at the classes it writes, and the card's frame stays the caller's class; `RuleSentence` emits `fabricate-rule-sentence`, which no selector styles.
+The same issue adds `SetPicker`, which emits `fabricate-set-picker` on its own root and the rest of its `fabricate-set-picker-*` family beneath it and on the panel parts it hands `SearchablePopover`; it portals only through that primitive, whose two roots it keeps.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
 The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issues 1523 and 1779.
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
@@ -761,6 +762,8 @@ A name composed from a value MUST be derived by a shared helper, because the alt
 A stage group (`StageBars`) takes exactly one naming route, `ariaLabel` or `ariaLabelledBy`, the latter where the caller renders the kicker.
 The one bar of a one-stage group takes the group's own name, because "Stage 1 of 1" states a position there is nothing to choose between.
 A rule's sentence (`RuleSentence`) is assembled from keys and never handed a string: a fragment mid-sentence takes its own key for its casing rather than a lowered string, so a tier a GM named keeps its capital, and a rule with a missing clause, an unknown key or an unfilled placeholder reads as its `missingClauseKey` sentence rather than as half a rule.
+A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel`, for its token group and its panel alike, and its overflow count is a button named "and N more" by a key rather than by its `+N` glyph.
+A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
@@ -981,6 +984,8 @@ A continuous scale cut into named regions is a range bar whose spans tile; an or
 `RunProgress` is the same implementation as `StageBars` rather than a neighbour of it: it is `StageBars` under a run heading, and the `<RunProgress>` entry stays `target` in its own library block, whose owner flips it.
 A `RuleRow` edits one condition→effect rule: a Check Breakage trigger, or a gathering condition modifier's condition and drop-chance change.
 It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier or any other row of the World › Rules & Resources route.
+`SetPicker` is a bounded trigger opening a staged panel committed on Apply, and its `choose` form exists only for the session control "Set membership is edited through a bounded, staged picker" exempts; a control that commits one choice into a single slot, a filter or a short list its caller renders is not a set picker.
+The deciding test is the widget and when the write lands, never how the control looks.
 A GRIP is the pointer's drag handle and the keyboard's move control, one per ordered row; a ROCKER is the stacked up and down chevron PAIR that steps a row one position, and neither word names the other's affordance.
 
 #### Scenario: A list row and an editor both show the same record state
@@ -1113,11 +1118,17 @@ A surface whose prototype pins the adder outside the list in the POPULATED state
 ### Requirement: Set membership is edited through a bounded, staged picker
 
 Where a record belongs to a set too large to render inline — its tags, the books it appears in, the recipes a book carries — the control MUST be searchable, MUST bound what it renders in place, and MUST stage its selections rather than writing on click.
+`SetPicker` is the one implementation, and its default `staged` commit is this control: the recipe-item editor's contents tab edits a book's recipes through it.
 
 THIS REQUIREMENT'S SUBJECT IS A SET A RECORD BELONGS TO, and a control that chooses which records a SESSION reads from is a different thing that happens to look identical.
 The session control is NOT bound by the two obligations above: it commits on choose rather than staging, because the surfaces that read its selection re-derive live and deferring the write removes the answer from the moment of the question, and it is not required to bound its trigger, because the selection is the working set the reader is holding in mind rather than a record's membership they are auditing.
 What binds both is the ANNOUNCEMENT: a panel that marks several entries at once says so, whichever of the two it serves.
 A change proposing to stage such a control states which of the two it is, and the answer is decided by what reads the selection, not by how the control looks.
+The session form is `SetPicker`'s `commit="choose"`: it writes each choice as it is made, announces a multi-selectable list, and draws no token run, because the session control draws its working set itself; the crafting component sources bar is that control.
+A typeahead that appends one id per choice to a short list its caller renders — the recipe-item limits tab's required-knowledge and character-prerequisite fields, appending through `patchLearn`, and the gathering modifier editor's character-modifier search — is outside this requirement's subject for the same reason the session control is: it owns no token run, no bound and no staging.
+Two look-alikes are adjudicated out by their widgets.
+The recipe editor's Books & Scrolls tab renders remove-only rows that write per row, by its own recorded decision that a recipe joins a book only from the book's editor, so nothing in it is searched, bounded or staged.
+The access inspector's two rosters are each searchable and paged at six, and each row toggle persists the whole access snapshot and is its own reversal, so the inspector's content IS the set, already bounded by its pager, and a trigger would hide the grant state in a column whose only job is showing it.
 One record's membership is this control's; a MULTI-RECORD edit is the staging inset's, and the requirement below states what that one owns.
 
 The trigger renders a FIXED maximum number of selected tokens and then an overflow count.
@@ -1126,6 +1137,8 @@ The picker panel scrolls internally at a fixed maximum height and states how man
 
 Every selection MUST be reversible before it is committed.
 The panel stages changes and applies them on an explicit action, and a Clear action is reachable at all times.
+Escape, an outside press and the trigger itself close the panel and DISCARD what it staged, and Apply writes only the members it adds and the members it removes.
+While the panel holds staged choices its footer states what Apply will add and remove rather than the size of the set, so a GM can see that a dismissal would discard something.
 
 Where the control edits several entries at once, the panel STAYS OPEN across choices and announces a multi-selectable list.
 
@@ -1134,6 +1147,12 @@ Where the control edits several entries at once, the panel STAYS OPEN across cho
 - **WHEN** a record belongs to more members than the trigger renders inline
 - **THEN** the trigger shows its bounded token run followed by an overflow count
 - **AND** the host editor does not grow with the size of the set
+
+#### Scenario: A GM dismisses a panel holding staged choices
+
+- **WHEN** a GM toggles members in the panel and presses Escape
+- **THEN** nothing is written
+- **AND** focus returns to the trigger, and reopening the panel shows the committed set
 
 #### Scenario: A session-scope multi-select
 

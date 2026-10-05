@@ -221,6 +221,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-sources-picker',
     'manager-recipe-item-contents-picker',
   ]),
+  // The set picker (issue 1782): the session form, and the staged form closed, open, staged and over its bound.
+  'src/ui/svelte/components/SetPicker.svelte': Object.freeze([
+    'player-crafting-sources-picker',
+    'manager-recipe-item-contents',
+    'manager-recipe-item-contents-picker',
+    'manager-recipe-item-contents-picker-staged',
+    'manager-recipe-item-contents-overflow',
+  ]),
   // The primitive's portaled panel (issue 1719), which draws the whole of what a picker presents.
   // Fourteen frames rather than the parent's nine, because the panel is also what `Select`,
   // `ModifierPillSelect` and `IconPicker` open, and the three `Select` frames are the
