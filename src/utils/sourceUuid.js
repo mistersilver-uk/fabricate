@@ -116,7 +116,7 @@ export function storedMatchName(document) {
 }
 
 /** The uuids a registration source owns: the one it is registered from, its document's, and for a
- * pack document the type-less spelling `addItemsFromPack` registers. */
+ * pack document the type-less spelling earlier bulk imports stored. */
 export function getOwnSourceUuids(registeredItemUuid, source) {
   const refs = [];
   pushUniqueReference(refs, registeredItemUuid);
