@@ -1008,7 +1008,14 @@
           "GroupPlayerAnyOne": "You choose one of…",
           "GroupPlayerUpTo": "You choose up to {count} of…",
           "GroupRolledAnyOne": "One of these, by roll",
-          "GroupRolledUpTo": "Up to {count} of these, by roll"
+          "GroupRolledUpTo": "Up to {count} of these, by roll",
+          "Columns": {
+            "Essence": "Essence",
+            "Tool": "Tool",
+            "Status": "Status",
+            "Output": "Item",
+            "Amount": "Amount"
+          }
         },
         "Slots": {
           "Title": "Requirements",
@@ -4719,12 +4726,9 @@
             "StaleToolChip": "Deleted tool",
             "UnnamedTool": "Unnamed tool",
             "DropRules": "Drop rules",
-            "DropRulesHint": "Configure what can drop, how often, and which conditions modify each drop.",
             "SearchDrops": "Search drop rules",
             "SearchDropsPlaceholder": "Search drop rules...",
             "AddDrop": "Add drop rule",
-            "ShowingDrops": "Showing {start}-{end} of {total} drops",
-            "DropRulesTable": "Drop rules table",
             "DropComponent": "Drop component",
             "SelectComponent": "Select a component",
             "DropChance": "Drop chance",

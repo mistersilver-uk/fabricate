@@ -48,6 +48,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/RunProgress.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
   ]),
+  // The data table (issue 1782): the drop rules with a row selected, ranked at the intermediate width,
+  // and the crafting detail's tool and output groups, one holding a choice group.
+  'src/ui/svelte/components/DataTable.svelte': Object.freeze([
+    'manager-gathering-task-drop-modifiers-normal',
+    'manager-gathering-task-drops-ranked-narrow',
+    'player-crafting-results-choice-group',
+  ]),
   // The log list (issue 1782): the Finished list with a failed entry open, and a cancelled one open.
   'src/ui/svelte/components/LogList.svelte': Object.freeze([
     'fabricate-journal-lifecycle-finished-failure',

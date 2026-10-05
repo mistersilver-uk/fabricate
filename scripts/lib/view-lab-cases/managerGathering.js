@@ -701,6 +701,30 @@ export const CASES = Object.freeze([
       GATHERING_TASK_EDITOR_PATTERN,
     ],
   }),
+  // The ranked drop table at the intermediate width (issue 1782), where the retired column grid took
+  // its narrow track set: the `DataTable` that replaced it, its rank column and rockers over two rows.
+  managerCase({
+    id: 'manager-gathering-task-drops-ranked-narrow',
+    label: 'Manager — Gathering task drop table, ranked, at the intermediate width',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism', gatheringTaskMode: 'reward-rule' },
+    steps: [
+      'Gathering',
+      ...OPEN_SLOWBLOOM_TASK,
+      taskTab('results'),
+      { selector: '[data-gathering-task-drops-table]', scroll: true },
+    ],
+    position: { width: 1180, height: 1000 },
+    expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager [data-gathering-task-drops-table].is-ranked-mode [data-gathering-task-drop-rank-cell]',
+    expectCenterHit:
+      '[data-gathering-task-drops-table] [data-gathering-task-drop-move="down"]:not([disabled])',
+    expectNoHorizontalOverflow: '[data-gathering-task-drops-table] .fabricate-data-table-scroll',
+    kinds: ['manager', 'environments', 'responsive'],
+    sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
+  }),
   managerCase({
     id: 'manager-environment-edit-placeholder',
     label: 'Manager — Environment edit placeholder',

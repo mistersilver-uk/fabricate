@@ -1339,7 +1339,7 @@ describe('the Results tab`s notices and authoring (issue 1522)', () => {
     search.value = 'Ash';
     search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     await view.sync();
-    assert.equal(count('.manager-gathering-task-drop-row'), 3, 'the drop table');
+    assert.equal(count('tr[data-gathering-task-drop-id]'), 3, 'the drop table');
 
     await next('[data-gathering-task-component-browser]');
     await harness.setProps({ itemCards: cards.slice(0, 3) });
@@ -1384,6 +1384,55 @@ describe('the Results tab`s notices and authoring (issue 1522)', () => {
       ],
       ['select', 'drop-b'],
     ]);
+  });
+
+  // The drop rules are a `DataTable` (issue 1782): a rank is the row's place in the whole list.
+  const twelveRanked = () =>
+    mountControlled({
+      task: {
+        ...taskFixture(),
+        dropRows: Array.from({ length: 12 }, (_, index) =>
+          row(`drop-${index + 1}`, { name: index === 10 ? 'Ashen Bloom' : `Moss ${index + 1}` })
+        ),
+      },
+      activeTab: 'results',
+      resolutionMode: 'd100',
+      rewardRules: { rewardSelectionMode: 'highestRankedDrop' },
+    });
+  const ranks = (root) =>
+    [...root.querySelectorAll('[data-gathering-task-drop-rank]')].map((rank) =>
+      rank.textContent.trim()
+    );
+  const searchDrops = async (view, term) => {
+    const search = view.root.querySelector(':scope input[aria-label="Search drop rules"]');
+    search.value = term;
+    search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await view.sync();
+  };
+
+  it('ranks a drop by its place in the whole list, on a later page and through a search', async () => {
+    const view = await twelveRanked();
+    chooseSelectOption(view.root, '.manager-task-drops-card [data-pagination-size]', 10);
+    await view.sync();
+    assert.equal(ranks(view.root).length, 10, 'ten rows a page');
+    await view.press('.manager-task-drops-card [data-pagination-next]');
+    assert.deepEqual(ranks(view.root), ['#11', '#12'], 'page 2 opens at the eleventh rank');
+
+    await searchDrops(view, 'ashen');
+    assert.deepEqual(ranks(view.root), ['#11'], 'a filtered row keeps its rank in the whole list');
+  });
+
+  it('says no drop rule matches a search that finds none, and clearing it returns the rows', async () => {
+    const view = await twelveRanked();
+    await searchDrops(view, 'nothing like this');
+    const table = view.root.querySelector('[data-gathering-task-drops-table]');
+    assert.equal(table.querySelectorAll('tr[data-gathering-task-drop-id]').length, 0);
+    assert.match(table.querySelector('tbody').textContent, /No drop rules match/);
+    assert.ok(!table.querySelector('thead'), 'no column head above no rows');
+
+    await searchDrops(view, '');
+    assert.equal(table.querySelectorAll('tr[data-gathering-task-drop-id]').length, 5);
+    assert.deepEqual(ranks(view.root), ['#1', '#2', '#3', '#4', '#5']);
   });
 
   it('forwards the description, the respawn expression and the stamina modifier list', async () => {

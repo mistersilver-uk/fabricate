@@ -557,12 +557,12 @@ export function registerGatheringCases() {
     await openEditor('task', 'task-herbs');
     await openTaskTab('results');
     const rows = () =>
-      Array.from(target.querySelectorAll('.manager-gathering-task-drop-row')).map((node) =>
+      Array.from(target.querySelectorAll('tr[data-gathering-task-drop-id]')).map((node) =>
         node.getAttribute('data-gathering-task-drop-id')
       );
     const selected = () =>
       target
-        .querySelector('.manager-gathering-task-drop-row.is-selected')
+        .querySelector('tr.is-selected[data-gathering-task-drop-id]')
         ?.getAttribute('data-gathering-task-drop-id');
     const press = async (node) => {
       node.click();
@@ -592,6 +592,59 @@ export function registerGatheringCases() {
     target.querySelector('[data-gathering-task-drop-id="drop-c"]').dispatchEvent(drop);
     await settleRouteExit();
     assert.equal(selected(), 'drop-c', 'an imported item selects the row it landed on');
+  });
+
+  /** Open the Results tab of a task whose drop rows and reward mode the options shape (issue 1782). */
+  async function openDropTable(storeOptions) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore([], storeOptions), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    navButton('Gathering').click();
+    await settleRouteExit();
+    gatheringSubitem('Tasks').click();
+    await settleRouteExit();
+    await openEditor('task', 'task-herbs');
+    await openTaskTab('results');
+    const ids = () =>
+      [...target.querySelectorAll('tr[data-gathering-task-drop-id]')].map(
+        (node) => node.dataset.gatheringTaskDropId
+      );
+    const selectedId = () =>
+      target.querySelector('tr.is-selected[data-gathering-task-drop-id]')?.dataset
+        .gatheringTaskDropId;
+    return { ids, selectedId };
+  }
+
+  it('selects the first drop rule added from the empty drop table', async () => {
+    const { ids, selectedId } = await openDropTable({ taskDropRows: [] });
+    assert.deepEqual(ids(), [], 'the table opens empty');
+    target.querySelector('[data-gathering-add-drop="empty"]').click();
+    await settleRouteExit();
+    assert.equal(ids().length, 1, 'the empty state adds a row');
+    assert.equal(selectedId(), ids()[0], 'and selects it, so the rail edits it next');
+  });
+
+  it('keeps the selected drop selected when a rank rocker moves it', async () => {
+    const row = (id) => ({ id, componentId: 'c1', quantity: 1, dropRate: 40, enabled: true });
+    const { ids, selectedId } = await openDropTable({
+      taskDropRows: [row('drop-a'), row('drop-b'), row('drop-c')],
+      rewardSelectionMode: 'highestRankedDrop',
+    });
+    target.querySelector('[data-gathering-task-drop-id="drop-b"]').click();
+    await settleRouteExit();
+    assert.equal(selectedId(), 'drop-b');
+    target
+      .querySelector(
+        ':scope [data-gathering-task-drop-id="drop-b"] [data-gathering-task-drop-move="down"]'
+      )
+      .click();
+    await settleRouteExit();
+    assert.deepEqual(ids(), ['drop-a', 'drop-c', 'drop-b'], 'the rocker moved the row');
+    assert.equal(selectedId(), 'drop-b', 'and the selection stayed with it');
   });
 
   /** Mount on the Tasks section of a system whose library the options shape. */
@@ -1338,7 +1391,7 @@ export function registerGatheringCases() {
         (node) => node.dataset.gatheringTaskDropId
       )
     );
-    Array.from(target.querySelectorAll('.manager-task-card-header .fabricate-button'))
+    Array.from(target.querySelectorAll('.manager-task-drops-card caption .fabricate-button'))
       .find((button) => button.textContent.includes('Add drop rule'))
       .click();
     await tick();

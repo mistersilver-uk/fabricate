@@ -35,6 +35,7 @@ manager-gathering-task-editor-routed
 manager-gathering-task-editor-routed-unmatched
 manager-gathering-task-availability-menu
 manager-gathering-task-editor-stacked
+manager-gathering-task-drops-ranked-narrow
 manager-environment-edit-placeholder
 manager-environment-empty-membership-normal
 manager-environment-empty-membership-narrow
