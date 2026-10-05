@@ -185,6 +185,7 @@
       <span aria-hidden="true">%</span>
     </label>
   {/snippet}
+  <!-- ratchet-exempt(design-system): the spread is `hook()`'s one `data-*` name from `HOOK_NAMES` -->
   <InspectorCard
     class="manager-drop-editor-condition-modifier-card"
     {...hook('conditionModifiers', kind)}
@@ -299,6 +300,7 @@
   </div>
 {/snippet}
 
+<!-- ratchet-exempt(design-system): the spread is `hook()`'s one `data-*` name from `HOOK_NAMES` -->
 <InspectorCard class="manager-character-modifier-row-card" {...hook('characterModifiers')}>
   <header class="manager-character-modifier-row-card-header">
     <div class="manager-character-modifier-row-card-heading">
