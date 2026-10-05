@@ -48,6 +48,8 @@
 
   headerSeq += 1;
   const instance = headerSeq;
+  // An edit that changes nothing, a re-picked strategy, emits nothing.
+  const emit = (next) => next !== group && onChange(next);
   const helpId = `fabricate-award-help-${instance}`;
   const selectionId = `fabricate-award-selection-${instance}`;
 
@@ -145,7 +147,7 @@
         'How many it awards'
       )}
       triggerProps={{ 'data-recipe-group-strategy': '' }}
-      onChange={(next) => onChange(withStrategy(group, next))}
+      onChange={(next) => emit(withStrategy(group, next))}
     />
     {#if upTo}
       <span class="manager-recipe-option-controls manager-recipe-award-count">

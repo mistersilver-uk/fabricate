@@ -58,8 +58,9 @@ export function withChooser(group, chooser) {
   return { ...rest, alternatives: rest.alternatives.map(withoutRange) };
 }
 
-/** Up to N opens on a fixed N of two; any one of drops N and repeats. */
+/** Up to N opens on a fixed N of two; any one of drops N and repeats; the current one is `group`. */
 export function withStrategy(group, strategy) {
+  if ((group?.awardStrategy ?? 'anyOne') === strategy) return group;
   const {
     awardStrategy: _a,
     awardCount: _n,

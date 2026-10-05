@@ -600,6 +600,23 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     assert.ok(!repeats(), 'a player picking from a list they can see cannot repeat');
   });
 
+  it('re-picking the current strategy keeps the rolled N and repeats, writing nothing', async () => {
+    const { target, groups } = await mountGroup({
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      awardStrategy: 'upTo',
+      awardCountFormula: '1d3',
+      withReplacement: true,
+    });
+    chooseSelectOption(target, '[data-recipe-group-strategy]', 'upTo');
+    await settle();
+    assert.equal(groups.length, 0, 'the strategy already chosen is no edit');
+    assert.equal(
+      target.querySelector('[data-recipe-group-repeats]').getAttribute('data-recipe-group-repeats'),
+      'repeats'
+    );
+  });
+
   it('holds a fixed N at two or more', async () => {
     const { target, groups } = await mountGroup({
       ...PLAYER_GROUP,

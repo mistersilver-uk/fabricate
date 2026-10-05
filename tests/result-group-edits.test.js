@@ -101,6 +101,9 @@ describe('the header’s settings', () => {
       true
     );
     assert.deepEqual(withStrategy(rolled, 'anyOne'), { ...converted(), chooser: 'rolled' });
+    assert.equal(withStrategy(rolled, 'upTo'), rolled, 're-picking up to N is no edit');
+    const plain = converted();
+    assert.equal(withStrategy(plain, 'anyOne'), plain, 'an absent strategy is any one of');
   });
 
   it('N is exactly one of a fixed count of two or more and an expression', () => {
