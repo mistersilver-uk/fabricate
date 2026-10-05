@@ -1088,8 +1088,14 @@ describe('the task editor`s three tabs (issue 1522)', () => {
       routedOutcomeTiers: [],
       resultValidationErrors: ['Rich tier needs a result set', 'A set has no results'],
     });
-    const panel = root.querySelector('[role="tabpanel"]');
+    // The scroller chain `manager-layout-side-rail-fixtures.js` measures: the strip and the page
+    // notice are the view's own children, outside the one scrolling tab panel.
+    const panel = root.querySelector(
+      ':scope main.manager-gathering-task-edit-view > [role="tabpanel"].manager-editor-tab-panel'
+    );
+    assert.ok(Boolean(panel), 'the tab panel is the shared editor scroller');
     const page = panel.previousElementSibling;
+    assert.ok(page.matches('.manager-editor-notice-position'), 'outside it, the page position');
     assert.ok(page.previousElementSibling.matches('[role="tablist"]'), 'between the strip and panel');
     const [stack, firstCard] = panel.children;
     assert.equal(page.dataset.noticePosition, 'page');
