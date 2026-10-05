@@ -3169,7 +3169,8 @@ export function registerGatheringCases() {
     );
   });
 
-  // `saveRecipeItemDraft` already reset `recipeItemSaveFailed` before its awaited store call.
+  // The recipe-item model's `saveRecipeItemDraft` already reset `recipeItemSaveFailed` before its
+  // awaited store call.
   it('re-announces a recipe-item save that fails the same way twice', async () => {
     await openDirtyRecipeItemEditor([], { saveRecipeItemResult: false });
     await assertRepeatFailureReAnnounces('[data-recipe-item-save-error]', clickRecipeItemSave);

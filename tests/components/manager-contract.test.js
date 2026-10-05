@@ -2212,9 +2212,11 @@ describe('CraftingSystemManager source contract', () => {
       'store.removeToolFromSystem',
       'store.setToolSectionInherited',
       // Tool creation is a world-scope write now.
-      'services.resolveToolSource',
       'store.worldScope.tool.createEntity',
     ],
+    // The model calls the resolver through its thunk, so no `services.` chain spells the read
+    // (issue 1721: the recipe-item model took the root's last one).
+    calls: ['resolveToolSource'],
     passesProps: [
       ['WorldToolCataloguePage', 'onCreateFromItemDrop'],
       ['ToolBrowserInspector', 'onAddToSystem'],
