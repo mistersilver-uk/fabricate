@@ -192,7 +192,8 @@
     aria-label={localize('FABRICATE.App.Alchemy.DropZone')}
     data-alchemy-dropzone
     use:dragDrop={{
-      activeClass: 'is-dragover',
+      // `is-dragover` is written by the directive above, never by the action: a class only the
+      // action adds can leave the scoped rule matching nothing, and silently in this file.
       onActiveChange: (active) => (dragOver = active),
       onDrop: handleDrop,
     }}
