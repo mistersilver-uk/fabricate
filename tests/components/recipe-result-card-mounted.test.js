@@ -458,6 +458,28 @@ describe('RecipeResultGroupCard: what a result row offers', () => {
   });
 });
 
+describe('RecipeResultGroupCard: focus after a removal (issue 1773)', () => {
+  it('moves to the row taking the removed one’s place, else the one before, else the adder', async () => {
+    const { target } = await mountCard(
+      ['r1', 'r2', 'r3'].map((id) => ({ id, componentId: 'cmp-herb', quantity: 1 })),
+      { resultKinds: ALL_KINDS }
+    );
+    const active = () => target.ownerDocument.activeElement;
+    const remove = async (index) => {
+      rows(target)[index].querySelector('[data-recipe-remove="result-item"]').click();
+      await settle();
+      await settle();
+    };
+    await remove(0);
+    assert.ok(active() === rows(target)[0].querySelector(KIND_TRIGGER), 'the next row’s');
+    await remove(1);
+    assert.ok(active() === rows(target)[0].querySelector(KIND_TRIGGER), 'the one before');
+    await remove(0);
+    assert.equal(rows(target).length, 0);
+    assert.ok(active() === target.querySelector(ADDER), 'the set’s adder');
+  });
+});
+
 describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
   const members = (target) => [...target.querySelectorAll('[data-recipe-result-member]')];
   const chooserRadio = (target, value) =>
@@ -693,8 +715,29 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     });
     members(target)[0].querySelector('[data-recipe-remove="result-alternative"]').click();
     await settle();
+    await settle();
     assert.deepEqual(groups.at(-1).results, [{ id: 'b', componentId: 'cmp-water', quantity: 3 }]);
     assert.equal(rows(target).length, 1, 'a flat row again');
+    assert.ok(
+      target.ownerDocument.activeElement ===
+        rows(target)[0].querySelector('.manager-recipe-or-trigger'),
+      'focus moves to the survivor’s or…, never to the document'
+    );
+  });
+
+  it('removing a member of three moves focus to the member taking its place, else the one before', async () => {
+    const herb = (id) => ({ id, componentId: 'cmp-herb', quantity: 1 });
+    const { target } = await mountGroup({ id: 'g1', alternatives: ['a', 'b', 'c', 'd'].map(herb) });
+    const removeMember = async (index) => {
+      members(target)[index].querySelector('[data-recipe-remove="result-alternative"]').click();
+      await settle();
+    };
+    const active = () => target.ownerDocument.activeElement;
+    await removeMember(1);
+    assert.ok(active() === members(target)[1].querySelector(KIND_TRIGGER), 'the next member’s');
+    await removeMember(2);
+    assert.equal(members(target).length, 2);
+    assert.ok(active() === members(target)[1].querySelector(KIND_TRIGGER), 'the one before');
   });
 
   it('draws one `alt <kind>` adder per offered kind, appending an empty member that takes focus', async () => {

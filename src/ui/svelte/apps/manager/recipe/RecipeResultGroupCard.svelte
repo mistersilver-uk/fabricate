@@ -2,10 +2,9 @@
 <!--
   One result group, each item a `PickerRow` naming a component, a currency or a taught recipe, with
   a fixed or rolled amount, drawn through the result-side `ChoiceGroup`, which also draws a choice
-  group's box; or on a progressive stage a component with a DC and an Edit link in its `trailing`,
-  under the set's statement that a stage offers no choice. Emitted as a shallow-updated copy through
-  `onChange(nextGroup)`. On a recipe every item
-  it creates carries an id and its kind's empty subject (`RecipeResultAdder`), and focus moves to its
+  group's box; or on a progressive stage a component with a DC and an Edit link in its `trailing`.
+  Emitted as a shallow-updated copy through `onChange(nextGroup)`. On a recipe every item it
+  creates carries an id and its kind's empty subject (`RecipeResultAdder`), and focus moves to its
   name field; on a gathering task it names the picked component. An empty group or an unnamed item
   is gated at the save path (`Recipe.validate`), not here, and on a non-terminal step an empty group
   is a finished state rather than a draft (issue 1907).
@@ -18,6 +17,7 @@
 <script>
   import { localizeOr } from '../../../util/localizeOr.js';
   import Callout from '../../../components/Callout.svelte';
+  import { isChoiceGroup } from '../../../../../utils/choiceGroupShape.js';
   import ChoiceGroup from './ChoiceGroup.svelte';
   import PickerRow from './PickerRow.svelte';
   import { emptyResult, fromValue, toValue } from './pickerRowKinds.js';
@@ -162,38 +162,47 @@
     onChange({ ...group, name });
   }
 
+  let root = $state(null);
+  // The control focus moves to once the row at `at` renders: `at` -1 is the set's adder.
+  let pendingFocus = null;
+  const FIRST_CONTROL = 'button:not([disabled]), input:not([disabled])';
+
+  // An unwrapped group remounts as its last alternative under that alternative's id, taking the
+  // focused remove with it, so focus moves to the survivor's `or…`.
   function updateItem(index, nextItem) {
+    if (isChoiceGroup(results[index]) && !isChoiceGroup(nextItem)) {
+      pendingFocus = { at: index, selector: '.manager-recipe-or-trigger' };
+    }
     onChange({ ...group, results: results.map((item, i) => (i === index ? nextItem : item)) });
   }
 
+  // A removed row's focus moves to the row taking its place, else the one before, else the adder.
   function removeItem(index) {
+    const at = Math.min(index, results.length - 2);
+    pendingFocus = { at, selector: at < 0 ? '[data-recipe-add]' : FIRST_CONTROL };
     onChange({ ...group, results: results.filter((_, i) => i !== index) });
   }
-
-  let root = $state(null);
-  let focusRowAt = -1;
 
   // Always appends, the row naming its own subject: a recipe set never bumps a quantity, and a
   // progressive award loop ignores `quantity`, so repeating a component asks for more of it.
   function addItem(kind) {
     const added = progressive ? { id: newId(), componentId: null } : emptyResult(kind, newId());
-    focusRowAt = results.length;
+    pendingFocus = { at: results.length, selector: '[data-recipe-option-search]' };
     onChange({ ...group, results: [...results, added] });
   }
 
-  // The card holds the pending focus because the adder that asked for it may not survive the add: a
-  // progressive set's first stage moves the adder into the list's footer, a new instance. The
-  // focus is a task, so it lands after the kind menu hands focus back to its trigger.
+  // The card holds the pending focus because the control that asked for it may not survive the
+  // edit: a progressive set's first stage moves the adder into the list's footer, a new instance.
+  // `results` is read first so the effect tracks every edit; the focus is a task, so it lands
+  // after a menu hands focus back to its trigger.
   $effect(() => {
     const count = results.length;
-    if (!root || focusRowAt < 0 || count <= focusRowAt) return;
-    const at = focusRowAt;
-    focusRowAt = -1;
+    if (!root || !pendingFocus || count <= pendingFocus.at) return;
+    const { at, selector } = pendingFocus;
+    pendingFocus = null;
     setTimeout(() => {
-      const row = root?.querySelectorAll('[data-recipe-result-item], [data-recipe-result-group]')[
-        at
-      ];
-      row?.querySelector('[data-recipe-option-search]')?.focus();
+      const rows = root?.querySelectorAll('[data-recipe-result-item], [data-recipe-result-group]');
+      (at < 0 ? root : rows?.[at])?.querySelector(selector)?.focus();
     }, 0);
   });
 

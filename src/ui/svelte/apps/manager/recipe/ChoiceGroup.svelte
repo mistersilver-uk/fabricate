@@ -194,13 +194,16 @@
   }
 
   // Choosing a kind turns the bare row into the box, unmounting the `or…` trigger focus would
-  // return to, so focus moves to the new alternative's name field once the caller hands it back.
+  // return to, so focus moves to the new alternative's name field once the caller hands it back;
+  // a removed member's moves to the member taking its place, else the one before.
   let root = $state(null);
-  let focusAlternativeAt = -1;
+  let pendingFocus = null;
   const NAME_FIELD = '[data-recipe-option-search], [data-recipe-add-tag]';
+  const FIRST_CONTROL = 'button:not([disabled]), input:not([disabled])';
+  const focusNameAt = (at) => (pendingFocus = { at, selector: NAME_FIELD });
 
   function selectKind(type) {
-    focusAlternativeAt = options.length;
+    focusNameAt(options.length);
     appendAlternative(type);
   }
 
@@ -209,10 +212,10 @@
   // The entry count is read first, so the effect tracks it even while no focus is pending.
   $effect(() => {
     const count = side === 'result' ? members.length : options.length;
-    if (!root || focusAlternativeAt < 0 || count <= focusAlternativeAt) return;
-    const row = root.querySelectorAll('[data-recipe-option]')[focusAlternativeAt];
-    focusAlternativeAt = -1;
-    row?.querySelector(NAME_FIELD)?.focus();
+    if (!root || !pendingFocus || count <= pendingFocus.at) return;
+    const row = root.querySelectorAll('[data-recipe-option]')[pendingFocus.at];
+    row?.querySelector(pendingFocus.selector)?.focus();
+    pendingFocus = null;
   });
 
   const rolled = $derived(chooserOf(group) === 'rolled');
@@ -239,12 +242,12 @@
   // The bare row's `or…` keeps the row's id as the group's, so this instance and its pending
   // focus survive the conversion.
   function convert(kind) {
-    focusAlternativeAt = 1;
+    focusNameAt(1);
     onChange(convertToGroup(group, kind));
   }
 
   function addMember(kind) {
-    focusAlternativeAt = members.length;
+    focusNameAt(members.length);
     onChange(withAlternative(group, kind));
   }
 
@@ -252,8 +255,12 @@
     onChange({ ...group, alternatives: members.map((m, i) => (i === index ? next : m)) });
   }
 
+  // One left unwraps, and the card moves focus to the survivor; none left drops the group.
   function removeMember(index) {
     const next = withoutAlternative(group, index);
+    if (isChoiceGroup(next)) {
+      pendingFocus = { at: Math.min(index, next.alternatives.length - 1), selector: FIRST_CONTROL };
+    }
     if (next) onChange(next);
     else onRemove();
   }

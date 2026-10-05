@@ -398,6 +398,8 @@ The group's header is one `role="group"` described by its help line, and its fir
 Under a roll a second line carries the **Selection** expression, and the help line restates the cell in prose.
 Switching to rolled writes no ranges and no expression; switching to the player drops the expression, every range and repeats; switching to any one of drops N and repeats.
 Removing alternatives down to one unwraps the group into that alternative, without the group's settings or its range.
+Focus moves to that row's `or…` control, never to the document.
+Removing any other result row, or an alternative from a group that stays a group, moves focus to the first control of the row taking its place, else of the row before it, else to the set's adder.
 
 Under a roll each alternative carries a RANGE CELL in its convert control's slot: two inline number fields named **"Lowest roll selecting {name}"** and **"Highest roll selecting {name}"**.
 A range overlapping another's, or one whose lowest roll is above its highest, marks both fields invalid with its reason on a line of its own; at a narrow width the cell leads the row's second line, before the toggle.
