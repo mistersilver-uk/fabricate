@@ -34,21 +34,33 @@ function fakePage({ background, rendersAfterFront = true }) {
   return { page, log };
 }
 
+const noDiagnosis = async () => {
+  throw new Error('a rendering page is never diagnosed');
+};
+
 describe('the GM page rendering check', () => {
   it('leaves a rendering page alone', async () => {
     const { page, log } = fakePage({ background: false });
-    assert.equal(await ensurePageRendering(page), false);
+    assert.equal(await ensurePageRendering(page, { diagnose: noDiagnosis }), null);
     assert.deepStrictEqual(log, ['frame']);
   });
 
   it('brings a page that renders no frame to the front, then proves it renders', async () => {
     const { page, log } = fakePage({ background: true });
-    assert.equal(await ensurePageRendering(page), true);
+    const stall = await ensurePageRendering(page, { diagnose: async () => ({ timerLateMs: 3 }) });
+    assert.deepStrictEqual(
+      stall,
+      { timerLateMs: 3 },
+      'what the page did while stalled is reported'
+    );
     assert.deepStrictEqual(log, ['frame', 'bringToFront', 'frame']);
   });
 
   it('fails a page that renders nothing even in front', async () => {
     const { page } = fakePage({ background: true, rendersAfterFront: false });
-    await assert.rejects(() => ensurePageRendering(page, { timeout: 20 }), /rendered no frame/);
+    await assert.rejects(
+      () => ensurePageRendering(page, { timeout: 20, diagnose: async () => ({ hottest: [] }) }),
+      /rendered no frame in 20ms, even brought to the front\. While stalled: \{"hottest":\[\]\}/
+    );
   });
 });

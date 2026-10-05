@@ -276,8 +276,11 @@ export async function rollPublicly(page, { bonus = '', choice = null } = {}) {
   await prompt.waitFor({ state: 'visible', timeout: 15_000 });
   // Every click below waits for its target to hold still across frames, so none can land on a
   // page that renders none.
-  if (await ensurePageRendering(page)) {
-    process.stdout.write('  The GM page had stopped rendering; brought it to the front.\n');
+  const stall = await ensurePageRendering(page);
+  if (stall) {
+    process.stdout.write(
+      `  The GM page had stopped rendering; brought it to the front. While stalled: ${JSON.stringify(stall)}\n`
+    );
   }
   if (bonus) await prompt.locator('input[name="situationalBonus"]').fill(bonus);
   const trigger = prompt.locator('.mode-field .fabricate-select-trigger');

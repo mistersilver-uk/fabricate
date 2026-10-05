@@ -4,6 +4,8 @@
  * enabled and stable" however healthy its DOM is.
  */
 
+import { diagnoseStall } from './stallDiagnostics.mjs';
+
 /** Resolve to the ms one animation frame took, or `null` when none came within `ms`. */
 export async function frameLatency(page, ms) {
   return await page.evaluate(
@@ -21,15 +23,22 @@ export async function frameLatency(page, ms) {
 }
 
 /**
- * Resolve once the page renders frames, bringing it to the front when it has none: a page another
- * browser context displaced can stop rendering while it still answers evaluations. Answers whether
- * the page had to be brought back; throws when it renders nothing even then.
+ * Resolve once the page renders frames, bringing it to the front when it has none. Answers `null`
+ * for a page that was rendering, else what `diagnose` saw while it was not; throws, with that,
+ * when the page renders nothing even in front.
  */
-export async function ensurePageRendering(page, { probeMs = 2000, timeout = 30_000 } = {}) {
-  if ((await frameLatency(page, probeMs)) !== null) return false;
+export async function ensurePageRendering(
+  page,
+  { probeMs = 2000, timeout = 30_000, diagnose = diagnoseStall } = {}
+) {
+  if ((await frameLatency(page, probeMs)) !== null) return null;
+  const stall = await diagnose(page);
   await page.bringToFront();
-  if ((await frameLatency(page, timeout)) !== null) return true;
-  throw new Error(`the page rendered no frame in ${timeout}ms, even brought to the front`);
+  if ((await frameLatency(page, timeout)) !== null) return stall;
+  throw new Error(
+    `the page rendered no frame in ${timeout}ms, even brought to the front. ` +
+      `While stalled: ${JSON.stringify(stall)}`
+  );
 }
 
 /**

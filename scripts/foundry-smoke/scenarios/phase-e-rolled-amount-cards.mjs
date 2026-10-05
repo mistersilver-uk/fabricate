@@ -415,6 +415,8 @@ async function authorTaskFormula(page, { systemId, taskId, taskName }) {
   await clickSegment(row, 'data-recipe-option-amount-mode', 'rolled');
   await row.locator(FORMULA).first().fill(ROLLED_FORMULA);
   await page.locator(`${HEADER_BUTTON}:has-text("Save task")`).first().click();
+  // Interval polling: this reads saved data, and the default per-frame polling stalls whenever the
+  // runner's GM page goes seconds without a frame.
   await page.waitForFunction(
     ({ systemId, taskId, formula }) =>
       game.settings
@@ -422,7 +424,7 @@ async function authorTaskFormula(page, { systemId, taskId, taskName }) {
         ?.systems?.[systemId]?.tasks?.find((task) => task?.id === taskId)?.resultGroups?.[0]
         ?.results?.[0]?.quantityFormula === formula,
     { systemId, taskId, formula: ROLLED_FORMULA },
-    { timeout: 10_000 }
+    { timeout: 10_000, polling: 250 }
   );
 }
 
