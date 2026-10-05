@@ -1036,6 +1036,29 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),
+  // Issue 1644: after a live craft of the Runeblade, the tier its roll routed through is marked.
+  playerCase({
+    id: 'player-crafting-routed-reached',
+    label: 'Player app — Crafting routed by check after its roll, the reached tier marked',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Runeblade' },
+      { selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+      { selector: '[data-recipe-section="outcome-tiers"]', scroll: true },
+    ],
+    expectSelector:
+      '[data-recipe-section="outcome-tiers"]' +
+      ':has([data-outcome-tier="rw-masterwork"][data-outcome-rolled="true"] [data-outcome-reached])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_ROUTED_CHECK,
+      /^src\/systems\/(?:versionedCommandResults|journalRollFacts)\.js$/,
+    ],
+  }),
   playerCase({
     id: 'player-crafting-run-summary',
     label: 'Player app — Crafting run summary',
