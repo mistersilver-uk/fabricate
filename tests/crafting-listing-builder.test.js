@@ -995,6 +995,11 @@ describe('CraftingListingBuilder — outcome tiers', () => {
     assert.equal(model.outcomeTiers.length, 3);
     const [shared, master, ruined] = model.outcomeTiers;
     assert.deepEqual(shared.names, ['Flawed', 'Standard', 'Fine']);
+    // Every merged tier's id rides along, so a roll routed through any of them finds this row.
+    assert.equal(shared.id, 't-flawed');
+    assert.deepEqual(shared.ids, ['t-flawed', 't-standard', 't-fine']);
+    assert.deepEqual(master.ids, ['t-master']);
+    assert.deepEqual(ruined.ids, ['t-ruined']);
     assert.equal(shared.success, true);
     assert.deepEqual(shared.awardedResults, [
       { name: 'Iron Sword', img: 'icons/sword.webp', qty: 2 },
@@ -1030,6 +1035,7 @@ describe('CraftingListingBuilder — outcome tiers', () => {
     assert.deepEqual(success.names, ['Success']);
     assert.equal(failure.success, false);
     assert.deepEqual(failure.names, ['Ruined', 'Botched']);
+    assert.deepEqual(failure.ids, ['t2', 't3']);
     assert.deepEqual(failure.awardedResults, []);
   });
 });

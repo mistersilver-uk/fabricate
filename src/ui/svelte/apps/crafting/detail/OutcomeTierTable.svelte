@@ -1,19 +1,41 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  OutcomeTierTable renders the awarded results for a routed-by-check recipe. Each
-  row shows its tier name(s), whether it is a success tier, and the items it awards
-  (a failure tier routes nothing and reads as such). Tiers that produce the exact
-  same result are collapsed into one row, so `tier.names` may list several tiers.
+  OutcomeTierTable adapts a routed-by-check recipe's tiers onto the shared `OutcomeLadder`: one row
+  per distinct result, its merged tier names joined and each award a list row. The builder collapses
+  tiers that award the same, so a row's `ids` may hold several, and `reachedId`, a successful
+  roll's recorded outcome, marks the row it was merged into. Crafting tiers carry no band.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import Kicker from '../../../components/Kicker.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
-  import AwardPill from './AwardPill.svelte';
+  import OutcomeLadder from '../../../components/OutcomeLadder.svelte';
 
-  let { tiers = [] } = $props();
+  let { tiers = [], reachedId = null } = $props();
 
-  const rows = $derived(Array.isArray(tiers) ? tiers : []);
+  /** One award as a row: an item's count, a reward's own amount, a choice group's members. */
+  function awardRow(item) {
+    const group = item?.kind === 'group';
+    return {
+      name: item?.name,
+      ...resolveCraftingArt(item?.img, item?.glyph),
+      quantity: group ? null : (item?.amountText ?? `×${item?.qty ?? 1}`),
+      detail: group ? (item.members ?? []).map((member) => member.name).join(' · ') : '',
+      props: { 'data-award-kind': item?.kind ?? 'component' },
+    };
+  }
+
+  const rows = $derived(
+    (Array.isArray(tiers) ? tiers : []).map((tier) => ({
+      id: tier.id,
+      ids: tier.ids,
+      name: (tier.names ?? []).join(', '),
+      fail: !tier.success,
+      props: { 'data-tier-success': tier.success ? 'true' : 'false' },
+      yields: (tier.awardedResults ?? []).map(awardRow),
+    }))
+  );
 </script>
 
 <section class="crafting-tiers" data-recipe-section="outcome-tiers">
@@ -21,36 +43,12 @@
     {localize('FABRICATE.App.Crafting.Detail.OutcomesTitle')}
   </Kicker>
   {#if rows.length > 0}
-    <ul class="crafting-tier-list">
-      {#each rows as tier, index (tier.id ?? tier.names?.[0] ?? index)}
-        <li
-          class="crafting-tier-row"
-          class:is-success={tier.success}
-          class:is-failure={!tier.success}
-          data-tier-success={tier.success ? 'true' : 'false'}
-        >
-          <div class="crafting-tier-head">
-            <span class="crafting-tier-name">{(tier.names ?? []).join(', ')}</span>
-            <span class={`crafting-tier-flag tone-${tier.success ? 'success' : 'danger'}`}>
-              <i
-                class={`fas ${tier.success ? 'fa-circle-check' : 'fa-circle-xmark'}`}
-                aria-hidden="true"
-              ></i>
-              {tier.success
-                ? localize('FABRICATE.App.Crafting.Detail.TierSuccess')
-                : localize('FABRICATE.App.Crafting.Detail.TierNoAward')}
-            </span>
-          </div>
-          {#if Array.isArray(tier.awardedResults) && tier.awardedResults.length > 0}
-            <ul class="crafting-tier-awards">
-              {#each tier.awardedResults as item, awardIndex (item.name + awardIndex)}
-                <AwardPill {item} variant="tier" />
-              {/each}
-            </ul>
-          {/if}
-        </li>
-      {/each}
-    </ul>
+    <OutcomeLadder
+      tiers={rows}
+      emptyTierText={localize('FABRICATE.App.Crafting.Detail.TierNoAward')}
+      {reachedId}
+      reachedLabel={localize('FABRICATE.App.Crafting.Detail.YourRoll')}
+    />
   {:else}
     <EmptyState note hint={localize('FABRICATE.App.Crafting.Detail.NoOutcomes')} />
   {/if}
@@ -60,73 +58,6 @@
   .crafting-tiers {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-  }
-
-  .crafting-tier-list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .crafting-tier-row {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 8px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface-soft);
-  }
-
-  .crafting-tier-row.is-success {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-  }
-
-  .crafting-tier-row.is-failure {
-    border-color: var(--fab-danger-border);
-    background: var(--fab-danger-soft);
-  }
-
-  .crafting-tier-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .crafting-tier-name {
-    font-weight: 600;
-    font-size: 13px;
-  }
-
-  .crafting-tier-flag {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-tier-flag.tone-success {
-    color: var(--fab-success-text);
-  }
-
-  .crafting-tier-flag.tone-danger {
-    color: var(--fab-danger-text);
-  }
-
-  .crafting-tier-awards {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-wrap: wrap;
     gap: 6px;
   }
 </style>

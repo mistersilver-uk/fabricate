@@ -489,87 +489,173 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(hint(single), 'FABRICATE.App.Crafting.Detail.IngredientRoutingHint');
   });
 
-  it('colours tiered outcomes green for success and red for failure', async () => {
-    const target = await harness.mount({
-      recipe: recipe({
-        modeToken: 'routedByCheck',
-        modeLabel: 'Routed by check',
-        check: {
-          dc: 15,
-          rollFormula: '1d20',
-          skill: null,
-          optional: false,
-          mandatory: true,
-          usable: true,
-        },
-        result: { items: [], time: null, timeLabel: null, xp: null },
-        outcomeTiers: [
-          {
-            id: 't-success',
-            names: ['Success'],
-            success: true,
-            awardedResults: [{ name: 'Elixir', img: null, qty: 1 }],
-          },
-          { id: 't-fail', names: ['Failure'], success: false, awardedResults: [] },
-        ],
-      }),
+  // Issue 1644: the tiers are the shared `OutcomeLadder`, its rows `data-tier-success`-hooked.
+  const routedRecipe = (outcomeTiers) =>
+    recipe({
+      modeToken: 'routedByCheck',
+      modeLabel: 'Routed by check',
+      check: CHECK,
+      result: { items: [], time: null, timeLabel: null, xp: null },
+      outcomeTiers,
+    });
+  const mountTiers = (outcomeTiers, rollResult = null) =>
+    harness.mount({
+      recipe: routedRecipe(outcomeTiers),
       selectedSetId: recipe().defaultSetId,
       craftability: craftability(),
+      rollResult,
     });
+  const tierSection = (target) => target.querySelector('[data-recipe-section="outcome-tiers"]');
+  const rolledTiers = (target) =>
+    [...tierSection(target).querySelectorAll('[data-outcome-rolled]')].map((node) =>
+      node.getAttribute('data-outcome-tier')
+    );
+  const COLLAPSED = [
+    {
+      id: 't-flawed',
+      ids: ['t-flawed', 't-standard', 't-fine'],
+      names: ['Flawed', 'Standard', 'Fine'],
+      success: true,
+      awardedResults: [{ name: 'Bronze Ingot', img: null, qty: 2 }],
+    },
+    {
+      id: 't-master',
+      ids: ['t-master'],
+      names: ['Masterwork'],
+      success: true,
+      awardedResults: [{ name: 'Steel Ingot', img: null, qty: 1 }],
+    },
+    { id: 't-ruined', ids: ['t-ruined'], names: ['Ruined'], success: false, awardedResults: [] },
+  ];
+  const rolled = (outcomeId, success = true) => ({
+    success,
+    checkResult: { success, data: { outcomeId } },
+  });
 
-    const section = target.querySelector('[data-recipe-section="outcome-tiers"]');
+  it('tones tiered outcomes by success and failure, with no band chip and no control', async () => {
+    const target = await mountTiers([
+      {
+        id: 't-success',
+        names: ['Success'],
+        success: true,
+        awardedResults: [{ name: 'Elixir', img: null, qty: 1 }],
+      },
+      { id: 't-fail', names: ['Failure'], success: false, awardedResults: [] },
+    ]);
+    const section = tierSection(target);
     const successRow = section.querySelector('[data-tier-success="true"]');
     const failureRow = section.querySelector('[data-tier-success="false"]');
-    assert.ok(successRow.classList.contains('is-success'), 'success tier reads green');
-    assert.ok(failureRow.classList.contains('is-failure'), 'failure tier reads red');
-    assert.ok(
-      successRow.querySelector('.crafting-tier-flag.tone-success'),
-      'success flag uses the success tone'
+    assert.ok(successRow.matches('.fab-outcome-tier:not(.is-failure)'), 'success tier is not failed');
+    assert.ok(failureRow.matches('.fab-outcome-tier.is-failure'), 'failure tier reads as failed');
+    assert.ok(successRow.querySelector('.fa-circle-check'), 'success tier states a check glyph');
+    assert.ok(failureRow.querySelector('.fa-circle-xmark'), 'failure tier states a cross glyph');
+    assert.equal(
+      failureRow.querySelector('[data-outcome-empty]').textContent.trim(),
+      'FABRICATE.App.Crafting.Detail.TierNoAward',
+      'an empty tier says it awards nothing'
     );
-    assert.ok(
-      failureRow.querySelector('.crafting-tier-flag.tone-danger'),
-      'failure flag uses the danger tone'
+    assert.equal(section.querySelectorAll('.fab-outcome-tier').length, 2, 'the rows are drawn');
+    assert.equal(
+      section.querySelectorAll('.fab-outcome-tier-heading .manager-chip').length,
+      0,
+      'crafting tiers carry no band, so no chip'
     );
+    assert.equal(section.querySelectorAll('button, input, select').length, 0, 'no control');
   });
 
   it('renders a collapsed tier group as one row listing every tier name', async () => {
-    const target = await harness.mount({
-      recipe: recipe({
-        modeToken: 'routedByCheck',
-        modeLabel: 'Routed by check',
-        check: {
-          dc: 15,
-          rollFormula: '1d20',
-          skill: null,
-          optional: false,
-          mandatory: true,
-          usable: true,
-        },
-        result: { items: [], time: null, timeLabel: null, xp: null },
-        outcomeTiers: [
-          {
-            id: 't-flawed',
-            names: ['Flawed', 'Standard', 'Fine', 'Masterwork'],
-            success: true,
-            awardedResults: [{ name: 'Bronze Ingot', img: null, qty: 2 }],
-          },
-          { id: 't-ruined', names: ['Ruined'], success: false, awardedResults: [] },
-        ],
-      }),
-      selectedSetId: recipe().defaultSetId,
-      craftability: craftability(),
-    });
-
-    const section = target.querySelector('[data-recipe-section="outcome-tiers"]');
-    const rows = section.querySelectorAll('.crafting-tier-row');
-    assert.equal(rows.length, 2, 'one collapsed success row + one failure row');
+    const target = await mountTiers(COLLAPSED);
+    const rows = tierSection(target).querySelectorAll('.fab-outcome-tier');
+    assert.equal(rows.length, 3, 'one collapsed success row, one more success, one failure');
     assert.equal(
-      rows[0].querySelector('.crafting-tier-name').textContent.trim(),
-      'Flawed, Standard, Fine, Masterwork',
+      rows[0].querySelector('.fab-outcome-tier-name').textContent.trim(),
+      'Flawed, Standard, Fine',
       'the collapsed row lists every contributing tier name'
     );
-    const awards = rows[0].querySelectorAll('.crafting-tier-award');
-    assert.equal(awards.length, 1, 'the shared result is shown once');
+    assert.equal(rows[0].querySelectorAll('[data-list-row]').length, 1, 'the shared result once');
+  });
+
+  it('marks "Your roll" on the row a success outcome id was merged into', async () => {
+    const target = await mountTiers(COLLAPSED, rolled('t-standard'));
+    assert.deepEqual(rolledTiers(target), ['t-flawed'], 'exactly the row Standard merged into');
+    const pill = tierSection(target).querySelector('[data-outcome-rolled] [data-outcome-reached]');
+    assert.equal(pill.textContent.trim(), 'FABRICATE.App.Crafting.Detail.YourRoll');
+    harness.remount();
+    const own = await mountTiers(COLLAPSED, rolled('t-master'));
+    assert.deepEqual(rolledTiers(own), ['t-master'], "a row's own id marks it");
+  });
+
+  it('marks no row before a roll, after a failed roll, or for an unknown outcome', async () => {
+    const before = await mountTiers(COLLAPSED);
+    assert.deepEqual(rolledTiers(before), [], 'nothing is marked before a roll');
+    harness.remount();
+    const failed = await mountTiers(COLLAPSED, rolled('t-ruined', false));
+    assert.deepEqual(rolledTiers(failed), [], 'a failing outcome marks nothing');
+    harness.remount();
+    const unknown = await mountTiers(COLLAPSED, rolled('t-elsewhere'));
+    assert.deepEqual(rolledTiers(unknown), [], 'an outcome no row names marks nothing');
+    assert.equal(tierSection(unknown).querySelectorAll('.fab-outcome-tier').length, 3);
+  });
+
+  it('draws each result kind on the shared row with its kind hook', async () => {
+    const target = await mountTiers([
+      {
+        id: 't-pass',
+        ids: ['t-pass'],
+        names: ['Pass'],
+        success: true,
+        awardedResults: [
+          { name: 'Iron Sword', img: 'icons/sword.webp', qty: 2 },
+          {
+            kind: 'currency',
+            name: 'Gold',
+            img: null,
+            glyph: 'fa-solid fa-coins',
+            qty: 5,
+            amountText: '5 gp',
+          },
+          {
+            kind: 'knowledge',
+            name: 'Runeblade',
+            img: null,
+            glyph: 'fa-solid fa-book-open',
+            qty: 1,
+            amountText: 'Recipe knowledge',
+          },
+          {
+            kind: 'group',
+            name: 'Choose one',
+            img: null,
+            glyph: 'fa-solid fa-layer-group',
+            qty: 1,
+            amountText: 'Ruby · Opal',
+            members: [
+              { name: 'Ruby', img: null, qty: 1 },
+              { name: 'Opal', img: null, qty: 1 },
+            ],
+          },
+        ],
+      },
+    ]);
+    const row = (kind) =>
+      tierSection(target).querySelector(`[data-list-row][data-award-kind="${kind}"]`);
+    const text = (node, part) =>
+      node.querySelector(`.fabricate-list-row-${part}`)?.textContent.trim() ?? null;
+    const item = row('component');
+    assert.equal(text(item, 'name'), 'Iron Sword');
+    assert.equal(text(item, 'quantity'), '×2', 'an item states its count');
+    assert.equal(item.querySelector('img').getAttribute('src'), 'icons/sword.webp');
+    const currency = row('currency');
+    assert.equal(text(currency, 'quantity'), '5 gp', 'a credit states its amount');
+    assert.ok(currency.querySelector('.fa-coins'), 'a credit draws its glyph');
+    const knowledge = row('knowledge');
+    assert.equal(text(knowledge, 'quantity'), 'Recipe knowledge');
+    assert.ok(knowledge.querySelector('.fa-book-open'), 'a recipe draws its glyph');
+    const group = row('group');
+    assert.equal(text(group, 'name'), 'Choose one');
+    assert.equal(text(group, 'detail'), 'Ruby · Opal', 'a choice group lists its members');
+    assert.equal(text(group, 'quantity'), null, 'and states no count of its own');
+    assert.ok(group.querySelector('.fa-layer-group'));
   });
 
   it('shows the check formula resolved against the selected actor', async () => {

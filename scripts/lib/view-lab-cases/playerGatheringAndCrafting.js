@@ -939,15 +939,12 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' },
     ],
     expectTab: 'crafting',
+    // One shared-ladder tier drawing both rows (issue 1644).
     expectSelector:
       '[data-recipe-section="outcome-tiers"]' +
-      ' .crafting-tier-awards:has([data-award-kind="component"]):has([data-award-kind="currency"])',
+      ' [data-outcome-tier]:has([data-award-kind="component"]):has([data-award-kind="currency"])',
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      CRAFTING_SHARED,
-      CRAFTING_ROUTED_CHECK,
-      /^src\/ui\/svelte\/apps\/crafting\/detail\/AwardPill\.svelte$/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_ROUTED_CHECK],
   }),
   // The Crafting header withholds `Ready to craft` and leads the blocking callout with the authority's own reason.
   playerCase({
