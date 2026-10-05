@@ -10,6 +10,10 @@ manager-gathering-task-editor-progressive-legacy
 manager-gathering-task-editor-progressive-results
 manager-gathering-task-editor-routed-no-tiers
 manager-gathering-task-editor-reward-rule
+manager-gathering-task-editor-validation
+manager-gathering-task-editor-validation-warnings
+manager-gathering-task-editor-validation-blocking
+manager-gathering-task-editor-validation-narrow
 manager-gathering-task-node-interval-normal
 manager-gathering-task-node-interval-narrow
 manager-gathering-task-depleted-image-filled

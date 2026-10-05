@@ -5598,6 +5598,10 @@ test('a change confined to one gathering task tab or card selects every task-edi
     'manager-gathering-task-editor-progressive-results',
     'manager-gathering-task-editor-routed-no-tiers',
     'manager-gathering-task-editor-reward-rule',
+    'manager-gathering-task-editor-validation',
+    'manager-gathering-task-editor-validation-warnings',
+    'manager-gathering-task-editor-validation-blocking',
+    'manager-gathering-task-editor-validation-narrow',
     // The drop rows these two select sit on the Results tab.
     'manager-gathering-task-drop-modifiers-normal',
     'manager-gathering-task-drop-condition-modifier-attached',

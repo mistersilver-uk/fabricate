@@ -33,6 +33,8 @@ const OPEN_SLOWBLOOM_TASK = Object.freeze([
       '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
   },
 ]);
+/** Blanks the task's name, the one Overview error the Validation tab can draw. */
+const BLANK_NAME = Object.freeze([{ selector: '[data-gathering-task-field="name"]', fill: '' }]);
 const AVAILABLE_SPRING_ROW = '[data-section="available-to-add"] [data-record-id="hb-task-spring"]';
 /** A Direct task's result rows; a step or a single-element check reads the first. */
 const STRAIGHT_RESULT = '[data-gathering-task-results="straight"] [data-recipe-result-item]';
@@ -245,6 +247,36 @@ export const CASES = Object.freeze([
       expectView: 'gathering-task-edit',
       expectSelector: `.fabricate-manager ${claim}`,
       expectCenterHit: `[data-gathering-task-tab="${tab}"]`,
+      kinds: ['manager', 'environments'],
+      sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
+    })
+  ),
+  // The Validation tab's three verdicts (issue 1522), full width on every task mode: a clean d100
+  // task, a d100 task warned of a repeated component, and a Check task whose blank name and
+  // unmatched tier block Save, at the normal and the narrow width.
+  ...[
+    ['validation', {}, [], 'pass', null],
+    ['validation-warnings', { gatheringTaskMode: 'reward-rule' }, [], 'warn', null],
+    ['validation-blocking', { gatheringTaskMode: 'routed-unmatched' }, BLANK_NAME, 'block', null],
+    [
+      'validation-narrow',
+      { gatheringTaskMode: 'routed-unmatched' },
+      BLANK_NAME,
+      'block',
+      { width: 1000, height: 720 },
+    ],
+  ].map(([suffix, flags, edits, verdict, position]) =>
+    managerCase({
+      id: `manager-gathering-task-editor-${suffix}`,
+      label: `Manager — Gathering task editor, ${suffix.replaceAll('-', ' ')}`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-herbalism', ...flags },
+      ...(position && { position }),
+      steps: ['Gathering', ...OPEN_SLOWBLOOM_TASK, ...edits, taskTab('validation')],
+      expectView: 'gathering-task-edit',
+      expectSelector: `.fabricate-manager[data-gathering-task-layout="full"] [data-gathering-task-panel="validation"] [data-editor-validation-summary="${verdict}"]`,
+      expectCenterHit: '[data-gathering-task-tab="validation"]',
       kinds: ['manager', 'environments'],
       sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
     })
