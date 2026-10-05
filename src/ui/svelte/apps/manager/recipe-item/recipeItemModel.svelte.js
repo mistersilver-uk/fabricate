@@ -247,7 +247,7 @@ function createDraftLifecycle(inputs, state) {
       state.recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(source);
       setActiveView('recipe-item-edit');
       navRail().expandGroup('crafting');
-      Promise.resolve(services()?.getWorldItemOptions?.()).then((options) => {
+      void Promise.resolve(services()?.getWorldItemOptions?.()).then((options) => {
         setWorldItemOptions(options || []);
       });
     });
