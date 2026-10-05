@@ -247,11 +247,11 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 - It renders only while all three hold: `fabricate.experimentalFeatures` is enabled; no provider is registered in either extension registry, which is the predicate the Manager title bar's `PREMIUM` badge reads; and the world setting `fabricate.premiumIconsAdDismissed` is not `true`.
   A provider registered while the Manager is open hides it at once.
 - **Its experimental gate is TEMPORARY and tied to Fabricate Premium being unreleased**, as §Downtime Preview and Premium Extension, Experimental gate, is, and it is removed with that gate.
-- Dismissing it writes `fabricate.premiumIconsAdDismissed` as `true` for the world, so it is hidden for every GM of that world on both screens.
-  It is hidden for the rest of the session the moment the GM dismisses it, whether or not the write succeeds; a refused write is logged and raises nothing.
+- Dismissing it writes `fabricate.premiumIconsAdDismissed` as `true` for the world, so it is hidden for every GM of that world on both screens; a GM whose Manager is already open stops seeing it the next time that GM opens the Manager.
+  It is hidden in the dismissing GM's Manager the moment the GM dismisses it, on both screens, until that Manager closes, whether or not the write succeeds; a refused write is logged and raises nothing, so the advert returns the next time the Manager opens.
   Fabricate offers no control that clears the setting, and the setting silences this advert only.
 - It is the first thing in the header to give way: it compacts, then disappears, as the Manager narrows, and never wraps the action group or crowds the page title.
-  It is full at a Manager width of 1180px and above, compact — three icons and no line of copy — from 980px, and not rendered below 980px, so the page heading keeps at least 320px.
+  It is full at a Manager width of 1180px and above, compact — three icons and no line of copy — from 980px, and not shown below 980px, so the page heading keeps at least 320px.
 - Its icons are bundled at 68px, about twice the 30px tile they fill, are referenced only by the module stylesheet, and are never offered as Item, component or essence art.
 - The advert is GM Manager only: §Player Navigation Extension's "no premium signal in any state" rule is unchanged.
 

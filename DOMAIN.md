@@ -1498,7 +1498,8 @@ Module Configuration
 |  |- travelConfig (the world realm library, revealMode and modifierVisibility; a crafting system keeps only gatheringRealmSettings.enabled)
 |  |- characterLibraries ({ characterPrerequisites, modifiers } — the two WORLD character libraries; a crafting system keeps NEITHER and has no participation flag over them)
 |  |- theme
-|  |- experimentalFeatures
+|  |- experimentalFeatures (gates the recipe graph placeholder, the GM Manager's World > Downtime surface and its Premium crafting-icons advert)
+|  |- premiumIconsAdDismissed (whether a GM has dismissed the GM Manager's Premium crafting-icons advert for this world)
 |  |- recipeItemFlagStampVersion (one-shot flag-stamp version)
 |  |- componentFlagStampVersion (one-shot flag-stamp version)
 |  |- toolFlagStampVersion (one-shot flag-stamp version)
