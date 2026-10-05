@@ -1120,7 +1120,7 @@ Represent one curated item entry available to recipes and salvage operations.
    A name resolved under GM authority may be visible to a player who could not have resolved it themselves; this is an accepted consequence of write-time resolution.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
 11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
-    The exception is importing again an Item whose own uuid a component already claims without that compendium source: the import adds no alias and reports no fallback; replace-source is not excepted.
+    The exception is importing again an Item whose own uuid a component already claims without that compendium source: the import adds no alias and reports no fallback (see **Recipe Item Identity → Registration Source Identity**); replace-source is not excepted.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
     12a.
     Every bulk component-import path — compendium pack import, folder import, and the folder-mapping commit — must persist its whole run with a SINGLE `craftingSystems` world-setting write, and the number of writes must not grow with the number of imported items or with the number of mapped folders.
