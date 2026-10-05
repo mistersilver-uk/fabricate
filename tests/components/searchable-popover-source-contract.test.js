@@ -240,7 +240,7 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
     snippetSites.length,
     3,
     `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; three do — ` +
-      "`IconPicker`, `EssenceSourceSelector` and `ComponentEditView`'s salvage adder (issue " +
+      "`IconPicker`, `EssenceSourceSelector` and `ComponentSalvageCard`'s salvage adder (issue " +
       '1516). A different number means the route has gained or lost a caller and the figures in ' +
       'this file need re-measuring.'
   );

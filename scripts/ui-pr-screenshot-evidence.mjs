@@ -360,9 +360,11 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-component-edit-difficulty',
     label: 'Manager component editor — staged progressive difficulty control',
     smokeLabels: ['manager-component-edit-difficulty'],
-    // The difficulty control rehomed from the deleted ComponentDifficultyInspector into
-    // ComponentEditView's body.
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    // The staged difficulty control is ComponentDifficultyCard, which ComponentEditView renders.
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentDifficultyCard\.svelte$/,
+    ],
   },
   {
     id: 'manager-component-edit-salvage',
@@ -372,6 +374,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-component-edit-salvage', 'manager-component-edit-salvage-off'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentSalvage(?:Card|Stages)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/component\/salvageDcPresets\.js$/,
     ],
   },
@@ -381,7 +384,10 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-component-edit-salvage-simple',
     label: 'Manager component editor — Simple-mode salvage single-group cap (no Add result set, required hint)',
     smokeLabels: ['manager-component-edit-salvage-simple'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/ComponentSalvageCard\.svelte$/,
+    ],
   },
   {
     id: 'manager-checks-gathering',

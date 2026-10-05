@@ -1,7 +1,7 @@
 /** Invariants for the View Lab case registry. */
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
-import { basename, dirname, relative, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { basename, dirname, relative, resolve, sep as SEP } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { parse } from 'svelte/compiler';
@@ -52,10 +52,13 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
+import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
 import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
+import { componentAstOf } from './helpers/parsedSource.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
+import { importedModules } from './helpers/svelteStructureContract.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
 import { LAB_JOURNAL_CASE_STATE_RUN_IDS } from './view-lab/world/labRunStates.js';
@@ -5512,6 +5515,63 @@ test('a change confined to recipeReadiness.js selects the recipe-editor cases, n
     [FALLBACK_CASE_ID],
     'an unmatched UI path falls through to the fallback, which is what the probe rules out'
   );
+});
+
+// The component rules editor's cards (issue 1522), named files rather than a directory walk, so a
+// pattern that stops matching a file that still exists fails here. The identity strip predates
+// the extraction and draws on every frame the editor does.
+const COMPONENT_EDITOR_VIEW = 'src/ui/svelte/apps/manager/ComponentEditView.svelte';
+const COMPONENT_CARD_DIR = 'src/ui/svelte/apps/manager/component/';
+const COMPONENT_EDITOR_CARDS = Object.freeze([
+  ...COMPONENT_EDITOR_CARD_FILES,
+  `${COMPONENT_CARD_DIR}ComponentIdentityStrip.svelte`,
+]);
+
+/** The `component/*.svelte` files the editor imports, and those they import in turn. */
+function componentCardClosure(file, found = new Set()) {
+  for (const specifier of importedModules(componentAstOf(file))) {
+    const path = relative(ROOT, resolve(ROOT, dirname(file), specifier)).replaceAll(SEP, '/');
+    if (!path.startsWith(COMPONENT_CARD_DIR) || !path.endsWith('.svelte') || found.has(path)) {
+      continue;
+    }
+    found.add(path);
+    componentCardClosure(path, found);
+  }
+  return found;
+}
+
+test('the rules-editor card list is every card the editor renders without frames of its own', () => {
+  const ids = (file) => mapChangedFilesToCases([file]).map((viewCase) => viewCase.id);
+  const editorFrames = ids(COMPONENT_EDITOR_VIEW);
+  for (const card of COMPONENT_EDITOR_CARDS) {
+    assert.ok(existsSync(resolve(ROOT, card)), `${card} exists`);
+  }
+  const closure = [...componentCardClosure(COMPONENT_EDITOR_VIEW)];
+  // A file selecting a frame the editor does not has cases of its own, and routes by them.
+  const ownFramed = closure.filter((file) => ids(file).some((id) => !editorFrames.includes(id)));
+  assert.ok(ownFramed.length > 0, 'the exclusion is exercised');
+  assert.deepEqual(
+    new Set(closure.filter((file) => !ownFramed.includes(file))),
+    new Set(COMPONENT_EDITOR_CARDS),
+    'a new card joins this list and COMPONENT_EDITOR_MATCHES'
+  );
+});
+
+test('a change confined to one rules-editor card selects every frame the editor selects', () => {
+  const ids = (file) => mapChangedFilesToCases([file]).map((viewCase) => viewCase.id);
+  const editorFrames = ids(COMPONENT_EDITOR_VIEW);
+  for (const expected of [
+    'manager-component-edit-normal',
+    'manager-component-edit-inheriting',
+    'manager-component-edit-salvage',
+    'manager-component-edit-salvage-simple',
+    'manager-component-complications-salvage-stage-strip',
+  ]) {
+    assert.ok(editorFrames.includes(expected), `the editor selects ${expected}`);
+  }
+  for (const card of COMPONENT_EDITOR_CARDS) {
+    assert.deepEqual(ids(card), editorFrames, `${card} selects the editor's frames`);
+  }
 });
 
 // The environment editor's validation tab (issue 1517). THE DEFECT THIS PINS WAS A STALE CLAIM, NOT

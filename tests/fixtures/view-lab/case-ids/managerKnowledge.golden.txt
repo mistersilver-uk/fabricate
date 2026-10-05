@@ -10,6 +10,7 @@ manager-knowledge-error
 manager-components-progressive
 manager-components-bulk-edit-progressive
 manager-component-edit-difficulty
+manager-component-edit-difficulty-card
 manager-import-report
 manager-import-folder-mapping
 manager-alchemy-settings

@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { ROUTE_EXIT_GUARDS } from '../../src/ui/svelte/apps/manager/routeExitGuards.js';
+import { COMPONENT_EDITOR_CARD_FILES } from '../helpers/componentEditorCards.js';
 import { calledName, identifierNames } from '../helpers/moduleAst.js';
 import { componentAstOf } from '../helpers/parsedSource.js';
 import {
@@ -401,6 +402,13 @@ describe('the save-failed statement is a blocking notice (issue 1522)', () => {
   for (const file of [EDIT, COMPONENT_EDIT, ESSENCE_EDIT]) {
     defineStructureContract(`${file} renders it through Notice`, file, {
       renders: ['Notice'],
+      spellsNo: ['manager-form-warning'],
+    });
+  }
+
+  // The component editor's cards render no save-failed statement of their own.
+  for (const file of COMPONENT_EDITOR_CARD_FILES) {
+    defineStructureContract(`${file} spells no form warning`, file, {
       spellsNo: ['manager-form-warning'],
     });
   }

@@ -1081,6 +1081,25 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(byId['player-salvage-misconfigured'], ['player-salvage-misconfigured']);
   });
 
+  // Issue 1522: the editor's cards keep the recipes the editor's body selected before they moved.
+  it('maps each extracted component-editor card to the recipes that photograph it', () => {
+    const viewsOf = (name) =>
+      mapChangedFilesToViews([`src/ui/svelte/apps/manager/component/${name}.svelte`]).map(v => v.id);
+    for (const [card, expected] of [
+      ['ComponentCategoryTagsCards', ['manager-component-edit']],
+      ['ComponentEssencesCard', ['manager-component-edit']],
+      ['ComponentRulesValidationTab', ['manager-component-edit']],
+      ['ComponentDifficultyCard', ['manager-component-edit', 'manager-component-edit-difficulty']],
+      ['ComponentSalvageStages', ['manager-component-edit', 'manager-component-edit-salvage']],
+      [
+        'ComponentSalvageCard',
+        ['manager-component-edit', 'manager-component-edit-salvage', 'manager-component-edit-salvage-simple'],
+      ],
+    ]) {
+      assert.deepEqual(viewsOf(card), expected, `${card} maps to its recipes`);
+    }
+  });
+
   // Issue 777: the required-tools disclosure frame is its own recipe (one file per id) so `collect`
   // publishes it; appending its label to `player-salvage` would never publish it.
   it('maps the issue-777 required-tools frame to its changed source', () => {

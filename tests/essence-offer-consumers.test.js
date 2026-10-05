@@ -16,7 +16,7 @@ const PICKER_ROW_NAME_FIELD = 'src/ui/svelte/apps/manager/recipe/PickerRowNameFi
 
 /** The enumerated consumers, each with the projection it applies. */
 const CONSUMERS = Object.freeze([
-  ['src/ui/svelte/apps/manager/ComponentEditView.svelte', 'visibleEssenceOptions'],
+  ['src/ui/svelte/apps/manager/component/ComponentEssencesCard.svelte', 'visibleEssenceOptions'],
   [
     'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
     'visibleEssenceOptions',
@@ -32,6 +32,10 @@ const CONSUMERS = Object.freeze([
 const ROW_CALLERS_WITHOUT_ESSENCES = Object.freeze({
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte':
     'A result names a component, a currency or a taught recipe, so its catalogue has no essence kind.',
+  'src/ui/svelte/apps/manager/component/ComponentSalvageCard.svelte':
+    'A salvage result names a component and nothing else, so its catalogue has no essence kind.',
+  'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte':
+    'A salvage stage names a component and nothing else, so its catalogue has no essence kind.',
 });
 
 // TWO ENTRIES LEFT WITH THE CHOICE THEY MADE (issue 1373, maintainer round 5), and the removal is

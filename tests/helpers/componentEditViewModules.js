@@ -1,11 +1,15 @@
 /** The mount-harness module closure of `ComponentEditView.svelte`. */
 
+import { resolve } from 'node:path';
+
 import { COMPONENT_SCOPE_LEAF_MODULES } from './componentScopeMountModules.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
 import {
   CHECK_TARGET_RAW_MODULES,
+  createMountedComponentHarness,
   RESULT_ROW_COMPILED_MODULES,
   RESULT_ROW_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
 } from './svelte-component-harness.js';
 
 /** Raw (uncompiled) modules the harness copies into the temp tree verbatim. */
@@ -162,5 +166,43 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
   'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
   ...RESULT_ROW_COMPILED_MODULES,
+  // The rules editor's cards and Validation tab (issue 1522).
+  'src/ui/svelte/apps/manager/component/ComponentCategoryTagsCards.svelte',
+  'src/ui/svelte/apps/manager/component/ComponentDifficultyCard.svelte',
+  'src/ui/svelte/apps/manager/component/ComponentEssencesCard.svelte',
+  'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte',
+  'src/ui/svelte/apps/manager/component/ComponentSalvageCard.svelte',
+  'src/ui/svelte/apps/manager/component/ComponentRulesValidationTab.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 ]);
+
+/** A mount harness for one of the editor's cards under `component/` (issue 1522). */
+export function componentCardHarness(name) {
+  return createMountedComponentHarness({
+    repoRoot: resolve(import.meta.dirname, '../..'),
+    tmpPrefix: `fabricate-${name}-`,
+    rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+    runeModules: TYPEAHEAD_RUNE_MODULES,
+    compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
+    componentPath: `src/ui/svelte/apps/manager/component/${name}.svelte`,
+  });
+}
+
+/** The fallback-only `text` and interpolating `format` a card takes from its host. */
+export const cardText = (_key, fallback) => fallback;
+export const cardFormat = (_key, fallback, data) =>
+  Object.entries(data ?? {}).reduce(
+    (result, [token, value]) => result.replaceAll(`{${token}}`, String(value)),
+    fallback
+  );
+
+/** A call log, and callbacks that append `[name, ...args]` to it. */
+export function callRecorder() {
+  const calls = [];
+  const record =
+    (name) =>
+    (...args) => {
+      calls.push([name, ...args]);
+    };
+  return { calls, record };
+}
