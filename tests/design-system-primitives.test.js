@@ -30,6 +30,12 @@ import {
   checkGate,
   manifestRows,
 } from './helpers/designSystemRatchet.js';
+import {
+  assertMovedByDiff,
+  headManifest,
+  isPrimitiveFile,
+  registerBase,
+} from './helpers/registerBase.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -247,35 +253,58 @@ test('the inputs every property below quantifies over are alive', () => {
     'the render-file walk reached no nested file, so it is not recursing'
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
-  // 48 as of issue 1392, which promoted `apps/manager/VocabularyPanel.svelte`: the World Vocabulary
-  // screen is its second independent caller, and property (e) below reported it as a component that
-  // had crossed the membership bar with nobody adjudicating it.
-  // 68 as of issue 2005, which promoted the shared Preview-as picker, the Player sees block and the
-  // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles;
-  // 72 as of issue 2008: the Formula card's option well, and the `<Well>` on its second caller.
-  // 73 as of issue 1518: the slot tile, on the requirement chooser as its second importer.
-  // 74 as of issue 1516: `PickerRow` on its second importer, the result card.
-  // 75 as of issue 1521, whose `InlineRenameField` replaced the party and realm name fields; 74
-  // once the inspector action button became the button primitive at full width.
-  // 76 as of issue 1782: `Meter` and `BandedBar`, each on three and two importers; 77 with
-  // `RuleRow` on its two; 76 once issue 1521 folded the explainer card onto the callout's `items`;
-  // 77 with `SetPicker` on its two; 78 as of issue 1773: the requirement chooser, on the award
-  // face; 79 when issue 1521 built `InfoStrip` on its two importers, the check card and the stamina
-  // pool; 80 with `ArtPicker` on its four (issue 1522); 81 with `Rail` on its three inspectors; 82
-  // with `ChoiceGroup`, on the result card as its second importer.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 82, 'the shipped primitive set changed size');
-  // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
-  // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;
-  // 17 when `ChoiceGroup` joined at one caller (issue 1516).
-  // 18 as of issue 1782: `StageBars`, whose one importer is `RunProgress`; 19 with `RuleSentence`,
-  // whose one importer is `RuleRow`. 18 when issue 1773 moved the requirement chooser out, and 17
-  // when it moved `ChoiceGroup` out; 18 with `LogList`, whose one importer is the journal's
-  // `HistoryList`.
-  assert.equal(NOT_A_PRIMITIVE.length, 18, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
     'no case publishes, so override values cannot be checked'
+  );
+});
+
+test('a primitive neither appears nor vanishes without a register row (issue 1495)', (t) => {
+  // Counts are the base's plus this diff's own rows, never a literal a PR hand-edits.
+  const base = registerBase();
+  if (base.skipped) return t.skip(base.skipped);
+  const head = headManifest();
+  const paths = (rows) => rows.map((row) => row.path);
+  assertMovedByDiff(
+    'shipped primitive rows',
+    paths(base.manifest.designSystemPrimitives),
+    paths(head.designSystemPrimitives),
+    DESIGN_SYSTEM_PRIMITIVES.length
+  );
+  assertMovedByDiff(
+    'recorded non-member rows',
+    paths(base.manifest.notAPrimitive),
+    paths(head.notAPrimitive),
+    NOT_A_PRIMITIVE.length
+  );
+  // The component files and the rows must move together: a file with no row, or a row whose file
+  // went, shows here by name.
+  const rowPaths = (manifest) => [
+    ...paths(manifest.designSystemPrimitives),
+    ...paths(manifest.notAPrimitive),
+  ];
+  const baseRows = new Set(rowPaths(base.manifest).filter(isPrimitiveFile));
+  const headRows = new Set(rowPaths(head).filter(isPrimitiveFile));
+  assert.deepEqual(
+    base.files.added.filter((file) => !headRows.has(file)),
+    [],
+    'a component joined a primitive directory without a manifest row'
+  );
+  assert.deepEqual(
+    base.files.removed.filter((file) => headRows.has(file)),
+    [],
+    'a component left a primitive directory and its manifest row stayed'
+  );
+  assert.deepEqual(
+    [...headRows].filter((file) => !baseRows.has(file) && !base.files.added.includes(file)),
+    [],
+    'a manifest row appeared for a component the diff did not add'
+  );
+  assert.deepEqual(
+    [...baseRows].filter((file) => !headRows.has(file) && !base.files.removed.includes(file)),
+    [],
+    'a manifest row vanished while its component file stayed'
   );
 });
 
