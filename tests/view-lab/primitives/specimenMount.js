@@ -25,11 +25,7 @@ import {
 /** A fallback box, big enough to show the printed error message, when mounting fails. */
 const ERROR_BOX = Object.freeze({ width: 420, height: 120 });
 
-/**
- * Post a message to the parent frame.
- *
- * @param {object} message A plain, structured-clonable object.
- */
+/** Post a plain, structured-clonable message to the parent frame. */
 function postToParent(message) {
   globalThis.parent.postMessage(message, globalThis.location.origin);
 }

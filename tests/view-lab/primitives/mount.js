@@ -77,11 +77,7 @@ function renderMissingChrome(message) {
   document.body.setAttribute(READY_ATTRIBUTE, '');
 }
 
-/**
- * Publish the page's own report onto `<body>`.
- *
- * @param {{mounted: number, problems: string[]}} report What mounted, and what did not.
- */
+/** Publish the page's own report, what mounted and what did not, onto `<body>`. */
 function publishReport({ mounted, problems }) {
   document.body.setAttribute(MOUNTED_ATTRIBUTE, String(mounted));
   if (problems.length === 0) document.body.removeAttribute(ERROR_ATTRIBUTE);
@@ -105,11 +101,7 @@ function requireSupportedMountMode() {
   );
 }
 
-/**
- * Adopt the library's own body into this document, and install its stylesheet.
- *
- * @param {{body: HTMLElement, css: string}} library The parsed library.
- */
+/** Adopt the library's own body into this document, and install its stylesheet. */
 function renderLibrary(library) {
   const style = document.createElement('style');
   style.dataset.plLibrary = '';
@@ -119,12 +111,7 @@ function renderLibrary(library) {
   while (library.body.firstChild) document.body.append(document.adoptNode(library.body.firstChild));
 }
 
-/**
- * Apply a specimen's reported size to its `<iframe>`, and reveal it once sized.
- *
- * @param {HTMLIFrameElement} iframe The specimen's frame.
- * @param {{width: number, height: number}} size The iframe's own report.
- */
+/** Apply a specimen's reported size to its `<iframe>`, and reveal it once sized. */
 function applySize(iframe, { width, height }) {
   iframe.style.width = `${width}px`;
   iframe.style.height = `${height}px`;
