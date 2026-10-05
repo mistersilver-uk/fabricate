@@ -135,7 +135,7 @@ describe('recipe-item model', () => {
     assert.deepEqual(views, ['recipe-item-edit', 'recipe-item-edit']);
     assert.deepEqual(expanded, ['crafting', 'crafting']);
     await Promise.resolve();
-    assert.deepEqual(worldItemOptions.at(-1), [{ uuid: 'Item.world' }]);
+    assert.deepEqual(worldItemOptions, [[{ uuid: 'Item.world' }], [{ uuid: 'Item.world' }]]);
   });
 
   it('opens nothing when the route exit is refused', () => {
@@ -304,5 +304,147 @@ describe('recipe-item model', () => {
     assert.equal(model.selectedRecipeItem, null);
     live.set('definitions', [TOME, { id: 'scroll' }]);
     assert.deepEqual(model.selectedRecipeItem, { id: 'scroll' });
+  });
+
+  it('keeps a tab choice the editor was left on', () => {
+    const { model } = openModel();
+    model.editRecipeItem('tome');
+    model.recipeItemActiveTab = 'limits';
+    assert.equal(model.recipeItemActiveTab, 'limits');
+  });
+
+  it('refuses a delete with no draft or while a save is in flight', async () => {
+    const none = openModel();
+    await none.model.deleteRecipeItemFromEdit();
+    assert.deepEqual(none.calls, []);
+
+    let settle;
+    const { model, calls } = openModel({
+      store: {
+        saveRecipeItem: () =>
+          new Promise((resolve) => {
+            settle = resolve;
+          }),
+      },
+    });
+    model.editRecipeItem('tome');
+    const saving = model.saveRecipeItemDraft();
+    await model.deleteRecipeItemFromEdit();
+    assert.ok(calls.every((call) => call[0] !== 'deleteRecipeItemDefinition'));
+    settle(true);
+    await saving;
+  });
+
+  it('clears the baseline and the failed flag when a delete lands', async () => {
+    const { model } = openModel({ store: { saveRecipeItem: async () => false } });
+    model.editRecipeItem('tome');
+    await model.saveRecipeItemDraft();
+    assert.equal(model.recipeItemSaveFailed, true);
+    await model.deleteRecipeItemFromEdit();
+    assert.equal(model.recipeItemDraftBaseline, null);
+    assert.equal(model.recipeItemSaveFailed, false);
+  });
+
+  it('clears a failed flag at the start of the next save', async () => {
+    let answer = false;
+    const { model } = openModel({ store: { saveRecipeItem: async () => answer } });
+    model.editRecipeItem('tome');
+    await model.saveRecipeItemDraft();
+    assert.equal(model.recipeItemSaveFailed, true);
+    answer = true;
+    await model.saveRecipeItemDraft();
+    assert.equal(model.recipeItemSaveFailed, false);
+  });
+
+  it('saves a bare draft with the payload defaults', async () => {
+    const { model, calls, live } = openModel();
+    live.set('definitions', [{ id: 'bare' }]);
+    model.editRecipeItem('bare');
+    await model.saveRecipeItemDraft();
+    assert.deepEqual(
+      calls.find((call) => call[0] === 'saveRecipeItem'),
+      ['saveRecipeItem', 'bare', { enabled: true, originItemUuid: null, recipeIds: [], caps: {} }]
+    );
+  });
+
+  it('resets the saving flag when an edit opens mid-save', async () => {
+    let settle;
+    const { model } = openModel({
+      store: {
+        saveRecipeItem: () =>
+          new Promise((resolve) => {
+            settle = resolve;
+          }),
+      },
+    });
+    model.editRecipeItem('tome');
+    const saving = model.saveRecipeItemDraft();
+    assert.equal(model.recipeItemEditSaving, true);
+    model.editRecipeItem('tome');
+    assert.equal(model.recipeItemEditSaving, false);
+    settle(true);
+    await saving;
+  });
+
+  it('ignores a recipe link or unlink with no draft or no id', () => {
+    const { model } = openModel();
+    model.linkRecipeToItem('r2');
+    model.unlinkRecipeFromItem('r1');
+    assert.equal(model.recipeItemDraft, null);
+    model.editRecipeItem('tome');
+    model.linkRecipeToItem('');
+    model.unlinkRecipeFromItem('');
+    assert.deepEqual(model.recipeItemDraft.recipeIds, ['r1']);
+  });
+
+  it('opens nothing for a drop with no uuid', async () => {
+    const { model, calls } = openModel();
+    await model.dropRecipeItem('');
+    assert.deepEqual(calls, []);
+    assert.equal(model.recipeItemDraft, null);
+  });
+
+  it('links nothing when the resolver finds no item, or there is no uuid', async () => {
+    let asked = 0;
+    const { model } = openModel({
+      services: {
+        resolveToolSource: async () => {
+          asked += 1;
+          return null;
+        },
+      },
+    });
+    model.editRecipeItem('tome');
+    assert.equal(await model.linkRecipeItemSource('Item.gone'), false);
+    assert.deepEqual(model.recipeItemDraft, TOME);
+    assert.equal(model.recipeItemEditorLinkedItem.name, 'Tome');
+    assert.equal(await model.linkRecipeItemSource(''), false);
+    assert.equal(asked, 1, 'an empty uuid never reaches the resolver');
+  });
+
+  it('forgets the unlinked preview rather than reviving it on a relink by patch', async () => {
+    const { model } = openModel({
+      services: { resolveToolSource: async (uuid) => ({ uuid, name: 'Guide', img: '' }) },
+    });
+    model.editRecipeItem('tome');
+    await model.linkRecipeItemSource('Item.guide');
+    model.unlinkRecipeItemSource();
+    model.patchRecipeItemDraft({ originItemUuid: 'Item.guide' });
+    assert.equal(model.recipeItemEditorLinkedItem.name, '');
+  });
+
+  it('offers an empty option list when the world has none to give', async () => {
+    const { model, worldItemOptions } = openModel({
+      services: { getWorldItemOptions: () => undefined },
+    });
+    model.editRecipeItem('tome');
+    await Promise.resolve();
+    assert.deepEqual(worldItemOptions, [[]]);
+  });
+
+  it('treats only a boolean `true` as a limited quick limit', () => {
+    const { model, calls } = openModel();
+    model.toggleRecipeItemQuickLimit('tome', 'on');
+    assert.equal(calls[0][2].learn.limitLearning, false);
   });
 });

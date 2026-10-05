@@ -6,7 +6,7 @@
  */
 import { mergeAccessors } from '../gatheringRouteModel.svelte.js';
 
-// Deep PLAIN clone for the recipe-item draft + baseline.
+// Deep plain clone for the recipe-item draft and baseline.
 function cloneRecipeItemDraft(source) {
   return source ? JSON.parse(JSON.stringify(source)) : null;
 }
