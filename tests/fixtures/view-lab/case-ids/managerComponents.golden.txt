@@ -15,6 +15,7 @@ manager-components-description-repaired
 manager-components-description-ingested
 manager-component-edit-normal
 manager-component-edit-save-failed
+manager-component-edit-validation
 manager-component-edit-stacked
 manager-component-edit-salvage
 manager-component-edit-salvage-narrow

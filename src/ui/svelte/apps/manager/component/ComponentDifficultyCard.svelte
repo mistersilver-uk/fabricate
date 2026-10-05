@@ -75,6 +75,7 @@
           'Increase difficulty'
         )}
         disabled={saving}
+        inputProps={{ 'data-validation-target': 'component-progressive-dc' }}
         onChange={(next) => handleDifficultyInput(next)}
       />
     </div>

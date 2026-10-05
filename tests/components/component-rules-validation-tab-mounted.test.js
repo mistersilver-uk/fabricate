@@ -3,22 +3,20 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import { componentRulesValidationPresentation } from '../../src/ui/svelte/apps/manager/component/componentRulesValidation.js';
-import { cardFormat, cardText, componentCardHarness } from '../helpers/componentEditViewModules.js';
+import {
+  callRecorder,
+  cardFormat,
+  cardText,
+  componentCardHarness,
+} from '../helpers/componentEditViewModules.js';
 
 const harness = componentCardHarness('ComponentRulesValidationTab');
-
-const SUMMARY = Object.freeze({
-  status: 'block',
-  icon: 'fas fa-circle-xmark',
-  title: 'These rules have gaps',
-  sub: 'What Smithing needs from this component.',
-});
 
 describe('ComponentRulesValidationTab', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
 
-  it('draws one hooked row per check, worded by status, under the summary it is given', async () => {
+  it('draws one hooked row per check, worded by status, under the hero its counts derive', async () => {
     const validation = componentRulesValidationPresentation(
       {
         category: 'general',
@@ -31,7 +29,14 @@ describe('ComponentRulesValidationTab', () => {
       },
       cardFormat
     );
-    const target = await harness.mount({ text: cardText, summary: SUMMARY, validation });
+    const { calls, record } = callRecorder();
+    const target = await harness.mount({
+      text: cardText,
+      format: cardFormat,
+      systemLabel: 'Smithing',
+      validation,
+      onSelectIssue: record('select'),
+    });
 
     const root = target.querySelector('[data-component-edit-validation]');
     assert.ok(Boolean(root), 'the surface carries the editor hook');
@@ -40,6 +45,7 @@ describe('ComponentRulesValidationTab', () => {
       'block'
     );
     assert.match(root.textContent, /These rules have gaps/);
+    assert.match(root.textContent, /What Smithing needs from this component/);
 
     const expected = validation.groups.flatMap((group) => group.rows.map((row) => row.id));
     const rows = [...root.querySelectorAll('[data-component-validation-check]')];
@@ -74,6 +80,63 @@ describe('ComponentRulesValidationTab', () => {
         `a ${status} row reads "${word}"`
       );
     }
+
+    // A failing row's View hands the view its route and control; a passing row offers none.
+    for (const row of rows) {
+      assert.equal(
+        Boolean(row.querySelector('[data-component-validation-view]')),
+        !row.classList.contains('is-pass'),
+        `${row.dataset.componentValidationCheck}: a View exactly when the row fails`
+      );
+    }
+    root.querySelector(':scope [data-component-validation-check="essences"] button').click();
+    assert.deepEqual(calls, [['select', 'rules', 'component-essences']]);
     harness.remount();
   });
+  const BLOCKING = {
+    category: 'general',
+    salvageFeatureEnabled: true,
+    salvageEnabled: true,
+    resultCount: 0,
+  };
+  const WARNING_ONLY = { category: 'general', essencesOffered: true, essenceTotal: 0 };
+  const ALL_PASS = { category: 'general', essencesOffered: true, essenceTotal: 1 };
+
+  it('badges the Validation tab at the worst severity, and not at all when everything passes', () => {
+    const blocking = componentRulesValidationPresentation(BLOCKING, cardFormat);
+    assert.deepEqual(blocking.badge, {
+      count: blocking.counts.blocking,
+      label: String(blocking.counts.blocking),
+      tone: 'danger',
+    });
+    assert.ok(blocking.counts.blocking > 0);
+    const warning = componentRulesValidationPresentation(WARNING_ONLY, cardFormat);
+    assert.deepEqual(warning.badge, {
+      count: warning.counts.warnings,
+      label: String(warning.counts.warnings),
+      tone: 'warning',
+    });
+    assert.ok(warning.counts.warnings > 0 && warning.counts.blocking === 0);
+    assert.equal(componentRulesValidationPresentation(ALL_PASS, cardFormat).badge, null);
+  });
+
+  for (const [status, context, icon] of [
+    ['block', BLOCKING, 'fa-circle-xmark'],
+    ['warn', WARNING_ONLY, 'fa-triangle-exclamation'],
+    ['pass', ALL_PASS, 'fa-circle-check'],
+  ]) {
+    it(`paints the ${status} hero with ${icon}`, async () => {
+      const target = await harness.mount({
+        text: cardText,
+        format: cardFormat,
+        systemLabel: 'Smithing',
+        validation: componentRulesValidationPresentation(context, cardFormat),
+      });
+      const summary = target.querySelector('[data-editor-validation-summary]');
+      assert.equal(summary.dataset.editorValidationSummary, status);
+      const classes = [...summary.querySelector('i').classList];
+      assert.ok(classes.includes(icon), `${status} wears ${icon}; got ${classes.join(' ')}`);
+      harness.remount();
+    });
+  }
 });
