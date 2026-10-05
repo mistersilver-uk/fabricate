@@ -140,6 +140,48 @@ A rolled group needs no pick, because the roll decides.
 A reward the player chooses needs a run on the current lifecycle.
 A run on the older lifecycle refuses to award one.
 
+#### Making a row a choice group
+
+There is no button that creates an empty group.
+A reward row becomes one, in place, when you select its **or…** control (**Add an alternative**).
+The row stays where it is and gains a second, empty alternative beside it.
+Each result kind has its own **alt** adder (for example **alt component** or **alt currency**), so an alternative can be an item, a currency amount or a recipe the character learns.
+Remove alternatives until only one is left and the group turns back into a plain row.
+A line under the group's header says in plain words what the group does.
+
+#### The group header
+
+| Setting | What it does |
+|:--------|:-------------|
+| **How many it awards** | **Any one of** awards a single alternative. **Up to N of** awards up to N, where N is at least 2. |
+| **Who chooses** | **Player chooses** hands the pick to the player. **Rolled** lets a roll decide. |
+
+For **Up to N of**, N is either a fixed whole number or a roll, and the roll must be one that can total more than 0.
+
+#### Rolled groups
+
+When the roll chooses, the header gains a **Selection** roll expression.
+It is rolled against the crafting character once for each award.
+Every alternative then shows a range cell with the lowest and highest roll that selects it.
+Ranges are whole numbers and may not overlap, but they may leave gaps.
+A roll that lands in a gap awards nothing.
+Fabricate marks a range that runs backwards, is a fraction or overlaps another alternative until you fix it.
+
+An **Up to N of** group that is rolled also offers **Unique** and **Repeats allowed**.
+**Unique** awards each alternative at most once.
+**Repeats allowed** lets the same alternative come up more than once.
+
+#### Settings the group is not using
+
+A setting that the current choices do not use is kept while you edit, so switching **Who chooses** back and forth does not lose your ranges.
+For example, ranges are kept when the player chooses.
+Saving the recipe drops the settings that are not in use.
+
+#### Progressive recipes
+
+A progressive recipe's stages offer no choice.
+The roll-budget strip in the Results tab says so, and a stage has no **or…** control.
+
 ### Moving a World Back to an Older Version
 
 {: .warning }
@@ -264,6 +306,10 @@ They browse the recipes their character can see, choose which owned actors suppl
 
 The Validation tab lists anything that would stop the recipe being crafted.
 Selecting an issue's **View** button jumps to the tab it concerns and highlights the part of it the issue is about.
+For [rewards the player chooses](#rewards-the-player-chooses), it reports a group with fewer than two alternatives.
+It also reports a rolled group with no selection roll, or one that cannot be rolled, and a rolled group whose ranges are missing, backwards, fractional or overlapping.
+It reports an **Up to N of** group whose count is not a positive whole number or a rollable roll, and a group with a chooser or award rule Fabricate does not recognise.
+A group inside a progressive system is reported too.
 
 {% include screenshot.html case="manager-recipe-edit-validation" %}
 
