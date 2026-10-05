@@ -15,6 +15,8 @@ export function versionedTransitionResult(run, outcome = {}) {
       ? [...outcome.createdResultUuids]
       : [],
     ...(Object.hasOwn(outcome || {}, 'consumed') && { consumed: outcome.consumed === true }),
+    // The tier a successful routed roll went through, in the run record's shape (issue 1644).
+    ...(outcome?.outcomeId && { checkResult: { data: { outcomeId: outcome.outcomeId } } }),
     // A stage that left the player a reward to pick says so (issue 1773).
     ...(holdsUnsettledAwardChoice(run) && { awardChoicePending: true }),
   };

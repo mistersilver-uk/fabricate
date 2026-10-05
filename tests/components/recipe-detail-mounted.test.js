@@ -19,6 +19,7 @@ import {
   steppedEssenceRecipe,
 } from '../helpers/crafting-fixtures.js';
 import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
+import { versionedTransitionResult } from '../../src/systems/versionedCommandResults.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
@@ -583,6 +584,22 @@ describe('RecipeDetail mounted behavior', () => {
     harness.remount();
     const own = await mountTiers(COLLAPSED, rolled('t-master'));
     assert.deepEqual(rolledTiers(own), ['t-master'], "a row's own id marks it");
+  });
+
+  it('marks the row a live craft result names, and none for a failed one', async () => {
+    // The engine's own result shape: a successful stage records its routed tier (issue 1644).
+    const run = { id: 'run-1', status: 'completed', runRevision: 2, currentStepIndex: null };
+    const live = (success) =>
+      versionedTransitionResult(run, {
+        success,
+        disposition: success ? 'succeeded' : 'failed',
+        ...(success && { outcomeId: 't-fine' }),
+      });
+    const target = await mountTiers(COLLAPSED, live(true));
+    assert.deepEqual(rolledTiers(target), ['t-flawed'], 'exactly the row Fine merged into');
+    harness.remount();
+    const failed = await mountTiers(COLLAPSED, live(false));
+    assert.deepEqual(rolledTiers(failed), [], 'a failed craft marks no row');
   });
 
   it('marks no row before a roll, after a failed roll, or for an unknown outcome', async () => {

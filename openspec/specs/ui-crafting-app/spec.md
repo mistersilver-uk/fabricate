@@ -915,6 +915,10 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   chip, and `No award` for a tier that awards nothing.
 - After a successful roll, the one row whose `ids` contain the craft result's recorded outcome
   id (`checkResult.data.outcomeId`) carries "Your roll"; a failing outcome marks no row.
+- A successful versioned stage records that id on its craft result, in the run record's
+  `lastCheckResult.data` shape; a failed stage records none.
+  The journal-run reply hands it on only beside a shown roll's evidence, so a secret or blind
+  roll, or an initiator the evidence entitlement refuses, receives no tier.
 
 #### Recipe List
 
