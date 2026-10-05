@@ -57,7 +57,7 @@ export const TOOL_LIST_MATCHES = [
 /** The component rules editor and the cards it renders (issue 1522). */
 export const COMPONENT_EDITOR_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/component\/Component(?:CategoryTagsCards|DifficultyCard|EssencesCard|SalvageStages|SalvageCard|RulesValidationTab)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/component\/Component(?:CategoryTagsCards|DifficultyCard|EssencesCard|IdentityStrip|SalvageStages|SalvageCard|RulesValidationTab)\.svelte$/,
 ];
 
 /** The trigger set every system Tool rules editor frame shares (issue 1373). */
