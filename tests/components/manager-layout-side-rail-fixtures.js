@@ -60,15 +60,12 @@ function worldLibrary(pageClass, announcement) {
  * d100 task's Results tab, the drop rail's aside after it.
  */
 export function gatheringTaskEditor({ results = false } = {}) {
-  const tabs = ['Overview', 'Requirements', 'Results']
-    .map((label) => `<button class="manager-editor-tab-button" role="tab">${label}</button>`)
-    .join('');
   const aside = results
     ? `<aside class="manager-inspector"><div class="manager-drop-inspector-stack">${TALL}</div></aside>`
     : '';
   return (
     '<main class="manager-main manager-gathering-task-edit-view" data-gathering-task-editor>' +
-    `<div class="fabricate-tabs manager-editor-tabs" role="tablist">${tabs}</div>` +
+    '<div class="fabricate-tabs manager-editor-tabs" role="tablist"><button class="manager-editor-tab-button" role="tab">Overview</button><button class="manager-editor-tab-button" role="tab">Requirements</button><button class="manager-editor-tab-button" role="tab">Results</button></div>' +
     `<div class="manager-editor-tab-panel" role="tabpanel">${TALL}</div></main>${aside}`
   );
 }
