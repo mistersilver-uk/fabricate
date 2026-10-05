@@ -221,10 +221,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-sources-picker',
     'manager-recipe-item-contents-picker',
   ]),
-  // The art picker (issue 1522): filled art, locked art, and the depleted marker filled and empty.
+  // The art picker (issue 1522): filled art, the event's art, locked art, and the depleted marker
+  // filled and empty.
   'src/ui/svelte/components/ArtPicker.svelte': Object.freeze([
     'manager-recipe-edit-normal',
     'manager-gathering-task-editor-normal',
+    'manager-gathering-event-availability-feedback-normal',
     'manager-environment-edit-placeholder',
     'manager-gathering-task-depleted-image-filled',
     'manager-gathering-task-depleted-image-empty',
