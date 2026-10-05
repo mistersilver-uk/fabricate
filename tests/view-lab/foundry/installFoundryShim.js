@@ -3,6 +3,7 @@
  * `game.settings` is the entire persistence layer.
  */
 import { registerCountRoll } from '../../../src/systems/countRoll.js';
+import CHROME_PROVENANCE from '../chrome-provenance.json' with { type: 'json' };
 import { createLabDialogV2 } from '../foundryDialog.js';
 import { createLabRollPromptAnswerer } from '../rollPromptAnswer.js';
 import {
@@ -15,6 +16,17 @@ import {
 import { installLabRandom } from './labRandom.js';
 import { createLabRoll } from './labRoll.js';
 import { LAB_TERM_CLASSES } from './labRollTerms.js';
+
+/**
+ * The client the lab declares itself, read from the harvested build whose chrome it renders, in
+ * core's `ReleaseData` shape (issue 1487). `essenceIcons.js` reads `game.release.generation`.
+ */
+const [LAB_GENERATION, LAB_BUILD] = CHROME_PROVENANCE.foundryVersion.split('.').map(Number);
+const LAB_RELEASE = Object.freeze({
+  generation: LAB_GENERATION,
+  build: LAB_BUILD,
+  version: `${LAB_GENERATION}.${LAB_BUILD}`,
+});
 
 /**
  * Compose the Map key for one setting.
@@ -183,10 +195,33 @@ function createTextEditor(documents) {
       const name = label || documents.get(uuid)?.name;
       return name ? `<a class="content-link" data-uuid="${uuid}">${name}</a>` : whole;
     });
+  // On both the base and `.implementation`, which different callers reach (issue 1487).
   return {
-    implementation: { enrichHTML: async (raw) => enrich(raw) },
+    implementation: { enrichHTML: async (raw) => enrich(raw), getDragEventData },
     enrichHTML: async (raw) => enrich(raw),
+    getDragEventData,
   };
+}
+
+/**
+ * `TextEditor.getDragEventData`, transcribed from the harvested
+ * `client/applications/ux/text-editor.mjs`: `{}` on failure, where the bridge's fallback says null.
+ *
+ * @param {DragEvent} event A drag event.
+ * @returns {object} The parsed payload, or `{}` when there is none to parse.
+ */
+function getDragEventData(event) {
+  if (!('dataTransfer' in event)) {
+    console.warn(
+      'Incorrectly attempted to process drag event data for an event which was not a DragEvent.'
+    );
+    return {};
+  }
+  try {
+    return JSON.parse(event.dataTransfer.getData('text/plain'));
+  } catch {
+    return {};
+  }
 }
 
 /** The two dnd5e Starter Heroes the smoke imports, reconstructed. */
@@ -327,6 +362,8 @@ export function installFoundryShim(world) {
 
   const game = {
     ready: true,
+    release: LAB_RELEASE,
+    version: LAB_RELEASE.version,
     user: gmUser,
     users: usersCollection([playerUser]),
     actors: Object.assign(createCollection(world.actorList), {
