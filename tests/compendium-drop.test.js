@@ -1233,7 +1233,7 @@ test('refreshComponentMetadataForUpdatedItem — updates component name for dire
   assert.equal(saveCount, 1);
 });
 
-test('refreshComponentMetadataForUpdatedItem — updates component image for canonical source UUID match', async () => {
+test('refreshComponentMetadataForUpdatedItem — updates component image when the compendium entry it records is edited, not an owned copy of it', async () => {
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
@@ -1248,12 +1248,22 @@ test('refreshComponentMetadataForUpdatedItem — updates component image for can
   let saveCount = 0;
   mgr.save = async () => { saveCount++; };
 
-  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+  // An actor-owned copy is a sibling of the linked source, not the linked source (issue 2217).
+  const owned = await mgr.refreshComponentMetadataForUpdatedItem(
     {
       uuid: 'Actor.actor-1.Item.ore-copy',
-      img: 'icons/ore-new.webp',
+      img: 'icons/ore-owned.webp',
       _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
     },
+    { img: 'icons/ore-owned.webp' }
+  );
+
+  assert.equal(owned.updated, 0);
+  assert.equal(mgr.getSystem('sys1').components[0].img, 'icons/ore-old.webp');
+  assert.equal(saveCount, 0);
+
+  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+    { uuid: 'Compendium.source.items.iron-ore', img: 'icons/ore-new.webp' },
     { img: 'icons/ore-new.webp' }
   );
 
@@ -1261,6 +1271,58 @@ test('refreshComponentMetadataForUpdatedItem — updates component image for can
   assert.equal(mgr.getSystem('sys1').components[0].img, 'icons/ore-new.webp');
   assert.equal(saveCount, 1);
 });
+
+// Issue 2217: the Items below share a compendium source with a component's source Item without
+// being it, so editing one refreshes only a component that claims the edited Item's own uuid.
+const REFRESH_SIBLINGS = [
+  ['a derivative', { uuid: 'Item.ore-derivative' }],
+  ['a sidebar duplicate', { uuid: 'Item.ore-duplicate', duplicateSource: 'Item.world-copy' }],
+  ['an unregistered world copy', { uuid: 'Item.ore-second-copy' }],
+  ['an actor-owned copy', { uuid: 'Actor.actor-1.Item.ore-copy' }]
+];
+
+for (const [label, { uuid, duplicateSource = null }] of REFRESH_SIBLINGS) {
+  test(`refreshComponentMetadataForUpdatedItem — editing ${label} refreshes its own component and not the one claiming its compendium source`, async () => {
+    const mgr = buildManager([{
+      id: 'sys1',
+      name: 'System One',
+      items: [
+        {
+          id: 'comp-ore',
+          name: 'Iron Ore',
+          img: 'icons/ore.webp',
+          description: 'Dull grey ore.',
+          registeredItemUuid: 'Item.world-copy',
+          originItemUuid: 'Compendium.source.items.iron-ore'
+        },
+        { id: 'comp-own', name: 'Old Name', img: 'icons/old.webp', registeredItemUuid: uuid }
+      ]
+    }]);
+    const description = '<p>Reworked.</p>';
+
+    const result = await mgr.refreshComponentMetadataForUpdatedItem(
+      {
+        uuid,
+        name: 'Reworked Ore',
+        img: 'icons/reworked.webp',
+        system: { description: { value: description } },
+        _stats: { compendiumSource: 'Compendium.source.items.iron-ore', duplicateSource }
+      },
+      { name: 'Reworked Ore', img: 'icons/reworked.webp', 'system.description.value': description }
+    );
+
+    const [ore, own] = mgr.getSystem('sys1').components;
+    assert.equal(result.updated, 1);
+    assert.deepEqual(
+      { name: ore.name, img: ore.img, description: ore.description },
+      { name: 'Iron Ore', img: 'icons/ore.webp', description: 'Dull grey ore.' }
+    );
+    assert.deepEqual(
+      { name: own.name, img: own.img, description: own.description },
+      { name: 'Reworked Ore', img: 'icons/reworked.webp', description: 'Reworked.' }
+    );
+  });
+}
 
 test('refreshComponentMetadataForUpdatedItem — updates component description for direct source UUID match', async () => {
   const mgr = buildManager([{
@@ -1321,7 +1383,7 @@ test('refreshComponentMetadataForUpdatedItem — RESOLVES the edited description
   );
 });
 
-test('refreshComponentMetadataForUpdatedItem — clears component description for canonical source UUID match', async () => {
+test('refreshComponentMetadataForUpdatedItem — clears component description when the compendium entry it records is edited, not an owned copy of it', async () => {
   const mgr = buildManager([{
     id: 'sys1',
     name: 'System One',
@@ -1337,12 +1399,25 @@ test('refreshComponentMetadataForUpdatedItem — clears component description fo
   let saveCount = 0;
   mgr.save = async () => { saveCount++; };
 
-  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+  const owned = await mgr.refreshComponentMetadataForUpdatedItem(
     {
       uuid: 'Actor.actor-1.Item.ore-copy',
       img: 'icons/ore.webp',
       system: { description: { value: '' } },
       _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
+    },
+    { system: { description: { value: '' } } }
+  );
+
+  assert.equal(owned.updated, 0);
+  assert.equal(mgr.getSystem('sys1').components[0].description, 'Old ore description.');
+  assert.equal(saveCount, 0);
+
+  const result = await mgr.refreshComponentMetadataForUpdatedItem(
+    {
+      uuid: 'Compendium.source.items.iron-ore',
+      img: 'icons/ore.webp',
+      system: { description: { value: '' } }
     },
     { system: { description: { value: '' } } }
   );

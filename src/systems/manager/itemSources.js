@@ -1,9 +1,10 @@
 /**
  * The item-source cluster (issue 1923): the legacy recipe-item reconciler, component and
  * recipe-item registration from an Item uuid, component source replacement and the GM metadata
- * refresh; collaborators arrive in `io`. Import de-duplication (`addItemFromUuid`) and
- * source-metadata propagation (`refreshComponentMetadataForUpdatedItem`) key on the narrower Item
- * Source Reference Chain, `getItemIdentityReferences`, which excludes `_stats.duplicateSource`.
+ * refresh; collaborators arrive in `io`. Import de-duplication (`addItemFromUuid`) keys on the
+ * narrower Item Source Reference Chain, `getItemIdentityReferences`, which excludes
+ * `_stats.duplicateSource`; source-metadata propagation
+ * (`refreshComponentMetadataForUpdatedItem`) keys on the edited Item's own uuid alone.
  */
 import { advanceDefinitionRevision } from '../../utils/definitionIndex.js';
 import {
@@ -501,10 +502,10 @@ export async function refreshComponentMetadataForUpdatedItem(io, item, changes =
   const refreshDescription = hasUpdatedItemDescription(changes);
   if (!refreshName && !refreshImg && !refreshDescription) return { updated: 0 };
 
-  // Identity references only: a clone's duplicateSource names its original, which must not
-  // receive this edit.
-  const itemRefs = new Set(getItemIdentityReferences(item));
-  if (itemRefs.size === 0) return { updated: 0 };
+  // The edited Item's own uuid only: its compendium and duplicate sources name sibling Items,
+  // whose components must not receive this edit (issue 2217).
+  const itemUuid = typeof item?.uuid === 'string' ? item.uuid.trim() : '';
+  if (!itemUuid) return { updated: 0 };
 
   const nextName = refreshName ? item?.name || changes.name || 'Unnamed Item' : null;
   const nextImg = refreshImg ? item?.img || changes.img || 'icons/svg/item-bag.svg' : null;
@@ -519,8 +520,7 @@ export async function refreshComponentMetadataForUpdatedItem(io, item, changes =
   for (const system of io.systems().values()) {
     const components = Array.isArray(system.components) ? system.components : []; // ratchet-exempt(world-scope): writer
     for (const component of components) {
-      const matches = getItemMatchUuids(component).some((ref) => itemRefs.has(ref));
-      if (!matches) continue;
+      if (!getItemMatchUuids(component).includes(itemUuid)) continue;
 
       let changed = false;
       if (refreshName && component.name !== nextName) {
