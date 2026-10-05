@@ -161,7 +161,7 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       '[data-recipe-section="check"][data-check-usable="true"]' +
-      ':has([data-check-formula] code:text-is("1d20"))' +
+      ':has([data-check-formula] .fabricate-info-strip-value:text-is("1d20"))' +
       ':not(:has([data-check-dc]))',
     kinds: ['player', 'crafting'],
     sourceMatches: [
@@ -288,6 +288,21 @@ export const CASES = Object.freeze([
     expectSelector:
       '[data-recipe-section="check"]:not(:has([data-check-target]))' +
       ' [data-check-target-unresolved]:has-text("could not read a number for its target")',
+    kinds: ['player', 'crafting'],
+    sourceMatches: DESCRIPTOR_SOURCES,
+  }),
+  // Issue 1521: a formula the crafter cannot reduce to a number is a danger notice after the strip.
+  playerCase({
+    id: 'player-crafting-check-formula-unresolved',
+    label: 'Player app — crafting check whose roll formula cannot be read for this character',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'formula-unresolved' },
+    steps: [CRAFT_HORSESHOE[0], { selector: '[data-recipe-section="check"]', scroll: true }],
+    expectSelector:
+      '[data-recipe-section="check"]' +
+      ':has(.fabricate-info-strip [data-check-formula]:has-text("@skills.missing.level"))' +
+      ' > .fabricate-info-strip + .fab-notice.is-danger[data-check-formula-error]',
     kinds: ['player', 'crafting'],
     sourceMatches: DESCRIPTOR_SOURCES,
   }),
@@ -603,7 +618,7 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       '[data-recipe-section="check"][data-check-usable="true"]' +
-      ':has([data-check-formula] code:text-is("5d10 · each ≥ 8"))' +
+      ':has([data-check-formula] .fabricate-info-strip-value:text-is("5d10 · each ≥ 8"))' +
       ':has([data-check-successes-needed="2"]:has-text("2 successes needed"))' +
       ':not(:has([data-check-dc]))',
     kinds: ['player', 'crafting'],
@@ -650,6 +665,21 @@ export const CASES = Object.freeze([
     ],
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
+  }),
+  // Issue 1521: the stamina pool is an info strip under its kicker, the node legend a line after it.
+  playerCase({
+    id: 'player-gathering-economy-strip',
+    label: 'Player app — Gathering stamina pool strip',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'gathering', rollPromptState: 'gathering-stamina' },
+    steps: [{ selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' }],
+    expectSelector:
+      '.fabricate-info-strip[data-gathering-economy-strip][data-economy-mode="both"]' +
+      ':has([data-gathering-stamina-pool=""]:has-text("6/10"))' +
+      ' + [data-gathering-nodes-legend]',
+    kinds: ['player', 'gathering'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
     id: 'player-gathering-task-ready',

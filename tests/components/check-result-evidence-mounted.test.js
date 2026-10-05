@@ -23,6 +23,7 @@ import {
 } from '../helpers/checkEvidenceFixtures.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
+  CHECK_CARD_COMPILED_MODULES,
   CHECK_EVIDENCE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -539,7 +540,7 @@ describe('CraftingCheckCard target line', () => {
   const harness = createMountedComponentHarness({
     ...SHARED,
     tmpPrefix: 'fabricate-check-card-target-',
-    compiledModules: ['src/ui/svelte/components/Kicker.svelte', INSPECTOR_CARD, CHECK_CARD],
+    compiledModules: [...CHECK_CARD_COMPILED_MODULES],
     componentPath: CHECK_CARD,
   });
   before(async () => {
