@@ -2,9 +2,9 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CHECK_TO_ISSUES } from '../../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
-import { CHECK_TO_ISSUES } from '../../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');

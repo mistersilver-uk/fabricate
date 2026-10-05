@@ -16,6 +16,7 @@ export const RESULT_KINDS = Object.freeze(['component', 'currency', 'knowledge']
 export {
   GROUP_AWARD_STRATEGIES,
   GROUP_CHOOSERS,
+  awardedResults,
   isChoiceGroup,
 } from '../utils/choiceGroupShape.js';
 export { quantityFormulaErrors } from '../utils/rollFormulaRollability.js';

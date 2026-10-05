@@ -686,8 +686,9 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
       const said = (field) =>
         target.querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent.trim();
       assert.equal(said(selection), 'This selection roll can never total more than 0.');
-      const count = target.querySelector(
-        '[data-recipe-group-header] [data-recipe-option-formula]:not([data-recipe-group-selection])'
+      const header = target.querySelector('[data-recipe-group-header]');
+      const count = header.querySelector(
+        ':scope [data-recipe-option-formula]:not([data-recipe-group-selection])'
       );
       assert.equal(said(count), 'This count cannot be rolled.');
     }));

@@ -70,8 +70,7 @@ import {
   normalizeNullableAdjustment,
   normalizeNullableSuccesses,
 } from '../../../systems/normalize/checkEvaluation.js';
-import { Result } from '../../../models/Result.js';
-import { awardedResults } from '../../../utils/choiceGroupShape.js';
+import { Result, awardedResults } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
 import { classifyModeChange } from '../../../systems/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
