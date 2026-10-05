@@ -4,6 +4,7 @@
  * and collect exactly the messages that craft created.
  */
 
+import { describeClickTarget, ensurePageRendering } from './pageRendering.mjs';
 import { chooseSelectOption } from './selectControl.mjs';
 
 export const ROLL_PROMPT = '.manager-modal[data-roll-prompt]';
@@ -273,20 +274,34 @@ export function withinTime(promise, ms, what) {
 export async function rollPublicly(page, { bonus = '', choice = null } = {}) {
   const prompt = page.locator(ROLL_PROMPT).last();
   await prompt.waitFor({ state: 'visible', timeout: 15_000 });
-  try {
-    if (bonus) await prompt.locator('input[name="situationalBonus"]').fill(bonus);
-    await chooseSelectOption(page, prompt.locator('.mode-field .fabricate-select-trigger'), {
-      value: 'publicroll',
-    });
-    const button = choice
-      ? prompt.locator(`button[data-action="${choice}"]`)
-      : prompt.locator('button[type="submit"]');
-    await button.click();
-  } catch (error) {
-    const seen = JSON.stringify(await describeStandingPrompts(page));
-    throw new Error(`${error.message.split('\n', 1)[0]} The page saw: ${seen}`, { cause: error });
+  // Every click below waits for its target to hold still across frames, so none can land on a
+  // page that renders none.
+  if (await ensurePageRendering(page)) {
+    process.stdout.write('  The GM page had stopped rendering; brought it to the front.\n');
   }
+  if (bonus) await prompt.locator('input[name="situationalBonus"]').fill(bonus);
+  const trigger = prompt.locator('.mode-field .fabricate-select-trigger');
+  await withTargetDiagnostics(trigger, () =>
+    chooseSelectOption(page, trigger, { value: 'publicroll' })
+  );
+  const button = choice
+    ? prompt.locator(`button[data-action="${choice}"]`)
+    : prompt.locator('button[type="submit"]');
+  await withTargetDiagnostics(button, () => button.click());
   await prompt.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+}
+
+/** Run `act` on `target`, adding what the target and its page looked like when it failed. */
+async function withTargetDiagnostics(target, act) {
+  try {
+    await act();
+  } catch (error) {
+    const seen = JSON.stringify({
+      target: await describeClickTarget(target),
+      prompts: await describeStandingPrompts(target.page()),
+    });
+    throw new Error(`${error.message}\nThe page saw: ${seen}`, { cause: error });
+  }
 }
 
 /**
