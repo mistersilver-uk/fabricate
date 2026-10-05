@@ -774,6 +774,37 @@ describe('evaluateRecipeReadiness: result choice groups', () => {
     assert.deepEqual(ids(withResults({ id: 'c2', alternatives: [PLAYER.alternatives[0]] })), ['choiceGroupTooFew']);
   });
 
+  it('reads every step, every set and every group, naming the step and the set', () => {
+    const clean = { id: 'ok', alternatives: PLAYER.alternatives };
+    const recipe = {
+      name: 'Staged',
+      steps: [
+        { id: 's1', name: 'Forge', ingredientSets: [{ id: 'i1' }], resultGroups: [{ id: 'g1', results: [clean] }] },
+        {
+          id: 's2',
+          name: 'Temper',
+          ingredientSets: [{ id: 'i2' }],
+          resultGroups: [
+            { id: 'g2', results: [clean] },
+            { id: 'f2', role: 'failure', results: [clean, { ...clean, id: 'bad', awardStrategy: 'upTo' }] },
+          ],
+        },
+      ],
+    };
+    const { issues } = evaluateRecipeReadiness(recipe);
+    assert.deepEqual(issues, [
+      {
+        id: 'choiceGroupCount',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'results',
+        focusTarget: 'result-group-f2',
+        stepId: 's2',
+        stepName: 'Temper',
+      },
+    ]);
+  });
+
   it('reads a group’s alternatives for the recipes it teaches', () => {
     const { checks, issues } = evaluateRecipeReadiness(withResults(PLAYER), { systemRecipes: [{ id: 'r-self' }] });
     assert.deepEqual(issues.map(issue => issue.id), ['missingTaughtRecipe']);

@@ -374,6 +374,7 @@ function collectTaughtRecipeReadiness(executionSteps, isMultiStep, systemRecipes
 /** The issue each `groupProblems` code raises, in the order the Validation tab lists them. */
 const CHOICE_GROUP_ISSUES = Object.freeze({
   tooFew: 'choiceGroupTooFew',
+  settings: 'choiceGroupSettings',
   selection: 'choiceGroupSelection',
   ranges: 'choiceGroupRanges',
   count: 'choiceGroupCount',

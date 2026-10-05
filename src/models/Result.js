@@ -1,16 +1,24 @@
-import { isChoiceGroup } from '../utils/choiceGroupShape.js';
-import { hasRollDataPath, maximisedTotal } from '../utils/rollFormulaRollability.js';
+import {
+  GROUP_AWARD_STRATEGIES,
+  GROUP_CHOOSERS,
+  countProblem,
+  isChoiceGroup,
+  knownSetting,
+  ladderProblems,
+} from '../utils/choiceGroupShape.js';
+import { quantityFormulaErrors } from '../utils/rollFormulaRollability.js';
 
 import { isNull, omitReconstructibleDefaults } from './reconstructibleDefaults.js';
 
 /** What a result awards (issue 1773); an absent `kind` is `component`. */
 export const RESULT_KINDS = Object.freeze(['component', 'currency', 'knowledge']);
 
-/** Who picks a choice group's award, and how many it awards (issue 1773); the first is the default. */
-export const GROUP_CHOOSERS = Object.freeze(['playerChooses', 'rolled']);
-export const GROUP_AWARD_STRATEGIES = Object.freeze(['anyOne', 'upTo']);
-
-export { isChoiceGroup } from '../utils/choiceGroupShape.js';
+export {
+  GROUP_AWARD_STRATEGIES,
+  GROUP_CHOOSERS,
+  isChoiceGroup,
+} from '../utils/choiceGroupShape.js';
+export { quantityFormulaErrors } from '../utils/rollFormulaRollability.js';
 
 /** Fields the constructor rebuilds exactly from absence (issue 1135). */
 export const RESULT_OMITTED_WHEN_DEFAULT = {
@@ -38,18 +46,6 @@ export function normalizeQuantityFormula(value) {
 
 const textOrNull = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
 
-/** The rollability floor an amount expression must clear, as validation errors; `Roll` is injected,
- *  and the gathering data boundary applies the same floor through this one function (issue 1645). */
-export function quantityFormulaErrors(quantityFormula, Roll) {
-  if (!quantityFormula || typeof Roll !== 'function') return [];
-  const maximum = maximisedTotal(quantityFormula, Roll);
-  if (maximum === null) return ['quantity formula cannot be rolled'];
-  if (maximum <= 0 && !hasRollDataPath(quantityFormula)) {
-    return ['quantity formula can never award a positive amount'];
-  }
-  return [];
-}
-
 /** The kind-specific half of `Result.validate` (issue 1773). */
 function kindErrors(result) {
   const { kind } = result;
@@ -72,21 +68,17 @@ function kindErrors(result) {
   return errors;
 }
 
-const finiteRange = (range) => Number.isFinite(range?.from) && Number.isFinite(range?.to);
+const LADDER_ERRORS = Object.freeze({
+  unranged: 'Every alternative of a rolled choice group needs a selecting range',
+  fraction: 'A selecting range must run between whole numbers',
+  inverted: 'A selecting range cannot start above its end',
+  overlap: 'Selecting ranges cannot overlap',
+});
 
-/** A rolled group's ladder: every member ranged, `from <= to`, and no two ranges overlapping. */
+/** A rolled group's ladder: every member ranged in whole numbers, `from <= to`, none overlapping. */
 function ladderErrors(members) {
-  if (members.some((member) => !finiteRange(member.selectionRange))) {
-    return ['Every alternative of a rolled choice group needs a selecting range'];
-  }
-  const ranges = members.map((member) => member.selectionRange).sort((a, b) => a.from - b.from);
-  const errors = ranges.some((range) => range.from > range.to)
-    ? ['A selecting range cannot start above its end']
-    : [];
-  if (ranges.some((range, index) => index > 0 && range.from <= ranges[index - 1].to)) {
-    errors.push('Selecting ranges cannot overlap');
-  }
-  return errors;
+  const codes = ladderProblems(members);
+  return (codes.includes('unranged') ? ['unranged'] : codes).map((code) => LADDER_ERRORS[code]);
 }
 
 /** Two or more distinct, un-nested members, each valid as a result in its own right. */
@@ -106,14 +98,9 @@ function memberErrors(members, Roll) {
 
 /** `upTo` takes exactly one of a positive whole count and a count formula. */
 function countErrors(group, Roll) {
-  if ((group.awardCount === null) === (group.awardCountFormula === null)) {
-    return ['Up to N needs exactly one of a count or a count formula'];
-  }
-  if (group.awardCount !== null) {
-    return Number.isSafeInteger(group.awardCount) && group.awardCount > 0
-      ? []
-      : ['The award count must be a positive whole number'];
-  }
+  const problem = countProblem(group);
+  if (problem === 'notWhole') return ['The award count must be a positive whole number'];
+  if (problem) return ['Up to N needs exactly one of a count or a count formula'];
   return quantityFormulaErrors(group.awardCountFormula, Roll).map(
     (error) => `Award count ${error}`
   );
@@ -130,10 +117,10 @@ function rolledErrors(group, Roll) {
 /** The choice-group half of `Result.validate` (issue 1773): members, settings and the ladder. */
 function groupErrors(group, Roll) {
   const errors = memberErrors(group.alternatives, Roll);
-  if (!GROUP_CHOOSERS.includes(group.chooser)) {
+  if (!knownSetting(group.chooser, GROUP_CHOOSERS)) {
     errors.push(`Chooser "${group.chooser}" is not recognised`);
   }
-  if (!GROUP_AWARD_STRATEGIES.includes(group.awardStrategy)) {
+  if (!knownSetting(group.awardStrategy, GROUP_AWARD_STRATEGIES)) {
     errors.push(`Award strategy "${group.awardStrategy}" is not recognised`);
   }
   if (group.awardStrategy === 'upTo') errors.push(...countErrors(group, Roll));

@@ -3240,6 +3240,7 @@
             "RangeLow": "Lowest roll selecting {name}",
             "RangeHigh": "Highest roll selecting {name}",
             "RangeInverted": "Its lowest roll is above its highest.",
+            "RangeFraction": "Its range must run between whole numbers.",
             "RangeOverlap": "Its range overlaps the range of {name}.",
             "ConvertHint": "Offer another reward in place of this one.",
             "ProgressiveNote": "Progressive awards every stage the roll affords, in order, so a stage offers no choice of reward."
@@ -3315,9 +3316,10 @@
             "IssueUnproducedOutcomeTier": "A check outcome is not assigned to any result set, so it produces nothing.",
             "IssueMissingTaughtRecipe": "A result teaches a recipe that is no longer in this system, so every craft is refused.",
             "IssueChoiceGroupTooFew": "A choice of rewards holds fewer than two alternatives.",
-            "IssueChoiceGroupSelection": "A rolled choice of rewards has no selection roll.",
-            "IssueChoiceGroupRanges": "A rolled choice of rewards needs a range on every alternative, with no two overlapping and none running backwards.",
-            "IssueChoiceGroupCount": "An up-to choice of rewards does not say how many it awards.",
+            "IssueChoiceGroupSettings": "A choice of rewards names a chooser or an award rule Fabricate does not recognise.",
+            "IssueChoiceGroupSelection": "A rolled choice of rewards has no selection roll, or one that cannot be rolled.",
+            "IssueChoiceGroupRanges": "A rolled choice of rewards needs a range of whole numbers on every alternative, with no two overlapping and none running backwards.",
+            "IssueChoiceGroupCount": "An up-to choice of rewards needs one count: a positive whole number, or a roll that can be rolled.",
             "IssueAlchemyResultSelection": "An alchemy recipe must resolve to exactly one result set before it can be enabled."
           },
           "PlayerVisibility": "Player visibility",

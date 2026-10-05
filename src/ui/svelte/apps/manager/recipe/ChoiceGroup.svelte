@@ -24,7 +24,7 @@
   import PickerRow from './PickerRow.svelte';
   import Button from '../../../components/Button.svelte';
   import { fromValue, kindMenuItems, toValue } from './pickerRowKinds.js';
-  import { isChoiceGroup } from '../../../../../utils/choiceGroupShape.js';
+  import { isChoiceGroup, rangeProblems } from '../../../../../utils/choiceGroupShape.js';
   import { localizeOr } from '../../../util/localizeOr.js';
   import ChoiceGroupAwardHeader from './ChoiceGroupAwardHeader.svelte';
   import PickerRowRangeCell from './PickerRowRangeCell.svelte';
@@ -32,7 +32,6 @@
     chooserOf,
     convertToGroup,
     keepingRange,
-    rangeProblems,
     withAlternative,
     withRange,
     withoutAlternative,
@@ -224,13 +223,20 @@
     offer.catalogue?.[entry?.kind ?? 'component']?.find((item) => item.id === toValue(entry).id)
       ?.label || localizeOr('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
 
+  const RANGE_PROBLEMS = {
+    fraction: [
+      'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.RangeFraction',
+      'Its range must run between whole numbers.',
+    ],
+    inverted: [
+      'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.RangeInverted',
+      'Its lowest roll is above its highest.',
+    ],
+  };
+
   function problemText(problem) {
-    if (problem?.code === 'inverted') {
-      return localizeOr(
-        'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.RangeInverted',
-        'Its lowest roll is above its highest.'
-      );
-    }
+    const [key, fallback] = RANGE_PROBLEMS[problem?.code] ?? [];
+    if (key) return localizeOr(key, fallback);
     if (problem?.code !== 'overlap') return '';
     return localizeOr(
       'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.RangeOverlap',

@@ -694,6 +694,27 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     ]);
   });
 
+  it('marks a range with a fractional end invalid, saying why', async () => {
+    const { target } = await mountGroup({
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      alternatives: [
+        { id: 'a', componentId: 'cmp-herb', quantity: 1, selectionRange: { from: 1, to: 2.5 } },
+        { id: 'b', componentId: 'cmp-water', quantity: 1, selectionRange: { from: 3, to: 20 } },
+      ],
+    });
+    const [first, second] = members(target);
+    assert.equal(
+      first.querySelector('[data-recipe-range-problem]')?.textContent.trim(),
+      'Its range must run between whole numbers.'
+    );
+    assert.equal(
+      first.querySelector('[data-recipe-range="to"]').getAttribute('aria-invalid'),
+      'true'
+    );
+    assert.ok(!second.querySelector('[data-recipe-range-problem]'), 'its neighbour is sound');
+  });
+
   it('retyping a rolled member keeps its range', async () => {
     const { target, groups } = await mountGroup({
       ...PLAYER_GROUP,

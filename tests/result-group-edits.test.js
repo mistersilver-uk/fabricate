@@ -10,9 +10,8 @@ import { Result } from '../src/models/Result.js';
 import { awardRoutedResults } from '../src/systems/choiceGroupAward.js';
 import {
   convertToGroup,
-  keepingRange,
   groupProblems,
-  rangeProblems,
+  keepingRange,
   withAlternative,
   withChooser,
   withCount,
@@ -22,8 +21,10 @@ import {
   withStrategy,
   withoutAlternative,
 } from '../src/ui/svelte/apps/manager/recipe/resultGroupEdits.js';
+import { rangeProblems } from '../src/utils/choiceGroupShape.js';
 
 import { scriptedFormulaRoll } from './helpers/scriptedFormulaRoll.js';
+import { rollDataRollClass, withRoll } from './helpers/seededRoll.js';
 
 const ROW = Object.freeze({ id: 'r1', componentId: 'ore', quantity: 2, quantityFormula: '1d4' });
 const converted = () => convertToGroup(ROW, 'currency', 'm1', 'm2');
@@ -230,7 +231,9 @@ describe('the engine reads an edited group as authored', () => {
     const answer = await awardRoutedResults([{ id: 'set', results: [saved] }], {
       actor: crafter,
       Roll: scriptedFormulaRoll(script).Roll,
-      awardOne: async (result, carrier) => awarded.push([result.id, carrier?.id ?? null]),
+      awardOne: async (result, carrier) => {
+        awarded.push([result.id, carrier?.id ?? null]);
+      },
     });
     return { ...answer, awarded };
   };
@@ -274,6 +277,17 @@ describe('the ladder’s problems', () => {
     ]);
     assert.deepEqual(rangeProblems(ladder({ from: 1, to: 3 }, { from: 5, to: 6 })), [null, null]);
     assert.deepEqual(rangeProblems(ladder(undefined, { from: 1, to: 2 })), [null, null]);
+    assert.deepEqual(rangeProblems(ladder({ from: 4, to: 4 }, { from: 5, to: 6 })), [null, null]);
+    assert.deepEqual(
+      rangeProblems(ladder({ from: 1, to: 2.5 }, { from: 2, to: null })),
+      [{ code: 'fraction' }, null],
+      'a fraction is its own problem, a half-typed range none'
+    );
+    assert.deepEqual(
+      rangeProblems(ladder({ from: 8, to: 2 }, { from: 3, to: 5 })),
+      [{ code: 'inverted' }, null],
+      'a backwards range overlaps nothing'
+    );
   });
 
   it('reports what blocks a save by code', () => {
@@ -291,4 +305,60 @@ describe('the ladder’s problems', () => {
       []
     );
   });
+});
+
+describe('readiness and the save read one shape', () => {
+  const { Roll } = rollDataRollClass();
+  const A = Object.freeze({ id: 'a', componentId: 'ore', quantity: 1 });
+  const B = Object.freeze({ id: 'b', componentId: 'gem', quantity: 1 });
+  const rolled = (from, to, extra = {}) => ({
+    id: 'g',
+    chooser: 'rolled',
+    selectionFormula: '1d20',
+    alternatives: [
+      { ...A, selectionRange: { from: 1, to: 10 } },
+      { ...B, selectionRange: { from, to } },
+    ],
+    ...extra,
+  });
+  const upTo = (extra) => ({ id: 'g', alternatives: [A, B], awardStrategy: 'upTo', ...extra });
+  // Each malformed shape, and the one code readiness raises for it.
+  const REFUSED = {
+    'an empty group': [{ id: 'g', alternatives: [] }, 'tooFew'],
+    'a group of one': [{ id: 'g', alternatives: [A] }, 'tooFew'],
+    'an unknown chooser': [{ id: 'g', alternatives: [A, B], chooser: 'gm' }, 'settings'],
+    'an unknown strategy': [{ id: 'g', alternatives: [A, B], awardStrategy: 'most' }, 'settings'],
+    'a blank selection': [rolled(11, 20, { selectionFormula: '  ' }), 'selection'],
+    'an unrollable selection': [rolled(11, 20, { selectionFormula: '1d' }), 'selection'],
+    'a missing end': [rolled(11, null), 'ranges'],
+    'a backwards range': [rolled(20, 11), 'ranges'],
+    'an overlap': [rolled(10, 20), 'ranges'],
+    'a fractional end': [rolled(11, 19.5), 'ranges'],
+    'no count': [upTo({}), 'count'],
+    'a count of 0': [upTo({ awardCount: 0 }), 'count'],
+    'a count of 1.5': [upTo({ awardCount: 1.5 }), 'count'],
+    'a count and a count formula': [upTo({ awardCount: 2, awardCountFormula: '1d3' }), 'count'],
+    'an unrollable count formula': [upTo({ awardCountFormula: '1d' }), 'count'],
+  };
+  const ACCEPTED = {
+    'the player, any one of': { id: 'g', alternatives: [A, B] },
+    'a range of one value beside another': rolled(11, 11),
+    'a rolled count': upTo({ awardCountFormula: '1d3' }),
+  };
+
+  for (const [shape, [group, code]] of Object.entries(REFUSED)) {
+    it(`flags and refuses ${shape}`, () =>
+      withRoll(Roll, () => {
+        assert.deepEqual(groupProblems(group), [code]);
+        assert.equal(Result.fromJSON(group).validate({ Roll }).valid, false, 'the save refuses');
+      }));
+  }
+
+  for (const [shape, group] of Object.entries(ACCEPTED)) {
+    it(`passes and saves ${shape}`, () =>
+      withRoll(Roll, () => {
+        assert.deepEqual(groupProblems(group), []);
+        assert.deepEqual(Result.fromJSON(group).validate({ Roll }).errors, []);
+      }));
+  }
 });

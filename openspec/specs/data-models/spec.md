@@ -3151,7 +3151,7 @@ This section states only what is persisted.
     `true` makes `awardCount` EXACT and permits the same alternative more than once; `false` awards distinct alternatives, and a count above the number of alternatives exhausts the bundle rather than erroring.
 12. No `awardStrategy` constrains `chooser`: every combination of the two is authorable.
     A repeated draw is not a third strategy — it is `"upTo"` under `"rolled"` with `withReplacement` true — so there is no combination left to forbid.
-13. `selectionRange` is read only on an alternative of a group whose `chooser` is `"rolled"`, and is not written on an alternative of any other group; `from` and `to` are inclusive.
+13. `selectionRange` is read only on an alternative of a group whose `chooser` is `"rolled"`, and is not written on an alternative of any other group; `from` and `to` are inclusive whole numbers.
     The ranges of a group's alternatives are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest alternative and a roll above the highest selects the highest, so no authored group can produce nothing.
     A roll selects the alternative with the highest `from` at or below it, and a roll below every `from` selects the lowest.
     Ranges MUST NOT overlap and `from` MUST NOT exceed `to`.

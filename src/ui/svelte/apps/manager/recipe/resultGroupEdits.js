@@ -1,9 +1,18 @@
 /**
  * The result-side choice group's authoring edits (issue 1773), as pure functions over the editor's
  * draft: convert, add and remove an alternative, and the four header settings, each writing only
- * what the group's cell reads (`data-models` Result requirements 8 to 13); and the ladder problems
- * the range cells and the Validation tab both report.
+ * what the group's cell reads (`data-models` Result requirements 8 to 13); and the problems the
+ * Validation tab reports, read through the predicates the save refuses on (`choiceGroupShape.js`).
  */
+import {
+  GROUP_AWARD_STRATEGIES,
+  GROUP_CHOOSERS,
+  countProblem,
+  knownSetting,
+  ladderProblems,
+} from '../../../../../utils/choiceGroupShape.js';
+import { diceEngine, quantityFormulaErrors } from '../../../../../utils/rollFormulaRollability.js';
+
 import { emptyResult } from './pickerRowKinds.js';
 
 /** The fixed N's floor: up to one is any one of. */
@@ -116,42 +125,28 @@ export function withRange(member, range) {
   return { ...member, selectionRange: ends };
 }
 
-const finiteRange = (range) => Number.isFinite(range?.from) && Number.isFinite(range?.to);
-const overlaps = (a, b) => a.from <= b.to && b.from <= a.to;
+/** Whether `formula` fails the save's rollability floor, the dice engine being Foundry's own. */
+const unrollable = (formula) => quantityFormulaErrors(formula.trim(), diceEngine()).length > 0;
 
 /**
- * Per alternative, aligned to `alternatives`: `{ code: 'inverted' }` where `from` exceeds `to`,
- * `{ code: 'overlap', with }` naming the first other alternative whose range shares a value, else
- * `null`. A missing range is not a cell problem; the Validation tab reports it.
- */
-export function rangeProblems(alternatives = []) {
-  const ranges = alternatives.map((member) =>
-    finiteRange(member?.selectionRange) ? member.selectionRange : null
-  );
-  return ranges.map((range, index) => {
-    if (!range) return null;
-    if (range.from > range.to) return { code: 'inverted' };
-    const other = ranges.findIndex(
-      (candidate, i) =>
-        i !== index && candidate && candidate.from <= candidate.to && overlaps(range, candidate)
-    );
-    return other === -1 ? null : { code: 'overlap', with: other };
-  });
-}
-
-/**
- * What blocks a group from saving, as codes: `tooFew` alternatives, a rolled group's `selection`
- * missing or its `ranges` missing, inverted or overlapping, and an up-to group's `count` missing.
+ * What blocks a group from saving, as codes, by the predicates `Result.validate` reads: `tooFew`
+ * alternatives, an unknown chooser or strategy as `settings`, a rolled group's `selection` missing
+ * or unrollable and its `ranges` (`ladderProblems`), and an up-to group's `count`.
  */
 export function groupProblems(group) {
   const alternatives = Array.isArray(group?.alternatives) ? group.alternatives : [];
   const problems = alternatives.length < 2 ? ['tooFew'] : [];
-  if (chooserOf(group) === 'rolled') {
-    if (blank(group.selectionFormula)) problems.push('selection');
-    const unranged = alternatives.some((member) => !finiteRange(member?.selectionRange));
-    if (unranged || rangeProblems(alternatives).some(Boolean)) problems.push('ranges');
+  const known =
+    knownSetting(group?.chooser, GROUP_CHOOSERS) &&
+    knownSetting(group?.awardStrategy, GROUP_AWARD_STRATEGIES);
+  if (!known) problems.push('settings');
+  if (group?.chooser === 'rolled') {
+    const selection = group.selectionFormula;
+    if (blank(selection) || unrollable(selection)) problems.push('selection');
+    if (ladderProblems(alternatives).length > 0) problems.push('ranges');
   }
-  const counted = Number.isFinite(group?.awardCount) || !blank(group?.awardCountFormula);
-  if (strategyOf(group) === 'upTo' && !counted) problems.push('count');
+  const count = group?.awardCountFormula;
+  const uncounted = countProblem(group) || (!blank(count) && unrollable(count));
+  if (group?.awardStrategy === 'upTo' && uncounted) problems.push('count');
   return problems;
 }

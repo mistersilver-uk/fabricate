@@ -24,6 +24,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
     'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
     'src/utils/choiceGroupShape.js',
+    'src/utils/rollFormulaRollability.js',
     // The tab localizes a signature-collision blocker row via this pure leaf (issue 549).
     'src/utils/recipeActivationMessages.js',
     'src/utils/scalars.js'
@@ -240,7 +241,36 @@ describe('RecipeValidationTab (mounted)', () => {
     });
     assert.equal(target.querySelector('[data-check="choiceGroupsValid"]')?.dataset.satisfied, 'false');
     assert.match(target.querySelector('[data-check="choiceGroupsValid"]').textContent, /Every choice of rewards is complete/);
-    assert.match(target.querySelector('[data-issue="choiceGroupRanges"]').textContent, /range on every alternative/);
+    assert.match(target.querySelector('[data-issue="choiceGroupRanges"]').textContent, /range of whole numbers on every alternative/);
+    harness.remount();
+  });
+
+  it('words each choice-of-rewards problem as its own (issue 1773)', async () => {
+    const pair = [{ id: 'a', componentId: 'x' }, { id: 'b', componentId: 'y' }];
+    const target = await harness.mount({
+      recipe: {
+        name: 'Rewarding',
+        enabled: true,
+        ingredientSets: [{ id: 's1' }],
+        resultGroups: [
+          {
+            id: 'g1',
+            results: [
+              { id: 'one', alternatives: [pair[0]] },
+              { id: 'odd', alternatives: pair, chooser: 'gm' },
+              { id: 'roll', alternatives: pair, chooser: 'rolled' },
+              { id: 'many', alternatives: pair, awardStrategy: 'upTo' }
+            ]
+          }
+        ]
+      }
+    });
+    const said = (id) => target.querySelector(`[data-issue="${id}"]`)?.textContent ?? '';
+    assert.match(said('choiceGroupTooFew'), /fewer than two alternatives/);
+    assert.match(said('choiceGroupSettings'), /does not recognise/);
+    assert.match(said('choiceGroupSelection'), /has no selection roll/);
+    assert.match(said('choiceGroupRanges'), /no two overlapping/);
+    assert.match(said('choiceGroupCount'), /needs one count/);
     harness.remount();
   });
 
