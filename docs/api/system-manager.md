@@ -330,12 +330,13 @@ A copy that keeps the entry's name still matches the component registered from t
 A sidebar duplicate is likewise matched only by its own UUID.
 If the compendium source does not resolve, the name cannot be compared and items sharing that source still merge until the pack is restored.
 If the canonical source UUID no longer resolves, Fabricate stores the live dropped item UUID as the component's primary source and keeps the broken canonical UUID in `aliasItemUuids`.
+Adding again an Item whose own UUID a component already claims adds no alias and reports no fallback.
 A component can claim a full source-reference chain through `registeredItemUuid`, `originItemUuid`, and `aliasItemUuids`.
 
 1. **Claimed source chain.**
    An existing component already claims the dropped live UUID or, for a copy that keeps the entry's name, the canonical source UUID or a fallback UUID in the same chain.
    A component that claims the dropped live UUID is preferred over one that claims only the compendium source.
-   Re-adding an item never changes which compendium entry its component claims.
+   Re-adding an item whose own UUID a component already claims never changes which compendium entry that component claims.
    Fabricate refreshes the component in place and returns `action: "updated"` when metadata or stored references changed, or `action: "skipped"` when nothing changed.
 2. **Unclaimed source chain.**
    No component claims any of those references, so a new component is created and `action` is `"added"`.
@@ -354,7 +355,7 @@ A component can claim a full source-reference chain through `registeredItemUuid`
 - `item` is the component object (new or existing).
 - `action` is `"added"` if a new component was created, `"updated"` if an existing component's name/image/source references were refreshed, `"skipped"` if the claimed source chain was already current.
 - `sourceFallbacks` holds broken source-link fallback notices in the form `{ itemName, brokenUuid, fallbackUuid }`.
-  It is empty when no fallback occurred.
+  It is empty when no fallback occurred, including when the Item was already registered by its own UUID.
 
 **Throws:** `Error` if the system ID is not found, or if the UUID resolves to a non-Item document (such as an Actor or JournalEntry).
 
@@ -424,6 +425,7 @@ GM only.
 
 The Item does not need to be imported as a component first.
 Tool registration follows the same name-based rule as components: an item built from a compendium entry and renamed becomes its own tool instead of updating one registered from the same entry.
+Unlike a component, a tool is not matched through a compendium source that does not resolve, so items sharing a missing entry do not merge into one tool.
 The new tool carries its own source references and a name/image display snapshot captured from the Item, and `componentId` is `null`.
 The method stamps the durable tool identity flag (`flags.fabricate.roles[systemId].toolId`) on the source Item so future copies are recognised.
 An Item that is already a managed component can also be registered as a tool this way, in which case the Item carries both the component and tool role flags.

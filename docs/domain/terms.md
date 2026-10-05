@@ -1476,7 +1476,8 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipe-visibi
 
 ## Derivative Source
 
-The verdict is a name comparison, trimmed, whitespace-collapsed and case-insensitive: the source's stored name (`_source.name`, else `name`) against the compendium document's stored name and, when the Babele translation module recorded one on that document, its `flags.babele.originalName`.
+Whether a source is a derivative is decided by a name comparison, trimmed, whitespace-collapsed and case-insensitive.
+The source's stored name (`_source.name`, else `name`) is compared against the compendium document's stored name and, when the Babele translation module recorded one on that document, its `flags.babele.originalName`.
 The source's own `flags.babele.originalName` is never read, because an Item built from a translated entry inherits that entry's flags and would always match it.
 A source whose **Source UUID** does not resolve, or a comparison in which either side has no name, is not a derivative, so components and recipe items sharing an unresolvable entry still merge until it is restored.
 The motivating case is the dnd5e spell scroll (issue 2217): dnd5e builds every scroll of one level from that level's template entry, so scrolls registered from freshly built Items shared one **Source UUID** and each overwrote the component the last one registered.
