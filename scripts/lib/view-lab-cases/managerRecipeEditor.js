@@ -53,6 +53,9 @@ const RESULT_GROUP = (id) => `[data-recipe-result-group="${id}"]`;
 /** What only some cells draw: N, repeats and a member's range cell. */
 const CELL_CONTROLS =
   '[data-recipe-group-count], [data-recipe-group-repeats], [data-recipe-range-cell]';
+/** The `n`th member row of a result choice group, counted from 1 past its OR separators. */
+const GROUP_MEMBER = (id, n) =>
+  `${RESULT_GROUP(id)} .manager-recipe-result-group-members > :nth-child(${2 * n - 1})`;
 /** Convert the `n`th flat row of the set matching `set` through its `or…`, adding `kind`. */
 const CONVERT_ROW = (set, n, kind) => [
   { selector: `${set} ${RESULT_ROW(n)} .manager-recipe-or-trigger` },
@@ -1147,7 +1150,7 @@ export const CASES = Object.freeze([
     sourceMatches: [...GROUP_SOURCES],
   }),
   // Up to two of three by roll, repeats allowed: the one cell drawing every control, and at the
-  // declared floor, where the chooser takes a line of its own.
+  // declared floor, where each member's range cell follows its amount on a second line.
   ...[
     { suffix: '', position: null },
     { suffix: '-narrow', position: { width: 1024, height: 640 } },
@@ -1174,6 +1177,64 @@ export const CASES = Object.freeze([
       sourceMatches: [...GROUP_SOURCES],
     })
   ),
+  // A ladder the GM has broken, typed through the cells: an overlap in the one-of-two draw and a
+  // backwards range in the up-to-two draw, each reason across its member's row, at full width and
+  // at the declared floor. The last step leaves the field, which is when a reason is stated.
+  ...[
+    { suffix: '', position: null },
+    { suffix: '-narrow', position: { width: 1024, height: 640 } },
+  ].map(({ suffix, position }) =>
+    managerCase({
+      id: `manager-recipe-edit-results-group-rolled-overlap${suffix}`,
+      label: `Manager — Recipe edit results, an overlapping and a backwards selection range${suffix ? ', at the declared floor' : ''}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-smithing', resultRowState: 'reward-group-rolled' },
+      steps: [
+        ...REWARD_RESULTS_STEPS,
+        {
+          selector: `${GROUP_MEMBER('sm-r-horseshoe-draw', 2)} [data-recipe-range="from"]`,
+          fill: '2',
+        },
+        {
+          selector: `${GROUP_MEMBER('sm-r-horseshoe-draws', 3)} [data-recipe-range="from"]`,
+          fill: '9',
+        },
+        { selector: `${RESULT_GROUP('sm-r-horseshoe-draws')} [data-recipe-group-help]` },
+        { selector: RESULT_GROUP('sm-r-horseshoe-draw'), scroll: true },
+      ],
+      expectView: 'recipe-edit',
+      expectSelector:
+        `.manager-recipe-ingredient-set-groups:has(${RESULT_GROUP('sm-r-horseshoe-draw')} ` +
+        '[data-recipe-range-problem]) ' +
+        `${RESULT_GROUP('sm-r-horseshoe-draws')} [data-recipe-range][aria-invalid="true"]`,
+      expectNoHorizontalOverflow: RESULT_GROUP('sm-r-horseshoe-draw'),
+      ...(position && { position }),
+      kinds: ['manager', 'recipes', ...(position ? ['responsive'] : [])],
+      sourceMatches: [...GROUP_SOURCES],
+    })
+  ),
+  // A rolled group with no selection roll and no ranges, reached by steps alone: the Validation
+  // tab lists the selection and the ranges as their own problems.
+  managerCase({
+    id: 'manager-recipe-edit-validation-choice-group',
+    label: 'Manager — Recipe edit validation, a rolled choice of rewards left incomplete',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-craft' },
+    steps: [
+      ...REWARD_RESULTS_STEPS,
+      ...CONVERT_ROW('[data-recipe-set]', 1, 'component'),
+      { selector: '[data-recipe-result-group] [data-recipe-group-chooser="rolled"]' },
+      { selector: '#recipe-tab-validation' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '[data-recipe-tab="validation"]:has([data-issue="choiceGroupSelection"]) ' +
+      '[data-issue="choiceGroupRanges"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...GROUP_SOURCES],
+  }),
   // A failed check's reserved set holds a choice group on the same terms as any other set.
   managerCase({
     id: 'manager-recipe-edit-results-group-failure-role',

@@ -93,6 +93,37 @@ export const CASES = Object.freeze([
   }),
   // Issue 1773: the inspector's Produces rows name a currency reward by its label and amount with
   // its unit, and a knowledge reward by the recipe it teaches, each with its kind's glyph.
+  // Issue 1773: a choice group reads in the inspector as the Requires list's any-one-of box,
+  // captioned with how many it awards and who chooses: the player's pick of up to two, and the
+  // two rolled draws.
+  ...[
+    { suffix: '', state: 'reward-group', member: 'knowledge' },
+    { suffix: '-rolled', state: 'reward-group-rolled', member: 'component' },
+  ].map(({ suffix, state, member }) =>
+    managerCase({
+      id: `manager-recipes-inspector-reward-group${suffix}`,
+      label: `Manager — Recipes inspector Produces a ${suffix ? 'rolled ' : ''}choice of rewards`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-smithing', resultRowState: state },
+      steps: [
+        'Crafting',
+        {
+          selector: '.manager-recipe-row[data-recipe-id="sm-r-horseshoe"] .manager-recipe-identity',
+        },
+      ],
+      expectView: 'recipes',
+      expectSelector: `[data-recipe-inspector] [data-recipe-produces-choice] [data-recipe-produces-kind="${member}"]`,
+      expectContained: [
+        { container: '[data-recipe-inspector]', target: '[data-recipe-produces-choice]' },
+      ],
+      kinds: ['manager', 'recipes'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/recipes\/Recipe(?:BrowserInspector|ProduceRow)\.svelte$/,
+        /^src\/ui\/model\/recipeBrowserModel\.js$/,
+      ],
+    })
+  ),
   managerCase({
     id: 'manager-recipes-inspector-reward-rows',
     label: 'Manager — Recipes inspector Produces rows of every result kind',

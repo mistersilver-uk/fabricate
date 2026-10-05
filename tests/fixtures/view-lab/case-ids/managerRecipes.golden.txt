@@ -1,6 +1,8 @@
 manager-recipes-normal
 manager-recipes-blocked-enable-flash
 manager-recipes-inspector-empty-step
+manager-recipes-inspector-reward-group
+manager-recipes-inspector-reward-group-rolled
 manager-recipes-inspector-reward-rows
 manager-recipes-inspector-route-list
 manager-recipes-narrow
