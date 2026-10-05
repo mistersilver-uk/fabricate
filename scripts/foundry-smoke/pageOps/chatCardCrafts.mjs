@@ -78,19 +78,26 @@ export async function clearStandingPrompts(page, timeout = 30_000) {
  * itself settles, so a prompt that mounts late can never answer the next case's craft.
  */
 export async function abandonCraft(page, crafted, timeout = 60_000) {
-  let settled = false;
   const done = crafted.then(
-    () => (settled = true),
-    () => (settled = true)
+    () => true,
+    () => true
   );
+  // A race against an already-settled promise answers false only while the craft is still open.
+  const settledNow = () => Promise.race([done, Promise.resolve(false)]);
   const deadline = Date.now() + timeout;
-  while (!settled && Date.now() < deadline) {
+  while (Date.now() < deadline) {
+    if (await settledNow()) return;
     const shown = page
       .locator(ROLL_PROMPT)
       .first()
-      .waitFor({ state: 'visible', timeout: Math.max(deadline - Date.now(), 1) });
-    await Promise.race([done, shown.catch(() => {})]);
+      .waitFor({ state: 'visible', timeout: Math.max(deadline - Date.now(), 1) })
+      .then(
+        () => false,
+        () => false
+      );
+    const settled = await Promise.race([done, shown]);
     await clearStandingPrompts(page).catch(() => {});
+    if (settled) return;
   }
 }
 
