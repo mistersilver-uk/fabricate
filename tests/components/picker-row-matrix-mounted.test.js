@@ -10,6 +10,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { createRawSnippet } from 'svelte';
 
 import {
+  INGREDIENT_KINDS,
   KIND_ORDER,
   fromValue,
   toValue,
@@ -50,20 +51,24 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
     'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
 });
 
 /**
- * What each authoring surface passes the row. Recipe ingredients and tool repair offer every kind
- * and the `or…` kind menu (`allowAny`); the three result surfaces offer `component` alone and a rolled amount;
- * a progressive stage draws neither an amount nor a remove, and puts its own controls in `trailing`.
+ * What each authoring surface passes the row. Recipe ingredients and tool repair offer every match
+ * type and the `or…` kind menu (`allowAny`); a recipe result offers the three result kinds, and a
+ * gathering or salvage result `component` alone, each with a rolled amount; a progressive stage
+ * draws neither an amount nor a remove, and puts its own controls in `trailing`.
  */
 const SURFACES = Object.freeze({
-  'recipe ingredient': { kinds: [...KIND_ORDER], allowAny: true },
-  'tool repair': { kinds: [...KIND_ORDER], allowAny: true },
-  'recipe result': { kinds: ['component'], rollable: true },
+  'recipe ingredient': { kinds: [...INGREDIENT_KINDS], allowAny: true },
+  'tool repair': { kinds: [...INGREDIENT_KINDS], allowAny: true },
+  'recipe result': { kinds: ['component', 'currency', 'knowledge'], rollable: true, reward: true },
   'gathering task result': { kinds: ['component'], rollable: true },
   'salvage result': { kinds: ['component'], rollable: true },
   'progressive stage': { kinds: ['component'], amount: false, removable: false, trailing: true },
@@ -90,15 +95,27 @@ const CATALOGUE = Object.freeze({
     { id: 'e-life', label: 'Life', icon: 'fas fa-flask-vial', offered: false },
   ],
   currency: [{ id: 'gp', label: 'Gold', icon: 'fa-solid fa-coins' }],
+  knowledge: [{ id: 'r-sword', label: 'Forge Sword', icon: 'fa-solid fa-book-open' }],
 });
-const EMPTY_CATALOGUE = Object.freeze({ component: [], tags: [], essence: [], currency: [] });
+const EMPTY_CATALOGUE = Object.freeze({
+  component: [],
+  tags: [],
+  essence: [],
+  currency: [],
+  knowledge: [],
+});
 
 /** The suggestion each kind's cell chooses, and the search that finds it. */
 const PICK = Object.freeze({
   component: { id: 'c-coal', label: 'Coal', query: 'coa' },
   essence: { id: 'e-fire', label: 'Fire', query: 'fir' },
   currency: { id: 'gp', label: 'Gold', query: 'gol' },
+  knowledge: { id: 'r-sword', label: 'Forge Sword', query: 'swo' },
 });
+
+/** The kinds whose result amount may be rolled, and the one that draws no amount at all. */
+const ROLLED_KINDS = new Set(['component', 'currency']);
+const hasAmount = (config, kind) => config.amount !== false && kind !== 'knowledge';
 const AMOUNT_HOOK = Object.freeze({
   component: 'data-recipe-option-quantity',
   tags: 'data-recipe-option-quantity',
@@ -129,6 +146,7 @@ async function mountRow(config, value, extra = {}) {
     amount: config.amount === false ? false : {},
     removable: config.removable !== false,
     allowAny: config.allowAny === true,
+    reward: config.reward === true,
     trailing: config.trailing ? TRAILING : null,
     onChange: (...args) => {
       changes.push(args);
@@ -178,8 +196,8 @@ afterEach(() => harness.remount());
 describe('PickerRow: the matrix is the offered-kind table', () => {
   it('derives a cell for every surface and kind, and both populations are non-empty', () => {
     assert.equal(CELLS.length, Object.keys(SURFACES).length * KIND_ORDER.length);
-    assert.equal(REACHABLE.length, 12, 'two surfaces of four kinds and four of one');
-    assert.equal(UNREACHABLE.length, 12, 'three kinds on each of the four result surfaces');
+    assert.equal(REACHABLE.length, 14, 'two surfaces of four kinds, one of three and three of one');
+    assert.equal(UNREACHABLE.length, 16, 'knowledge twice, two kinds once and four kinds thrice');
     assert.ok(
       UNREACHABLE.every((cell) => cell.kind !== 'component'),
       'component is offered on every surface'
@@ -189,11 +207,12 @@ describe('PickerRow: the matrix is the offered-kind table', () => {
 
 describe('PickerRow: unreachable cells are absent', () => {
   for (const { surface, kind, config } of UNREACHABLE) {
-    it(`${surface} × ${kind}: a stored row of that kind draws no amount toggle`, async () => {
+    it(`${surface} × ${kind}: a stored row of that kind rolls only where its kind has a formula`, async () => {
       // The row lists its own kind always, so a stored row is the only way into this cell.
       const { target } = await mountRow(config, unnamed(kind), { rollable: true });
-      assert.ok(!target.querySelector(TOGGLE), 'only a component row has a formula to roll');
-      assert.ok(!target.querySelector(FORMULA), 'so it draws no expression field either');
+      const rolls = ROLLED_KINDS.has(kind) && hasAmount(config, kind);
+      assert.equal(Boolean(target.querySelector(TOGGLE)), rolls, 'a component or currency rolls');
+      assert.ok(!target.querySelector(FORMULA), 'and it opens on Fixed, with no expression field');
     });
   }
 
@@ -206,7 +225,7 @@ describe('PickerRow: unreachable cells are absent', () => {
     it(`${surface}: toggle, convert, amount and remove are drawn only where the table says`, async () => {
       for (const kind of config.kinds) {
         const { target } = await mountRow(config, unnamed(kind));
-        const rollable = config.rollable === true && kind === 'component';
+        const rollable = config.rollable === true && ROLLED_KINDS.has(kind);
         assert.equal(Boolean(target.querySelector(TOGGLE)), rollable, `${kind}: toggle`);
         assert.equal(
           Boolean(target.querySelector(CONVERT)),
@@ -220,7 +239,7 @@ describe('PickerRow: unreachable cells are absent', () => {
         );
         assert.equal(
           Boolean(target.querySelector('[data-stepper-input]')),
-          config.amount !== false,
+          hasAmount(config, kind),
           `${kind}: amount`
         );
         assert.equal(
@@ -324,7 +343,7 @@ describe('PickerRow: every reachable cell acts', () => {
       });
     }
 
-    if (config.amount !== false) {
+    if (hasAmount(config, kind)) {
       it(`${surface} × ${kind}: stepping forwards the amount and redraws it`, async () => {
         const start = unnamed(kind);
         const { target, applied } = await mountRow(config, start);
@@ -753,14 +772,14 @@ describe('PickerRow: the remaining branches', () => {
 
   it('an unrecognised kind is drawn as a misconfiguration, never as a component', async () => {
     const { target, removes, changes } = await mountRow(SURFACES['recipe result'], {
-      ...unnamed('knowledge'),
+      ...unnamed('activity'),
       id: 'c-iron',
     });
     assert.equal(
       target
         .querySelector('[data-recipe-option-misconfigured]')
         .getAttribute('data-recipe-option-misconfigured'),
-      'knowledge'
+      'activity'
     );
     assert.ok(!target.querySelector('[data-recipe-option-chosen]'), 'it names no component');
     assert.ok(!target.querySelector('[data-recipe-option-search]'));
@@ -782,14 +801,14 @@ describe('PickerRow: the remaining branches', () => {
     );
     assert.equal(tag.textContent.trim(), 'Unknown kind');
     const hint =
-      'Fabricate does not recognise the kind "knowledge". Remove this row or correct the data.';
+      'Fabricate does not recognise the kind "activity". Remove this row or correct the data.';
     assert.equal(tag.getAttribute('title'), hint);
     const describedBy = target.querySelector(KIND_TRIGGER).getAttribute('aria-describedby');
     assert.equal(target.querySelector(`[id="${describedBy}"]`).textContent, hint);
 
     // The kind select states the raw kind, takes focus and refuses to open.
     const trigger = target.querySelector(KIND_TRIGGER);
-    assert.equal(selectTriggerText(target, KIND_TRIGGER), 'knowledge');
+    assert.equal(selectTriggerText(target, KIND_TRIGGER), 'activity');
     assert.equal(trigger.getAttribute('aria-disabled'), 'true');
     assert.ok(!trigger.disabled, 'read-only, so it still takes focus');
     trigger.focus();

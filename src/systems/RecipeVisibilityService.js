@@ -11,6 +11,11 @@ import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils
 
 import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
 import { evaluatePrerequisites } from './characterPrerequisites.js';
+import {
+  VISIBILITY_MODES,
+  isLearnedKnowledgeObservable as learnedKnowledgeObservable,
+  resolveVisibilityMode,
+} from './learnedKnowledgeObservability.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
 import {
@@ -55,8 +60,6 @@ const APPLY_USE_OUTCOME = Object.freeze({
   uncapped: 'uncapped',
   spent: 'spent',
 });
-
-const VISIBILITY_MODES = ['global', 'restricted', 'item', 'knowledge'];
 
 /**
  * Visibility-phase counters (issue 1228). `candidateItemOffers` counts held documents offered to
@@ -111,25 +114,9 @@ export class RecipeVisibilityService {
     return this.craftingSystemManager?.getSystem(recipe.craftingSystemId) || null;
   }
 
-  // The flat system visibility mode (issue 511). A legacy system without `visibilityMode`
-  // derives one from `recipeVisibility.listMode` + `knowledge.mode`: global → global, player →
-  // restricted, knowledge+item → item, knowledge+(learned|itemOrLearned) → knowledge, teaser →
-  // teaser, anything else → global.
+  // The flat system visibility mode (issue 511): `resolveVisibilityMode`.
   _getVisibilityMode(system) {
-    // Legacy teaser has no flat-enum value and keeps its own teaserConfig runtime, so
-    // `listMode: 'teaser'` wins over a possibly-defaulted `visibilityMode`.
-    if (system?.recipeVisibility?.listMode === 'teaser') return 'teaser';
-
-    const mode = system?.visibilityMode;
-    if (VISIBILITY_MODES.includes(mode)) return mode;
-
-    const listMode = system?.recipeVisibility?.listMode;
-    if (listMode === 'player') return 'restricted';
-    if (listMode === 'knowledge') {
-      const knowledgeMode = system?.recipeVisibility?.knowledge?.mode || 'itemOrLearned';
-      return knowledgeMode === 'item' ? 'item' : 'knowledge';
-    }
-    return 'global';
+    return resolveVisibilityMode(system);
   }
 
   // Whether the system authored a flat `visibilityMode`. If so, item → 'item' and knowledge →
@@ -517,27 +504,9 @@ export class RecipeVisibilityService {
     return ['learned', 'itemOrLearned'].includes(knowledge?.mode || 'itemOrLearned');
   }
 
-  /**
-   * Whether any reveal path on this system reads `learnedRecipes`, i.e. whether a learned entry
-   * written for a character can become visible to them (issue 1289). A sibling of
-   * `_isLearnModeEnabled`, never built on it: flat `knowledge` over a residual `item` sub-mode
-   * (as `migrateVisibilityModeEnum` leaves it) is observable but not learnable, and alchemy
-   * `item`/`restricted` without `learnOnCraft` is not observable, so "learn mode or alchemy"
-   * would over-report. Mirrors `evaluateRecipeAccess`'s reveal switch arm by arm; change both.
-   */
+  /** Whether a learned entry can become visible on this system: `learnedKnowledgeObservability.js`. */
   isLearnedKnowledgeObservable(system) {
-    if (system?.resolutionMode === 'alchemy') {
-      // The brew-discovery union reveals a learned entry under EVERY mode.
-      if (system?.alchemy?.learnOnCraft === true) return true;
-      // Otherwise only the switch's `default:` arm reads the learned map; `restricted` and
-      // `item` never do, and legacy `teaser` falls to `default:` too.
-      const mode = this._getVisibilityMode(system);
-      return mode !== 'restricted' && mode !== 'item';
-    }
-    // Non-alchemy: `item` forces `knowledgeMode: 'item'` and `restricted`/`global`/`teaser`
-    // never reach `evaluateKnowledgeAccess`, so only `knowledge` lets `hasLearned` grant. Legacy
-    // systems agree: `listMode: 'knowledge'` resolves to it only for the learned sub-modes.
-    return this._getVisibilityMode(system) === 'knowledge';
+    return learnedKnowledgeObservable(system);
   }
 
   // Per-recipe-item use/learn caps (issue 511), read from the recipe's book definition

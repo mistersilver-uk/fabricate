@@ -14,6 +14,7 @@
   | `triggerClass` / `triggerIcon` / `triggerTitle` / `triggerProps` | strings / attribute object | `''` / `{}` | The trigger's extra class, glyph, native tooltip and hooks. The trigger is `<IconButton>`, so the primitive that owns the icon-only-button meaning keeps owning it. |
   | `panelLabel` / `menuClass` | string / class string | `ariaLabel` / `''` | The panel's accessible name, and an extra class on the portaled panel, which escapes this component's root, so a caller's popover-scoped hook has to ride the panel itself. |
   | `heading` | pre-localized string | `''` | A `<Kicker>` atop the panel and outside its `role="menu"`, which it names through `aria-labelledby` in place of `panelLabel`. |
+  | `align` | `'end'` \| `'start'` | `'end'` | The trigger edge the panel lines up with: `end` for a kebab at a row's end, `start` for an adder at a list's start. Either is clamped inside the host. |
   | `trigger` | snippet `{ attributes, open }` | `undefined` | Replaces the `<IconButton>`. The caller spreads `attributes` — `aria-haspopup`, `aria-expanded`, the click and key handlers, and an attachment handing this component the element — last onto its own button, which it names, titles and disables itself; `triggerClass`, `triggerIcon`, `triggerTitle` and `triggerProps` then reach nothing, and `ariaLabel` still names a menu without a heading when no `panelLabel` is passed. |
   | `open` | bindable boolean | `false` | For a surface that must close the menu from outside itself. |
 
@@ -48,9 +49,6 @@
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { computeActionMenuLayout } from '../util/actionMenuLayout.js';
 
-  const menuLayout = (triggerRect, panelRect, hostRect) =>
-    computeActionMenuLayout(triggerRect, panelRect, hostRect);
-
   let {
     items = [],
     disabled = false,
@@ -62,10 +60,14 @@
     menuClass = '',
     panelLabel = '',
     heading = '',
+    align = 'end',
     trigger = undefined,
     open = $bindable(false),
     onSelect = () => {},
   } = $props();
+
+  const menuLayout = (triggerRect, panelRect, hostRect) =>
+    computeActionMenuLayout(triggerRect, panelRect, hostRect, { align });
 
   const instanceId = $props.id();
   const headingId = `${instanceId}-heading`;

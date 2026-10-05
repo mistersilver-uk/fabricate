@@ -491,6 +491,7 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
     assert.deepEqual(buildRecipeList(null, makeRecipeManager([]), null, ''), {
       recipes: [],
       rosterRecipes: [],
+      recipeRoster: [],
       recipeCategories: [],
       recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
@@ -522,6 +523,12 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
       ['r-1', 'r-2'],
       'the roster cohort is unfiltered and in roster order'
     );
+    // Its published table (issue 1773): the same roster, cut to what resolves a taught recipe.
+    assert.deepEqual(
+      searched.recipeRoster.map(({ id, name }) => [id, name]),
+      searched.rosterRecipes.map(({ id, name }) => [id, name])
+    );
+    assert.deepEqual(Object.keys(searched.recipeRoster[0]), ['id', 'name', 'img']);
   });
 
   it('selects the filtered rows positionally, so two recipes sharing an id both survive', () => {

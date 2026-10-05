@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { HANDLERS } from '../src/models/match/matchTypes.js';
+import { RESULT_KINDS } from '../src/models/Result.js';
 import {
+  INGREDIENT_KINDS,
   KIND_META,
   KIND_ORDER,
+  RESULT_ROW_KINDS,
+  emptyResult,
   fromValue,
   isKnownKind,
   kindMenuItems,
@@ -39,12 +43,14 @@ function assertUntouched(entry, label) {
   assert.deepEqual(entry, snapshot, `${label}: the adapter mutated its input`);
 }
 
-test('the kind table names exactly the match types the model registers', () => {
-  assert.deepEqual(new Set(KIND_ORDER), new Set(Object.keys(HANDLERS)));
-  assert.equal(KIND_ORDER.length, Object.keys(HANDLERS).length);
+test('the kind table names exactly the match types and result kinds the models register', () => {
+  assert.deepEqual(new Set(INGREDIENT_KINDS), new Set(Object.keys(HANDLERS)));
+  assert.equal(INGREDIENT_KINDS.length, Object.keys(HANDLERS).length);
+  assert.deepEqual(RESULT_ROW_KINDS, RESULT_KINDS, 'the restated result kinds are the model’s');
+  assert.deepEqual(new Set(KIND_ORDER), new Set([...INGREDIENT_KINDS, ...RESULT_KINDS]));
   assert.deepEqual(Object.keys(KIND_META), [...KIND_ORDER]);
   for (const kind of KIND_ORDER) assert.ok(isKnownKind(kind), kind);
-  assert.ok(!isKnownKind('knowledge'), 'a kind the table does not name is not known');
+  assert.ok(!isKnownKind('activity'), 'a kind the table does not name is not known');
   assert.ok(!isKnownKind('toString'), 'an inherited key is not a kind');
 });
 
@@ -224,18 +230,115 @@ test('retyping a row leaves the old subject behind and seeds the new kind empty'
   });
 });
 
-test('a result reads its kind and never has one written', () => {
+test('a result reads its kind, and is never retyped to or from a kind a result cannot be', () => {
   assert.equal(toValue(RESULTS.fixed).kind, 'component', 'an absent kind is component');
   assert.equal(toValue({ componentId: null, kind: 'currency' }).kind, 'currency');
-  const unknown = { componentId: 'c-iron', kind: 'knowledge', quantity: 1 };
-  assert.equal(toValue(unknown).kind, 'knowledge', 'an unrecognised kind is passed through');
+  const unknown = { componentId: 'c-iron', kind: 'mystery', quantity: 1 };
+  assert.equal(toValue(unknown).kind, 'mystery', 'an unrecognised kind is passed through');
+  assert.equal(toValue(unknown).id, '', 'naming no subject');
   assert.ok(!isKnownKind(toValue(unknown).kind), 'so the row can draw it as a misconfiguration');
   const retyped = fromValue(RESULTS.fixed, { ...toValue(RESULTS.fixed), kind: 'tags' });
-  assert.ok(!Object.hasOwn(retyped, 'kind'), 'a result gains no kind');
-  assert.ok(!Object.hasOwn(retyped, 'match'), 'and no match');
-  // The row's own retype payload: it must not reach the subject of a result.
+  assert.equal(retyped, RESULTS.fixed, 'an ingredient-only kind is refused');
+  // The row's own retype payload: it must not reach the subject of a misconfigured result.
   const payload = { ...toValue(unknown), kind: 'component', id: '', tags: [], tagMatch: 'any' };
   assert.deepEqual(fromValue(unknown, payload), unknown);
+});
+
+test('an ingredient never reads as a result-only kind, so it never writes a result’s subject', () => {
+  const lore = { id: 'opt-9', quantity: 1, match: { type: 'knowledge', recipeId: 'r-sword' } };
+  assert.equal(toValue(lore).kind, 'component', 'knowledge is not an ingredient match type');
+  assert.equal(toValue(lore).id, '');
+  const named = fromValue(lore, { ...toValue(lore), id: 'c-iron' });
+  assert.deepEqual(named.match, { type: 'component', componentId: 'c-iron' });
+  assert.ok(!Object.hasOwn(named.match, 'undefined'), 'no subject key is written as undefined');
+});
+
+/** One persisted result per reward kind, each carrying the fields its kind keeps. */
+const KINDS = Object.freeze({
+  currency: {
+    id: 'res-3',
+    kind: 'currency',
+    unit: 'gp',
+    quantity: 5,
+    quantityFormula: '2d6',
+    label: 'Bounty',
+    reason: 'For the pelts',
+  },
+  knowledge: { id: 'res-4', kind: 'knowledge', recipeId: 'r-sword', quantity: 1 },
+});
+
+test('a currency or knowledge result reads its own subject, and round-trips untouched', () => {
+  assert.deepEqual(toValue(KINDS.currency), {
+    kind: 'currency',
+    id: 'gp',
+    tags: [],
+    tagMatch: 'any',
+    quantity: 5,
+    quantityFormula: '2d6',
+    label: 'Bounty',
+    reason: 'For the pelts',
+  });
+  assert.equal(toValue(KINDS.knowledge).id, 'r-sword');
+  for (const [kind, entry] of Object.entries(KINDS)) assertUntouched(entry, kind);
+});
+
+test('naming a currency or knowledge result writes its own subject key', () => {
+  const name = (entry, id) => fromValue(entry, { ...toValue(entry), id });
+  assert.deepEqual(name(KINDS.currency, 'sp'), { ...KINDS.currency, unit: 'sp' });
+  assert.deepEqual(name(KINDS.knowledge, 'r-axe'), { ...KINDS.knowledge, recipeId: 'r-axe' });
+  assert.ok(!Object.hasOwn(name(KINDS.knowledge, 'r-axe'), 'componentId'));
+});
+
+test('retyping a result clears the old kind’s value and seeds the new kind empty', () => {
+  const retype = (entry, kind) =>
+    fromValue(entry, { ...toValue(entry), kind, id: '', tags: [], tagMatch: 'any' });
+  assert.deepEqual(retype(RESULTS.rolled, 'currency'), {
+    id: 'res-2',
+    kind: 'currency',
+    unit: '',
+    quantity: 2,
+    quantityFormula: '1d4+1',
+  });
+  assert.deepEqual(retype(KINDS.currency, 'knowledge'), {
+    id: 'res-3',
+    kind: 'knowledge',
+    recipeId: '',
+    quantity: 1,
+  });
+  // Back to component: the kind key goes, since an absent kind is component, and the roll stays,
+  // since both kinds roll.
+  assert.deepEqual(retype(KINDS.currency, 'component'), {
+    id: 'res-3',
+    componentId: null,
+    quantity: 5,
+    quantityFormula: '2d6',
+  });
+});
+
+test('a currency label and reason are written as typed, and a blank one removes its key', () => {
+  const edit = (patch) => fromValue(KINDS.currency, { ...toValue(KINDS.currency), ...patch });
+  assert.equal(edit({ label: 'Wages ' }).label, 'Wages ', 'typed text is kept as typed');
+  assert.equal(edit({ reason: 'Paid' }).reason, 'Paid');
+  for (const blank of ['', '  ', undefined]) {
+    assert.ok(!Object.hasOwn(edit({ label: blank }), 'label'), JSON.stringify(blank));
+    assert.ok(!Object.hasOwn(edit({ reason: blank }), 'reason'), JSON.stringify(blank));
+  }
+});
+
+test('an empty result carries its kind and no value', () => {
+  assert.deepEqual(emptyResult('component', 'a'), { id: 'a', componentId: null, quantity: 1 });
+  assert.deepEqual(emptyResult('currency', 'b'), {
+    id: 'b',
+    kind: 'currency',
+    unit: '',
+    quantity: 1,
+  });
+  assert.deepEqual(emptyResult('knowledge', 'c'), {
+    id: 'c',
+    kind: 'knowledge',
+    recipeId: '',
+    quantity: 1,
+  });
 });
 
 test('a rolled amount is written beside quantity, and Fixed removes the key', () => {
@@ -294,6 +397,13 @@ test('the kind menu lists the offered kinds in table order, toned and hooked fro
     'the label is the caller’s localization'
   );
   assert.equal(kindMenuItems(['essence'])[0].label, 'Essence', 'and the fallback without one');
+  assert.deepEqual(
+    kindMenuItems(['knowledge', 'currency', 'component'], undefined, 'result').map(
+      (item) => item.data['data-recipe-add']
+    ),
+    ['result-component', 'result-currency', 'result-knowledge'],
+    'a result adder hooks its entries as results'
+  );
   assert.deepEqual(
     kindMenuItems(['unknown']),
     [],

@@ -21,8 +21,13 @@ export function computeActionMenuLayout(trigger, panel, host, options = {}) {
   const panelWidth = Math.max(0, Number(panel.width) || 0);
   const panelHeight = Math.max(0, Number(panel.height) || 0);
 
-  // Right-aligned: these menus hang off a kebab at the END of a row, so growing right leaves it.
-  const alignedRight = hostWidth - (Number(trigger.right) || 0) + (Number(host.left) || 0);
+  // End-aligned by default, since a kebab sits at the END of a row and growing right leaves it;
+  // `align: 'start'` lines the panel's left edge up with an adder's at the START of a list.
+  const hostLeft = Number(host.left) || 0;
+  const alignedRight =
+    options.align === 'start'
+      ? hostWidth - ((Number(trigger.left) || 0) - hostLeft) - panelWidth
+      : hostWidth - (Number(trigger.right) || 0) + hostLeft;
   // Keeping the panel's left edge inside the host is an UPPER bound on `right`. A panel wider than
   // the host drives that bound below `margin`, so the lower bound wins and the menu is pinned to
   // the host's right margin rather than pushed off its left edge — the verbs are read from the left.

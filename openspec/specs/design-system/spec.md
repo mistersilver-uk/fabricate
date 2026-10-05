@@ -1274,6 +1274,7 @@ A caller MAY supply its own labelled trigger and a heading, and the primitive ke
 The caller's trigger receives `aria-haspopup="menu"`, `aria-expanded`, the primitive's handlers and the binding that lets the primitive measure it and return focus to it, so a caller writes no ARIA of its own.
 A heading renders in the same portaled panel OUTSIDE the `role="menu"` element and names it through `aria-labelledby`, so the menu's children stay its items.
 An item MAY carry a tone, which tints its glyph and never its label.
+The panel lines up with its trigger's END edge, which suits a kebab at the end of a row, and a caller MAY align it with the START edge instead (`align`), which suits an adder at the start of a list; either alignment is clamped inside the portal host.
 The requirement row's kind menu is this primitive: the `or…` control opens it under the heading that states what choosing does, each kind's item toned with that kind.
 
 #### Scenario: A surface needs a kebab over two or more commands
