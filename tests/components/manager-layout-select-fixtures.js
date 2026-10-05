@@ -102,7 +102,7 @@ export const SOURCE_TRIGGER_SITES = [
   SOURCE_TRIGGER_SHELL(
     'essences',
     '<main class="manager-main">Browser</main>',
-    `<section class="manager-essence-inspector-section" data-essence-section="source">
+    `<section class="fab-rail" role="group" data-essence-section="source">
        <div class="manager-essence-source-drop-zone manager-essence-inspector-source-drop-zone">
          ${SOURCE_TRIGGER_MARKUP('inspector-trigger')}
        </div>

@@ -17,6 +17,7 @@
   import Medallion from '../../../components/Medallion.svelte';
   import Chip from '../../../components/Chip.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
+  import Rail from '../../../components/Rail.svelte';
   import SystemRulesRoster from '../scoped/SystemRulesRoster.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { statusChipTone } from '../../../util/statusChipTone.js';
@@ -122,6 +123,13 @@
       format
     )
   );
+  const onCraftLabel = $derived(
+    systemName
+      ? format('FABRICATE.Admin.Manager.Essence.OnCraftIn', 'On craft in {system}', {
+          system: systemName,
+        })
+      : text('FABRICATE.Admin.Manager.Essence.Tabs.OnCraft', 'On craft')
+  );
 
   function truncate(value) {
     if (typeof value !== 'string') return '';
@@ -135,7 +143,7 @@
   }
 </script>
 
-<section class="manager-essence-inspector-section" data-essence-browser-inspector>
+<Rail data-essence-browser-inspector="">
   <div class="manager-inspector-title-row is-hero-large">
     <!-- The tile carries the essence's own colour here too, so the inspector and the row
          cannot disagree about what colour an essence is. -->
@@ -168,7 +176,7 @@
     {description ||
       text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
   </p>
-</section>
+</Rail>
 
 <!--
   WHICH LAYER THE GM IS LOOKING AT, AND THE WAY OUT TO THE OTHER ONE. This describes ONE system's
@@ -205,7 +213,7 @@
 
 <!-- Two stats, two questions: components CARRY the essence and recipes REQUIRE it, and neither
      number is derivable from the other. -->
-<section class="manager-essence-inspector-section" data-essence-section="stats">
+<Rail data-essence-section="stats">
   <!-- The SHIPPED two-stat grid, joined into the sibling selector lists in
        `styles/fabricate.css` rather than re-authored: a hand-rolled copy had already drifted on
        radius, background, value size and both halves of the typographic contract. -->
@@ -223,19 +231,10 @@
       >
     </div>
   </div>
-</section>
+</Rail>
 
 {#if onCraftCards.length > 0}
-  <section class="manager-essence-inspector-section" data-essence-section="oncraft">
-    <p class="manager-kicker">
-      {#if systemName}
-        {format('FABRICATE.Admin.Manager.Essence.OnCraftIn', 'On craft in {system}', {
-          system: systemName,
-        })}
-      {:else}
-        {text('FABRICATE.Admin.Manager.Essence.Tabs.OnCraft', 'On craft')}
-      {/if}
-    </p>
+  <Rail label={onCraftLabel} data-essence-section="oncraft">
     <ul class="manager-essence-oncraft-cards">
       {#each onCraftCards as card (card.id)}
         <li data-essence-oncraft-card={card.id} data-essence-oncraft-suppressed={card.suppressed}>
@@ -243,7 +242,7 @@
         </li>
       {/each}
     </ul>
-  </section>
+  </Rail>
 {/if}
 
 <!--
@@ -252,7 +251,7 @@
   `systemRows` over an unreadable corpus reports the essence as held by no system at all.
 -->
 {#if systemRows.length > 0}
-  <section class="manager-essence-inspector-section" data-essence-section="systems">
+  <Rail data-essence-section="systems">
     <SystemRulesRoster
       rows={systemRows}
       {memberCount}
@@ -265,12 +264,12 @@
       {onOpenSystemRules}
       resetKey={essence.id}
     />
-  </section>
+  </Rail>
 {/if}
 
 <!-- THE ACTIONS SIT ABOVE `Source` AND `Usage`: ordered after two detail cards the primary fell
      past the fold, so the rail's one loud control was invisible in every captured frame. -->
-<section class="manager-essence-inspector-section" data-essence-section="actions">
+<Rail data-essence-section="actions">
   <!-- Every verb on the rail is a full-width `Button` in the role its verb names. -->
   <!--
     NO DUPLICATE. `store.duplicateEssence` minted a SYSTEM-owned essence with its own name, icon and
@@ -322,11 +321,13 @@
       )}
     </p>
   {/if}
-</section>
+</Rail>
 
 {#if showSourceUi}
-  <section class="manager-essence-inspector-section" data-essence-section="source">
-    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}</p>
+  <Rail
+    label={text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}
+    data-essence-section="source"
+  >
     {#if essence.associatedItem}
       <div class="manager-essence-source-summary manager-essence-inspector-source-summary">
         <img
@@ -378,11 +379,10 @@
         />
       </div>
     {/if}
-  </section>
+  </Rail>
 {/if}
 
-<section class="manager-essence-inspector-section" data-essence-section="usage">
-  <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</p>
+<Rail label={text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')} data-essence-section="usage">
   <div class="fab-stack" data-gap="2">
     <div class="manager-requirement-row">
       <span>{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</span>
@@ -412,7 +412,7 @@
       {/each}
     </div>
   {/if}
-</section>
+</Rail>
 
 <style>
   /* No stat-grid block here: the classes joined the sibling selector lists in
@@ -470,18 +470,6 @@
      only reinforces them. */
   .manager-essence-oncraft-cards li[data-essence-oncraft-suppressed='true'] {
     opacity: 0.72;
-  }
-
-  /* A BARE COLUMN, NOT A STACK OF BOXES. Every section wore `.fabricate-card` and four of
-     them CONTAIN cards, so one border became three nested ones. The rail is a column on the pane's
-     own surface with a micro-label per section, and only the things that ARE objects keep a box, as
-     `RecipeBrowserInspector` already does. THE SHARED-DEFINITION CALLOUT KEEPS ITS BOX, because it
-     IS an object, and is therefore the ONE site here calling `<InspectorCard>`. */
-  .manager-essence-inspector-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    min-width: 0;
   }
 
   .manager-essence-inspector-actions {

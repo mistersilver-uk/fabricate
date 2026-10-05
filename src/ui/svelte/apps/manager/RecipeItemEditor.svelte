@@ -24,6 +24,7 @@
 <script>
   import EmptyState from '../../components/EmptyState.svelte';
   import Notice from '../../components/Notice.svelte';
+  import Rail from '../../components/Rail.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { prerequisitePreview } from '../../../../systems/characterPrerequisites.js';
@@ -484,27 +485,22 @@
           'Preview and effective rules'
         )}
       >
-        <div class="manager-recipe-item-rail-section">
-          <span class="manager-recipe-item-rail-title"
-            >{text(
-              'FABRICATE.Admin.Manager.RecipeItem.Rail.HowPlayersSee',
-              'How players see it'
-            )}</span
-          >
+        <Rail
+          label={text(
+            'FABRICATE.Admin.Manager.RecipeItem.Rail.HowPlayersSee',
+            'How players see it'
+          )}
+        >
           <!-- The REAL player book detail, fed a synthetic row — so it can never drift.
                No callbacks are passed, so it's a read-only preview. -->
           <div class="manager-recipe-item-live-preview" data-recipe-item-preview>
             <InventoryDetail item={previewRow} learningRecipeId={null} />
           </div>
-        </div>
+        </Rail>
 
-        <div class="manager-recipe-item-rail-section">
-          <span class="manager-recipe-item-rail-title"
-            >{text(
-              'FABRICATE.Admin.Manager.RecipeItem.Rail.EffectiveRules',
-              'Effective rules'
-            )}</span
-          >
+        <Rail
+          label={text('FABRICATE.Admin.Manager.RecipeItem.Rail.EffectiveRules', 'Effective rules')}
+        >
           <div class="manager-recipe-item-rules-list" data-recipe-item-rules>
             {#each effectiveRules as rule, index (`${rule.title}-${index}`)}
               <div
@@ -539,7 +535,7 @@
               </div>
             {/each}
           </div>
-        </div>
+        </Rail>
 
         <div class="manager-recipe-item-rail-note">
           <i class="fas fa-circle-check" aria-hidden="true"></i>
@@ -614,18 +610,11 @@
     border-left: 1px solid var(--fab-border);
   }
 
-  .manager-recipe-item-rail-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-  }
-
-  .manager-recipe-item-rail-title {
+  /* THIS RAIL'S KICKERS KEEP THEIR OWN SIZE AND TRACKING, flush, so no frame moves. */
+  .manager-recipe-item-editor-rail > :global(.fab-rail) > :global(.fab-rail-label) {
+    margin: 0;
     font-size: 0.62rem;
-    font-weight: 700;
     letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--fab-text-subtle);
   }
 
   /* The "How players see it" rail embeds the REAL player `InventoryDetail` component

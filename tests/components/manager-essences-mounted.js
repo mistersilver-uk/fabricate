@@ -293,6 +293,18 @@ export function registerEssencesCases() {
       target.querySelector('[data-essence-section="usage"]'),
       'essence inspector should expose a Usage section'
     );
+    // Its labelled rail sections are groups named by their kickers, and the rest are unnamed
+    // sections, never regions (issue 1782).
+    const named = (section) =>
+      section.getAttribute('role') === 'group'
+        ? document.querySelector(`[id="${section.getAttribute('aria-labelledby')}"]`)?.textContent
+        : null;
+    assert.deepEqual(
+      ['stats', 'actions', 'source', 'usage'].map((id) =>
+        named(target.querySelector(`.fab-rail[data-essence-section="${id}"]`))
+      ),
+      [null, null, 'Source', 'Usage']
+    );
     assert.ok(
       target.querySelector(
         '[data-essence-section="source"] .manager-essence-source-drop-zone .essence-source-trigger'

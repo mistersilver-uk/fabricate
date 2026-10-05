@@ -337,6 +337,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-import-report',
     'manager-components-add-from-catalogue',
   ]),
+  // The inspector rail section (issue 1782): the essence inspector's labelled sections, the tool
+  // inspector's two groups and the recipe-item editor's preview rail.
+  'src/ui/svelte/components/Rail.svelte': Object.freeze([
+    'manager-essences-normal',
+    'manager-tool-parity-01-library-1280x720',
+    'manager-recipe-item-overview',
+  ]),
   // The well below a card (issue 2008): the Formula card's roll-prompt and additional-dice groups,
   // and the roll prompt's additional-dice control.
   'src/ui/svelte/components/Well.svelte': Object.freeze([

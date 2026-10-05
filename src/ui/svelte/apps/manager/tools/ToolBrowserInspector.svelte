@@ -3,6 +3,7 @@
   import EmptyState from '../../../components/EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
+  import Rail from '../../../components/Rail.svelte';
   import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { projectToolBehaviorFacts, projectToolRow } from './toolStudio.js';
@@ -171,48 +172,52 @@
     <!-- ONE GROUP, ONE KICKER, where four separately-headed sections each sat over a single row
          already stating the same thing in bold. The heading the panel needs is the one naming what
          the whole group is: the rules that apply HERE, after inheritance and overrides. -->
-    <p class="manager-kicker manager-tool-inspector-section-kicker">
-      {row
+    <Rail
+      label={row
         ? text('FABRICATE.Admin.Manager.Tools.InspectorEffectiveRules', 'Effective rules here')
         : text(
             'FABRICATE.Admin.Manager.Tools.InspectorWorldDefaultsHere',
             'What it would inherit here'
           )}
-    </p>
-    <div class="manager-tool-inspector-rules">
-      {#each facts as fact (fact.id)}
-        <!-- The SAME row the editor's behavior preview renders, from the same projection. -->
-        <IconFactRow
-          icon={fact.icon}
-          title={fact.title}
-          subtitle={fact.subtitle}
-          tile
-          density="rule"
-          data-tool-inspector-rule={fact.id || true}
-        />
-      {/each}
-    </div>
+      data-tool-inspector-section="rules"
+    >
+      <div class="manager-tool-inspector-rules">
+        {#each facts as fact (fact.id)}
+          <!-- The SAME row the editor's behavior preview renders, from the same projection. -->
+          <IconFactRow
+            icon={fact.icon}
+            title={fact.title}
+            subtitle={fact.subtitle}
+            tile
+            density="rule"
+            data-tool-inspector-rule={fact.id || true}
+          />
+        {/each}
+      </div>
+    </Rail>
     <!-- WHICH OF THOSE FOUR ARE THIS SYSTEM'S OWN. The rules above cannot state where each answer
          came from, because a section overridden to the world's own value resolves identically to
          one inherited, so the row's `Overrides …` claim was unverifiable on the screen it opened.
          A separate region rather than a per-row pill, because `Inherited` qualifies the RULE.
          Members only: a Tool with no rules record inherits nothing. -->
     {#if row}
-      <p class="manager-kicker manager-tool-inspector-section-kicker">
-        {text('FABRICATE.Admin.Manager.Tools.InspectorInheritance', 'Inheritance')}
-      </p>
-      <div class="manager-tool-inspector-inheritance" data-tool-inspector-inheritance>
-        {#each inheritRows as section (section.id)}
-          <div
-            class="manager-tool-inspector-inherit-row"
-            data-tool-inspector-inherit={section.id}
-            data-tool-inspector-inherit-state={section.inherited ? 'inherited' : 'overridden'}
-          >
-            <span>{section.label}</span>
-            <Chip tone={section.inherited ? 'info' : 'warning'}>{section.state}</Chip>
-          </div>
-        {/each}
-      </div>
+      <Rail
+        label={text('FABRICATE.Admin.Manager.Tools.InspectorInheritance', 'Inheritance')}
+        data-tool-inspector-section="inheritance"
+      >
+        <div class="manager-tool-inspector-inheritance" data-tool-inspector-inheritance>
+          {#each inheritRows as section (section.id)}
+            <div
+              class="manager-tool-inspector-inherit-row"
+              data-tool-inspector-inherit={section.id}
+              data-tool-inspector-inherit-state={section.inherited ? 'inherited' : 'overridden'}
+            >
+              <span>{section.label}</span>
+              <Chip tone={section.inherited ? 'info' : 'warning'}>{section.state}</Chip>
+            </div>
+          {/each}
+        </div>
+      </Rail>
     {/if}
     <!-- TWO GROUPS, AND THE SPLIT IS THE DESIGN'S OWN: the first is a NAVIGATION out of this
          system entirely, to where identity and the world defaults are authored once, and the
@@ -287,10 +292,19 @@
   /* THE PANEL'S OWN HEAD, spanning the column above the medallion. ITS TYPE IS THE SHARED CLASS'S:
      restating it here would make the source fix UNREACHABLE rather than redundant, because the
      sheet is imported at `layer(modules)` and this block is injected unlayered. */
-  .manager-tool-inspector-kicker,
-  .manager-tool-inspector-section-kicker {
+  .manager-tool-inspector-kicker {
     margin: 0;
     min-width: 0;
+  }
+
+  /* EACH SECTION KEEPS THE CARD'S OWN RHYTHM, kicker to body, and its kicker the card's flush
+     edge, so no frame moves; chained through the card because `Rail` writes both elements. */
+  :global(.fabricate-card.manager-tool-browser-inspector > .fab-rail) {
+    gap: inherit;
+  }
+
+  :global(.fabricate-card.manager-tool-browser-inspector > .fab-rail > .fab-rail-label) {
+    margin: 0;
   }
 
   .manager-tool-inspector-rules {
