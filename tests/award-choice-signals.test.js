@@ -251,7 +251,8 @@ test('1773: the group preview reads who chooses and how many, over its alternati
   assert.equal(player.name, 'FABRICATE.App.Crafting.Io.GroupPlayerAnyOne{}');
   assert.deepEqual(
     player.members.map((member) => member.name),
-    ['Gem', 'FABRICATE.App.Crafting.Io.CurrencyReward']
+    ['Gem', 'gp'],
+    'an unlabelled currency alternative reads its unit, as a currency result row does'
   );
   const [rolled] = rows(
     group({ chooser: 'rolled', awardStrategy: 'upTo', awardCountFormula: '1d3' })
