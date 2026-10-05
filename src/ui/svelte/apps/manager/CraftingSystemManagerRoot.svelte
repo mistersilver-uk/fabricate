@@ -2071,7 +2071,7 @@
     return buildComponentEditorState(selectedSystem, item).showEssences === true;
   }
 
-  // The page header's six answers, one derivation each (issue 1720). Every leg is passed as a
+  // The page header's answers, one derivation each (issue 1720). Every leg is passed as a
   // thunk so `createHeaderModel` reads this shell's live `$derived` values rather than the ones
   // they held when it was built.
   const header = createHeaderModel({
@@ -2096,16 +2096,19 @@
       downtimeHeaderArtwork: () => downtimeHeaderArtwork,
       enabledPartyCount: () => enabledPartyCount,
       essenceRulesMode: () => essenceRulesMode,
+      experimentalFeaturesEnabled: () => experimentalFeaturesEnabled,
       format: () => format,
       gatheringTabPageHint: () => gathering.gatheringTabPageHint,
       gatheringTabPageTitle: () => gathering.gatheringTabPageTitle,
       playerCharacterUuids: () => playerCharacterUuids,
+      premiumInstalled: () => premiumInstalled,
       recipeDraft: () => recipeDraft,
       recipeEditSubtitle: () => recipeEditSubtitle,
       selectedCharacterPrerequisites: () => selectedCharacterPrerequisites,
       selectedCurrencyUnits: () => selectedCurrencyUnits,
       selectedSystem: () => selectedSystem,
       selectedSystemModifiers: () => selectedSystemModifiers,
+      services: () => services,
       showEssenceSourceUi: () => showEssenceSourceUi,
       text: () => text,
       travelParties: () => travelParties,
@@ -4282,17 +4285,11 @@
   <!--
     The manager titlebar: a thin, always-present identity strip above the header.
   -->
-  <!--
-    THE TITLE BAND RENDERS ON THE TOOL ROUTES TOO (issue 1373).
-  -->
   <div
     class="manager-titlebar"
     data-manager-titlebar
     aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}
   >
-    <!--
-    The layer-group icon and "Crafting Systems" product label used to lead this strip.
-  -->
     {#if premiumInstalled}
       <span
         class="manager-titlebar-badge"

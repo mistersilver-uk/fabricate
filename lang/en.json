@@ -2746,6 +2746,14 @@
           "OutcomeTier": "outcome tier",
           "OutcomeTiers": "outcome tiers"
         },
+        "PremiumIconsAd": {
+          "Title": "Crafting icons",
+          "Badge": "PREMIUM",
+          "Subline": "For components and essences, with Downtime",
+          "SeePremium": "See Premium",
+          "SeePremiumHint": "Opens Fabricate Premium on Patreon in a new tab",
+          "Hide": "Hide Premium suggestion"
+        },
         "Crafting": {
           "CraftingTabs": {
             "Label": "Crafting sections",
@@ -7564,6 +7572,7 @@
         },
         "Scoped": {
           "ComponentCatalogueTitle": "Component catalogue",
+          "ComponentCatalogueActions": "Component catalogue actions",
           "ComponentCatalogueSubtitle": "One component per source item — identity only. Crafting behaviour lives in each system's own component rules.",
           "ComponentEntryTitle": "Component entry",
           "ComponentEntrySubtitle": "Identity, the world category and tags, and a row per crafting system that has this Component.",
