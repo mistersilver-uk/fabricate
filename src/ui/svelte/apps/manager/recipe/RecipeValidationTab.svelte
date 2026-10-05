@@ -68,6 +68,7 @@
       'CheckTaughtRecipesResolve',
       'Every recipe it teaches is in this system',
     ],
+    choiceGroupsValid: ['CheckChoiceGroupsValid', 'Every choice of rewards is complete'],
     alchemyResultSelection: ['CheckAlchemyResultSelection', 'Resolves to exactly one result set'],
     noSignatureCollision: [
       'CheckNoSignatureCollision',
@@ -106,6 +107,22 @@
       'IssueMissingTaughtRecipe',
       'A result teaches a recipe that is no longer in this system, so every craft is refused.',
     ],
+    choiceGroupTooFew: [
+      'IssueChoiceGroupTooFew',
+      'A choice of rewards holds fewer than two alternatives.',
+    ],
+    choiceGroupSelection: [
+      'IssueChoiceGroupSelection',
+      'A rolled choice of rewards has no selection roll.',
+    ],
+    choiceGroupRanges: [
+      'IssueChoiceGroupRanges',
+      'A rolled choice of rewards needs a range on every alternative, with no two overlapping and none running backwards.',
+    ],
+    choiceGroupCount: [
+      'IssueChoiceGroupCount',
+      'An up-to choice of rewards does not say how many it awards.',
+    ],
     alchemyResultSelection: [
       'IssueAlchemyResultSelection',
       'An alchemy recipe must resolve to exactly one result set before it can be enabled.',
@@ -121,6 +138,7 @@
     routedResultGroupsRouted: 'results',
     routedOutcomeTiersProduced: 'results',
     taughtRecipesResolve: 'results',
+    choiceGroupsValid: 'results',
     alchemyResultSelection: 'resolution',
     hasName: 'requirements',
     stepsNamed: 'requirements',

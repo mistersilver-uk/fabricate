@@ -47,8 +47,10 @@ const RECIPE_RAW_MODULES = [
   // The lifted browse state's default page size, which the browse-list composable reads.
   'src/ui/model/managerBrowserViewState.js',
   'src/ui/model/recipeBrowserModel.js',
-  // ... which names a reward row by its glyph and its unit's display name (issue 1773).
+  // ... which names a reward row by its glyph and its unit's display name, and draws a choice
+  // group as one row of its alternatives (issue 1773).
   'src/ui/presenters/resultKindGlyphs.js',
+  'src/utils/choiceGroupShape.js',
   'src/systems/currencyProfile.js',
   'src/config/currencyPresets.js',
   'src/utils/objectPath.js',
@@ -1841,6 +1843,42 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
     assert.equal(root.querySelector('[data-recipe-produces-outcome]'), null, 'no outcome sections without a check');
     assert.match(root.querySelector('.manager-recipe-flow-list').textContent, /Healing Potion/);
+  });
+
+  // Issue 1773: a choice group is one Produces entry holding its alternatives, captioned with how
+  // many it awards and who chooses.
+  it('draws a result choice group as a box of its alternatives, captioned by its cell', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-choice',
+        resultGroups: [
+          {
+            id: 'g1',
+            results: [
+              {
+                id: 'c1',
+                chooser: 'rolled',
+                awardStrategy: 'upTo',
+                awardCount: 2,
+                alternatives: [
+                  { id: 'a', componentId: 'cmp-herb', quantity: 2 },
+                  { id: 'b', componentId: 'cmp-potion', quantity: 1 }
+                ]
+              }
+            ]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+    const box = root.querySelector('[data-recipe-produces-choice="success"]');
+    assert.ok(box, 'the group is one box');
+    assert.equal(box.querySelector('.manager-recipe-flow-anyof-label').textContent.trim(), 'Up to 2 of · Rolled');
+    assert.deepEqual(
+      [...box.querySelectorAll('[data-recipe-produces]')].map((row) => row.querySelector('.manager-recipe-flow-name').textContent),
+      ['Mountain Herb', 'Healing Potion']
+    );
   });
 
   // Issue 884 — the hero medallion is the recipe's own icon.

@@ -273,6 +273,35 @@ test('1773: the manager Produces rows name a reward by itself, never as a compon
   );
 });
 
+test('1773: a choice group is one Produces row holding its alternatives as rows', () => {
+  const [row] = buildRecipeProduceRows(
+    {
+      resultGroups: [
+        {
+          id: 'g',
+          role: 'failure',
+          results: [{ id: 'choice', alternatives: [{ id: 'a', componentId: 'ore' }, coin()] }],
+        },
+      ],
+    },
+    {
+      componentOptions: [{ id: 'ore', name: 'Iron ore' }],
+      currencyUnits: [{ id: 'gp', label: 'Gold' }],
+    }
+  );
+  assert.equal(row.kind, 'group');
+  assert.equal(row.chooser, 'playerChooses');
+  assert.equal(row.awardStrategy, 'anyOne');
+  assert.equal(row.failure, true);
+  assert.deepEqual(
+    row.members.map(({ id, kind, name }) => [id, kind ?? 'component', name]),
+    [
+      ['g:choice:a', 'component', 'Iron ore'],
+      ['g:choice:c', 'currency', ''],
+    ]
+  );
+});
+
 test('1773: an alchemy headline is the first component result, never a reward', () => {
   const builder = new AlchemyListingBuilder({});
   const recipe = {

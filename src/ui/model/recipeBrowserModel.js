@@ -5,6 +5,7 @@
 
 import { isFixedSumOver } from '../../systems/checkTarget.js';
 import { currencyUnitDisplayName, findCurrencyUnit } from '../../systems/currencyProfile.js';
+import { isChoiceGroup } from '../../utils/choiceGroupShape.js';
 import { RESULT_KIND_GLYPHS } from '../presenters/resultKindGlyphs.js';
 
 import {
@@ -470,12 +471,46 @@ function rewardProduceFields(result, rosters) {
   };
 }
 
+/** What one awarded result reads as: its component, or a reward's own fields. */
+function produceFields(result, rosters) {
+  const component = findById(rosters.componentOptions, result?.componentId);
+  return {
+    componentId: result?.componentId || '',
+    name: component?.name || '',
+    img: component?.img || '',
+    quantity: Number(result?.quantity) > 0 ? Number(result.quantity) : 1,
+    amountLabel: amountLabelOf(result),
+    // The component's authored difficulty (its progressive "cost"/DC).
+    difficulty: Number.isFinite(Number(component?.difficulty))
+      ? Number(component.difficulty)
+      : null,
+    ...((result?.kind ?? 'component') !== 'component' && rewardProduceFields(result, rosters)),
+  };
+}
+
+/**
+ * A choice group's own fields (issue 1773): `kind: 'group'`, who chooses, how many it awards, and
+ * its alternatives as `members`, each a row of its own.
+ */
+function choiceProduceFields(result, rowId, rosters) {
+  return {
+    kind: 'group',
+    chooser: result.chooser === 'rolled' ? 'rolled' : 'playerChooses',
+    awardStrategy: result.awardStrategy === 'upTo' ? 'upTo' : 'anyOne',
+    count: result.awardCountFormula || result.awardCount || null,
+    members: result.alternatives.map((member, index) => ({
+      id: `${rowId}:${member?.id || index}`,
+      ...produceFields(member, rosters),
+    })),
+  };
+}
+
 /**
  * One Produces row per result item, in authoring order, tagged with the result GROUP it belongs to;
- * a currency or knowledge row adds its kind and names itself rather than a component.
+ * a currency or knowledge row adds its kind and names itself rather than a component, and a choice
+ * group is one row holding its alternatives.
  */
 export function buildRecipeProduceRows(recipe, rosters = {}) {
-  const components = rosters.componentOptions;
   const rows = [];
 
   for (const scope of executionScopes(recipe)) {
@@ -484,18 +519,12 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
       const results = Array.isArray(group?.results) ? group.results : [];
 
       for (const [resultIndex, result] of results.entries()) {
-        const component = findById(components, result?.componentId);
+        const id = `${groupId}:${result?.id || resultIndex}`;
         rows.push({
-          id: `${groupId}:${result?.id || resultIndex}`,
-          componentId: result?.componentId || '',
-          name: component?.name || '',
-          img: component?.img || '',
-          quantity: Number(result?.quantity) > 0 ? Number(result.quantity) : 1,
-          amountLabel: amountLabelOf(result),
-          // The component's authored difficulty (its progressive "cost"/DC).
-          difficulty: Number.isFinite(Number(component?.difficulty))
-            ? Number(component.difficulty)
-            : null,
+          id,
+          ...(isChoiceGroup(result)
+            ? choiceProduceFields(result, id, rosters)
+            : produceFields(result, rosters)),
           groupId,
           groupName: group?.name || '',
           // The check-outcome tiers this result group is routed to (routed-by-check).
@@ -503,8 +532,6 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
           // The reserved alchemy-Simple failure group: what a FAILED craft makes.
           failure: group?.role === 'failure',
           scopeName: scope.multi ? scope.name : '',
-          ...((result?.kind ?? 'component') !== 'component' &&
-            rewardProduceFields(result, rosters)),
         });
       }
     }

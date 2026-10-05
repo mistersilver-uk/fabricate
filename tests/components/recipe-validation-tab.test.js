@@ -20,6 +20,10 @@ const harness = createMountedComponentHarness({
     'src/config/flags.js',
     'src/models/match/matchTypes.js',
     'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+    // …which reads a result choice group's problems through its edits (issue 1773).
+    'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
+    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+    'src/utils/choiceGroupShape.js',
     // The tab localizes a signature-collision blocker row via this pure leaf (issue 549).
     'src/utils/recipeActivationMessages.js',
     'src/utils/scalars.js'
@@ -215,6 +219,28 @@ describe('RecipeValidationTab (mounted)', () => {
       /no longer in this system/,
       'and says why, with the set it names'
     );
+    harness.remount();
+  });
+
+  it('flags a rolled choice of rewards with no selection roll and no ranges (issue 1773)', async () => {
+    const target = await harness.mount({
+      recipe: {
+        name: 'Rewarding',
+        enabled: true,
+        ingredientSets: [{ id: 's1' }],
+        resultGroups: [
+          {
+            id: 'g1',
+            results: [
+              { id: 'c', chooser: 'rolled', alternatives: [{ id: 'a', componentId: 'x' }, { id: 'b', componentId: 'y' }] }
+            ]
+          }
+        ]
+      }
+    });
+    assert.equal(target.querySelector('[data-check="choiceGroupsValid"]')?.dataset.satisfied, 'false');
+    assert.match(target.querySelector('[data-check="choiceGroupsValid"]').textContent, /Every choice of rewards is complete/);
+    assert.match(target.querySelector('[data-issue="choiceGroupRanges"]').textContent, /range on every alternative/);
     harness.remount();
   });
 
