@@ -2198,7 +2198,7 @@ export function registerEnvironmentsCases() {
       'the lock says why the art cannot be picked'
     );
     const artRoot = () =>
-      target.querySelector('[data-overview-section="identity"] .fab-art-picker');
+      target.querySelector(':scope [data-overview-section="identity"] .fab-art-picker');
     assert.ok(artRoot().hasAttribute('data-scene-locked-image'), 'the locked art keeps its hook');
     assert.ok(picker.querySelector('.fa-lock'), 'locked identity image should show a lock icon');
     assert.equal(

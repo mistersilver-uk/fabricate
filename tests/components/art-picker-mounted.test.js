@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
-import { declarationsIn, rulesIn, stripCssComments } from '../helpers/styleBlockScan.js';
 import { defineStructureContract } from '../helpers/structureContract.js';
+import { declarationsIn, rulesIn, stripCssComments } from '../helpers/styleBlockScan.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');

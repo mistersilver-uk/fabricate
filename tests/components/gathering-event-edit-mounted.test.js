@@ -42,7 +42,7 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 const tileOf = (root) =>
-  root.querySelector('[data-gathering-event-core-editor] .fab-art-picker-tile');
+  root.querySelector(':scope [data-gathering-event-core-editor] .fab-art-picker-tile');
 
 /** Mount the editor on one event, recording every `onUpdateEvent` patch and each picker open. */
 async function mountEvent(event, onPickImagePath) {
@@ -50,7 +50,9 @@ async function mountEvent(event, onPickImagePath) {
   const root = await harness.mount({
     event: { id: 'event-squall', name: 'Squall', dropRate: 10, ...event },
     onPickImagePath,
-    onUpdateEvent: (patch) => updates.push(patch),
+    onUpdateEvent: (patch) => {
+      updates.push(patch);
+    },
   });
   return { root, updates, tile: tileOf(root) };
 }

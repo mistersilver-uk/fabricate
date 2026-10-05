@@ -2311,7 +2311,12 @@ describe('RecipeEditView (mounted)', () => {
     ]) {
       const patches = [];
       const target = await editHarness.mount(
-        identityProps({ ...overrides, onUpdateRecipe: (patch) => patches.push(patch) })
+        identityProps({
+          ...overrides,
+          onUpdateRecipe: (patch) => {
+            patches.push(patch);
+          },
+        })
       );
       const button = target.querySelector('button[data-recipe-field="img"]');
       assert.equal(button.disabled, true, `the recipe art is disabled ${why}`);
