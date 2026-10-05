@@ -47,6 +47,10 @@ export const GATHERING_TASK_EDITOR_PATTERN =
 export const WORLD_SCOPE_MODEL_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/(worldScopeModel\.svelte|dropUuidClassification)\.js$/;
 
+/** The Premium crafting-icons advert in the two component screens' headers (issue 2220). */
+export const PREMIUM_ICONS_AD_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/(ManagerPremiumIconsAd\.svelte|premiumIconsAdModel\.js)$/;
+
 /** The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010). */
 export const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/Recipe/,
