@@ -4,6 +4,7 @@
  * operation the executor's award-choice lane runs on an active or terminal run.
  */
 import { diceEngine } from '../utils/rollFormulaRollability.js';
+import { arrayOrEmpty as list } from '../utils/scalars.js';
 
 import {
   awardPickRefusal,
@@ -47,8 +48,16 @@ export const AWARD_CHOICE_PENDING = Object.freeze({
   message: 'Choose the pending reward before the next stage can begin.',
 });
 const REFUSED = 'AWARD_CHOICE_REFUSED';
-
-const list = (value) => (Array.isArray(value) ? value : []);
+const SETTLE_IN_PROGRESS = "Another settle of this run's reward is still in progress";
+/** The executor's refusals before any plan is written: a settle refused there changed nothing. */
+const PRE_PLAN_CODES = new Set([
+  'PLAN_MISMATCH',
+  'EXECUTION_IN_PROGRESS',
+  'RUN_PAUSED',
+  'STALE_RUN_REVISION',
+  'LEGACY_RUN',
+  'RUN_NOT_FOUND',
+]);
 
 function refusal(message) {
   const error = new Error(message);
@@ -207,7 +216,9 @@ export class AwardChoiceSettler {
       return versionedTransitionResult(execution.run, execution.outcome);
     } catch (error) {
       if (error?.code === 'AUTHORITY_UNAVAILABLE') return authorityUnavailableResult();
-      if (error?.code === REFUSED) return versionedFailure(error.message);
+      if (error?.code === REFUSED || PRE_PLAN_CODES.has(error?.code)) {
+        return versionedFailure(error.message);
+      }
       throw error;
     }
   }
@@ -222,21 +233,33 @@ export class AwardChoiceSettler {
     );
   }
 
-  _claimable(actor, recipe) {
+  /** Why `actor` cannot claim an alternative of `run`'s choices now, or `null`, for the Journal. */
+  unclaimable(run, actor) {
+    return this._unclaimable(actor, this._recipeOf(run));
+  }
+
+  _unclaimable(actor, recipe) {
     const resolveComponent = (componentId) => this.resolveComponent(recipe, componentId);
     const { seams, resolveItem } = this;
     const context = { actor, recipe, seams, resolveComponent, resolveItem };
-    return (member) => memberUnclaimableReason(member, context) === null;
+    return (member) => memberUnclaimableReason(member, context);
+  }
+
+  _claimable(actor, recipe) {
+    const reason = this._unclaimable(actor, recipe);
+    return (member) => reason(member) === null;
   }
 
   /**
-   * A fresh settle is refused before any plan exists; a resume runs the plan it persisted, with no
-   * claim check. Until `award-choice` has started, every pick is resolved here, so it only writes.
+   * A fresh settle is refused before any plan exists, and while another settle's plan is open; a
+   * resume runs the plan it persisted, with no claim check. Until `award-choice` has started,
+   * every pick is resolved here, so it only writes.
    */
   async _operation({ actor, run, requestId, choiceId, picks }) {
     const journal = run.awardChoiceJournal;
-    const resuming =
-      journal?.status === 'planned' && journal.requestId === String(requestId ?? '').trim();
+    const planned = journal?.status === 'planned';
+    const resuming = planned && journal.requestId === String(requestId ?? '').trim();
+    if (planned && !resuming) throw refusal(SETTLE_IN_PROGRESS);
     const located = locateChoice(run, choiceId, resuming ? journal.intent?.stepIndex : null);
     if (!located) throw refusal('There is no such award choice on this run');
     const { stepIndex, choice } = located;

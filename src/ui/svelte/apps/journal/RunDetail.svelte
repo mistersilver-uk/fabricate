@@ -33,6 +33,7 @@
   import { reconcileRetainedClaim, retainedClaimPrompt } from './runRecovery.js';
   import PlayerDetailHeader from '../PlayerDetailHeader.svelte';
   import ActionsPanel from './ActionsPanel.svelte';
+  import RunAwardChoice from './RunAwardChoice.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
   import StepDetails from './StepDetails.svelte';
   import TimeRemainingBox from './TimeRemainingBox.svelte';
@@ -91,8 +92,6 @@
   // THE BAR READS THE GATE'S DEADLINE, NEVER ELAPSED WALL TIME (issue 1648). `applyResume`
   // re-anchors `availableAt` past every paused second, so `required - remaining` carries any
   // number of pause cycles already and agrees with the remaining-time labels beside it.
-  // `now - initiatedAt` counted the pause as progress and pegged the bar full on a run the
-  // same panel reported as still waiting.
   const elapsed = $derived.by(() => {
     const required = Number(currentGate?.requiredSeconds);
     if (!(Number.isFinite(required) && required > 0)) return status === 'ready' ? 100 : 0;
@@ -430,6 +429,7 @@
           : null}
       />
     {/if}
+    <RunAwardChoice {run} {journal} />
   </section>
 
   {#if stateNotice?.evidence}

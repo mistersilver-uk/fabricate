@@ -202,6 +202,7 @@ function attempted(stage) {
 function closedKey(run, stages, results) {
   if (run?.recoveryEvidence?.required) return 'ClosedRecovery';
   if (run?.recoveryEvidence?.status === 'planned') return 'SettlementPending';
+  if (run?.awardChoicePending) return 'ClosedAwardPending';
   if (run?.redacted) return 'ClosedRedacted';
   if (run?.status === 'cancelled') return cancelledClosedKey(run, stages);
   if (run?.status === 'failed') {

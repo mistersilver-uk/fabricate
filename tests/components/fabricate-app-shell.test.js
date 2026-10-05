@@ -293,6 +293,27 @@ describe('SvelteFabricateApp shell window', () => {
       );
     });
   });
+  it('1773: opening a run in the Journal selects that run, then switches to the Journal tab', async () => {
+    await withFabricateLifecycleReplay(async ({ loadModule }) => {
+      const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
+      const app = Object.create(SvelteFabricateApp.prototype);
+      const services = app._buildServices();
+      const calls = [];
+      services.journal = {
+        select: (...args) => {
+          calls.push(['select', ...args]);
+        },
+      };
+      app._selectTab = (tab) => {
+        calls.push(['tab', tab]);
+      };
+      services.navigateToJournalRun('run-7');
+      assert.deepEqual(calls, [
+        ['select', 'run-7', 'crafting'],
+        ['tab', 'journal'],
+      ]);
+    });
+  });
   // Issue 2048: the listing and the attempt must carry the SAME interactable ref, read per call,
   // so a scoped listing shows and gates on the pool the attempt decrements, and a re-show or close
   // never leaves a stale scope behind for the next refresh.

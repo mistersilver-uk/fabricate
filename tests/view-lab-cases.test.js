@@ -2495,8 +2495,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    128,
-    `expected the 128 crafting-path cases to be examined, saw ${examined.length}`
+    131,
+    `expected the 131 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -3778,6 +3778,7 @@ const SHARED_CASE_MODULES = Object.freeze([
   'broadSignals.js',
   'caseConstants.js',
   'caseFactories.js',
+  'journalAwardChoiceCases.js',
   'journalBlindRunCases.js',
   'journalHistoryCases.js',
   'journalLifecycleCases.js',

@@ -409,3 +409,82 @@ describe('RequirementChooser mounted behavior', () => {
     assert.equal(root.querySelector('[role="group"]').getAttribute('aria-label'), 'Requirements');
   });
 });
+
+// Issue 1773: the award face, a reward pick bounded by a ceiling.
+const AWARD = {
+  key: 'award-pick',
+  slotId: 'pick',
+  kind: 'award',
+  name: 'Choose up to 2 rewards',
+  status: '2 of 2 chosen — unpick one to choose another',
+  alternatives: [
+    { id: 'gem', name: 'Gem', label: 'Gem, ×2', pip: '×2', selected: true },
+    { id: 'gold', name: 'Gold', label: 'Gold, 3 gp', pip: '3 gp', selected: true },
+    {
+      id: 'tonic',
+      name: 'Tonic',
+      label: 'Tonic',
+      disabled: true,
+      reading: 'You already know this recipe',
+    },
+  ],
+};
+
+describe('RequirementChooser award face (issue 1773)', () => {
+  before(harness.setup);
+  after(harness.teardown);
+  afterEach(harness.remount);
+
+  it('draws an award slot as an always-open well of tiles, with no tile in the row', async () => {
+    const target = await harness.mount({ slots: [AWARD] });
+    assert.equal(slotsIn(target).length, 0, 'no row tile for an award slot');
+    const panel = target.querySelector('[data-requirement-panel="pick"][data-slot-kind="award"]');
+    assert.equal(panel.querySelector('.fab-well').getAttribute('role'), 'group');
+    assert.equal(panel.querySelector('.fab-well').getAttribute('aria-label'), AWARD.name);
+    assert.equal(alternativesIn(target).length, 3);
+  });
+
+  it('makes a disabled tile a native disabled button that chooses nothing, and says why', async () => {
+    const chosen = [];
+    const target = await harness.mount({
+      slots: [AWARD],
+      onChoose: (_slot, alternative) => {
+        chosen.push(alternative.id);
+      },
+    });
+    const tonic = target.querySelector(':scope [data-requirement-alternative="tonic"] button');
+    assert.equal(tonic.disabled, true);
+    tonic.click();
+    assert.deepEqual(chosen, [], 'a disabled tile fires no choice');
+    const reason = target.querySelector('[data-requirement-reason="tonic"]');
+    const status = target.querySelector('[data-award-status]');
+    assert.equal(status.getAttribute('role'), 'status');
+    assert.equal(status.textContent.trim(), AWARD.status);
+    const describedBy = tonic.getAttribute('aria-describedby').split(' ');
+    assert.ok(describedBy.includes(reason.id) && describedBy.includes(status.id));
+    target.querySelector(':scope [data-requirement-alternative="gem"] button').click();
+    assert.deepEqual(chosen, ['gem'], 'an open tile still chooses');
+  });
+
+  it('keeps a short ingredient tile pressable beside an award slot', async () => {
+    const chosen = [];
+    const target = await harness.mount({
+      slots: [CHOICE, AWARD],
+      openSlotId: 'g-haft',
+      onChoose: (_slot, alternative) => {
+        chosen.push(alternative.id);
+      },
+    });
+    const bog = target.querySelector(':scope [data-requirement-alternative="bog"] button');
+    assert.equal(bog.disabled, false, 'short is dimmed, never disabled');
+    bog.click();
+    assert.deepEqual(chosen, ['bog']);
+  });
+
+  it('draws read-only award tiles as labelled images', async () => {
+    const target = await harness.mount({ slots: [AWARD], readOnly: true });
+    assert.equal(target.querySelectorAll(':scope [data-slot-kind="award"] button').length, 0);
+    const gem = target.querySelector(':scope [data-requirement-alternative="gem"] [role="img"]');
+    assert.equal(gem.getAttribute('aria-label'), 'Gem, ×2');
+  });
+});

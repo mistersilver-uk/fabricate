@@ -1510,7 +1510,7 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 
 - **WHEN** a GM authors alternatives inside a result set
 - **THEN** the group renders the same choice group used on the ingredient side
-- **AND** the player picks one of those alternatives when the craft resolves, the group being set to player-chooses
+- **AND** the player picks at award time: one under any one of, up to N under up to N
 
 #### Scenario: A GM opens a result set two tiers share
 
@@ -1594,8 +1594,8 @@ It resolves against the CRAFTING CHARACTER, the actor every other rolled amount 
 Where a roll awards more than one alternative, the selection expression is rolled ONCE PER AWARD rather than once for the group.
 A single roll would select the same alternative every time, which is not a selection at all.
 
-A roll that lands outside every authored range CLAMPS to the nearest one: below the lowest it selects the lowest alternative, above the highest it selects the highest.
-The ranges are a LADDER the roll is read against rather than a set of independent windows, so no authored group can produce nothing.
+A roll that lands below every range start selects the lowest alternative, and one above the highest end selects the highest.
+A roll selects the member with the highest range start at or below it, and a roll below every start selects the lowest, so no authored group can produce nothing.
 This is deliberately unlike outcome-tier routing, where a value no tier claims is a blocking GAP — a craft that has already succeeded must still award what it was routed to, so the group clamps rather than failing at the last step.
 
 A result-side choice group is NOT legal inside a `progressive` result group, and the surface MUST NOT offer its controls there.
@@ -1665,6 +1665,29 @@ The persisted shape of the chooser, the award strategy, N and replacement is out
 - **WHEN** a GM adds alternatives to a failure-role result set
 - **THEN** the group carries the chooser and the award strategy any other result set carries
 - **AND** the set stays selected by role rather than named by a tier
+
+#### Scenario: A player picks a reward at award time
+
+- **WHEN** a craft awards a group set to player-chooses
+- **THEN** nothing from it is awarded until the player picks
+- **AND** the pick renders through the requirement chooser's award face
+
+#### Scenario: A player picks fewer than N
+
+- **WHEN** the group is up to 2 under player-chooses
+- **THEN** the face accepts one or two picks
+- **AND** it refuses a third
+
+#### Scenario: A selection roll lands between two ranges
+
+- **WHEN** the roll falls in a hole between two authored ranges
+- **THEN** the group awards the member whose range start is highest at or below it
+
+#### Scenario: A rolled count comes up zero
+
+- **WHEN** N resolves to 0
+- **THEN** the group awards nothing
+- **AND** no choice is left pending
 
 ### Requirement: Every select renders the app’s own option list
 
@@ -1817,6 +1840,7 @@ The environment editor's validation tab was ADJUDICATED a different surface at i
 A requirement renders as a slot, and a slot is `fixed`, a `choice` or an essence slot.
 Its state is `met`, `partial` or `short`.
 At most one slot's chooser is open at a time.
+An `award` slot is a reward pick bounded by a ceiling; it has no met, partial or short state, and tiles past the ceiling are `disabled`.
 
 Where a requirement names a CLASS rather than a record — a tag requirement — the player still chooses which held item satisfies it, so every held item carrying the tag renders as a candidate.
 A candidate whose count falls short renders dimmed rather than hidden, because knowing what almost works is what tells a player what to go and find.
@@ -1841,6 +1865,12 @@ The shared chip states that ground as its `solid` emphasis, which a held-versus-
 - **WHEN** an essence's delivered total exceeds what its requirement asks
 - **THEN** a sentence beneath the source list names the essence and the surplus
 - **AND** the ratio beside the requirement states neither
+
+#### Scenario: A player reaches the reward ceiling
+
+- **WHEN** a player has picked N of an up-to-N award
+- **THEN** the unpicked tiles are disabled
+- **AND** a visible sentence states why
 
 ### Requirement: A multi-step flow inside the manager uses the shared modal
 
@@ -1938,7 +1968,8 @@ A PLAYER screen orders the app rail, a browse column carrying search and filters
 The identity header carries at most one primary action: zero is correct, and two never is.
 Its shipped composition is `apps/PlayerDetailHeader.svelte`, which renders the primary itself so that a caller cannot pass a second.
 A pane with no identity row of its own — the alchemy Workbench, the inventory bulk panel — still carries at most one primary, beside the flow it commits.
-The player window carries NO premium signal in any state, and a player-side chooser is a read-only mirror of the GM's authored group.
+The player window carries NO premium signal in any state.
+A player never authors a choice group, and MAY pick from a result-side choice group whose chooser is the player, at award time, through the requirement chooser's award face.
 
 #### Scenario: A new GM browse surface is built
 

@@ -73,6 +73,7 @@ const RAW_MODULES = [
   'src/utils/objectPath.js',
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
+  'src/utils/choiceGroupShape.js',
   'src/utils/rollFormulaRollability.js', // `Result.validate` proves a rolled amount through it.
   'src/utils/recipeCategories.js',
   // #1663: the ONE implementation behind both category shims; imports nothing.
