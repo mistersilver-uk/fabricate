@@ -10,23 +10,66 @@ export const ROLL_PROMPT = '.manager-modal[data-roll-prompt]';
 
 /**
  * Close every standing roll prompt through its own close control. Never Escape: with focus on the
- * page body Foundry answers it by opening its main menu over the next prompt.
+ * page body Foundry answers it by opening its main menu over the next prompt. The click is the
+ * DOM's own, because a prompt a failed case abandoned is the one Playwright could not act on, and
+ * teardown must not depend on the actionability that just failed.
  */
 export async function dismissStandingPrompts(page) {
-  const close = page.locator(`${ROLL_PROMPT} [data-manager-modal-close]`);
-  for (let attempt = 0; attempt < 5 && (await close.count()) > 0; attempt += 1) {
-    await close
-      .last()
-      .click({ timeout: 5000 })
-      .catch(() => {});
-    await page.waitForTimeout(200);
-  }
+  await page.evaluate((selector) => {
+    for (const close of document.querySelectorAll(`${selector} [data-manager-modal-close]`)) {
+      close.click();
+    }
+  }, ROLL_PROMPT);
+}
+
+/**
+ * What a standing prompt looks like to the page when Playwright cannot act on it: how many stand,
+ * where each is hosted, whether its box moves across frames, what covers its centre, and any
+ * disabling ancestor. Diagnostic only; it never throws.
+ */
+export async function describeStandingPrompts(page) {
+  return await page
+    .evaluate(async (selector) => {
+      const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+      const prompts = [...document.querySelectorAll(selector)];
+      const boxes = [];
+      for (let sample = 0; sample < 4 && prompts.length > 0; sample += 1) {
+        const { x, y, width, height } = prompts.at(-1).getBoundingClientRect();
+        boxes.push([x, y, width, height].map(Math.round).join(','));
+        await frame();
+      }
+      return {
+        visibility: document.visibilityState,
+        focused: document.hasFocus(),
+        boxes,
+        prompts: prompts.map((prompt) => {
+          const { x, y, width, height } = prompt.getBoundingClientRect();
+          const top = document.elementFromPoint(x + width / 2, y + height / 2);
+          const style = getComputedStyle(prompt);
+          return {
+            host: prompt.closest('.application')?.id || prompt.parentElement?.className || null,
+            disabledBy: prompt
+              .closest('[aria-disabled="true"], [inert], fieldset[disabled]')
+              ?.outerHTML?.slice(0, 120),
+            coveredBy: prompt.contains(top) ? null : (top?.outerHTML?.slice(0, 120) ?? null),
+            animation: style.animationName,
+            transition: style.transitionProperty,
+          };
+        }),
+      };
+    }, ROLL_PROMPT)
+    .catch((error) => ({ unreadable: error.message }));
 }
 
 /** Close every standing prompt and resolve once none is left, so the next prompt is one craft's. */
 export async function clearStandingPrompts(page, timeout = 30_000) {
   await dismissStandingPrompts(page);
-  await page.locator(ROLL_PROMPT).first().waitFor({ state: 'detached', timeout });
+  try {
+    await page.locator(ROLL_PROMPT).first().waitFor({ state: 'detached', timeout });
+  } catch (error) {
+    const seen = JSON.stringify(await describeStandingPrompts(page));
+    throw new Error(`a dismissed prompt still stands. The page saw: ${seen}`, { cause: error });
+  }
 }
 
 /**
@@ -230,14 +273,19 @@ export function withinTime(promise, ms, what) {
 export async function rollPublicly(page, { bonus = '', choice = null } = {}) {
   const prompt = page.locator(ROLL_PROMPT).last();
   await prompt.waitFor({ state: 'visible', timeout: 15_000 });
-  if (bonus) await prompt.locator('input[name="situationalBonus"]').fill(bonus);
-  await chooseSelectOption(page, prompt.locator('.mode-field .fabricate-select-trigger'), {
-    value: 'publicroll',
-  });
-  const button = choice
-    ? prompt.locator(`button[data-action="${choice}"]`)
-    : prompt.locator('button[type="submit"]');
-  await button.click();
+  try {
+    if (bonus) await prompt.locator('input[name="situationalBonus"]').fill(bonus);
+    await chooseSelectOption(page, prompt.locator('.mode-field .fabricate-select-trigger'), {
+      value: 'publicroll',
+    });
+    const button = choice
+      ? prompt.locator(`button[data-action="${choice}"]`)
+      : prompt.locator('button[type="submit"]');
+    await button.click();
+  } catch (error) {
+    const seen = JSON.stringify(await describeStandingPrompts(page));
+    throw new Error(`${error.message.split('\n', 1)[0]} The page saw: ${seen}`, { cause: error });
+  }
   await prompt.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
 }
 

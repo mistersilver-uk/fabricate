@@ -16,6 +16,7 @@ import {
   abandonCraft,
   clearStandingPrompts,
   craftAndCollect,
+  describeStandingPrompts,
   readBackAllRolls,
   rollPublicly,
   seedChatCardForge,
@@ -55,7 +56,10 @@ const ANSWERS = 4;
 /** The footer's Advantage button, present for every case but `off`, which offers none. */
 async function assertFooterOffer(page, caseId) {
   const prompt = page.locator(ROLL_PROMPT).last();
-  await prompt.waitFor({ state: 'visible', timeout: PROMPT_CEILING_MS });
+  await prompt.waitFor({ state: 'visible', timeout: PROMPT_CEILING_MS }).catch(async (error) => {
+    const seen = JSON.stringify(await describeStandingPrompts(page));
+    throw new Error(`${caseId}: no prompt showed. The page saw: ${seen}`, { cause: error });
+  });
   const hasAdvantage = (await prompt.locator('button[data-action="advantage"]').count()) > 0;
   if (caseId === 'off' && hasAdvantage) {
     throw new Error('off: the footer still offers an Advantage button');
