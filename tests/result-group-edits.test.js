@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { Result } from '../src/models/Result.js';
+import { awardRoutedResults } from '../src/systems/choiceGroupAward.js';
 import {
   convertToGroup,
   keepingRange,
@@ -21,6 +22,8 @@ import {
   withStrategy,
   withoutAlternative,
 } from '../src/ui/svelte/apps/manager/recipe/resultGroupEdits.js';
+
+import { scriptedFormulaRoll } from './helpers/scriptedFormulaRoll.js';
 
 const ROW = Object.freeze({ id: 'r1', componentId: 'ore', quantity: 2, quantityFormula: '1d4' });
 const converted = () => convertToGroup(ROW, 'currency', 'm1', 'm2');
@@ -77,7 +80,7 @@ describe('convert and unwrap', () => {
 });
 
 describe('the header’s settings', () => {
-  it('rolled writes no ranges and no expression; player-chooses drops both and repeats', () => {
+  it('rolled writes the chooser alone; the player hides the rest, and back restores it', () => {
     const rolled = withChooser(converted(), 'rolled');
     assert.deepEqual(rolled, { ...converted(), chooser: 'rolled' });
     const authored = withRepeats(
@@ -87,11 +90,15 @@ describe('the header’s settings', () => {
       ),
       true
     );
-    assert.deepEqual(withChooser(authored, 'playerChooses'), {
-      ...converted(),
-      awardStrategy: 'upTo',
-      awardCount: 2,
-    });
+    const { chooser: _chooser, ...hidden } = authored;
+    const player = withChooser(authored, 'playerChooses');
+    assert.deepEqual(player, hidden, 'the expression, every range and repeats stay in the draft');
+    assert.deepEqual(withChooser(player, 'rolled'), authored, 'switching back restores them');
+  });
+
+  it('switching to rolled keeps a rolled N', () => {
+    const counted = withCount(withStrategy(converted(), 'upTo'), { quantityFormula: '1d3' });
+    assert.deepEqual(withChooser(counted, 'rolled'), { ...counted, chooser: 'rolled' });
   });
 
   it('up to N opens on a fixed two; any one of drops N and repeats', () => {
@@ -174,6 +181,8 @@ describe('every cell saves and reads back unchanged', () => {
     'player, up to N': () => withStrategy(converted(), 'upTo'),
     'rolled, any one of': () => rolledBase(),
     'rolled, up to N with repeats': () => withRepeats(withStrategy(rolledBase(), 'upTo'), true),
+    'rolled, up to a rolled N': () =>
+      withCount(withStrategy(rolledBase(), 'upTo'), { quantityFormula: '1d2' }),
   };
 
   for (const [cell, build] of Object.entries(CELLS)) {
@@ -187,6 +196,7 @@ describe('every cell saves and reads back unchanged', () => {
         'chooser',
         'awardStrategy',
         'awardCount',
+        'awardCountFormula',
         'withReplacement',
         'selectionFormula',
       ]) {
@@ -197,12 +207,55 @@ describe('every cell saves and reads back unchanged', () => {
     });
   }
 
-  it('switching rolled, up to N and repeats to the player serialises no repeats', () => {
+  it('a player group saved with the roll’s settings hidden in its draft writes none of them', () => {
     const repeats = named(withRepeats(withStrategy(rolledBase(), 'upTo'), true));
     const json = Result.fromJSON(withChooser(repeats, 'playerChooses')).toJSON();
     assert.equal(Object.hasOwn(json, 'withReplacement'), false);
     assert.equal(Object.hasOwn(json, 'selectionFormula'), false);
     assert.ok(json.alternatives.every((member) => !Object.hasOwn(member, 'selectionRange')));
+    assert.deepEqual(Result.fromJSON(json).validate().errors, []);
+  });
+});
+
+describe('the engine reads an edited group as authored', () => {
+  const crafter = { getRollData: () => ({}) };
+  const rolledBase = () =>
+    withSelection(
+      ranged(withChooser(converted(), 'rolled'), { from: 1, to: 10 }, { from: 11, to: 20 }),
+      '1d20'
+    );
+  const award = async (draft, script) => {
+    const awarded = [];
+    const saved = Result.fromJSON(draft).toJSON();
+    const answer = await awardRoutedResults([{ id: 'set', results: [saved] }], {
+      actor: crafter,
+      Roll: scriptedFormulaRoll(script).Roll,
+      awardOne: async (result, carrier) => awarded.push([result.id, carrier?.id ?? null]),
+    });
+    return { ...answer, awarded };
+  };
+
+  it('a player group whose draft hides ranges becomes one pending choice of both members', async () => {
+    const hidden = withChooser(withStrategy(rolledBase(), 'upTo'), 'playerChooses');
+    const { pendingAwardChoices, awarded } = await award(hidden, {});
+    assert.deepEqual(awarded, []);
+    assert.equal(pendingAwardChoices.length, 1);
+    const [choice] = pendingAwardChoices;
+    assert.deepEqual([choice.awardStrategy, choice.count], ['upTo', 2]);
+    assert.deepEqual(
+      choice.alternatives.map((member) => member.id),
+      ['m1', 'm2']
+    );
+  });
+
+  it('a rolled group under a rolled N draws its count, then a selection per award', async () => {
+    const draft = withCount(withStrategy(rolledBase(), 'upTo'), { quantityFormula: '1d2' });
+    const { awarded, groupAwards } = await award(draft, { '1d2': [2], '1d20': [15, 3] });
+    assert.deepEqual(awarded, [
+      ['m2', 'r1'],
+      ['m1', 'r1'],
+    ]);
+    assert.equal(groupAwards[0].count, 2);
   });
 });
 

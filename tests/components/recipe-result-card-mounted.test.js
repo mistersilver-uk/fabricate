@@ -593,7 +593,7 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     ]);
   });
 
-  it('up to N by roll offers repeats, defaulting to unique; back to the player drops them', async () => {
+  it('up to N by roll offers repeats, defaulting to unique; the player hides them until rolled again', async () => {
     const { target, groups } = await mountGroup({ ...PLAYER_GROUP, chooser: 'rolled' });
     chooseSelectOption(target, '[data-recipe-group-strategy]', 'upTo');
     await settle();
@@ -618,8 +618,19 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
       ...PLAYER_GROUP,
       awardStrategy: 'upTo',
       awardCount: 2,
+      withReplacement: true,
+      selectionFormula: '1d20',
     });
     assert.ok(!repeats(), 'a player picking from a list they can see cannot repeat');
+    assert.ok(!target.querySelector('[data-recipe-group-selection]'), 'nor sees a selection roll');
+
+    await choose(chooserRadio(target, 'rolled'));
+    assert.equal(repeats().getAttribute('data-recipe-group-repeats'), 'repeats', 'restored');
+    assert.equal(target.querySelector('[data-recipe-group-selection]').value, '1d20');
+    repeats().click();
+    await settle();
+    assert.equal(Object.hasOwn(groups.at(-1).results[0], 'withReplacement'), false, 'unique');
+    assert.equal(repeats().getAttribute('data-recipe-group-repeats'), 'unique');
   });
 
   it('re-picking the current strategy keeps the rolled N and repeats, writing nothing', async () => {

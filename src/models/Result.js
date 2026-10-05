@@ -177,11 +177,13 @@ export class Result {
     // Present makes this result a choice group; each setting is kept only in the cell that reads
     // it, so a group unwrapped or switched to another cell drops it (Result requirement 11).
     const group = isChoiceGroup(data);
-    this.alternatives = group ? data.alternatives.map((member) => new Result(member)) : null;
     this.chooser = group ? (data.chooser ?? GROUP_CHOOSERS[0]) : null;
     this.awardStrategy = group ? (data.awardStrategy ?? GROUP_AWARD_STRATEGIES[0]) : null;
     const upTo = this.awardStrategy === 'upTo';
     const rolled = this.chooser === 'rolled';
+    // A member's range is read only under a roll, so a draft's hidden ranges are not saved.
+    const member = (entry) => new Result(rolled ? entry : { ...entry, selectionRange: null });
+    this.alternatives = group ? data.alternatives.map(member) : null;
     this.awardCount = upTo ? (data.awardCount ?? null) : null;
     this.awardCountFormula = upTo ? normalizeQuantityFormula(data.awardCountFormula) : null;
     this.selectionFormula = rolled ? normalizeQuantityFormula(data.selectionFormula) : null;

@@ -51,11 +51,14 @@ export function withoutAlternative(group, index) {
   return rest.length === 1 ? withoutRange(rest[0]) : { ...group, alternatives: rest };
 }
 
-/** Rolled writes no expression and no ranges; player-chooses drops both, and repeats with them. */
+/**
+ * Rolled writes the chooser alone. Under the player the expression, the ranges and repeats stay in
+ * the draft, hidden, so switching back restores them; `Result` saves none of them there.
+ */
 export function withChooser(group, chooser) {
   if (chooser === 'rolled') return { ...group, chooser: 'rolled' };
-  const { chooser: _c, selectionFormula: _s, withReplacement: _w, ...rest } = group;
-  return { ...rest, alternatives: rest.alternatives.map(withoutRange) };
+  const { chooser: _c, ...rest } = group;
+  return rest;
 }
 
 /** Up to N opens on a fixed N of two; any one of drops N and repeats; the current one is `group`. */

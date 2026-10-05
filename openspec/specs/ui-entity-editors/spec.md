@@ -396,7 +396,7 @@ The group's header is one `role="group"` described by its help line, and its fir
 - Who chooses: a segmented control, **Player chooses** | **Rolled**, which moves whole to its own line where the box is too narrow for one.
 
 Under a roll a second line carries the **Selection** expression, and the help line restates the cell in prose.
-Switching to rolled writes no ranges and no expression; switching to the player drops the expression, every range and repeats; switching to any one of drops N and repeats.
+Switching to rolled writes no range and no expression of its own; switching to the player hides the expression, every range and repeats, which the draft keeps so that switching back restores them and the save does not write; switching to any one of drops N and repeats.
 Removing alternatives down to one unwraps the group into that alternative, without the group's settings or its range.
 Focus moves to that row's `or…` control, never to the document.
 Removing any other result row, or an alternative from a group that stays a group, moves focus to the first control of the row taking its place, else of the row before it, else to the set's adder.
