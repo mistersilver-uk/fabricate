@@ -41,9 +41,9 @@
   // which the acting player cannot see (issue 901). The projection only ever sets
   // it for a GM viewer, so no player-facing branch depends on it.
   const blindSecretPreview = $derived(run?.blindSecretPreview === true);
-  // The projection answers this from the engine's own automatic-stage predicate (issue 1644).
+  // The projection answers this from the world-time scan's own eligibility (issue 1644).
   const completesAsTimePasses = $derived(run?.completesAsTimePasses === true);
-  const boltLabel = localize('FABRICATE.App.Journal.WorldClock.CompletesAsTimePasses');
+  const boltLabel = localize('FABRICATE.App.Journal.WorldClock.FinishesStageAsTimePasses');
 
   const availableAt = $derived(Number(run?.timeGate?.availableAt));
   const requiredSeconds = $derived(Number(run?.timeGate?.requiredSeconds));

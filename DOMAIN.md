@@ -1778,7 +1778,8 @@ Conflicting nonempty evidence leaves that field unknown rather than falling thro
 
 **Completion Mode** is a run-level preference: `manual` asks the player to execute a ready stage, while `worldTime` permits eligible completion when world time advances.
 The switch may appear during a no-check countdown even with unresolved materials; its visibility is not permission to spend them automatically.
-Automatic crafting stops without spending on material, currency, choice, essence, Tool or player-check requirements and on validation failures, retaining the preference.
+Automatic crafting stops without spending, retaining the preference: the automatic blocker refuses a stage whose selected ingredient set holds any ingredient group, whether an item, a currency option or a choice of options, a stage or recipe Tool, or a player check in the recipe's system; an owed claimable award pick holds the world-time scan; and an essence requirement or any other unmet requirement stops at the stage's own validation.
+A run **finishes its current stage as time passes** when the world-time scan will take it once its gate passes and that stage carries no automatic blocker; the Journal marks it with a bolt, and a later stage may still stop.
 Pause freezes the remaining gate time, including zero; resume reanchors it at the current world time, and neither manual nor automatic execution advances a paused run.
 Cancellation remains possible while paused, retains completed spending and awards, and forfeits elapsed time without refunding unspent inputs.
 Public crafting preserves one-call execution when the stage is ready and all choices are supplied, through the same version-1 authority boundary; Journal start controls may leave a run awaiting manual execution.

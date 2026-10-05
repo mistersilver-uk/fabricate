@@ -1393,7 +1393,7 @@
         },
         "WorldClock": {
           "Label": "World time",
-          "CompletesAsTimePasses": "Completes as time passes"
+          "FinishesStageAsTimePasses": "Finishes this stage as time passes"
         },
         "Notice": {
           "PausedTitle": "Run paused",

@@ -727,7 +727,7 @@ export function journalLifecycleCases() {
         expectAttributes: ['aria-label', 'data-tooltip'].map((name) => ({
           selector: `[data-run-id="lab-v1-waiting-auto-completes"] ${bolt}`,
           name,
-          value: 'Completes as time passes',
+          value: 'Finishes this stage as time passes',
         })),
       }),
       ...(state === 'filter-paused' && { expectCenterHit: steps[state].at(-1).selector }),

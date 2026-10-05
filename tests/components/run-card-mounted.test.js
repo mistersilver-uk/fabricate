@@ -302,10 +302,10 @@ describe('RunCard mounted behavior', () => {
     }
   });
 
-  // Issue 1644: the projection's `completesAsTimePasses` is the engine's own automatic-stage
-  // predicate, so the card draws exactly what it is given and invents no rule of its own.
-  it('draws the named bolt before the status chip only for a run that completes as time passes', async () => {
-    const boltKey = 'FABRICATE.App.Journal.WorldClock.CompletesAsTimePasses';
+  // Issue 1644: the projection's `completesAsTimePasses` is the world-time scan's own eligibility,
+  // so the card draws exactly what it is given and invents no rule of its own.
+  it('draws the named bolt before the status chip only for a run that finishes its stage as time passes', async () => {
+    const boltKey = 'FABRICATE.App.Journal.WorldClock.FinishesStageAsTimePasses';
     const target = await harness.mount({ run: { ...makeCraftingRun(), completesAsTimePasses: true }, now: 0 });
     const bolt = target.querySelector('[data-run-completes-as-time-passes]');
     assert.ok(Boolean(bolt), 'the bolt renders');
@@ -327,7 +327,7 @@ describe('RunCard mounted behavior', () => {
     const card = target.querySelector('.journal-run-card');
     assert.ok(!card.hasAttribute('aria-label') && !card.hasAttribute('aria-labelledby'));
     const name = nameFromContent(card).replaceAll(/\s+/g, ' ');
-    assert.match(name, /Healing Potion FABRICATE\.App\.Journal\.WorldClock\.CompletesAsTimePasses/);
+    assert.match(name, /Healing Potion FABRICATE\.App\.Journal\.WorldClock\.FinishesStageAsTimePasses/);
   });
 
   it('invokes onSelect with the composite-identity run on click', async () => {

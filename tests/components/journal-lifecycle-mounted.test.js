@@ -1649,7 +1649,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
         assert.equal(bolts[0].closest('[data-run-id]').dataset.runId, selectedId);
         assert.equal(
           bolts[0].getAttribute('aria-label'),
-          english.FABRICATE.App.Journal.WorldClock.CompletesAsTimePasses
+          english.FABRICATE.App.Journal.WorldClock.FinishesStageAsTimePasses
         );
       }
       if (HISTORY_DATA_WITNESS[state]) {
