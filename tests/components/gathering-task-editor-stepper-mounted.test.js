@@ -118,6 +118,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
+    // The task's identity art and its depleted-marker art (issue 1522).
+    'src/ui/svelte/components/ArtPicker.svelte',
     EDITOR_PATH,
   ],
   componentPath: EDITOR_PATH,
@@ -899,5 +901,85 @@ describe('the gathering task result row is the requirement row (issue 1516)', ()
     assert.ok(reopened.row().querySelector(':scope [data-recipe-option-amount-mode="rolled"] input').checked);
     assert.equal(reopened.row().querySelector('[data-recipe-option-formula]').value, '1d4+1');
     assert.equal(saved.results[0].quantity, 3, 'quantity is unchanged');
+  });
+});
+
+describe('the depleted-marker art picker (issue 1522)', () => {
+  /** A node task whose depleted marker shows `swapImage`, recording every `onUpdateTask` patch. */
+  async function mountDepleted(swapImage, pickedPath = null) {
+    const updates = [];
+    const fixture = taskFixture();
+    const nodes = swapImage ? { ...fixture.nodes, depletedBehavior: { swapImage } } : fixture.nodes;
+    const root = await harness.mount({
+      task: { ...fixture, nodes },
+      nodesEnabled: true,
+      onPickImagePath: async () => pickedPath,
+      onUpdateTask: (patch) => {
+        updates.push(patch);
+      },
+    });
+    const picker = () => root.querySelector('[data-gathering-task-depleted-image]');
+    return { root, updates, picker };
+  }
+
+  it('clears the marker art on a right-click of the art, preventing the context menu', async () => {
+    const view = await mountDepleted('marker.webp');
+    assert.equal(view.picker().querySelector('img').getAttribute('src'), 'marker.webp');
+    const menu = new globalThis.MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    view.picker().dispatchEvent(menu);
+    assert.ok(menu.defaultPrevented, 'the browser menu never opens over the art');
+    assert.deepEqual(view.updates.at(-1)?.nodes?.depletedBehavior, null);
+  });
+
+  it('clears it from the visible Remove image button too', async () => {
+    const view = await mountDepleted('marker.webp');
+    const clear = view.root.querySelector('[data-gathering-task-depleted-image-clear]');
+    assert.equal(clear.textContent.trim(), 'Remove image');
+    clear.click();
+    assert.deepEqual(view.updates.at(-1)?.nodes?.depletedBehavior, null);
+  });
+
+  it('draws an empty slot with nothing to clear, and a pick writes the chosen path', async () => {
+    const view = await mountDepleted('', 'picked.webp');
+    assert.ok(view.picker().classList.contains('is-empty'));
+    assert.ok(!view.root.querySelector('[data-gathering-task-depleted-image-clear]'));
+    view.picker().dispatchEvent(new globalThis.MouseEvent('contextmenu', { bubbles: true }));
+    assert.equal(view.updates.length, 0, 'a right-click on an empty slot writes nothing');
+    view.picker().click();
+    await new Promise((done) => setTimeout(done, 0));
+    assert.deepEqual(view.updates.at(-1)?.nodes?.depletedBehavior, { swapImage: 'picked.webp' });
+  });
+});
+
+describe('the task identity art picker (issue 1522)', () => {
+  it('draws the task art under its name, and a pick writes the chosen path', async () => {
+    const updates = [];
+    const opened = [];
+    const root = await harness.mount({
+      task: { ...taskFixture(), img: 'icons/task.webp' },
+      onPickImagePath: async (current) => {
+        opened.push(current);
+        return 'icons/picked.webp';
+      },
+      onUpdateTask: (patch) => {
+        updates.push(patch);
+      },
+    });
+    const tile = root.querySelector(':scope .manager-task-core-grid .fab-art-picker-tile');
+    assert.equal(tile.getAttribute('aria-label'), 'Choose task image');
+    assert.equal(tile.querySelector('img').getAttribute('src'), 'icons/task.webp');
+    assert.equal(tile.disabled, false, 'a host with a file picker can open it');
+    tile.click();
+    await new Promise((done) => setTimeout(done, 0));
+    assert.deepEqual(opened, ['icons/task.webp'], 'the picker opens on the stored art');
+    assert.deepEqual(updates.at(-1), { img: 'icons/picked.webp' });
+  });
+
+  it('disables the identity art and the depleted marker when the host has no file picker', async () => {
+    const root = await harness.mount({ task: taskFixture(), nodesEnabled: true });
+    const identity = root.querySelector(':scope .manager-task-core-grid .fab-art-picker-tile');
+    const depleted = root.querySelector(':scope [data-gathering-task-depleted-image]');
+    assert.equal(identity.disabled, true, 'the identity art cannot open a picker');
+    assert.equal(depleted.disabled, true, 'nor can the depleted marker');
   });
 });

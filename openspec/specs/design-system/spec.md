@@ -912,6 +912,7 @@ Destructive confirmation defaults to `confirmDialog`; arm-then-confirm is a carv
 There is no URL and no router, so page state, filter state and navigation MUST live in an app-level store and a primitive MUST NOT expose an in-app `href`.
 
 A control that selects a world asset path MUST render the ASSET and a browse action, never the stored path string.
+Its one implementation is `src/ui/svelte/components/ArtPicker.svelte`.
 Foundry owns the picker dialog, the path is an implementation detail, and a long path destroys the row it sits in.
 
 A native `select` renders its option popup through the operating system, which reaches it only through the control’s own computed background and `color-scheme`, and differs by browser and platform even then.
@@ -1738,10 +1739,11 @@ It is a PROP rather than a variant so a caller states that judgement at the call
 
 ### Requirement: Art that is an identity is picked as a picture
 
-Where art IS the identity of a record — a component, an essence, a recipe — the control MUST render the picture itself at a size worth looking at and MUST NOT render the stored path.
+Where art IS the identity of a record — a recipe, a gathering task, a gathering event, an environment — the control MUST render the picture itself at a size worth looking at and MUST NOT render the stored path.
+That control is `ArtPicker`.
 The filled state MUST carry an explicit edit affordance — a pencil — because a picture with nothing on it does not read as a control, and the empty slot is legible as actionable while the filled one is not.
-Empty is a dashed square that reads as a slot; filled is the art carrying an edit affordance revealed on hover and on focus.
-The path-bearing variant exists only where the record’s identity is something else and the art is an attribute of it.
+Empty is a dashed square that reads as a slot; filled is the art carrying an edit affordance present at rest and emphasised on hover and on focus; locked is the art with a padlock and no control; clear is an optional action.
+Where art is an attribute rather than the identity (a gathering task’s depleted-marker art), the same control is used.
 
 ### Requirement: A table is used only where columns are compared
 

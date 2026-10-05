@@ -105,13 +105,17 @@ describe('RecipeEditView identity-only single column', () => {
     {
       // The card-stack chrome is gone: micro-labels over unwrapped fields (issue 643).
       spellsNo: ['manager-task-core-card'],
-      spells: ['manager-recipe-micro-label', 'manager-task-image-picker'],
-      renders: ['ToggleCard', 'RecipeDurationSteppers', 'Select'],
+      spells: ['manager-recipe-micro-label'],
+      // The recipe art is the shared art picker (issue 1522), its hook handed over as `pickProps`.
+      renders: ['ToggleCard', 'RecipeDurationSteppers', 'Select', 'ArtPicker'],
       // The category control became a `Select` call site at issue 1847, so the hook this row used
       // to find as a WRITTEN attribute is handed to the primitive as trigger data instead. The
       // clause moves with it rather than being dropped: the hook is what every other suite finds
       // the control by.
-      passesProps: [['Select', 'triggerProps']],
+      passesProps: [
+        ['Select', 'triggerProps'],
+        ['ArtPicker', 'pickProps'],
+      ],
       spellsExactly: ['data-recipe-category-select'],
       // The issue-658 retrofit is a byte-faithful DOM no-op, so the section/field markers moved
       // from inlined attributes onto props.
@@ -124,7 +128,6 @@ describe('RecipeEditView identity-only single column', () => {
         ['field', 'locked'],
         ['data-recipe-field', 'name'],
         ['data-recipe-field', 'description'],
-        ['data-recipe-field', 'img'],
       ],
     }
   );
@@ -962,7 +965,7 @@ describe('RecipeEditView keeps the recipe image always editable', () => {
       namesNo: ['isRecipeItemLinked'],
       spellsNo: ['is-recipe-item-linked'],
       writesNo: ['data-recipe-item-locked-image'],
-      attributes: [['data-recipe-field', 'img']],
+      passesPropsNo: [['ArtPicker', 'locked']],
       names: ['onChooseImage'],
     }
   );

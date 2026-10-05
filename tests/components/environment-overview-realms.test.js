@@ -91,6 +91,8 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     writeRawModule('src/ui/svelte/util/gatheringFormat.js');
     writeRawModule('src/ui/svelte/apps/manager/environment/environmentSelectOptions.js');
     writeCompiledSvelte('src/ui/svelte/components/StatusToggle.svelte');
+    // The identity art (issue 1522).
+    writeCompiledSvelte('src/ui/svelte/components/ArtPicker.svelte');
     // The realm and biome rows render the shared chip as of issue 1515, and their add controls plus
     // the danger picker render the shared `<Select>` as of issue 1510. A `.svelte` this tree
     // renders but this list omits does not FAIL this suite - the temp tree dies on

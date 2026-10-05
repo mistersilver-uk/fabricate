@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import ArtPicker from '../../components/ArtPicker.svelte';
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -1087,20 +1088,16 @@
       </div>
       <div class="manager-task-core-grid">
         <div class="manager-task-media-column">
-          <button
-            type="button"
-            data-keyboard-focus="true"
-            class="manager-task-image-picker"
-            aria-label={text(
+          <ArtPicker
+            class="manager-task-art"
+            art={taskImage()}
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Environment.Tasks.ChooseImage',
               'Choose task image'
             )}
-            onclick={chooseTaskImage}
+            onPick={chooseTaskImage}
             disabled={typeof onPickImagePath !== 'function'}
-          >
-            <img src={taskImage()} alt="" />
-            <i class="fas fa-pen" aria-hidden="true"></i>
-          </button>
+          />
 
           <div class="manager-task-core-status">
             <StatusToggle
@@ -1717,52 +1714,27 @@
               </p>
             </div>
 
-            <div
-              class="manager-task-depleted-image-column"
-              data-gathering-task-depleted-image-column
-            >
-              <button
-                type="button"
-                data-keyboard-focus="true"
-                class="manager-task-image-picker manager-task-depleted-image-picker"
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.Economy.DepletedSwapImagePick',
-                  'Choose depleted marker image'
-                )}
-                onclick={chooseDepletedImage}
-                oncontextmenu={onDepletedImageContextMenu}
-                disabled={typeof onPickImagePath !== 'function'}
-                data-gathering-task-depleted-image
-              >
-                {#if depletedSwapImage}
-                  <img src={depletedSwapImage} alt="" />
-                {:else}
-                  <i class="fas fa-image" aria-hidden="true"></i>
-                {/if}
-                <i class="fas fa-pen" aria-hidden="true"></i>
-              </button>
-              {#if depletedSwapImage}
-                <button
-                  type="button"
-                  data-keyboard-focus="true"
-                  class="manager-link-button manager-task-depleted-image-clear"
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.Economy.DepletedSwapImageClear',
-                    'Remove image'
-                  )}
-                  onclick={clearDepletedImage}
-                  data-gathering-task-depleted-image-clear
-                >
-                  <i class="fas fa-xmark" aria-hidden="true"></i>
-                  <span
-                    >{text(
-                      'FABRICATE.Admin.Manager.Economy.DepletedSwapImageClear',
-                      'Remove image'
-                    )}</span
-                  >
-                </button>
-              {/if}
-            </div>
+            <ArtPicker
+              class="manager-task-art"
+              data-gathering-task-depleted-image-column=""
+              art={depletedSwapImage}
+              ariaLabel={text(
+                'FABRICATE.Admin.Manager.Economy.DepletedSwapImagePick',
+                'Choose depleted marker image'
+              )}
+              onPick={chooseDepletedImage}
+              disabled={typeof onPickImagePath !== 'function'}
+              onClear={clearDepletedImage}
+              clearLabel={text(
+                'FABRICATE.Admin.Manager.Economy.DepletedSwapImageClear',
+                'Remove image'
+              )}
+              pickProps={{
+                'data-gathering-task-depleted-image': '',
+                oncontextmenu: onDepletedImageContextMenu,
+              }}
+              clearProps={{ 'data-gathering-task-depleted-image-clear': '' }}
+            />
           </div>
         </div>
       </section>
@@ -2883,26 +2855,6 @@
   .manager-task-depleted-copy {
     flex: 1 1 auto;
     min-width: 0;
-  }
-
-  /* The image picker plus the "Remove image" button stack vertically, so the clear control sits
-     directly underneath the thumbnail. */
-  .manager-task-depleted-image-column {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--fab-space-1);
-  }
-
-  .manager-task-depleted-image-picker {
-    flex: 0 0 auto;
-  }
-
-  .manager-task-depleted-image-clear {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--fab-space-1);
   }
 
   /* Cost field sits beside the per-actor modifiers; captions align at the top so the cost input

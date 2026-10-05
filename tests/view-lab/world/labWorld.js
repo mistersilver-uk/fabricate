@@ -377,6 +377,25 @@ function blockHerbalism(content) {
   system.craftingCheck = { ...check, progressive: { ...check.progressive, rollFormula: '' } };
 }
 
+/** Prospect the Seam's depleted-marker art, for the art picker's filled frame (issue 1522). */
+function seedDepletedImage(content) {
+  const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.SMITHING];
+  const withImage = (entry) =>
+    entry.id === 'sm-task-prospect'
+      ? {
+          ...entry,
+          nodes: {
+            ...entry.nodes,
+            depletedBehavior: {
+              swapImage: `${ICON_BASE}/environment/wilderness/cave-entrance-mountain.webp`,
+            },
+          },
+        }
+      : entry;
+  slice.tasks = slice.tasks.map(withImage);
+  content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(withImage);
+}
+
 function seedCheckOverride(content, state) {
   const spec = CHECK_OVERRIDE_STATES[state];
   if (!spec) return;
@@ -643,6 +662,7 @@ function stripAuthoredWorldComponents(content) {
  *   for two groups drawn by roll, or `reward-tiers` for a Runeblade tier paying a commission.
  * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
  *   {@link seedLearnableBook}.
+ * @param {boolean} [options.depletedImage] See {@link seedDepletedImage}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
@@ -664,6 +684,7 @@ export async function buildLabWorld({
   resultRowState = null,
   learnableBook = false,
   systemBlocked = false,
+  depletedImage = false,
 } = {}) {
   const content = buildLabContent({ journalCaseState });
   if (
@@ -678,6 +699,7 @@ export async function buildLabWorld({
   seedRuneworkCheckMode(content, runeworkCheckMode);
   seedCheckOverride(content, checkOverride);
   if (systemBlocked) blockHerbalism(content);
+  if (depletedImage) seedDepletedImage(content);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.

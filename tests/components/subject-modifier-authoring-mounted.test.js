@@ -366,6 +366,8 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
+    // The task's identity and depleted-marker art (issue 1522).
+    'src/ui/svelte/components/ArtPicker.svelte',
     GATHERING_PATH,
   ],
   componentPath: GATHERING_PATH,

@@ -9,6 +9,7 @@
 -->
 <script>
   import { untrack } from 'svelte';
+  import ArtPicker from '../../../components/ArtPicker.svelte';
   import Button from '../../../components/Button.svelte';
   import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
@@ -448,17 +449,13 @@
     <div class="manager-recipe-overview-media">
       <!-- Always editable: a recipe can belong to many books & scrolls, so its image mirrors no
            single linked recipe item. -->
-      <button
-        type="button"
-        class="manager-task-image-picker manager-recipe-overview-image"
-        data-recipe-field="img"
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.ChooseImage', 'Choose recipe image')}
-        onclick={onChooseImage}
+      <ArtPicker
+        art={recipeImage(img)}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.ChooseImage', 'Choose recipe image')}
+        onPick={onChooseImage}
         disabled={typeof onPickImagePath !== 'function' || saving}
-      >
-        <img src={recipeImage(img)} alt="" />
-        <i class="fas fa-pen" aria-hidden="true"></i>
-      </button>
+        pickProps={{ 'data-recipe-field': 'img' }}
+      />
     </div>
     <div class="manager-recipe-overview-fields">
       <label class="manager-recipe-field" for="manager-recipe-edit-name">
