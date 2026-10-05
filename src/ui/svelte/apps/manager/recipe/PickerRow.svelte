@@ -18,6 +18,7 @@
   | `rollable` / `removable` | booleans | `false` / `true` | The Fixed \| Rolled toggle on a `component` or `currency` row; and the remove button. |
   | `reward` | boolean | `false` | A result surface's row: a named currency row opens its naming body and a knowledge row its help line, `PickerRowRewardBody.svelte`, beneath it. A knowledge row naming a recipe absent from `catalogue` draws the missing face. |
   | `allowAny` | boolean | `false` | The `or…` kind menu, `PickerRowKindMenu.svelte`, after the amount and a divider, offering `kinds`. |
+  | `menuHeading` / `menuHint` | localized strings | `''` | That menu's eyebrow and its trigger's tooltip; empty reads the ingredient side's. |
   | `clearable` / `removeHook` | boolean / string | `true` / `'alternative'` | The named pill's clear; and the remove's `data-recipe-remove` value. The remove is `Remove {name}` and the kind select `Kind of {name}`, `{name}` being the subject's or, unnamed, the kind's. |
   | `nameProps` / `removeProps` | attribute objects | `{}` | A caller's own hooks on the name field and on the remove, spread before the row's own. |
 
@@ -87,6 +88,8 @@
     removeProps = {},
     class: className = '',
     allowAny = false,
+    menuHeading = '',
+    menuHint = '',
     reward = false,
     trailing = null,
     onChange = () => {},
@@ -380,7 +383,7 @@
 
     {#if allowAny}
       <span class="manager-recipe-option-divider" aria-hidden="true"></span>
-      <PickerRowKindMenu {kinds} {disabled} {onSelect} />
+      <PickerRowKindMenu {kinds} {disabled} heading={menuHeading} hint={menuHint} {onSelect} />
     {/if}
 
     <!-- One line, so a row with no `trailing` gains no text node. -->

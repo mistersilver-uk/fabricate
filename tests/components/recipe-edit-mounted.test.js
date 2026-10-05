@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  CHOICE_GROUP_RAW_MODULES,
+  CHOICE_GROUP_COMPILED_MODULES,
   createMountedComponentHarness,
   KIND_MENU_COMPILED_MODULES,
   KIND_MENU_RAW_MODULES,
@@ -137,6 +139,7 @@ const RAW_MODULES = [
   'src/utils/fillPlaceholders.js',
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   ...KIND_MENU_RAW_MODULES,
+  ...CHOICE_GROUP_RAW_MODULES,
   // A progressive stage row draws its component's complications read-only (issue 1286).
   'src/ui/model/complicationSummary.js',
   'src/systems/characterPrerequisites.js',
@@ -183,6 +186,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte',
   ...KIND_MENU_COMPILED_MODULES,
+  ...CHOICE_GROUP_COMPILED_MODULES,
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
@@ -3877,6 +3881,11 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(
       box.classList.contains('has-alternatives'),
       'a multi-alternative requirement renders the alternatives box'
+    );
+    // Scenario "A GM authors an ingredient-side choice group" (issue 1773).
+    assert.ok(
+      !box.querySelector('[data-recipe-group-header], [data-recipe-group-chooser]'),
+      'an ingredient-side group renders neither a chooser nor an award strategy'
     );
     editHarness.remount();
   });

@@ -5,6 +5,8 @@ import { resolve } from 'node:path';
 import { tick } from 'svelte';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
+  CHOICE_GROUP_RAW_MODULES,
+  CHOICE_GROUP_COMPILED_MODULES,
   createMountedComponentHarness,
   KIND_MENU_COMPILED_MODULES,
   KIND_MENU_RAW_MODULES,
@@ -82,6 +84,7 @@ const harness = createMountedComponentHarness({
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...KIND_MENU_RAW_MODULES,
+    ...CHOICE_GROUP_RAW_MODULES,
   ],
   runeModules: TYPEAHEAD_RUNE_MODULES,
   compiledModules: [
@@ -118,6 +121,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
     'src/ui/svelte/components/Field.svelte',
     ...KIND_MENU_COMPILED_MODULES,
+    ...CHOICE_GROUP_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     // The shared scoped-entity patterns the Tool Studio is converted onto (issue 1362).
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',

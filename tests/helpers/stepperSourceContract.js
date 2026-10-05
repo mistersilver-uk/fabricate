@@ -201,6 +201,15 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
       + 'only pointer path to the value, so it stays',
     spinnerSuppressed: false,
   }),
+  Object.freeze({
+    path: 'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
+    register: 'R4',
+    reason:
+      'a rolled choice group member\'s two range bounds (issue 1773): roll values are typed, and '
+      + 'two steppers would more than double the cell in a row already carrying the amount '
+      + 'stepper; with no adjuncts the native spinner is their only pointer path, so it stays',
+    spinnerSuppressed: false,
+  }),
 ]);
 
 /** The shared panel that renders the bounds row, once, for both scopes (issue 1707). */

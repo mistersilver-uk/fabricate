@@ -257,16 +257,18 @@ test('the inputs every property below quantifies over are alive', () => {
   // once the inspector action button became the button primitive at full width.
   // 76 as of issue 1782: `Meter` and `BandedBar`, each on three and two importers; 77 with
   // `RuleRow` on its two; 76 once issue 1521 folded the explainer card onto the callout's `items`;
-  // 77 with `SetPicker` on its two; 78 as of issue 1773: the requirement chooser, on the award face;
-  // 79 when issue 1521 built `InfoStrip` on its two importers, the check card and the stamina pool;
-  // 80 with `ArtPicker` on its four (issue 1522); 81 with `Rail` on its three inspectors.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 81, 'the shipped primitive set changed size');
+  // 77 with `SetPicker` on its two; 78 as of issue 1773: the requirement chooser, on the award
+  // face; 79 when issue 1521 built `InfoStrip` on its two importers, the check card and the stamina
+  // pool; 80 with `ArtPicker` on its four (issue 1522); 81 with `Rail` on its three inspectors; 82
+  // with `ChoiceGroup`, on the result card as its second importer.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 82, 'the shipped primitive set changed size');
   // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
   // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;
   // 17 when `ChoiceGroup` joined at one caller (issue 1516).
   // 18 as of issue 1782: `StageBars`, whose one importer is `RunProgress`; 19 with `RuleSentence`,
-  // whose one importer is `RuleRow`. 18 when issue 1773 moved the requirement chooser out.
-  assert.equal(NOT_A_PRIMITIVE.length, 18, 'the recorded non-member set changed size');
+  // whose one importer is `RuleRow`. 18 when issue 1773 moved the requirement chooser out, and 17
+  // when it moved `ChoiceGroup` out.
+  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,

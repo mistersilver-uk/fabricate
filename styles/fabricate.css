@@ -9685,6 +9685,106 @@
   }
 }
 
+/* A choice group's members wrap the same way against their own list, which a rolled member's range cell widens, so under the width one line needs the range cell leads the second line, before the toggle (issue 1773). */
+.fabricate-manager .manager-recipe-result-group-members {
+  container: fabricate-result-members / inline-size;
+}
+
+@container fabricate-result-members (max-width: 760px) {
+  .fabricate-manager .manager-recipe-result-group-members > .is-result {
+    row-gap: var(--fab-space-1);
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result::after {
+    content: '';
+    flex-basis: 100%;
+    order: 2;
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls {
+    /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+    display: contents;
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > * {
+    order: 4;
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > .manager-recipe-option-remove {
+    order: 1;
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > .manager-recipe-range-cell {
+    order: 3;
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > .manager-recipe-option-invalid {
+    order: 5;
+    margin-inline-end: 0;
+  }
+}
+
+/* A result-side choice group's header (issue 1773): one line of controls read as a sentence, whose chooser wraps whole beneath it on a narrow box, a selection line under a roll, and the help line. */
+.fabricate-manager .manager-recipe-award-header {
+  display: grid;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-award-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-award-strategy .fabricate-select-trigger {
+  width: 124px;
+}
+
+.fabricate-manager .manager-recipe-award-spacer {
+  flex: 1 1 var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-award-caption,
+.fabricate-manager .manager-recipe-award-help {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 0.7rem;
+}
+
+/* A rolled member's range cell: two short mono number fields in the convert control's slot, stated over the field's own control chrome. */
+.fabricate-manager .manager-recipe-range-cell {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-recipe-range-cell .fabricate-field.fabricate-field input[data-recipe-range] {
+  box-sizing: border-box;
+  width: 52px;
+  height: 28px;
+  min-height: 0;
+  margin: 0;
+  padding: 0 var(--fab-space-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  background: var(--fab-surface-soft);
+  color: var(--fab-text);
+  font-family: var(--fab-font-mono);
+  font-size: 0.74rem;
+  text-align: center;
+}
+
+.fabricate-manager .manager-recipe-range-cell .fabricate-field.fabricate-field input[data-recipe-range][aria-invalid="true"] {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-recipe-range-dash {
+  color: var(--fab-text-subtle);
+}
+
 /* Vertical divider between the stepper and the inline "or…". */
 .fabricate-manager .manager-recipe-option-divider {
   flex: 0 0 auto;

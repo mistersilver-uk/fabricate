@@ -1,8 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <!--
   One result group, each item a `PickerRow` naming a component, a currency or a taught recipe, with
-  a fixed or rolled amount, or on a progressive stage a component with a DC and an Edit link in its
-  `trailing`, emitted as a shallow-updated copy through `onChange(nextGroup)`. On a recipe every item
+  a fixed or rolled amount, drawn through the result-side `ChoiceGroup`, which also draws a choice
+  group's box; or on a progressive stage a component with a DC and an Edit link in its `trailing`,
+  under the set's statement that a stage offers no choice. Emitted as a shallow-updated copy through
+  `onChange(nextGroup)`. On a recipe every item
   it creates carries an id and its kind's empty subject (`RecipeResultAdder`), and focus moves to its
   name field; on a gathering task it names the picked component. An empty group or an unnamed item
   is gated at the save path (`Recipe.validate`), not here, and on a non-terminal step an empty group
@@ -15,9 +17,12 @@
 -->
 <script>
   import { localizeOr } from '../../../util/localizeOr.js';
+  import Callout from '../../../components/Callout.svelte';
+  import ChoiceGroup from './ChoiceGroup.svelte';
   import PickerRow from './PickerRow.svelte';
   import { emptyResult, fromValue, toValue } from './pickerRowKinds.js';
-  import { componentCatalogue, resultAmountInvalid, withAddedResult } from './resultRows.js';
+  import { newDraftId as newId } from './resultGroupEdits.js';
+  import { componentCatalogue, withAddedResult } from './resultRows.js';
   import RecipeResultAdder from './RecipeResultAdder.svelte';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
@@ -152,11 +157,6 @@
       name: componentNameFor(item),
     });
 
-  function newId() {
-    const random = globalThis.foundry?.utils?.randomID;
-    return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
-  }
-
   // Spread the existing group so its id and name, which routing references, survive.
   function setName(name) {
     onChange({ ...group, name });
@@ -190,7 +190,9 @@
     const at = focusRowAt;
     focusRowAt = -1;
     setTimeout(() => {
-      const row = root?.querySelectorAll('[data-recipe-result-item]')[at];
+      const row = root?.querySelectorAll('[data-recipe-result-item], [data-recipe-result-group]')[
+        at
+      ];
       row?.querySelector('[data-recipe-option-search]')?.focus();
     }, 0);
   });
@@ -308,6 +310,17 @@
     </div>
   {/if}
 
+  {#if progressive && recipeSurface}
+    <Callout
+      icon="fas fa-list-ol"
+      text={localizeOr(
+        'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.ProgressiveNote',
+        'Progressive awards every stage the roll affords, in order, so a stage offers no choice of reward.'
+      )}
+      data-recipe-progressive-note
+    />
+  {/if}
+
   {#if results.length === 0 && !isTerminalStep}
     <p class="manager-muted" data-recipe-result-empty>
       {localizeOr(
@@ -381,19 +394,12 @@
     {:else}
       <div class="manager-recipe-ingredient-set-groups">
         {#each results as item, index (item?.id || index)}
-          <PickerRow
-            value={toValue(item)}
-            {kinds}
-            catalogue={offer.catalogue}
-            readonlyKinds={offer.readonlyKinds}
-            rollable
+          <ChoiceGroup
+            side="result"
+            group={item}
+            {offer}
             reward={recipeSurface}
-            clearable={false}
-            removeHook="result-item"
-            invalid={resultAmountInvalid(item, localizeOr)}
-            class={recipeSurface ? 'is-result is-reward' : 'is-result'}
-            data-recipe-result-item=""
-            onChange={(value) => updateItem(index, fromValue(item, value))}
+            onChange={(next) => updateItem(index, next)}
             onRemove={() => removeItem(index)}
           />
         {/each}
