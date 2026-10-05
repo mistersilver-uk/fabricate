@@ -1293,6 +1293,11 @@ describe('JournalView mounted behavior', () => {
       const showAll = panel.querySelector('[data-journal-kind-show-all]');
       assert.equal(showAll.dataset.keyboardFocus, 'true');
       assert.match(showAll.textContent, /Kind\.ShowAll/u);
+      assert.equal(showAll.disabled, true, 'nothing is hidden, so there is nothing to switch back on');
+      assert.ok(
+        list.querySelector('.fab-selection-check').classList.contains('is-sm'),
+        'the row box is the compact density'
+      );
     });
 
     it('filters both lists by two ticked kinds and summarises them in label order', async () => {
@@ -1305,6 +1310,16 @@ describe('JournalView mounted behavior', () => {
       assert.equal(kindTrigger(target).getAttribute('aria-expanded'), 'true', 'the panel stays open');
       assert.deepEqual([...store.kindFilter], ['crafting', 'salvage']);
       assert.equal(summaryOf(target), `${KIND_KEY}Crafting, ${KIND_KEY}Salvage`, 'label order');
+      assert.equal(
+        target.querySelector(':scope [data-journal-kind-filter]').dataset.journalKindShown,
+        'crafting salvage',
+        'the field hook carries the partial set, in label order'
+      );
+      assert.equal(
+        openKinds(target).querySelector('[data-journal-kind-show-all]').disabled,
+        false,
+        'hidden kinds enable the footer'
+      );
       assert.match(kindTrigger(target).getAttribute('aria-label'), /Kind\.Crafting, .*Kind\.Salvage/u);
       assert.deepEqual(shown(target, 'data-run-id'), ['a-craft', 'a-salvage']);
       assert.deepEqual(shown(target, 'data-history-run-id'), ['h-craft', 'h-salvage']);

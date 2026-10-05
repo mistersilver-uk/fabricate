@@ -22,7 +22,7 @@
   });
   // A summary, not a sentence: "Crafting, Salvage" rather than "Crafting and Salvage".
   const SUMMARY_LIST = Object.freeze({ style: 'short', type: 'unit' });
-  // The panel is the trigger's width at every layout, so no band narrower than the column caps it.
+  // The panel matches the trigger's width, so the upper bound is effectively unbounded.
   const TRIGGER_WIDTH_BAND = Object.freeze({ min: 200, max: 4096 });
 
   const counts = $derived(countRunsByKind(runs));
@@ -60,7 +60,9 @@
 
 {#snippet showAllFooter()}
   <div class="journal-kind-footer">
-    <Button role="ghost" fullWidth data-journal-kind-show-all="" onclick={showAll}>
+    <Button role="ghost" fullWidth data-journal-kind-show-all=""
+      disabled={shown.length === RUN_KINDS.length}
+      onclick={showAll}>
       <i class="fas fa-xmark" aria-hidden="true"></i>
       {localize('FABRICATE.App.Journal.Filters.Kind.ShowAll')}
     </Button>
