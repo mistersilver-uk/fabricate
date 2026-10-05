@@ -207,7 +207,12 @@ describe('the derivative test compares names, and errs toward the existing rule'
 
   const ROWS = [
     ['a renamed copy is a derivative', worldScroll('x'), entry(), OWN_KEYED],
-    ['a copy keeping the name is not', worldScroll('x', { name: ENTRY_NAME }), entry(), ENTRY_KEYED],
+    [
+      'a copy keeping the name is not',
+      worldScroll('x', { name: ENTRY_NAME }),
+      entry(),
+      ENTRY_KEYED,
+    ],
     [
       'case and spacing do not make a derivative',
       worldScroll('x', { name: '\tblank \n SCROLL ' }),
@@ -253,7 +258,10 @@ describe('the derivative test compares names, and errs toward the existing rule'
         entryDocument
       );
       assert.deepEqual({ canonicalUuid, references }, expected);
-      assert.deepEqual({ aliasItemUuids, sourceFallbacks }, { aliasItemUuids: [], sourceFallbacks: [] });
+      assert.deepEqual(
+        { aliasItemUuids, sourceFallbacks },
+        { aliasItemUuids: [], sourceFallbacks: [] }
+      );
     });
   }
 
@@ -304,7 +312,12 @@ describe('a clone still keys on its own uuid when it keeps the entry name', () =
 
 describe('replacing a component source', () => {
   const COMPONENTS = [
-    { id: 'comp-entry', name: ENTRY_NAME, registeredItemUuid: ENTRY_UUID, originItemUuid: ENTRY_UUID },
+    {
+      id: 'comp-entry',
+      name: ENTRY_NAME,
+      registeredItemUuid: ENTRY_UUID,
+      originItemUuid: ENTRY_UUID,
+    },
     { id: 'comp-other', name: 'Other', registeredItemUuid: 'Item.other' },
   ];
 
@@ -394,7 +407,11 @@ describe('a re-registration neither adds nor releases a compendium-source claim'
 
         assert.equal(result.item.id, 'def-fire');
         const [entryDefinition, fireDefinition] = system()[library];
-        assert.deepEqual(entryDefinition, entryBefore, 'the definition claiming the entry is untouched');
+        assert.deepEqual(
+          entryDefinition,
+          entryBefore,
+          'the definition claiming the entry is untouched'
+        );
         assert.deepEqual(getItemMatchUuids(fireDefinition), [scroll.uuid]);
         assert.equal(system()[library].length, 2);
       });
@@ -465,7 +482,11 @@ describe('a durable leaf at find-existing', () => {
       assert.equal(result.action, 'added');
       assert.notEqual(result.item.id, 'def-entry');
       assert.equal(system()[library].length, 2);
-      assert.equal(stamped(scroll, role), result.item.id, 'the leaf is overwritten with its own id');
+      assert.equal(
+        stamped(scroll, role),
+        result.item.id,
+        'the leaf is overwritten with its own id'
+      );
     });
 
     it(`a clone whose inherited leaf names the entry's ${kind} registers as a new one`, async () => {
