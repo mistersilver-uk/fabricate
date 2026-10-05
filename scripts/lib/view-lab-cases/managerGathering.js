@@ -213,6 +213,32 @@ export const CASES = Object.freeze([
       ],
     })
   ),
+  // The depleted-marker art picker (issue 1522): the art and its pencil, and the empty slot.
+  ...[
+    ['filled', { depletedImage: '1' }, '[data-gathering-task-depleted-image]'],
+    ['empty', {}, '[data-gathering-task-depleted-image]'],
+  ].map(([state, flags, hit]) =>
+    managerCase({
+      id: `manager-gathering-task-depleted-image-${state}`,
+      label: `Manager — Gathering task depleted marker image, ${state}`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-smithing', ...flags },
+      steps: [
+        'Gathering',
+        ...OPEN_PROSPECT_TASK,
+        { selector: '[data-gathering-task-depleted-behavior]', scroll: true },
+      ],
+      expectView: 'gathering-task-edit',
+      expectSelector: `.fabricate-manager [data-gathering-task-depleted-image]${state === 'filled' ? ' img' : ':not(:has(img))'}`,
+      expectCenterHit: hit,
+      kinds: ['manager', 'environments'],
+      sourceMatches: [
+        GATHERING_ROUTE_MODEL_PATTERN,
+        /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      ],
+    })
+  ),
   // The gathering studio's first open-panel frame (issue 1510), and the only way to photograph a
   // converted control's list: it exists only while the panel is open, and an open panel cannot
   // double as the route's closed-state frame. This one is unticked, unlike the checks studio's.

@@ -19,11 +19,8 @@ const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemMan
 const langPath = resolve(repoRoot, 'lang/en.json');
 const GATHERING_ROUTE_MODEL = 'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js';
 
-const cssPath = resolve(repoRoot, 'styles/fabricate.css');
-
 const editorSource = readFileSync(editorPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
-const cssSource = readFileSync(cssPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 describe('Gathering task editor — economy sections are flag-gated and carded', () => {
@@ -170,63 +167,14 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     assert.match(editorSource, /onPickImagePath\(\s*depletedSwapImage/, 'the depleted image picker calls onPickImagePath');
   });
 
-  it('puts the swap-image picker inline with the title/hint and the clear control below the image (plus right-click clears)', () => {
-    // Title/hint and the image sit on one row.
+  it('puts the swap-image picker inline with the title/hint', () => {
+    // Title/hint and the image sit on one row. The picker, its clear button and the right-click
+    // clear are ACTED in `gathering-task-editor-stepper-mounted.test.js` (issue 1522).
     const rowIdx = editorSource.indexOf('manager-task-depleted-row');
     const copyIdx = editorSource.indexOf('manager-task-depleted-copy');
     const imageColIdx = editorSource.indexOf('data-gathering-task-depleted-image-column');
     assert.ok(rowIdx >= 0, 'an inline row wraps the depleted-behavior block');
     assert.ok(copyIdx > rowIdx && imageColIdx > rowIdx, 'the title/hint copy and the image column both sit inside the inline row');
-
-    // The remove control is a button BELOW the thumbnail (inside the image column,
-    // after the picker button).
-    const pickerIdx = editorSource.indexOf('data-gathering-task-depleted-image');
-    const clearIdx = editorSource.indexOf('data-gathering-task-depleted-image-clear');
-    assert.ok(clearIdx > pickerIdx, 'the remove-image button renders after (below) the picker thumbnail');
-    assert.match(editorSource, /class="manager-link-button manager-task-depleted-image-clear"/, 'the remove control is a labelled button below the image');
-
-    // Right-click on the thumbnail clears it (oncontextmenu prevents the default menu).
-    assert.match(editorSource, /oncontextmenu=\{onDepletedImageContextMenu\}/, 'the thumbnail wires a context-menu (right-click) clear');
-    assert.match(editorSource, /function onDepletedImageContextMenu\(event\)\s*\{[\s\S]*?event\.preventDefault\(\)/, 'the context-menu handler prevents the default menu');
-  });
-
-  it('positions the depleted picker pen as a corner badge and the empty-state placeholder centered (no overlap)', () => {
-    // Empty state: a centered fa-image placeholder shown only when no swap image
-    // is set; the fa-pen edit affordance is the bottom-right badge over either
-    // the placeholder or the <img>. The fix is in the SHARED .manager-task-image-picker
-    // rule so every picker (task identity, event, depleted) gets the same treatment.
-    const pickerIdx = editorSource.indexOf('manager-task-depleted-image-picker');
-    const pickerBlock = editorSource.slice(pickerIdx, editorSource.indexOf('</button>', pickerIdx));
-    assert.ok(
-      pickerBlock.includes('{#if depletedSwapImage}') && pickerBlock.includes('<img src={depletedSwapImage}'),
-      'the picker renders the swap <img> when an image is set'
-    );
-    assert.ok(
-      pickerBlock.includes('<i class="fas fa-image" aria-hidden="true">'),
-      'the picker renders the fa-image placeholder when no image is set'
-    );
-    assert.ok(
-      pickerBlock.includes('<i class="fas fa-pen" aria-hidden="true">'),
-      'the picker always renders the fa-pen edit affordance'
-    );
-
-    // Shared CSS: the pen (and the scene-locked variant) is pinned to the
-    // bottom-right corner; the placeholder centers itself with a full-box absolute
-    // flex layer (inset:0 + center) so it stays centered even when Foundry's global
-    // button styles override the picker's own flex — without that, the glyph drifts
-    // into the corner and overlaps the pen.
-    assert.match(
-      cssSource,
-      /\.manager-task-image-picker \.fa-pen[\s\S]*?position:\s*absolute[\s\S]*?bottom:\s*5px/,
-      'the pen badge is pinned to the bottom-right corner in the shared rule'
-    );
-    const placeholderRule = cssSource.slice(cssSource.indexOf('.manager-task-image-picker .fa-image'));
-    const placeholderBlock = placeholderRule.slice(0, placeholderRule.indexOf('}'));
-    assert.match(placeholderBlock, /position:\s*absolute/, 'the placeholder uses an absolute layer so its centering is independent of the button display');
-    assert.match(placeholderBlock, /inset:\s*0/, 'the absolute layer fills the whole box (so margin/flex centering is box-relative, not corner-pinned)');
-    assert.match(placeholderBlock, /justify-content:\s*center/, 'the placeholder glyph is centered horizontally');
-    assert.ok(!placeholderBlock.includes('bottom: 5px'), 'the placeholder is NOT corner-pinned like the pen badge (no overlap)');
-    assert.match(placeholderBlock, /font-size:\s*1\.8rem/, 'the placeholder icon is larger than the corner badge');
   });
 
   it('authors the optional defaultEnvironmentId select wired from the parent', () => {

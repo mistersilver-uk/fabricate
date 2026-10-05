@@ -1295,7 +1295,7 @@ export function registerEnvironmentsCases() {
     assert.equal(populatedDropRow.querySelector('[aria-label="Select drop rule"]'), null);
     assert.equal(populatedDropRow.querySelector('[aria-label="Edit drop rule"]'), null);
     const mediaColumn = coreEditor.querySelector('.manager-task-media-column');
-    const taskImagePicker = coreEditor.querySelector('.manager-task-image-picker');
+    const taskImagePicker = coreEditor.querySelector('.fab-art-picker');
     const taskStatus = coreEditor.querySelector('.manager-task-core-status');
     const taskStatusToggle = taskStatus.querySelector('.fabricate-toggle');
     assert.equal(mediaColumn.firstElementChild, taskImagePicker);
@@ -2185,14 +2185,13 @@ export function registerEnvironmentsCases() {
     );
 
     // Identity image is a locked, muted scene thumbnail — not an editable picker.
-    let picker = target.querySelector(
-      '[data-overview-section="identity"] .manager-task-image-picker'
-    );
+    let picker = target.querySelector('[data-overview-section="identity"] .fab-art-picker-tile');
     assert.ok(
-      picker.classList.contains('is-scene-linked'),
+      picker.classList.contains('is-locked'),
       'identity image should be scene-locked while a scene is linked'
     );
     assert.equal(picker.tagName, 'SPAN', 'locked identity image should not be an editable button');
+    assert.equal(picker.getAttribute('role'), 'img', 'locked identity image is a named image');
     assert.ok(picker.querySelector('.fa-lock'), 'locked identity image should show a lock icon');
     assert.equal(
       target.querySelector('[data-overview-section="identity"] .fa-pen'),
@@ -2210,13 +2209,13 @@ export function registerEnvironmentsCases() {
     await tick();
     flushSync();
 
-    picker = target.querySelector('[data-overview-section="identity"] .manager-task-image-picker');
+    picker = target.querySelector('[data-overview-section="identity"] .fab-art-picker-tile');
     assert.equal(
       picker.tagName,
       'BUTTON',
       'identity image should be editable again once the scene is unlinked'
     );
-    assert.equal(picker.classList.contains('is-scene-linked'), false);
+    assert.equal(picker.classList.contains('is-locked'), false);
     assert.ok(
       picker.querySelector('.fa-pen'),
       'unlocked identity image should show the edit affordance'
@@ -4333,7 +4332,7 @@ export function registerEnvironmentsCases() {
       const updates = [];
       mountEditor(overridesEditorProps(updates, { sceneUuid }));
       const art = target.querySelector(
-        ':scope [data-overview-section="identity"] .manager-task-image-picker'
+        ':scope [data-overview-section="identity"] .fab-art-picker-tile'
       );
       art.click();
       art.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));

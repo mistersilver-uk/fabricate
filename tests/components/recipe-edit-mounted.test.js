@@ -194,6 +194,8 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
+  // The Overview tab's recipe art (issue 1522).
+  'src/ui/svelte/components/ArtPicker.svelte',
   // The Overview tab's eligible-modifier override renders the shared pill multi-select
   // (issue 770). A `.svelte` the tree renders but the harness omits HANGS the suite.
   'src/ui/svelte/components/ModifierPillSelect.svelte',

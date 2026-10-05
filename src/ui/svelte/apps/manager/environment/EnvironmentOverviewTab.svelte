@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import ArtPicker from '../../../components/ArtPicker.svelte';
   import Field from '../../../components/Field.svelte';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
@@ -209,40 +210,26 @@
         </div>
         <div class="manager-task-core-grid">
           <div class="manager-task-media-column">
-            {#if isSceneLinked}
-              <span
-                class="manager-task-image-picker is-scene-linked"
-                data-scene-locked-image
-                title={text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImageTooltip',
-                  "This image comes from the linked scene and can't be edited. Unlink the scene on the Linked scene card below to choose a custom image."
-                )}
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImage',
-                  'Image provided by the linked scene'
-                )}
-              >
-                <img
-                  src={linkedSceneImage || environment.img || DEFAULT_GATHERING_ENVIRONMENT_IMG}
-                  alt=""
-                />
-                <i class="fas fa-lock" aria-hidden="true"></i>
-              </span>
-            {:else}
-              <button
-                type="button"
-                class="manager-task-image-picker"
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ChooseImage',
-                  'Choose environment image'
-                )}
-                onclick={chooseImage}
-                disabled={typeof onPickImagePath !== 'function'}
-              >
-                <img src={environment.img || DEFAULT_GATHERING_ENVIRONMENT_IMG} alt="" />
-                <i class="fas fa-pen" aria-hidden="true"></i>
-              </button>
-            {/if}
+            <ArtPicker
+              art={(isSceneLinked && linkedSceneImage) ||
+                environment.img ||
+                DEFAULT_GATHERING_ENVIRONMENT_IMG}
+              ariaLabel={text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ChooseImage',
+                'Choose environment image'
+              )}
+              onPick={chooseImage}
+              disabled={typeof onPickImagePath !== 'function'}
+              locked={isSceneLinked}
+              lockedLabel={text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImage',
+                'Image provided by the linked scene'
+              )}
+              lockedHint={text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImageTooltip',
+                "This image comes from the linked scene and can't be edited. Unlink the scene on the Linked scene card below to choose a custom image."
+              )}
+            />
             <div class="manager-task-core-status">
               <StatusToggle
                 on={environment.enabled !== false}

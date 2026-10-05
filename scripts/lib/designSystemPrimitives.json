@@ -631,6 +631,14 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "Issue 1521 builds the specified strip of current values: an optional kicker that names the group, an optional read-only badge drawn through `Chip`, and glyph-led facts whose values arrive caller-formatted in mono, with nothing focusable inside it. Two importers: `apps/crafting/detail/CraftingCheckCard.svelte`, whose DC, successes needed, target, target source, skill and formula are its facts under a Required or Optional badge, and `apps/gathering/GatheringDetail.svelte`, whose stamina pool is its one fact under the Stamina kicker. Scoped `shared`: the player crafting and gathering tabs both draw it, and its family is rooted at `fabricate-info-strip`, the class it writes. `checks/CheckModeCallout.svelte` and `apps/ActorSelectTopBar.svelte` are recorded non-matching in the library census."
+    },
+    {
+      "path": "src/ui/svelte/components/ArtPicker.svelte",
+      "library": "<ArtPicker>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1522 builds the control the art requirement and the world-asset-path requirement both name: identity art drawn as a picture with a pencil at rest, a dashed empty slot, a locked `role=\"img\"` with a padlock, and an optional visible clear, the stored path never rendered. The caller's `onPick` opens Foundry's picker, so the primitive imports nothing. Four importers over six render sites: `apps/manager/recipe/RecipeOverviewTab.svelte`, `apps/manager/GatheringTaskEditView.svelte` (the identity art and the depleted-marker art with its clear), `apps/manager/GatheringEventEditView.svelte` and `apps/manager/environment/EnvironmentOverviewTab.svelte` (editable, and locked to a linked scene). Scoped `shared`: its rules are its own scoped style, so it paints wherever it is mounted, though every caller today is a manager editor. It retired the `manager-task-image-picker` sheet family, whose six sites it draws pixel-identically in every filled and locked state. Its broad-signal override names the frames that draw each state."
     }
   ],
   "notAPrimitive": [

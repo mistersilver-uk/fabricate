@@ -84,6 +84,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
+  // Issue 1522: identity art picked as a picture, on the frames that draw each of its states.
+  'src/ui/svelte/components/ArtPicker.svelte',
   // Issue 1506: an actor's portrait, and the FIRST key this list gains by a primitive ARRIVING.
   'src/ui/svelte/components/Avatar.svelte',
   // Issue 1782: the three instruments arrive over the fill leaf, which gains its own frame.
@@ -254,8 +256,9 @@ test('the inputs every property below quantifies over are alive', () => {
   // 76 as of issue 1782: `Meter` and `BandedBar`, each on three and two importers; 77 with
   // `RuleRow` on its two; 76 once issue 1521 folded the explainer card onto the callout's `items`;
   // 77 with `SetPicker` on its two; 78 as of issue 1773: the requirement chooser, on the award face;
-  // 79 when issue 1521 built `InfoStrip` on its two importers, the check card and the stamina pool.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 79, 'the shipped primitive set changed size');
+  // 79 when issue 1521 built `InfoStrip` on its two importers, the check card and the stamina pool;
+  // 80 with `ArtPicker` on its four (issue 1522).
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 80, 'the shipped primitive set changed size');
   // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
   // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer;
   // 17 when `ChoiceGroup` joined at one caller (issue 1516).
