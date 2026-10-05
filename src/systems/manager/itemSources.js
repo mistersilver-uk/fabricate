@@ -237,8 +237,8 @@ function resolveImportedSourceData(itemUuid, source = null) {
   }
   // A world source with `_stats.duplicateSource` is a clone whose inherited `compendiumSource`
   // names the original's pack, so it keys on its own uuid or it would overwrite the original's
-  // definition (issue 555). Registration only: Foundry stamps `duplicateSource` on every
-  // non-compendium drag-drop, so `matchRecipeItemDefinition` has no clone gate.
+  // definition (issue 555). Registration only: an actor-owned copy may carry `duplicateSource`
+  // too, depending on the core build, so `matchRecipeItemDefinition` has no clone gate.
   const isClone = !!getDuplicateSourceUuid(source);
   const identityRefs = isClone
     ? [source?.uuid].filter((ref) => typeof ref === 'string' && ref.trim())

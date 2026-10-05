@@ -49,8 +49,8 @@ async function writeSourceIdentity(source, flagKey, id) {
  * Stamp a durable identity on a registered source world Item, so a future copy inherits it even
  * when Foundry's transitive `_stats.duplicateSource` points at a template; a no-op for a non-Item
  * or any pack source. The clone-gate is safe only on a source, where `duplicateSource` means a
- * sidebar Duplicate, never on an actor-owned copy, which carries it from every non-compendium
- * drop; `matchRecipeItemDefinition` deliberately has no gate.
+ * sidebar Duplicate, never on an actor-owned copy, which may carry it from a drop depending on
+ * the core build; `matchRecipeItemDefinition` deliberately has no gate.
  */
 export async function stampSourceIdentity(source, flagKey, id) {
   if (!id) return;
@@ -190,8 +190,8 @@ function resolveSourceRepairOwner(item, kind) {
   return claimedBy(getItemIdentityReferences(item));
 }
 
-// An actor-owned item's `{definition, tier}`, with no clone-gate: Foundry stamps
-// `duplicateSource` on drag-drop, so the ordinary runtime matchers apply.
+// An actor-owned item's `{definition, tier}`, with no clone-gate: a drop may stamp
+// `duplicateSource`, depending on the core build, so the ordinary runtime matchers apply.
 function resolveOwnedRepairOwner(item, kind) {
   if (kind.bucket === 'recipeItems') {
     return matchRecipeItemDefinition(item, kind.definitions, kind.systemId);
