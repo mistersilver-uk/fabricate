@@ -317,7 +317,7 @@ describe('RunCard mounted behavior', () => {
     harness.remount();
     for (const completesAsTimePasses of [false, undefined]) {
       const other = await harness.mount({ run: { ...makeCraftingRun(), completesAsTimePasses }, now: 0 });
-      assert.ok(!other.querySelector('[data-run-completes-as-time-passes]'), `${completesAsTimePasses}`);
+      assert.ok(!other.querySelector('[data-run-completes-as-time-passes]'), String(completesAsTimePasses));
       harness.remount();
     }
   });

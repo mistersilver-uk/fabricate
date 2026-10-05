@@ -36,8 +36,13 @@ const CASES = [
 
 function fixture({ run = {}, set = null, step = {}, recipe = {}, system = {} } = {}) {
   const stage = { ...STEP, ...step, ingredientSets: [set ?? STEP.ingredientSets[0]] };
-  const authored = { id: 'recipe', craftingSystemId: 'sys', toolIds: [], ...recipe };
-  authored.getExecutionSteps = () => [stage];
+  const authored = {
+    id: 'recipe',
+    craftingSystemId: 'sys',
+    toolIds: [],
+    ...recipe,
+    getExecutionSteps: () => [stage],
+  };
   return {
     run: {
       id: 'run',
