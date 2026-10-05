@@ -10,8 +10,8 @@ export const JOINED_CLIENT_TIMEOUTS = Object.freeze({ navigation: 120_000, ready
  * Foundry reads the client-scoped `core.noCanvas` setting from `localStorage` as JSON before it
  * initializes the canvas, so writing it ahead of the first page keeps WebGL and scene assets off.
  */
-export function disableCanvasBeforeLoad() {
-  globalThis.localStorage.setItem('core.noCanvas', 'true');
+export function disableCanvasBeforeLoad(storage = globalThis.localStorage) {
+  storage.setItem('core.noCanvas', 'true');
 }
 
 /**

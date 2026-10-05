@@ -425,7 +425,7 @@ describe('the manager shell services bag', () => {
       return [...world.journal];
     });
     assert.ok(
-      !journal.some(([channel]) => channel === 'notify.error'),
+      journal.every(([channel]) => channel !== 'notify.error'),
       'closing the manager nulls its store, which is not a failed import'
     );
   });

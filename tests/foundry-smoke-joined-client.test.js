@@ -13,7 +13,7 @@ import {
 /** A GM page whose browser hands out one recording context; `failAt` names the step that throws. */
 function fakeGmPage({ failAt = null, users = [{ id: 'u-player', name: 'Player' }] } = {}) {
   const log = [];
-  const step = (name, value) => {
+  const step = (name, value = null) => {
     log.push(name);
     if (name === failAt) throw new Error(`${name} failed`);
     return value;
@@ -62,7 +62,7 @@ describe('the joined smoke client', () => {
     'goto http://localhost:30000/game 120000',
     'ready u-player',
   ]) {
-    it(`closes its context when "${failAt.split(' ')[0]}" fails`, async () => {
+    it(`closes its context when "${failAt.split(' ', 1)[0]}" fails`, async () => {
       const { page, log } = fakeGmPage({ failAt });
       await assert.rejects(() => openJoinedClient(page, 'Player'), /never joined/);
       assert.equal(log.at(-1), 'close', 'a failed join leaves no client loading beside the GM');
@@ -77,13 +77,7 @@ describe('the joined smoke client', () => {
 
   it('stores noCanvas as the JSON Foundry reads its client settings from', () => {
     const stored = new Map();
-    const previous = globalThis.localStorage;
-    globalThis.localStorage = { setItem: (key, value) => stored.set(key, value) };
-    try {
-      disableCanvasBeforeLoad();
-    } finally {
-      globalThis.localStorage = previous;
-    }
+    disableCanvasBeforeLoad({ setItem: (key, value) => stored.set(key, value) });
     assert.equal(JSON.parse(stored.get('core.noCanvas')), true);
   });
 });

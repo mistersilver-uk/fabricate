@@ -116,7 +116,11 @@ describe('an import whose manager closes while it runs', () => {
   /** An io whose store closes when `close` is called, or when the import reads its file. */
   function closingManager() {
     const refreshes = [];
-    let store = { refresh: async () => refreshes.push('refresh') };
+    let store = {
+      refresh: async () => {
+        refreshes.push('refresh');
+      },
+    };
     const close = () => (store = null);
     const file = { text: async () => (close(), IMPORT_FILE.text()) };
     return { io: { ...KNOWLEDGE_IO, adminStore: () => store }, file, close, refreshes };
