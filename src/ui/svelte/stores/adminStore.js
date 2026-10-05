@@ -3208,12 +3208,10 @@ export function createAdminStore(services) {
           addOption(required, option);
         }
       }
-      for (const group of Array.isArray(holder?.resultGroups) ? holder.resultGroups : []) {
-        for (const result of Array.isArray(group?.results) ? group.results : []) {
-          addOption(produced, result);
-        }
-      }
-      for (const result of Array.isArray(holder?.results) ? holder.results : []) {
+      const groups = Array.isArray(holder?.resultGroups) ? holder.resultGroups : [];
+      const results = [...groups.map((group) => group?.results), holder?.results].flat();
+      // A choice group produces each of its alternatives (issue 1773).
+      for (const result of results.filter(Boolean).flatMap((r) => r.alternatives ?? [r])) {
         addOption(produced, result);
       }
     }

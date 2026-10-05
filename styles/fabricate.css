@@ -9578,6 +9578,12 @@
   font-size: 0.74rem;
 }
 
+/* A requirement row's invalid message, in the danger text at the row's small size: the amount slot's, a choice group header's and a range cell's alike. */
+.fabricate-manager .manager-recipe-option-invalid {
+  color: var(--fab-danger-text);
+  font-size: 0.66rem;
+}
+
 /* The invalid message hangs on a second line under the toggle, after the remove: `order` moves non-focusable text only, so tab order and `aria-describedby` are unchanged. `contain: inline-size` gives it no intrinsic width and the negative end margin cancels the gap it would add, so the controls keep a valid row's width. */
 .fabricate-manager .manager-recipe-option-controls:has(> .manager-recipe-option-invalid) {
   flex-wrap: wrap;
@@ -9683,6 +9689,122 @@
     order: 4;
     margin-inline-end: 0;
   }
+}
+
+/* A choice group's members wrap the same way, against their own list, because a rolled member's range cell widens the row: under the width one line needs, the second line holds the toggle, the amount and then the range cell (issue 1773). */
+.fabricate-manager .manager-recipe-result-group-members {
+  container: fabricate-result-members / inline-size;
+}
+
+/* A member's range problem spans the row rather than the controls' column: the controls step aside so the message is a row item, which `order` puts last on a line of its own, so the first line stays centred. */
+.fabricate-manager .manager-recipe-result-group-members > .is-result:has(> .manager-recipe-option-controls > [data-recipe-range-problem]) {
+  align-items: center;
+}
+
+.fabricate-manager .manager-recipe-result-group-members > .is-result:has(> .manager-recipe-option-controls > [data-recipe-range-problem]) > .manager-recipe-option-controls {
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+  display: contents;
+}
+
+.fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > [data-recipe-range-problem] {
+  order: 6;
+  margin-inline-end: 0;
+}
+
+@container fabricate-result-members (max-width: 760px) {
+  .fabricate-manager .manager-recipe-result-group-members > .is-result {
+    row-gap: var(--fab-space-1);
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result::after {
+    content: '';
+    flex-basis: 100%;
+    order: 2;
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls {
+    /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+    display: contents;
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > * {
+    order: 4;
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > .manager-recipe-option-remove {
+    order: 1;
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > :is(.manager-recipe-option-divider, .manager-recipe-range-cell) {
+    order: 5;
+  }
+
+  .fabricate-manager .manager-recipe-result-group-members > .is-result > .manager-recipe-option-controls > .manager-recipe-option-invalid {
+    order: 6;
+    margin-inline-end: 0;
+  }
+}
+
+/* A result-side choice group's header (issue 1773): one line of controls read as a sentence, whose chooser wraps whole beneath it on a narrow box, a selection line under a roll, and the help line. */
+.fabricate-manager .manager-recipe-award-header {
+  display: grid;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-award-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-award-strategy .fabricate-select-trigger {
+  width: 124px;
+}
+
+.fabricate-manager .manager-recipe-award-spacer {
+  flex: 1 1 var(--fab-space-2);
+}
+
+.fabricate-manager .manager-recipe-award-caption,
+.fabricate-manager .manager-recipe-award-help {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 0.7rem;
+}
+
+/* A rolled member's range cell: two short mono number fields in the convert control's slot, stated over the field's own control chrome. */
+.fabricate-manager .manager-recipe-range-cell {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-1);
+}
+
+.fabricate-manager .manager-recipe-range-cell .fabricate-field.fabricate-field input[data-recipe-range] {
+  box-sizing: border-box;
+  width: 52px;
+  height: 28px;
+  min-height: 0;
+  margin: 0;
+  padding: 0 var(--fab-space-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  background: var(--fab-surface-soft);
+  color: var(--fab-text);
+  font-family: var(--fab-font-mono);
+  font-size: 0.74rem;
+  text-align: center;
+}
+
+.fabricate-manager .manager-recipe-range-cell .fabricate-field.fabricate-field input[data-recipe-range][aria-invalid="true"] {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-recipe-range-dash,
+.fabricate-manager .manager-recipe-range-glyph {
+  color: var(--fab-text-subtle);
 }
 
 /* Vertical divider between the stepper and the inline "or…". */

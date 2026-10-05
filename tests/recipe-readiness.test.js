@@ -721,3 +721,102 @@ describe('evaluateRecipeReadiness: taught recipes', () => {
     assert.equal(check(plain.checks, 'taughtRecipesResolve'), undefined, 'nothing taught, no check');
   });
 });
+
+// Issue 1773: a choice group the save would refuse is flagged on its set, and a taught recipe is
+// read inside a group's alternatives as well as on a flat row.
+describe('evaluateRecipeReadiness: result choice groups', () => {
+  const withResults = (...results) => ({
+    name: 'Rewarding',
+    enabled: true,
+    ingredientSets: [{ id: 's1' }],
+    resultGroups: [{ id: 'g1', results }],
+  });
+  const PLAYER = Object.freeze({
+    id: 'c1',
+    alternatives: [
+      { id: 'a', componentId: 'ore' },
+      { id: 'b', kind: 'knowledge', recipeId: 'r-gone' },
+    ],
+  });
+
+  it('adds a passing check to a recipe whose groups are complete, and none without a group', () => {
+    const { checks, issues } = evaluateRecipeReadiness(withResults(PLAYER));
+    assert.equal(check(checks, 'choiceGroupsValid').satisfied, true);
+    assert.equal(issues.length, 0);
+    const flat = evaluateRecipeReadiness(withResults({ id: 'r', componentId: 'ore' }));
+    assert.equal(check(flat.checks, 'choiceGroupsValid'), undefined);
+  });
+
+  it('flags a rolled group with no selection and no ranges, addressed to its set', () => {
+    const { checks, issues } = evaluateRecipeReadiness(withResults({ ...PLAYER, chooser: 'rolled' }));
+    assert.deepEqual(issues.map(issue => issue.id), ['choiceGroupSelection', 'choiceGroupRanges']);
+    for (const issue of issues) {
+      assert.equal(issue.severity, 'critical');
+      assert.equal(issue.blocks, 'enable');
+      assert.equal(issue.focusTarget, 'result-group-g1');
+    }
+    assert.equal(check(checks, 'choiceGroupsValid').satisfied, false);
+    const row = recipeValidationRowStates({ checks, issues }).find(entry => entry.checkId === 'choiceGroupsValid');
+    assert.equal(row.issue, issues[0]);
+    assert.equal(row.status, 'block');
+  });
+
+  it('flags overlapping ranges, an up-to group with no N, and a group of one', () => {
+    const overlap = {
+      ...PLAYER,
+      chooser: 'rolled',
+      selectionFormula: '1d6',
+      alternatives: PLAYER.alternatives.map((member, i) => ({ ...member, selectionRange: { from: 1 + i, to: 4 } })),
+    };
+    const ids = (recipe) => evaluateRecipeReadiness(recipe).issues.map(issue => issue.id);
+    assert.deepEqual(ids(withResults(overlap)), ['choiceGroupRanges']);
+    assert.deepEqual(ids(withResults({ ...PLAYER, awardStrategy: 'upTo' })), ['choiceGroupCount']);
+    assert.deepEqual(ids(withResults({ id: 'c2', alternatives: [PLAYER.alternatives[0]] })), ['choiceGroupTooFew']);
+  });
+
+  it('reads every step, every set and every group, naming the step and the set', () => {
+    const clean = { id: 'ok', alternatives: PLAYER.alternatives };
+    const recipe = {
+      name: 'Staged',
+      steps: [
+        { id: 's1', name: 'Forge', ingredientSets: [{ id: 'i1' }], resultGroups: [{ id: 'g1', results: [clean] }] },
+        {
+          id: 's2',
+          name: 'Temper',
+          ingredientSets: [{ id: 'i2' }],
+          resultGroups: [
+            { id: 'g2', results: [clean] },
+            { id: 'f2', role: 'failure', results: [clean, { ...clean, id: 'bad', awardStrategy: 'upTo' }] },
+          ],
+        },
+      ],
+    };
+    const { issues } = evaluateRecipeReadiness(recipe);
+    assert.deepEqual(issues, [
+      {
+        id: 'choiceGroupCount',
+        severity: 'critical',
+        blocks: 'enable',
+        target: 'results',
+        focusTarget: 'result-group-f2',
+        stepId: 's2',
+        stepName: 'Temper',
+      },
+    ]);
+  });
+
+  it('flags a set holding a group under progressive, which awards every stage in order', () => {
+    const progressive = evaluateRecipeReadiness(withResults(PLAYER), { progressive: true });
+    assert.deepEqual(progressive.issues.map(issue => issue.id), ['choiceGroupInProgressive']);
+    assert.equal(progressive.issues[0].focusTarget, 'result-group-g1');
+    assert.equal(check(progressive.checks, 'choiceGroupsValid').satisfied, false);
+    const flat = evaluateRecipeReadiness(withResults({ id: 'r', componentId: 'ore' }), { progressive: true });
+    assert.equal(check(flat.checks, 'choiceGroupsValid'), undefined, 'no group, no check');
+  });
+
+  it('reads a group’s alternatives for the recipes it teaches', () => {
+    const { checks, issues } = evaluateRecipeReadiness(withResults(PLAYER), { systemRecipes: [{ id: 'r-self' }] });
+    assert.deepEqual(issues.map(issue => issue.id), ['missingTaughtRecipe']);
+    assert.equal(check(checks, 'taughtRecipesResolve').satisfied, false);
+  });
+});

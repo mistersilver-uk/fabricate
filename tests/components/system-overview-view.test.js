@@ -2,6 +2,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CHECK_TO_ISSUES } from '../../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
@@ -133,6 +134,32 @@ describe('SystemOverviewView (mounted)', () => {
       'system kind carries no deep-link button'
     );
 
+    harness.remount();
+  });
+
+  // Every issue the recipe editor's checks own can reach this list, so each has its own words
+  // rather than the raw id or the headless fallback (issue 1773).
+  it('labels every recipe readiness issue a check owns', async () => {
+    const codes = Object.values(CHECK_TO_ISSUES).flat();
+    const target = await harness.mount({
+      report: {
+        issues: codes.map((code) => ({
+          kind: 'recipe',
+          entityId: 'r1',
+          entityName: 'Iron Ingot',
+          severity: 'critical',
+          code,
+          message: 'UNLABELLED',
+          nav: { view: 'recipe-edit', tab: 'results' }
+        })),
+        counts: { critical: codes.length, warning: 0, info: 0, blockers: 0 }
+      }
+    });
+    const unlabelled = codes.filter((code) => {
+      const row = target.querySelector(`[data-overview-issue="${code}"]`);
+      return !row || /UNLABELLED/.test(row.textContent) || row.textContent.includes(code);
+    });
+    assert.deepEqual(unlabelled, []);
     harness.remount();
   });
 

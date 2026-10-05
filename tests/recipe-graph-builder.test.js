@@ -69,6 +69,15 @@ describe('extractComponentIds', () => {
     assert.ok(outputIds.has('c3'));
   });
 
+  it('extracts every alternative of a result choice group (issue 1773)', () => {
+    const recipe = makeRecipe({ id: 'r1' });
+    recipe.resultGroups = [
+      { results: [{ id: 'g', alternatives: [{ componentId: 'c4' }, { kind: 'currency', unit: 'gp' }, { componentId: 'c5' }] }] }
+    ];
+    const { outputIds } = extractComponentIds(recipe);
+    assert.deepEqual([...outputIds], ['c4', 'c5']);
+  });
+
   it('extracts legacy flat ingredient componentId', () => {
     const recipe = makeRecipeLegacy({ id: 'r1', inputComponentIds: ['c1'] });
     const { inputIds } = extractComponentIds(recipe);

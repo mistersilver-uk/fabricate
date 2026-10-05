@@ -179,7 +179,7 @@
       icon="fas fa-dice-d20"
       text={text(
         'FABRICATE.Admin.Manager.Recipe.ResultsProgressiveInfo',
-        'Roll budget flows down the list · each stage consumes its difficulty before the next is produced'
+        'Roll budget flows down the list · each stage consumes its difficulty before the next is produced, so no stage offers a choice of reward'
       )}
       data-recipe-info-strip
     />

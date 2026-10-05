@@ -128,6 +128,18 @@ export const READONLY_FACES = Object.freeze({
 /** Whether this table names `kind`; a row draws any other as a misconfiguration. */
 export const isKnownKind = (kind) => Object.hasOwn(KIND_META, kind);
 
+/** A kind's one word in `translate`'s words; a kind the table does not name, verbatim. */
+export const kindWord = (kind, translate) =>
+  isKnownKind(kind) ? translate(KIND_META[kind].labelKey, KIND_META[kind].label) : String(kind);
+
+/** What a row's `value` is called aloud: its catalogue entry's label, else its kind's word. */
+export function subjectName(value, catalogue, translate) {
+  const kind = value?.kind ?? 'component';
+  const entries = Array.isArray(catalogue?.[kind]) ? catalogue[kind] : [];
+  const chosen = value?.id ? entries.find((entry) => entry.id === value.id) : null;
+  return chosen?.label || kindWord(kind, translate);
+}
+
 /** The amount a row shows: an absent or non-positive stored amount reads as 1. */
 export const shownAmount = (stored) => (Number(stored) > 0 ? Number(stored) : 1);
 

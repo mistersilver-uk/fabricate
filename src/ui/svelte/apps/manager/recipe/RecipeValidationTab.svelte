@@ -30,6 +30,8 @@
     signatureConflicts = [],
     // The system's unfiltered recipes, which a knowledge result's taught recipe resolves against.
     systemRecipes = [],
+    // A progressive system awards every stage in order, so a set may hold no choice group.
+    progressive = false,
     onSelectIssue = () => {},
   } = $props();
 
@@ -46,6 +48,7 @@
       routedOutcomeTierOptions,
       alchemy,
       signatureConflicts,
+      progressive,
     })
   );
 
@@ -68,6 +71,7 @@
       'CheckTaughtRecipesResolve',
       'Every recipe it teaches is in this system',
     ],
+    choiceGroupsValid: ['CheckChoiceGroupsValid', 'Every choice of rewards is complete'],
     alchemyResultSelection: ['CheckAlchemyResultSelection', 'Resolves to exactly one result set'],
     noSignatureCollision: [
       'CheckNoSignatureCollision',
@@ -106,6 +110,30 @@
       'IssueMissingTaughtRecipe',
       'A result teaches a recipe that is no longer in this system, so every craft is refused.',
     ],
+    choiceGroupInProgressive: [
+      'IssueChoiceGroupInProgressive',
+      'A progressive system awards every stage in order, so a result set cannot hold a choice of rewards.',
+    ],
+    choiceGroupTooFew: [
+      'IssueChoiceGroupTooFew',
+      'A choice of rewards holds fewer than two alternatives.',
+    ],
+    choiceGroupSettings: [
+      'IssueChoiceGroupSettings',
+      'A choice of rewards names a chooser or an award rule Fabricate does not recognise.',
+    ],
+    choiceGroupSelection: [
+      'IssueChoiceGroupSelection',
+      'A rolled choice of rewards has no selection roll, or one that cannot be rolled.',
+    ],
+    choiceGroupRanges: [
+      'IssueChoiceGroupRanges',
+      'A rolled choice of rewards needs a range of whole numbers on every alternative, with no two overlapping and none running backwards.',
+    ],
+    choiceGroupCount: [
+      'IssueChoiceGroupCount',
+      'An up-to choice of rewards needs one count: a positive whole number, or a roll that can be rolled.',
+    ],
     alchemyResultSelection: [
       'IssueAlchemyResultSelection',
       'An alchemy recipe must resolve to exactly one result set before it can be enabled.',
@@ -121,6 +149,7 @@
     routedResultGroupsRouted: 'results',
     routedOutcomeTiersProduced: 'results',
     taughtRecipesResolve: 'results',
+    choiceGroupsValid: 'results',
     alchemyResultSelection: 'resolution',
     hasName: 'requirements',
     stepsNamed: 'requirements',

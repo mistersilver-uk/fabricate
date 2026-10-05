@@ -246,7 +246,11 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/models/Result.js',
   'src/utils/choiceGroupShape.js',
   'src/models/reconstructibleDefaults.js',
-  'src/utils/rollFormulaRollability.js'
+  'src/utils/rollFormulaRollability.js',
+  // Issue 1773: a recipe result renders through the result-side `ChoiceGroup`, whose edits and
+  // essence offer (read by its ingredient form) it imports.
+  'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
+  'src/ui/model/essenceValidation.js'
 ]);
 
 export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
@@ -264,7 +268,40 @@ export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
   // Issue 1773: a recipe result set's one adder.
   'src/ui/svelte/components/Button.svelte',
-  'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte'
+  'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte',
+  // …and its choice group, with the award header, the range cell and the progressive statement.
+  'src/ui/svelte/components/Callout.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
+  'src/ui/svelte/apps/manager/recipe/ChoiceGroupAwardHeader.svelte',
+  'src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte'
+]);
+
+// Issue 1773: what `ChoiceGroup`'s result-side form adds to every tree compiling the group — its
+// award header and range cell, the edits they write and the amount floor they read. Restated as
+// literals, because the harness guard reads literals only.
+export const CHOICE_GROUP_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/apps/manager/recipe/resultGroupEdits.js',
+  'src/ui/svelte/apps/manager/recipe/resultRows.js',
+  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+  'src/ui/svelte/util/recipeCurrency.js',
+  'src/utils/choiceGroupShape.js',
+  'src/models/Result.js',
+  'src/models/reconstructibleDefaults.js',
+  'src/utils/rollFormulaRollability.js',
+  'src/systems/characterModifierPrerequisiteCopy.js',
+  'src/systems/characterPrerequisites.js',
+  'src/utils/scalars.js'
+]);
+
+export const CHOICE_GROUP_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/Button.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowRangeCell.svelte',
+  'src/ui/svelte/apps/manager/recipe/ChoiceGroupAwardHeader.svelte'
 ]);
 
 // THE ONE TONE MAP the retired status pill's call sites read (issue 1506). THE QUANTITY READINGS

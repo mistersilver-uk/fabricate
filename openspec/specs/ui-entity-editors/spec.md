@@ -353,6 +353,7 @@ A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of
 It is a single flat **"Accept instead"** list of the four real ingredient match types — Component, Tag, Essence, and Currency, in that order — each appended to that requirement as a new OR alternative for the row's own field to fill in.
 A requirement that already holds two or more alternatives renders that choice as four explicit dashed adders at the foot of its box instead, worded `alt component` / `alt tag` / `alt essence` / `alt currency`: inside a choice group every one of them appends an ALTERNATIVE, and `Add component` beside `Add cost` is two verbs for one act.
 The menu and the adders are drawn from one list, so they offer the same kinds in the same order, and no row inside the box draws the `or…` control.
+A result-side box draws one `alt <kind>` adder per offered kind, `alt component`, `alt currency` and `alt knowledge`, from the same list its set's `Result` adder offers.
 Choosing a kind turns a bare requirement into its box and so removes the trigger the menu would return focus to, so focus moves to the new alternative's name field, a tag alternative's being its `+ Tag`, rather than falling to the document, where Foundry's keybindings take the keys.
 Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
 
@@ -380,6 +381,30 @@ The per-option `tagMatch` (any / all) control is retained on every tag alternati
 The set-level **"Add essence"** control is retained and appends a single-option essence GROUP (an AND-required requirement), the only way to author a fresh essence-only requirement.
 The add-new essence OFFER — withholding a DISABLED essence, while keeping an already-authored one reachable — is applied where an essence is actually CHOSEN, which is the row's own field.
 An adder that names nothing cannot leak a disabled essence, so the adders gate on the system HAVING essences and the field narrows the list.
+
+#### A result choice group
+
+A recipe's flat reward row carries the `or…` control, headed **"Add an alternative"**, immediately before its remove; choosing a kind converts the row IN PLACE into a choice group whose first alternative is the row's own pick and whose second is an empty row of that kind, and focus moves to that row's name field.
+The group keeps the row's id, and it opens on **Any one of** with the player choosing, writing no setting of its own.
+A gathering task's result, a salvage result and a progressive stage carry no convert control, and the results tab's standing roll-budget strip on a progressive system adds that no stage offers a choice of reward.
+
+The group's header is one `role="group"` described by its help line, and its first line reads left to right as one sentence:
+
+- How many it awards: a `Select` offering **Any one of** and **Up to N of**; up to N opens on a fixed N of two.
+- N, under up to N only: the amount slot's Fixed | Rolled control, a fixed N held at two or more, and a rolled N exactly one expression in its place.
+- Repeats, under up to N by roll only: a neutral button naming its own state, **Unique** or **Repeats allowed**, defaulting to unique, its slot as wide as its wider word.
+- Who chooses: a segmented control, **Player chooses** | **Rolled**, which moves whole to its own line where the box is too narrow for one.
+
+Under a roll a second line carries the **Selection** expression, and the help line restates the cell in prose.
+Switching to rolled writes no range and no expression of its own; switching to the player hides the expression, every range and repeats, which the draft keeps so that switching back restores them and the save does not write; switching to any one of drops N and repeats.
+Removing alternatives down to one unwraps the group into that alternative, without the group's settings or its range.
+Focus moves to that row's `or…` control, never to the document.
+Removing any other result row, or an alternative from a group that stays a group, moves focus to the first control of the row taking its place, else of the row before it, else to the set's adder.
+
+Under a roll each alternative carries a RANGE CELL in its convert control's slot, after the row's divider: a d20 glyph titled **"Selection roll range"**, then two inline number fields named **"Lowest roll selecting {name}"** and **"Highest roll selecting {name}"**, `{name}` being the alternative's subject or, unnamed, its kind's word.
+A range overlapping another's, one whose lowest roll is above its highest, or one with an end that is not a whole number marks both fields invalid with its reason on a line of its own across the row.
+The reason is stated once a field is committed, on its `change` or `blur`, rather than on every keystroke; at a narrow width the cell follows the toggle and the amount on the row's second line.
+A rolled group with no rollable expression or a missing range, an up-to group with no N, a group of fewer than two alternatives, and any group in a progressive system's set are flagged by the Validation tab on their set and refused by the save, both reading one set of shape rules.
 
 Multi-set authoring is gated by **`Recipe.complex`** plus the mode's structural constraints (`simple` and `progressive` are one set to one group; alchemy forces a single set) — never by `resolutionMode` alone.
 

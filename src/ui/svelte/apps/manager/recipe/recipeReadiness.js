@@ -23,7 +23,10 @@
  */
 
 import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
+import { isChoiceGroup } from '../../../../../utils/choiceGroupShape.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
+
+import { groupProblems } from './resultGroupEdits.js';
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
@@ -334,6 +337,12 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
   return { issues, checks };
 }
 
+/** A set's awardable rows: each flat result, and each choice group's alternatives (issue 1773). */
+const awardRows = (group) =>
+  asArray(group?.results).flatMap((result) =>
+    isChoiceGroup(result) ? result.alternatives : [result]
+  );
+
 /**
  * A knowledge result naming a recipe its system does not hold, which every craft's pre-flight
  * refuses (issue 1773): one critical issue per offending set, and a check only on a recipe that
@@ -345,7 +354,7 @@ function collectTaughtRecipeReadiness(executionSteps, isMultiStep, systemRecipes
   let teaches = false;
   for (const step of executionSteps) {
     for (const group of step.resultGroups) {
-      const taught = asArray(group?.results).filter((result) => result?.kind === 'knowledge');
+      const taught = awardRows(group).filter((result) => result?.kind === 'knowledge');
       teaches ||= taught.length > 0;
       if (taught.every((result) => !result?.recipeId || known.has(result.recipeId))) continue;
       issues.push({
@@ -359,6 +368,47 @@ function collectTaughtRecipeReadiness(executionSteps, isMultiStep, systemRecipes
     }
   }
   const checks = teaches ? [{ id: 'taughtRecipesResolve', satisfied: issues.length === 0 }] : [];
+  return { issues, checks };
+}
+
+/** The issue each `groupProblems` code raises, in the order the Validation tab lists them; a set
+ *  holding a group under progressive, which awards every stage in order, raises `progressive`. */
+const CHOICE_GROUP_ISSUES = Object.freeze({
+  progressive: 'choiceGroupInProgressive',
+  tooFew: 'choiceGroupTooFew',
+  settings: 'choiceGroupSettings',
+  selection: 'choiceGroupSelection',
+  ranges: 'choiceGroupRanges',
+  count: 'choiceGroupCount',
+});
+
+/**
+ * What blocks a result set's choice groups from saving (issue 1773): one critical issue per set and
+ * problem, addressed to the set, and a check only on a recipe that holds a group.
+ */
+function collectChoiceGroupReadiness(executionSteps, isMultiStep, progressive) {
+  const issues = [];
+  let grouped = false;
+  for (const step of executionSteps) {
+    for (const set of step.resultGroups) {
+      const groups = asArray(set?.results).filter(isChoiceGroup);
+      grouped ||= groups.length > 0;
+      const found = new Set(groups.flatMap(groupProblems));
+      if (progressive && groups.length > 0) found.add('progressive');
+      for (const [code, id] of Object.entries(CHOICE_GROUP_ISSUES)) {
+        if (!found.has(code)) continue;
+        issues.push({
+          id,
+          severity: 'critical',
+          blocks: 'enable',
+          target: 'results',
+          ...focusTag(resultGroupTarget(set)),
+          ...stepTag(step, isMultiStep),
+        });
+      }
+    }
+  }
+  const checks = grouped ? [{ id: 'choiceGroupsValid', satisfied: issues.length === 0 }] : [];
   return { issues, checks };
 }
 
@@ -421,7 +471,8 @@ function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
  * Every check and issue for one projected recipe. `options` carries `systemComponents`, whose
  * absence no-ops overlap detection; `systemRecipes`, whose absence or emptiness no-ops the taught
  * recipe check; `routingProvider`, which gates the routed warnings on `check`;
- * `routedOutcomeTierOptions`, the system's policy-conditional tiers; and `alchemy` with
+ * `routedOutcomeTierOptions`, the system's policy-conditional tiers; `progressive`, the system's
+ * mode, under which a set may hold no choice group; and `alchemy` with
  * `signatureConflicts`, which drive the two enable blockers above and are ignored without it.
  */
 export function evaluateRecipeReadiness(recipe = {}, options = {}) {
@@ -493,6 +544,14 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
     checks.push(...taught.checks);
   }
 
+  const choiceGroups = collectChoiceGroupReadiness(
+    executionSteps,
+    isMultiStep,
+    options.progressive === true
+  );
+  issues.push(...choiceGroups.issues);
+  checks.push(...choiceGroups.checks);
+
   // The two blockers the enable path enforces and the generic readiness checks never inspect.
   const alchemyReadiness = collectAlchemyReadiness(recipe, alchemy, signatureConflicts);
   issues.push(...alchemyReadiness.issues);
@@ -537,6 +596,7 @@ export const CHECK_TO_ISSUES = Object.freeze({
   routedResultGroupsRouted: ['unroutedResultGroup'],
   routedOutcomeTiersProduced: ['unproducedOutcomeTier'],
   taughtRecipesResolve: ['missingTaughtRecipe'],
+  choiceGroupsValid: Object.values(CHOICE_GROUP_ISSUES),
   alchemyResultSelection: ['alchemyResultSelection'],
   noSignatureCollision: ['signatureCollision'],
 });

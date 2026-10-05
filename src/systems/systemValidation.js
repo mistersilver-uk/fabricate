@@ -111,6 +111,18 @@ const READINESS_ISSUE_MESSAGES = {
   requirementOverlap: 'Two ingredient requirements can be satisfied by the same component.',
   unroutedResultGroup: 'A result group is not routed to any crafting-check outcome.',
   unproducedOutcomeTier: 'A crafting-check outcome tier produces no result group.',
+  missingTaughtRecipe: 'A result teaches a recipe that is no longer in this system.',
+  choiceGroupInProgressive:
+    'A result set holds a choice of rewards, which a progressive system cannot award.',
+  choiceGroupTooFew: 'A choice of rewards holds fewer than two alternatives.',
+  choiceGroupSettings:
+    'A choice of rewards names a chooser or an award rule Fabricate does not recognise.',
+  choiceGroupSelection: 'A rolled choice of rewards has no selection roll that can be rolled.',
+  choiceGroupRanges:
+    'A rolled choice of rewards has a missing, backwards, fractional or overlapping range.',
+  choiceGroupCount: 'An up-to choice of rewards does not say how many it awards.',
+  alchemyResultSelection: 'An alchemy recipe does not resolve to exactly one result set.',
+  signatureCollision: 'The recipe shares its ingredient signature with another recipe.',
   disabledIncomplete: 'Recipe is disabled and cannot be enabled until its gaps are fixed.',
   noAvailableTasks: 'Environment has no available gathering tasks.',
   activeNoComposition: 'Environment is active but composes no available tasks.',
@@ -190,6 +202,7 @@ function collectRecipeIssues(system, recipes, systemComponents) {
       systemComponents,
       routingProvider,
       routedOutcomeTierOptions,
+      progressive: mode === 'progressive',
     });
     for (const issue of recipeIssues) {
       issues.push(tagRecipeIssue(issue, projected));

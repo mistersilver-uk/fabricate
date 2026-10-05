@@ -252,8 +252,7 @@
     updateIngredientSetTools(stepId, setId, (ids) => ids.filter((id) => id !== toolId));
   }
 
-  // Deleting a step removes the whole step — its ingredients, results and tools. The root confirms
-  // with wording contextual to where the delete was triggered.
+  // Deleting a step removes its ingredients, results and tools; the root words the confirm.
   function deleteStepFrom(context) {
     return (stepId) => onDeleteStep(stepId, context);
   }
@@ -272,11 +271,11 @@
         routedOutcomeTierOptions,
         alchemy,
         signatureConflicts,
+        progressive,
       }
     )
   );
-  // THE BADGE IS THE VALIDATION TAB'S OWN COUNTS, READ THROUGH THE SHARED TALLY (issue 1517): two
-  // numbers describing one screen have to be one number.
+  // The badge is the Validation tab's own counts through the shared tally (issue 1517).
   const validationCounts = $derived(countRecipeReadiness(readiness));
   const errorCount = $derived(validationCounts.blocking);
   const warningCount = $derived(validationCounts.warnings);
@@ -581,6 +580,7 @@
             {routedOutcomeTierOptions}
             {alchemy}
             {signatureConflicts}
+            {progressive}
             systemRecipes={recipeOptions}
             onSelectIssue={selectIssue}
           />

@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  CHOICE_GROUP_RAW_MODULES,
+  CHOICE_GROUP_COMPILED_MODULES,
   createMountedComponentHarness,
   KIND_MENU_COMPILED_MODULES,
   KIND_MENU_RAW_MODULES,
@@ -137,6 +139,7 @@ const RAW_MODULES = [
   'src/utils/fillPlaceholders.js',
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   ...KIND_MENU_RAW_MODULES,
+  ...CHOICE_GROUP_RAW_MODULES,
   // A progressive stage row draws its component's complications read-only (issue 1286).
   'src/ui/model/complicationSummary.js',
   'src/systems/characterPrerequisites.js',
@@ -183,6 +186,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte',
   ...KIND_MENU_COMPILED_MODULES,
+  ...CHOICE_GROUP_COMPILED_MODULES,
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
@@ -2986,6 +2990,12 @@ describe('RecipeEditView (mounted)', () => {
     const results = target.querySelector('[data-recipe-section="results"]');
     const card = reorderCard(target);
     assert.ok(strip && results && card);
+    // …and it is the one place a progressive recipe says a stage offers no choice (issue 1773).
+    assert.match(strip.textContent, /so no stage offers a choice of reward/);
+    const saying = [...target.querySelectorAll('.manager-callout')].filter((callout) =>
+      /choice of reward/.test(callout.textContent)
+    );
+    assert.equal(saying.length, 1, 'said once, never again per set');
     assert.ok(
       card.compareDocumentPosition(strip) & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
       'the info strip follows the reorder card'
@@ -3877,6 +3887,11 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(
       box.classList.contains('has-alternatives'),
       'a multi-alternative requirement renders the alternatives box'
+    );
+    // Scenario "A GM authors an ingredient-side choice group" (issue 1773).
+    assert.ok(
+      !box.querySelector('[data-recipe-group-header], [data-recipe-group-chooser]'),
+      'an ingredient-side group renders neither a chooser nor an award strategy'
     );
     editHarness.remount();
   });
@@ -5878,6 +5893,31 @@ describe('RecipeEditView (mounted)', () => {
     assert.deepEqual(await offered({ ...AWARDS, currencyUnits: [], knowledgeObservable: false }), [
       'component',
     ]);
+  });
+
+  // The system's mode reaches the Validation tab (issue 1773): a progressive set holding a group
+  // is flagged there, and the editor's badge counts it.
+  it('threads progressive to the Validation tab, which flags a choice group in a set', async () => {
+    const choice = {
+      id: 'cg',
+      alternatives: [
+        { id: 'a', componentId: 'cmp-herb' },
+        { id: 'b', componentId: 'cmp-water' },
+      ],
+    };
+    const { target } = await mountResultGroups([{ id: 'grp-1', results: [choice] }], {
+      props: { progressive: true },
+    });
+    await openTab(target, 'validation');
+    assert.equal(
+      target.querySelector('[data-check="choiceGroupsValid"]')?.dataset.satisfied,
+      'false'
+    );
+    assert.match(
+      target.querySelector('[data-check="choiceGroupsValid"]').textContent,
+      /awards every stage in order/
+    );
+    editHarness.remount();
   });
 
   // Every path the kinds reach a result set through, one each (issue 1773): a forward dropped on

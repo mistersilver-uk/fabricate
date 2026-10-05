@@ -438,6 +438,18 @@ Who picks the alternative a RESULT-side **Choice Group** awards: the PLAYER, or 
 
 [Notes](docs/domain/terms.md#chooser)
 
+#### Selection Roll
+
+The roll a RESULT-side **Choice Group** makes when the ROLL is its **Chooser**: one roll per alternative awarded, read against the alternatives' **Selection Ranges**.
+
+[Notes](docs/domain/terms.md#selection-roll)
+
+#### Selection Range
+
+The lowest and highest **Selection Roll** that select one alternative of a rolled **Choice Group**: whole numbers, never overlapping, and free to leave gaps.
+
+[Notes](docs/domain/terms.md#selection-range)
+
 #### Pending Award Choice
 
 A choice group whose chooser is the player that has been awarded but awaits settlement.

@@ -11,6 +11,8 @@ import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js'
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
+  CHOICE_GROUP_RAW_MODULES,
+  CHOICE_GROUP_COMPILED_MODULES,
   KIND_MENU_COMPILED_MODULES,
   KIND_MENU_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -35,6 +37,7 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...KIND_MENU_RAW_MODULES,
+    ...CHOICE_GROUP_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     ...TOOL_TREE_RAW_MODULES,
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
@@ -113,6 +116,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
     'src/ui/svelte/components/Field.svelte',
     ...KIND_MENU_COMPILED_MODULES,
+    ...CHOICE_GROUP_COMPILED_MODULES,
     // The per-row match-type segmented control those three render.
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Pagination.svelte',

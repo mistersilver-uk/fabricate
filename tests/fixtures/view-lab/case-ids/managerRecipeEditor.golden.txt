@@ -39,6 +39,15 @@ manager-recipe-edit-results-kinds-narrow
 manager-recipe-edit-results-currency-body-empty
 manager-recipe-edit-results-currency-body-filled
 manager-recipe-edit-results-adder-menu
+manager-recipe-edit-results-group-player-anyone
+manager-recipe-edit-results-group-player-upto
+manager-recipe-edit-results-group-rolled-anyone
+manager-recipe-edit-results-group-rolled-upto-repeats
+manager-recipe-edit-results-group-rolled-upto-repeats-narrow
+manager-recipe-edit-results-group-rolled-overlap
+manager-recipe-edit-results-group-rolled-overlap-narrow
+manager-recipe-edit-validation-choice-group
+manager-recipe-edit-results-group-failure-role
 manager-recipe-edit-results-learning-off
 manager-recipe-edit-results-missing-recipe
 manager-multistep-disable-confirm

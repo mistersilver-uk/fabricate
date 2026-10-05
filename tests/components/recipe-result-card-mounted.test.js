@@ -87,6 +87,12 @@ async function choose(input) {
   await settle();
 }
 
+/** A field's `change`, which commits what was typed. */
+async function commit(field) {
+  field.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+  await settle();
+}
+
 async function type(field, text) {
   field.focus();
   field.value = text;
@@ -455,5 +461,453 @@ describe('RecipeResultGroupCard: what a result row offers', () => {
       resultKinds: off,
     });
     assert.ok(rows(target)[0].querySelector('[data-recipe-currency-readonly]'));
+  });
+});
+
+describe('RecipeResultGroupCard: focus after a removal (issue 1773)', () => {
+  it('moves to the row taking the removed one’s place, else the one before, else the adder', async () => {
+    const { target } = await mountCard(
+      ['r1', 'r2', 'r3'].map((id) => ({ id, componentId: 'cmp-herb', quantity: 1 })),
+      { resultKinds: ALL_KINDS }
+    );
+    const active = () => target.ownerDocument.activeElement;
+    const remove = async (index) => {
+      rows(target)[index].querySelector('[data-recipe-remove="result-item"]').click();
+      await settle();
+      await settle();
+    };
+    await remove(0);
+    assert.ok(active() === rows(target)[0].querySelector(KIND_TRIGGER), 'the next row’s');
+    await remove(1);
+    assert.ok(active() === rows(target)[0].querySelector(KIND_TRIGGER), 'the one before');
+    await remove(0);
+    assert.equal(rows(target).length, 0);
+    assert.ok(active() === target.querySelector(ADDER), 'the set’s adder');
+  });
+});
+
+describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
+  const members = (target) => [...target.querySelectorAll('[data-recipe-result-member]')];
+  const chooserRadio = (target, value) =>
+    target.querySelector(`[data-recipe-group-chooser="${value}"] input`);
+  const help = (target) => target.querySelector('[data-recipe-group-help]');
+  const PLAYER_GROUP = Object.freeze({
+    id: 'g1',
+    alternatives: [
+      { id: 'a', componentId: 'cmp-herb', quantity: 2 },
+      { id: 'b', componentId: 'cmp-water', quantity: 1 },
+    ],
+  });
+
+  const mountGroup = (group, extra = {}) =>
+    mountCard([group], { resultKinds: ALL_KINDS, ...extra });
+
+  it('converts a reward row in place: it keeps its id as the group, which opens on any one of, the player choosing', async () => {
+    const { target, groups } = await mountGroup({ id: 'r1', componentId: 'cmp-herb', quantity: 2 });
+    rows(target)[0].querySelector('.manager-recipe-or-trigger').click();
+    await settle();
+    const menu = target.ownerDocument.querySelector(':scope .manager-recipe-or-menu');
+    assert.equal(
+      menu.querySelector('.manager-action-menu-heading').textContent.trim(),
+      'Add an alternative'
+    );
+    const entries = [...menu.querySelectorAll('[role="menuitem"]')];
+    assert.deepEqual(
+      entries.map((entry) => entry.textContent.trim()),
+      ['Component', 'Currency', 'Recipe knowledge'],
+      'the convert menu states the set’s subset'
+    );
+    entries[1].click();
+    await settle();
+    await settle();
+
+    const [group] = groups.at(-1).results;
+    assert.equal(group.id, 'r1');
+    assert.deepEqual(new Set(Object.keys(group)), new Set(['alternatives', 'id']), 'no setting');
+    const [first, added] = group.alternatives;
+    assert.deepEqual({ ...first, id: 'x' }, { id: 'x', componentId: 'cmp-herb', quantity: 2 });
+    assert.deepEqual({ ...added, id: 'y' }, { id: 'y', kind: 'currency', unit: '', quantity: 1 });
+    assert.notEqual(first.id, added.id);
+    assert.notEqual(first.id, group.id, 'the pick takes a fresh id; the row’s id is the group’s');
+
+    assert.equal(rows(target).length, 0, 'the bare row became the box');
+    assert.equal(members(target).length, 2);
+    assert.ok(chooserRadio(target, 'playerChooses').checked);
+    assert.ok(!target.querySelector('.manager-recipe-or-trigger'), 'no member converts again');
+    assert.ok(!target.querySelector('[data-recipe-range-cell]'), 'no range without a roll');
+    assert.ok(!target.querySelector('[data-recipe-group-count]'), 'no N under any one of');
+    assert.ok(!target.querySelector('[data-recipe-group-repeats]'));
+    assert.ok(
+      target.ownerDocument.activeElement === nameField(members(target)[1]),
+      'focus lands on the new alternative’s name field'
+    );
+    const head = target.querySelector('[data-recipe-group-header]');
+    assert.equal(head.getAttribute('aria-describedby'), help(target).id);
+    assert.equal(
+      help(target).textContent.trim(),
+      'The player picks one of these when the result is awarded.'
+    );
+  });
+
+  it('a failed check’s reserved set converts on the same terms as any other set', async () => {
+    const { target, groups } = await mountGroup(
+      { id: 'f1', componentId: 'cmp-water', quantity: 1 },
+      { reserved: true, staticLabel: 'On a failed check', hideRemove: true }
+    );
+    rows(target)[0].querySelector('.manager-recipe-or-trigger').click();
+    await settle();
+    target.ownerDocument.querySelector(':scope .manager-recipe-or-menu [role="menuitem"]').click();
+    await settle();
+    assert.equal(groups.at(-1).results[0].alternatives.length, 2);
+    await choose(chooserRadio(target, 'rolled'));
+    assert.equal(groups.at(-1).results[0].chooser, 'rolled');
+    assert.ok(target.querySelector('[data-recipe-group-strategy]'), 'with the award strategy');
+  });
+
+  it('a gathering row and a progressive stage carry no convert control', async () => {
+    const gathering = await mountGroup(
+      { id: 'r1', componentId: 'cmp-herb', quantity: 2 },
+      { surface: undefined }
+    );
+    assert.ok(!gathering.target.querySelector('.manager-recipe-or-trigger'));
+    harness.remount();
+    const stage = await mountGroup({ id: 's1', componentId: 'cmp-herb' }, { progressive: true });
+    assert.ok(!stage.target.querySelector('.manager-recipe-or-trigger'));
+  });
+
+  it('switches to rolled writing no ranges and no expression, and its rows gain range cells', async () => {
+    const { target, groups } = await mountGroup(PLAYER_GROUP);
+    await choose(chooserRadio(target, 'rolled'));
+    assert.deepEqual(groups.at(-1).results[0], { ...PLAYER_GROUP, chooser: 'rolled' });
+    assert.equal(target.querySelectorAll('[data-recipe-range-cell]').length, 2);
+    assert.ok(target.querySelector('[data-recipe-group-selection]'), 'the selection line opens');
+    const labels = [...members(target)[0].querySelectorAll('[data-recipe-range]')].map((input) =>
+      input.closest('label').textContent.trim()
+    );
+    assert.deepEqual(labels, [
+      'Lowest roll selecting Mountain Herb',
+      'Highest roll selecting Mountain Herb',
+    ]);
+  });
+
+  it('up to N by roll offers repeats, defaulting to unique; the player hides them until rolled again', async () => {
+    const { target, groups } = await mountGroup({ ...PLAYER_GROUP, chooser: 'rolled' });
+    chooseSelectOption(target, '[data-recipe-group-strategy]', 'upTo');
+    await settle();
+    assert.deepEqual(groups.at(-1).results[0], {
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      awardStrategy: 'upTo',
+      awardCount: 2,
+    });
+    const repeats = () => target.querySelector('[data-recipe-group-repeats]');
+    assert.equal(repeats().getAttribute('data-recipe-group-repeats'), 'unique');
+    repeats().click();
+    await settle();
+    assert.equal(groups.at(-1).results[0].withReplacement, true);
+    assert.equal(repeats().getAttribute('data-recipe-group-repeats'), 'repeats');
+    await type(target.querySelector('[data-recipe-group-selection]'), '1d20');
+    assert.equal(groups.at(-1).results[0].selectionFormula, '1d20');
+    assert.match(help(target).textContent, /the same one may come up twice/);
+
+    await choose(chooserRadio(target, 'playerChooses'));
+    assert.deepEqual(groups.at(-1).results[0], {
+      ...PLAYER_GROUP,
+      awardStrategy: 'upTo',
+      awardCount: 2,
+      withReplacement: true,
+      selectionFormula: '1d20',
+    });
+    assert.ok(!repeats(), 'a player picking from a list they can see cannot repeat');
+    assert.ok(!target.querySelector('[data-recipe-group-selection]'), 'nor sees a selection roll');
+
+    await choose(chooserRadio(target, 'rolled'));
+    assert.equal(repeats().getAttribute('data-recipe-group-repeats'), 'repeats', 'restored');
+    assert.equal(target.querySelector('[data-recipe-group-selection]').value, '1d20');
+    repeats().click();
+    await settle();
+    assert.equal(Object.hasOwn(groups.at(-1).results[0], 'withReplacement'), false, 'unique');
+    assert.equal(repeats().getAttribute('data-recipe-group-repeats'), 'unique');
+  });
+
+  it('re-picking the current strategy keeps the rolled N and repeats, writing nothing', async () => {
+    const { target, groups } = await mountGroup({
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      awardStrategy: 'upTo',
+      awardCountFormula: '1d3',
+      withReplacement: true,
+    });
+    chooseSelectOption(target, '[data-recipe-group-strategy]', 'upTo');
+    await settle();
+    assert.equal(groups.length, 0, 'the strategy already chosen is no edit');
+    assert.equal(
+      target.querySelector('[data-recipe-group-repeats]').getAttribute('data-recipe-group-repeats'),
+      'repeats'
+    );
+  });
+
+  it('restates each cell in its own help line, N included', async () => {
+    const rolled = { chooser: 'rolled', selectionFormula: '1d20' };
+    const CELLS = [
+      [{}, 'The player picks one of these when the result is awarded.'],
+      [
+        { awardStrategy: 'upTo', awardCount: 3 },
+        'The player picks up to 3 of these when the result is awarded.',
+      ],
+      [rolled, 'The selection roll decides which one is awarded.'],
+      [
+        { ...rolled, awardStrategy: 'upTo', awardCount: 3 },
+        'The selection roll awards up to 3 of these, once per award, never the same one twice.',
+      ],
+      [
+        { ...rolled, awardStrategy: 'upTo', awardCountFormula: '1d4', withReplacement: true },
+        'The selection roll awards 1d4 of these, once per award, so the same one may come up twice.',
+      ],
+    ];
+    for (const [settings, said] of CELLS) {
+      const { target } = await mountGroup({ ...PLAYER_GROUP, ...settings });
+      assert.equal(help(target).textContent.trim(), said);
+      harness.remount();
+    }
+  });
+
+  it('words a selection and a count the floor refuses as what each decides', () =>
+    withRoll(SEEDED_ROLL, async () => {
+      const { target } = await mountGroup({
+        ...PLAYER_GROUP,
+        chooser: 'rolled',
+        selectionFormula: '0',
+        awardStrategy: 'upTo',
+        awardCountFormula: 'max(, 2)',
+      });
+      const selection = target.querySelector('[data-recipe-group-selection]');
+      assert.equal(selection.getAttribute('aria-invalid'), 'true');
+      const said = (field) =>
+        target.querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent.trim();
+      assert.equal(said(selection), 'This selection roll can never total more than 0.');
+      const header = target.querySelector('[data-recipe-group-header]');
+      const count = header.querySelector(
+        ':scope [data-recipe-option-formula]:not([data-recipe-group-selection])'
+      );
+      assert.equal(said(count), 'This count cannot be rolled.');
+    }));
+
+  it('names the N stepper’s buttons for what they change', async () => {
+    const { target } = await mountGroup({ ...PLAYER_GROUP, awardStrategy: 'upTo', awardCount: 3 });
+    const stepper = target.querySelector('[data-recipe-group-count]').parentElement;
+    assert.equal(
+      stepper.querySelector('[data-stepper-decrement]').getAttribute('aria-label'),
+      'Award fewer'
+    );
+    assert.equal(
+      stepper.querySelector('[data-stepper-increment]').getAttribute('aria-label'),
+      'Award more'
+    );
+  });
+
+  it('holds a fixed N at two or more', async () => {
+    const { target, groups } = await mountGroup({
+      ...PLAYER_GROUP,
+      awardStrategy: 'upTo',
+      awardCount: 2,
+    });
+    const count = target.querySelector('[data-recipe-group-count]');
+    assert.equal(count.getAttribute('min'), '2');
+    assert.ok(count.parentElement.querySelector('[data-stepper-decrement]').disabled);
+    await type(count, '1');
+    assert.equal(groups.length, 0, 'a typed one is held at two, which writes nothing');
+    await type(count, '3');
+    assert.equal(groups.at(-1).results[0].awardCount, 3);
+  });
+
+  it('marks an overlap and a backwards range invalid, each with its reason on its own line', async () => {
+    const { target } = await mountGroup({
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      selectionFormula: '1d20',
+      alternatives: [
+        { id: 'a', componentId: 'cmp-herb', quantity: 1, selectionRange: { from: 1, to: 10 } },
+        { id: 'b', componentId: 'cmp-water', quantity: 1, selectionRange: { from: 8, to: 20 } },
+      ],
+    });
+    const problem = (row) => row.querySelector('[data-recipe-range-problem]')?.textContent.trim();
+    assert.deepEqual(members(target).map(problem), [
+      'Its range overlaps the range of Pure Water.',
+      'Its range overlaps the range of Mountain Herb.',
+    ]);
+    const low = members(target)[0].querySelector('[data-recipe-range="from"]');
+    assert.equal(low.getAttribute('aria-invalid'), 'true');
+    assert.equal(
+      low.getAttribute('aria-describedby'),
+      members(target)[0].querySelector('[data-recipe-range-problem]').id
+    );
+
+    const second = members(target)[1].querySelector('[data-recipe-range="from"]');
+    await type(second, '25');
+    assert.deepEqual(
+      members(target).map(problem),
+      [
+        'Its range overlaps the range of Pure Water.',
+        'Its range overlaps the range of Mountain Herb.',
+      ],
+      'a bound being typed states nothing new'
+    );
+    await commit(second);
+    assert.deepEqual(members(target).map(problem), [
+      undefined,
+      'Its lowest roll is above its highest.',
+    ]);
+  });
+
+  it('draws the cell after a divider under a titled d20, and writes the end each field names', async () => {
+    const { target, groups } = await mountGroup({
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      alternatives: [
+        { id: 'a', componentId: 'cmp-herb', quantity: 1, selectionRange: { from: 1, to: 10 } },
+        { id: 'b', componentId: 'cmp-water', quantity: 1, selectionRange: { from: 11, to: 20 } },
+      ],
+    });
+    const cell = members(target)[0].querySelector('[data-recipe-range-cell]');
+    assert.ok(cell.previousElementSibling.classList.contains('manager-recipe-option-divider'));
+    const glyph = cell.querySelector('.fa-dice-d20');
+    assert.equal(glyph.getAttribute('aria-hidden'), 'true');
+    assert.equal(glyph.getAttribute('title'), 'Selection roll range');
+
+    await type(cell.querySelector('[data-recipe-range="to"]'), '12');
+    const range = () => groups.at(-1).results[0].alternatives[0].selectionRange;
+    assert.deepEqual(range(), { from: 1, to: 12 }, 'the highest roll writes `to`');
+    await type(cell.querySelector('[data-recipe-range="from"]'), '');
+    assert.deepEqual(range(), { from: null, to: 12 }, 'a cleared end is no end, not 0');
+  });
+
+  it('names an unnamed alternative by its kind, as its row does', async () => {
+    const { target } = await mountGroup({
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      alternatives: [
+        { id: 'a', kind: 'currency', unit: '', quantity: 1, selectionRange: { from: 1, to: 10 } },
+        { id: 'b', componentId: 'cmp-water', quantity: 1, selectionRange: { from: 5, to: 20 } },
+      ],
+    });
+    const [unnamed, water] = members(target);
+    assert.equal(
+      water.querySelector('[data-recipe-range-problem]').textContent.trim(),
+      'Its range overlaps the range of Currency.'
+    );
+    assert.equal(
+      unnamed.querySelector('[data-recipe-range="from"]').closest('label').textContent.trim(),
+      'Lowest roll selecting Currency'
+    );
+  });
+
+  it('marks a range with a fractional end invalid, saying why', async () => {
+    const { target } = await mountGroup({
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      alternatives: [
+        { id: 'a', componentId: 'cmp-herb', quantity: 1, selectionRange: { from: 1, to: 2.5 } },
+        { id: 'b', componentId: 'cmp-water', quantity: 1, selectionRange: { from: 3, to: 20 } },
+      ],
+    });
+    const [first, second] = members(target);
+    assert.equal(
+      first.querySelector('[data-recipe-range-problem]')?.textContent.trim(),
+      'Its range must run between whole numbers.'
+    );
+    assert.equal(
+      first.querySelector('[data-recipe-range="to"]').getAttribute('aria-invalid'),
+      'true'
+    );
+    assert.ok(!second.querySelector('[data-recipe-range-problem]'), 'its neighbour is sound');
+  });
+
+  it('retyping a rolled member keeps its range', async () => {
+    const { target, groups } = await mountGroup({
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      alternatives: [
+        { id: 'a', componentId: 'cmp-herb', quantity: 1, selectionRange: { from: 1, to: 10 } },
+        { id: 'b', componentId: 'cmp-water', quantity: 1, selectionRange: { from: 11, to: 20 } },
+      ],
+    });
+    chooseSelectOption(target, KIND_TRIGGER, 'currency');
+    await settle();
+    const [retyped] = groups.at(-1).results[0].alternatives;
+    assert.equal(retyped.kind, 'currency');
+    assert.deepEqual(retyped.selectionRange, { from: 1, to: 10 });
+    assert.equal(members(target)[0].querySelector('[data-recipe-range="to"]').value, '10');
+  });
+
+  it('removing down to one member unwraps it, dropping the group’s settings and its range', async () => {
+    const { target, groups } = await mountGroup({
+      id: 'g1',
+      chooser: 'rolled',
+      awardStrategy: 'upTo',
+      awardCount: 2,
+      withReplacement: true,
+      selectionFormula: '1d20',
+      alternatives: [
+        { id: 'a', componentId: 'cmp-herb', quantity: 1, selectionRange: { from: 1, to: 10 } },
+        { id: 'b', componentId: 'cmp-water', quantity: 3, selectionRange: { from: 11, to: 20 } },
+      ],
+    });
+    members(target)[0].querySelector('[data-recipe-remove="result-alternative"]').click();
+    await settle();
+    await settle();
+    assert.deepEqual(groups.at(-1).results, [{ id: 'b', componentId: 'cmp-water', quantity: 3 }]);
+    assert.equal(rows(target).length, 1, 'a flat row again');
+    assert.ok(
+      target.ownerDocument.activeElement ===
+        rows(target)[0].querySelector('.manager-recipe-or-trigger'),
+      'focus moves to the survivor’s or…, never to the document'
+    );
+  });
+
+  it('removing a member of three moves focus to the member taking its place, else the one before', async () => {
+    const herb = (id) => ({ id, componentId: 'cmp-herb', quantity: 1 });
+    const { target } = await mountGroup({ id: 'g1', alternatives: ['a', 'b', 'c', 'd'].map(herb) });
+    const removeMember = async (index) => {
+      members(target)[index].querySelector('[data-recipe-remove="result-alternative"]').click();
+      await settle();
+    };
+    const active = () => target.ownerDocument.activeElement;
+    await removeMember(1);
+    assert.ok(active() === members(target)[1].querySelector(KIND_TRIGGER), 'the next member’s');
+    await removeMember(2);
+    assert.equal(members(target).length, 2);
+    assert.ok(active() === members(target)[1].querySelector(KIND_TRIGGER), 'the one before');
+  });
+
+  it('removing a group’s last alternative removes the whole entry', async () => {
+    const { target, groups } = await mountGroup({
+      id: 'g1',
+      alternatives: [{ id: 'a', componentId: 'cmp-herb', quantity: 1 }],
+    });
+    members(target)[0].querySelector('[data-recipe-remove="result-alternative"]').click();
+    await settle();
+    assert.deepEqual(groups.at(-1).results, []);
+  });
+
+  it('draws one `alt <kind>` adder per offered kind, appending an empty member that takes focus', async () => {
+    const { target, groups } = await mountGroup(PLAYER_GROUP);
+    const adders = [...target.querySelectorAll('[data-recipe-add^="alternative-"]')];
+    assert.deepEqual(
+      adders.map((adder) => [adder.getAttribute('data-recipe-add'), adder.textContent.trim()]),
+      [
+        ['alternative-component', 'alt component'],
+        ['alternative-currency', 'alt currency'],
+        ['alternative-knowledge', 'alt knowledge'],
+      ]
+    );
+    adders[2].click();
+    await settle();
+    const added = groups.at(-1).results[0].alternatives[2];
+    assert.deepEqual(
+      { ...added, id: 'x' },
+      { id: 'x', kind: 'knowledge', recipeId: '', quantity: 1 }
+    );
+    assert.ok(target.ownerDocument.activeElement === nameField(members(target)[2]));
   });
 });

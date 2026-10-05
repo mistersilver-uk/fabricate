@@ -1,5 +1,4 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): PickerRow is promoted to a manager-only primitive at target, because the recipe ingredient card and the result card now both draw it (issue 1516) -->
 <!--
   The one requirement row: a kind plate, a kind select, a name field that is a search until it is
   named and a pill after, an amount, and the caller's trailing controls. Its anatomy is specified in
@@ -18,6 +17,7 @@
   | `rollable` / `removable` | booleans | `false` / `true` | The Fixed \| Rolled toggle on a `component` or `currency` row; and the remove button. |
   | `reward` | boolean | `false` | A result surface's row: a named currency row opens its naming body and a knowledge row its help line, `PickerRowRewardBody.svelte`, beneath it. A knowledge row naming a recipe absent from `catalogue` draws the missing face. |
   | `allowAny` | boolean | `false` | The `or…` kind menu, `PickerRowKindMenu.svelte`, after the amount and a divider, offering `kinds`. |
+  | `menuHeading` / `menuHint` | localized strings | `''` | That menu's eyebrow and its trigger's tooltip; empty reads the ingredient side's. |
   | `clearable` / `removeHook` | boolean / string | `true` / `'alternative'` | The named pill's clear; and the remove's `data-recipe-remove` value. The remove is `Remove {name}` and the kind select `Kind of {name}`, `{name}` being the subject's or, unnamed, the kind's. |
   | `nameProps` / `removeProps` | attribute objects | `{}` | A caller's own hooks on the name field and on the remove, spread before the row's own. |
 
@@ -66,6 +66,8 @@
     READONLY_FACES,
     isKnownKind,
     kindMeta,
+    kindWord as wordOfKind,
+    subjectName as nameOfSubject,
   } from './pickerRowKinds.js';
 
   tagMatchGroupSeq += 1;
@@ -87,6 +89,8 @@
     removeProps = {},
     class: className = '',
     allowAny = false,
+    menuHeading = '',
+    menuHint = '',
     reward = false,
     trailing = null,
     onChange = () => {},
@@ -112,7 +116,7 @@
   const chosen = $derived(
     value?.id ? entries.find((entry) => entry.id === value.id) || null : null
   );
-  const subjectName = $derived(chosen?.label || kindWord(matchType));
+  const subjectName = $derived(nameOfSubject(value, catalogue, localizeOr));
   // A taught recipe its system no longer holds: named as missing rather than drawn unnamed.
   const missing = $derived(!readonly && matchType === 'knowledge' && Boolean(value?.id) && !chosen);
 
@@ -123,8 +127,7 @@
       .map(({ id, label, icon }) => ({ id, label, icon }))
   );
 
-  const kindWord = (kind) =>
-    isKnownKind(kind) ? localizeOr(kindMeta(kind).labelKey, kindMeta(kind).label) : String(kind);
+  const kindWord = (kind) => wordOfKind(kind, localizeOr);
   // The caller's kinds in table order, plus this row's own kind always.
   const kindOptions = $derived(
     [...KIND_ORDER, ...(misconfigured ? [matchType] : [])]
@@ -380,7 +383,7 @@
 
     {#if allowAny}
       <span class="manager-recipe-option-divider" aria-hidden="true"></span>
-      <PickerRowKindMenu {kinds} {disabled} {onSelect} />
+      <PickerRowKindMenu {kinds} {disabled} heading={menuHeading} hint={menuHint} {onSelect} />
     {/if}
 
     <!-- One line, so a row with no `trailing` gains no text node. -->

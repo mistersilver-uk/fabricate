@@ -61,6 +61,13 @@ export function recipeResultKinds({
   };
 }
 
+/** Which floor a roll expression fails, `unrollable` or `neverPositive`, or `null` for none. */
+export function formulaFloorProblem(quantityFormula) {
+  const formula = normalizeQuantityFormula(quantityFormula);
+  if (quantityFormulaErrors(formula, diceEngine()).length === 0) return null;
+  return maximisedTotal(formula) === null ? 'unrollable' : 'neverPositive';
+}
+
 /**
  * `PickerRow`'s `invalid` for `result`: its amount's floor error in `text`'s words, a fixed
  * currency amount that is not whole, which every craft would refuse, else none.
@@ -75,10 +82,11 @@ export function resultAmountInvalid(result, text) {
       ),
     };
   }
-  if (quantityFormulaErrors(formula, diceEngine()).length === 0) return {};
+  const problem = formulaFloorProblem(formula);
+  if (!problem) return {};
   return {
     amount:
-      maximisedTotal(formula) === null
+      problem === 'unrollable'
         ? text(
             'FABRICATE.Admin.Manager.Recipe.AmountUnrollable',
             'This expression cannot be rolled.'

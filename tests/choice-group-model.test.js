@@ -152,6 +152,7 @@ test('1773: Result.validate refuses every malformed group', () => {
   assert.match(rolled([ranged('a', 1, 3), member('b')]), /needs a selecting range/);
   assert.match(rolled([ranged('a', 1, 4), ranged('b', 4, 6)]), /cannot overlap/);
   assert.match(rolled([ranged('a', 3, 1), ranged('b', 4, 6)]), /cannot start above its end/);
+  assert.match(rolled([ranged('a', 1, 3.5), ranged('b', 4, 6)]), /between whole numbers/);
   assert.match(errors({ ...CELLS.playerAnyOne, chooser: 'gm' }), /Chooser "gm"/);
   assert.match(
     errors({ ...CELLS.playerAnyOne, alternatives: [member('a'), { id: 'b', quantity: 1 }] }),

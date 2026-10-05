@@ -1466,7 +1466,7 @@ A set MUST be renameable in the surface that shows it, because every other surfa
 A set addressable only by position is what makes reordering dangerous.
 
 A CHOICE GROUP is this document's name for the OR-alternative bundle `DOMAIN.md` calls an Ingredient Group, widened because the same bundle is valid on the result side where "ingredient" would be wrong.
-It ships as `ChoiceGroup`, in its ingredient-side form, at one caller.
+It ships as `ChoiceGroup` in both forms, the result-side form adding the award header; its alternative adders follow `ui-entity-editors` rather than the specimen, recorded `divergent` (issue 1516).
 On the ingredient side it is exactly that OR: the crafter spends one alternative and the rest are untouched.
 On the RESULT side the bundle is not always exclusive — its award strategy states how many of its alternatives are handed over — so the name is retained for the shape the two sides share, which is a set of alternatives authored as one thing, rather than for the cardinality, which differs by side.
 Where the two documents are read together, they name one thing.
