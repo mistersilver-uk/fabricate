@@ -1762,7 +1762,8 @@ An empty table keeps its heading and count, drops the header row, and says what 
 
 Every editor’s validation surface MUST use one arrangement: a verdict stating in the product’s own words what the blocking issues prevent, then the pass, warning and blocking counts in that order, then the issues grouped by the part of the record they belong to, in the order the editor’s own tabs run.
 It is a full-width screen with no inspector rail, because the issues are the content.
-The manager's shell selects full width per VIEW rather than per tab, so an editor whose validation is a tab either becomes a full-width view or states why it keeps its third column; two shipped editors repurpose that column rather than reserving it for an inspector.
+The manager's shell selects full width per view, or per editor state where a predicate reads one (the gathering task editor's result modes, and every tab but Results).
+An editor whose validation is a tab is full width there or states why it keeps its third column: the Tool editor keeps it for its own content (`self-owned-3-track`), and the essence editor keeps the shared rail for its behaviour preview, which is recorded debt.
 A passing group still renders, so a GM sees what was checked rather than inferring it from silence, and blocking issues sort above warnings inside a group.
 A site MAY pass `issuesFirst` to lift warnings above passes as well, so every issue precedes every pass; the Checks validation route does, after the GM Checks Studio prototype's Validation frames.
 Each issue offers an action that moves focus to the offending control.
@@ -1968,6 +1969,7 @@ The environments screen's inspector rail is a declared repurposing of that third
 The maintainer ruled on 2026-09-19 that this departure is a declared exception to the read-only convention rather than an open row in the library's planned-migrations table.
 The departure predates the extraction and is neither widened nor narrowed by it, and the read-only convention stands as the default for every other rail.
 The 2026-09-19 exception is the three leaves named above and no other environment pane: the environment editor's record and summary panes are read-only, a composition row's overrides open in place in that row whatever its section, and the scene link is authored on the Overview tab's Linked scene card.
+The gathering task leaf's selected-drop editor is the same declared leaf where the gathering task editor draws it: the Results tab of a d100 task, the only tab on which that editor keeps a rail.
 
 A PLAYER screen orders the app rail, a browse column carrying search and filters, and a detail pane that leads with its identity header, then progress, then requirements.
 The identity header carries at most one primary action: zero is correct, and two never is.

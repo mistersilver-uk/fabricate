@@ -445,7 +445,7 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and
 
 The depleted state is read from the shared `environment.nodeRuntime[taskId]` (linked) or the behaviour's `system.node.current` (unlinked, issue 302).
 
-Canonical mapping: `depletedBehavior`, `src/systems/gatheringNodeConfig.js`, `src/ui/svelte/stores/adminStore.js`, `src/ui/svelte/apps/manager/GatheringTaskEditView.svelte`, `src/ui/svelte/apps/InteractableConfigRoot.svelte`, `src/canvas/regions/interactableMarkerDepletion.js`
+Canonical mapping: `depletedBehavior`, `src/systems/gatheringNodeConfig.js`, `src/ui/svelte/stores/adminStore.js`, `src/ui/svelte/apps/manager/gathering-task/GatheringTaskNodesCard.svelte`, `src/ui/svelte/apps/InteractableConfigRoot.svelte`, `src/canvas/regions/interactableMarkerDepletion.js`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 

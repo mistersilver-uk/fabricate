@@ -1387,6 +1387,7 @@ Current GM editor behavior:
 - Expanded override panels contain per-environment override fields only; Gathering Task fields remain edited in their library surface.
 - Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager widths.
 - The scene link is authored on the Overview tab's Linked scene card: a Scene drop links or replaces it, a visible Unlink clears it, and a link whose scene no longer resolves reads as missing.
+- Gathering Task authoring is a tabbed editor — Overview (identity, task resolution mode, nodes), Requirements (availability, stamina, check modifiers, check override, required tools), Results — whose d100 Results tab alone keeps the selected-drop rail.
 - Gathering Task authoring includes identity, image, description, enabled state, task-level time/weather availability gates, search/pagination for ordered d100 drop rows, unresolved drop-zone rows, inline chance/quantity controls, modifier summaries, selected-drop inspector editing, and final chance preview.
   D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
 - Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.

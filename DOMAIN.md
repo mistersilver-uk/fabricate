@@ -763,7 +763,7 @@ Gathering-only choice between `targeted` and `blind` environment behavior.
 
 #### Task Resolution Mode
 
-Gathering-only choice between `routed` and `progressive` task resolution.
+A gathering task's choice among `d100`, `straight` and `routed` resolution; `progressive` is legacy, kept at runtime and not offered for new authoring.
 
 [Notes](docs/domain/terms.md#task-resolution-mode)
 
