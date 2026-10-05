@@ -16,7 +16,7 @@ import { listSvelteComponents, toRepositoryPaths } from '../scripts/lib/svelteCo
 import { readDeclaration } from './helpers/apiConvention.js';
 import { parseDesignLibrary, primitiveNamesIn, readDesignLibrary } from './helpers/designLibrary.js';
 import { componentAstOf } from './helpers/parsedSource.js';
-import { assertMovedByDiff, registerBase } from './helpers/registerBase.js';
+import { PRIMITIVE_DIRECTORY, assertMovedByDiff, registerBase } from './helpers/registerBase.js';
 import { styleTextFor } from './helpers/styleBlockScan.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,14 +52,6 @@ const SHIPPED_COMPONENT_PATHS = toRepositoryPaths(
 const SHIPPED_COMPONENT_NAMES = new Set(
   SHIPPED_COMPONENT_PATHS.map((file) => path.basename(file, '.svelte'))
 );
-
-/**
- * The directory `AGENTS.md` and `spec.md` both name when they prohibit an unrecorded primitive.
- *
- * Its `startsWith` test decides only where a manifest row is compulsory (issue 1481 item 2); a
- * component in a nested `apps/manager` directory may hold a row and is not compelled to.
- */
-const PRIMITIVE_DIRECTORY = 'src/ui/svelte/components/';
 
 test('the corpus every property below quantifies over is alive', () => {
   assert.ok(library.blockCount > 0, 'the parser found no spec-head block; the anchor is dead');

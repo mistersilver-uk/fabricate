@@ -284,9 +284,8 @@ test('a primitive neither appears nor vanishes without a register row (issue 149
     ...paths(manifest.designSystemPrimitives),
     ...paths(manifest.notAPrimitive),
   ];
-  const inDirectory = (file) => isPrimitiveFile(file);
-  const baseRows = new Set(rowPaths(base.manifest).filter(inDirectory));
-  const headRows = new Set(rowPaths(head).filter(inDirectory));
+  const baseRows = new Set(rowPaths(base.manifest).filter(isPrimitiveFile));
+  const headRows = new Set(rowPaths(head).filter(isPrimitiveFile));
   assert.deepEqual(
     base.files.added.filter((file) => !headRows.has(file)),
     [],

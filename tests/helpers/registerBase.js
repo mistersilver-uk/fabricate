@@ -15,7 +15,12 @@ import { changedPaths, readBaseFiles, resolveRatchetBase } from './mergeBaseRatc
 export const MANIFEST_FILE = 'scripts/lib/designSystemPrimitives.json';
 export const LIBRARY_FILE = 'openspec/specs/design-system/library.html';
 
-/** The directory whose every `.svelte` file must carry a manifest row. */
+/**
+ * The directory `AGENTS.md` and `spec.md` both name when they prohibit an unrecorded primitive:
+ * its every top-level `.svelte` file must carry a manifest row. Its `startsWith` test decides only
+ * where a row is compulsory (issue 1481 item 2); a component in a nested `apps/manager` directory
+ * may hold a row and is not compelled to.
+ */
 export const PRIMITIVE_DIRECTORY = 'src/ui/svelte/components/';
 
 export const isPrimitiveFile = (file) =>
@@ -23,6 +28,8 @@ export const isPrimitiveFile = (file) =>
   file.endsWith('.svelte') &&
   !file.slice(PRIMITIVE_DIRECTORY.length).includes('/');
 
+// Read once per process: each test file runs in its own process, so the base cannot change under
+// it. A test that varies RATCHET_BASE in-process would need to clear this.
 let cached;
 
 /**
