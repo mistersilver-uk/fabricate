@@ -665,6 +665,49 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'components', 'responsive'],
     sourceMatches: SALVAGE_ROW_SOURCES,
   }),
+  // The Progressive DC card closing the stage list (issue 1522), which no frame above scrolls to.
+  managerCase({
+    id: 'manager-component-edit-salvage-progressive-dc',
+    label: 'Manager — Component edit progressive salvage, the DC card closing the stage list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] [data-component-edit]',
+      },
+      { selector: '[data-component-edit-section="difficulty"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager [data-salvage-result-groups] [data-component-edit-section="difficulty"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
+  }),
+  // The stage list's complication band at the declared floor (issue 1522).
+  managerCase({
+    id: 'manager-component-edit-salvage-stages-narrow',
+    label: 'Manager — Component edit progressive salvage, a stage’s complication band at the floor',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] [data-component-edit]',
+      },
+      { selector: '[data-salvage-stage-complications]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager .fabricate-sortable-list-row.has-band [data-salvage-stage-complications]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'components', 'responsive'],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
+  }),
   managerCase({
     id: 'manager-component-edit-salvage-off',
     label: 'Manager — Component edit salvage off',

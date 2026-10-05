@@ -233,6 +233,28 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'components'],
     sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
+  // The DC card at its own placement, after the salvage card (issue 1522). The frame above's system
+  // reads no DC, so this one borrows a check state that resolves Smithing's recipes progressively.
+  managerCase({
+    id: 'manager-component-edit-difficulty-card',
+    label: 'Manager — Component edit difficulty, the DC card after the salvage card',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-extended' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector: '.manager-component-row[data-component-id="sm-ruby"] [data-component-edit]',
+      },
+      { selector: '[data-component-edit-section="difficulty"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager [data-component-edit-panel="rules"] > [data-component-edit-section="difficulty"]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'components'],
+    sourceMatches: COMPONENT_EDITOR_MATCHES,
+  }),
   managerCase({
     id: 'manager-import-report',
     label: 'Manager — Import report',

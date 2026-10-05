@@ -18,6 +18,8 @@ manager-component-edit-save-failed
 manager-component-edit-stacked
 manager-component-edit-salvage
 manager-component-edit-salvage-narrow
+manager-component-edit-salvage-progressive-dc
+manager-component-edit-salvage-stages-narrow
 manager-component-edit-salvage-off
 manager-component-edit-salvage-simple
 manager-component-edit-salvage-rolled-narrow
