@@ -1,8 +1,7 @@
 /**
- * Issue 2217 — a DERIVATIVE source (an Item built from a compendium entry and changed into a
- * different thing) registers on its own uuid, for components, recipe items and tools. Every
- * fixture resolves per uuid: a resolver answering one document for every uuid would make each
- * Item its own compendium source and hide the gate.
+ * Issue 2217: a derivative source, an Item built from a compendium entry and changed into another
+ * thing, registers on its own uuid for every kind. Fixtures resolve per uuid, because one document
+ * answering every uuid makes each Item its own compendium source and hides the gate.
  */
 
 import assert from 'node:assert/strict';
@@ -16,11 +15,13 @@ const ENTRY_UUID = 'Compendium.kit.templates.Item.blank';
 const ENTRY_NAME = 'Blank Scroll';
 const SCROLL_PACK = 'world.scrolls';
 
-/** A resolvable Item document; `id` is what `addItemsFromPack` builds its uuid from. */
+/** A resolvable Item document. `storedName` is the `_source` name where it differs from the
+ * prepared `name`; `id` is the pack document id. */
 function item(spec) {
   const document = makeDocument(spec);
   document.documentName = 'Item';
   if (spec.id) document.id = spec.id;
+  if (spec.storedName !== undefined) document._source = { name: spec.storedName };
   return document;
 }
 
@@ -204,6 +205,8 @@ describe('the derivative test compares names, and errs toward the existing rule'
 
   const OWN_KEYED = { canonicalUuid: 'Item.scroll-x', references: ['Item.scroll-x'] };
   const ENTRY_KEYED = { canonicalUuid: ENTRY_UUID, references: ['Item.scroll-x', ENTRY_UUID] };
+  // What a translation module records on an entry, and `fromCompendium` copies to its copies.
+  const TRANSLATED = { babele: { originalName: ENTRY_NAME } };
 
   const ROWS = [
     ['a renamed copy is a derivative', worldScroll('x'), entry(), OWN_KEYED],
@@ -220,26 +223,39 @@ describe('the derivative test compares names, and errs toward the existing rule'
       ENTRY_KEYED,
     ],
     [
-      'a translated copy matches through its recorded original name',
-      worldScroll('x', {
-        name: 'Parchemin vierge',
-        flags: { babele: { originalName: ENTRY_NAME } },
-      }),
-      entry(),
-      ENTRY_KEYED,
+      'a derivative of a translated entry is one despite the original name it inherited',
+      worldScroll('x', { flags: TRANSLATED }),
+      entry({ name: 'Parchemin vierge', flags: TRANSLATED }),
+      OWN_KEYED,
     ],
     [
-      'a translated entry matches through its recorded original name',
+      'and stays one against the untranslated entry, with the translation module disabled',
+      worldScroll('x', { flags: TRANSLATED }),
+      entry(),
+      OWN_KEYED,
+    ],
+    [
+      'a same-name copy matches a translated entry through the original name the entry records',
       worldScroll('x', { name: ENTRY_NAME }),
-      entry({ name: 'Parchemin vierge', flags: { babele: { originalName: ENTRY_NAME } } }),
+      entry({ name: 'Parchemin vierge', flags: TRANSLATED }),
       ENTRY_KEYED,
     ],
     [
       'the stored name decides, not a prepared rewrite of it',
-      Object.assign(worldScroll('x', { name: 'Unidentified Scroll' }), {
-        _source: { name: ENTRY_NAME },
-      }),
+      worldScroll('x', { name: 'Unidentified Scroll', storedName: ENTRY_NAME }),
       entry(),
+      ENTRY_KEYED,
+    ],
+    [
+      'a prepared name equal to the entry does not hide a stored rename',
+      worldScroll('x', { name: ENTRY_NAME, storedName: 'Scroll of x' }),
+      entry(),
+      OWN_KEYED,
+    ],
+    [
+      "the entry's stored name decides too",
+      worldScroll('x', { name: ENTRY_NAME }),
+      entry({ name: 'Parchemin vierge', storedName: ENTRY_NAME }),
       ENTRY_KEYED,
     ],
     ['an empty name is no evidence', worldScroll('x', { name: ' \t ' }), entry(), ENTRY_KEYED],

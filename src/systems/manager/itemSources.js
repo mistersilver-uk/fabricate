@@ -251,20 +251,22 @@ function resolveImportedSourceData(itemUuid, source = null) {
   return { currentUuid, canonicalUuid, references, isClone };
 }
 
-/** The names a derivative test compares: the stored name (the prepared one on an index entry or a
- * plain record) and the original a translation module recorded, normalized, empties dropped. */
-function sourceMatchNames(document) {
-  return [document?._source?.name ?? document?.name, document?.flags?.babele?.originalName]
-    .map((name) => normalizeMatchName(name))
-    .filter(Boolean);
+/** A document's stored name, normalized (the prepared one on an index entry or a plain record). */
+function storedMatchName(document) {
+  return normalizeMatchName(document?._source?.name ?? document?.name);
 }
 
-/** Whether a non-clone source is a derivative of its resolved compendium source (issue 2217): the
- * two share no name. A side with no name is no evidence, so the source is not a derivative. */
+/** Whether a non-clone source is a derivative of its resolved compendium source (issue 2217): its
+ * stored name is neither the entry's stored name nor the original a translation module recorded
+ * on the entry. The source's own recorded original is not read, because `fromCompendium` copies
+ * the entry's flags into everything built from it. A side with no name is no evidence. */
 function isDerivativeOf(source, compendiumDocument) {
-  const names = sourceMatchNames(source);
-  const entryNames = new Set(sourceMatchNames(compendiumDocument));
-  return names.length > 0 && entryNames.size > 0 && names.every((name) => !entryNames.has(name));
+  const name = storedMatchName(source);
+  const entryNames = [
+    storedMatchName(compendiumDocument),
+    normalizeMatchName(compendiumDocument?.flags?.babele?.originalName),
+  ].filter(Boolean);
+  return !!name && entryNames.length > 0 && !entryNames.includes(name);
 }
 
 /**
