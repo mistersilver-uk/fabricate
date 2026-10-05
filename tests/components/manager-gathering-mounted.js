@@ -683,7 +683,9 @@ export function registerGatheringCases() {
     await openTaskTab('results');
     assert.equal(manager().dataset.gatheringTaskLayout, undefined, 'Results keeps its track');
     assert.ok(
-      Boolean(target.querySelector('aside.manager-inspector [data-gathering-task-drop-inspector]')),
+      Boolean(
+        target.querySelector(':scope aside.manager-inspector [data-gathering-task-drop-inspector]')
+      ),
       'the rail holds the selected-drop editor'
     );
 
@@ -706,8 +708,8 @@ export function registerGatheringCases() {
     await openEditor('task', 'task-herbs');
     await openTaskTab('results');
     const page = () =>
-      target.querySelector('.manager-task-drops-card [data-pagination-page]').textContent.trim();
-    target.querySelector('.manager-task-drops-card [data-pagination-next]').click();
+      target.querySelector(':scope .manager-task-drops-card [data-pagination-page]').textContent.trim();
+    target.querySelector(':scope .manager-task-drops-card [data-pagination-next]').click();
     await settleRouteExit();
     assert.equal(page(), 'Page 2 of 2');
     await openTaskTab('overview');

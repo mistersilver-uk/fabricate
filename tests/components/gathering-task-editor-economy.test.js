@@ -140,7 +140,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     for (const cardClass of CARD_CHROME) {
       assert.match(
         cardSource,
-        new RegExp(`\\.${cardClass}[^{]*\\{[^}]*border:[^}]*background:[^}]*\\}`),
+        new RegExp(String.raw`\.${cardClass}[^{]*\{[^}]*border:[^}]*background:[^}]*\}`),
         `GatheringTaskCard gives ${cardClass} the card chrome (border + background)`
       );
     }
@@ -231,7 +231,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     const dcCardIdx = overrideSource.indexOf('data-gathering-task-dc');
     const dcFieldIdx = overrideSource.indexOf('data-gathering-task-dc-override');
     assert.ok(guardIdx >= 0, 'the DC card is guarded by the routed mode');
-    assert.ok(dcCardIdx >= 0, 'the override card is the DC card');
+    assert.ok(dcCardIdx !== -1, 'the override card is the DC card');
     assert.ok(dcFieldIdx > dcCardIdx, 'the numeric DC override input renders inside it');
   });
 

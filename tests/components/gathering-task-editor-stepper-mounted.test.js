@@ -1039,7 +1039,9 @@ describe('the task editor`s three tabs (issue 1522)', () => {
       staminaEnabled: true,
       nodesEnabled: true,
       gatheringModifierPolicy: 'bySubject',
-      onTabChange: (tab) => chosen.push(tab),
+      onTabChange: (tab) => {
+        chosen.push(tab);
+      },
       ...props,
     });
     return { root, chosen };
@@ -1053,7 +1055,7 @@ describe('the task editor`s three tabs (issue 1522)', () => {
       [...strip.querySelectorAll('[role="tab"]')].map((tab) => tab.dataset.gatheringTaskTab),
       ['overview', 'requirements', 'results']
     );
-    for (const [tab, cards] of Object.entries(TAB_CARDS)) {
+    for (const tab of Object.keys(TAB_CARDS)) {
       await harness.setProps({ activeTab: tab });
       const panel = root.querySelector('[role="tabpanel"]');
       assert.equal(panel.getAttribute('aria-labelledby'), `gathering-task-tab-${tab}`);
@@ -1110,7 +1112,7 @@ describe('the task editor`s three tabs (issue 1522)', () => {
       rewardRules: { rewardSelectionMode: 'highestRankedDrop' },
     });
     const notice = root.querySelector(
-      '[data-notice-position="stack"] [data-gathering-task-reward-rule-notice]'
+      ':scope [data-notice-position="stack"] [data-gathering-task-reward-rule-notice]'
     );
     assert.equal(notice?.getAttribute('role'), 'status');
     assert.equal(notice.dataset.noticeTone, 'warning');
