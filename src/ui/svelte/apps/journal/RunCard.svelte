@@ -41,6 +41,9 @@
   // which the acting player cannot see (issue 901). The projection only ever sets
   // it for a GM viewer, so no player-facing branch depends on it.
   const blindSecretPreview = $derived(run?.blindSecretPreview === true);
+  // The projection answers this from the engine's own automatic-stage predicate (issue 1644).
+  const completesAsTimePasses = $derived(run?.completesAsTimePasses === true);
+  const boltLabel = localize('FABRICATE.App.Journal.WorldClock.CompletesAsTimePasses');
 
   const availableAt = $derived(Number(run?.timeGate?.availableAt));
   const requiredSeconds = $derived(Number(run?.timeGate?.requiredSeconds));
@@ -124,6 +127,15 @@
     <div class="journal-run-card-copy">
       <div class="journal-run-card-heading">
         <span class="journal-run-card-name" {title}>{title}</span>
+        {#if completesAsTimePasses}
+          <span
+            class="journal-run-card-bolt"
+            role="img"
+            aria-label={boltLabel}
+            data-tooltip={boltLabel}
+            data-run-completes-as-time-passes><i class="fas fa-bolt" aria-hidden="true"></i></span
+          >
+        {/if}
         <Chip
           class="journal-run-status"
           density="list"
@@ -276,6 +288,14 @@
 
   .journal-run-card-step {
     font-size: 10.5px;
+  }
+
+  /* The specimen's mark: 10px, accent, before the status chip. */
+  .journal-run-card-bolt {
+    flex: 0 0 auto;
+    color: var(--fab-accent);
+    font-size: 10px;
+    line-height: 1;
   }
 
   /* GM secret preview marker. Deliberately styled as a warning-toned chip rather

@@ -15,6 +15,13 @@ import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
+/** A name from content, as accname computes one: hidden nodes skipped, an `aria-label` taken whole. */
+function nameFromContent(node) {
+  if (node.nodeType === 3) return node.textContent;
+  if (node.nodeType !== 1 || node.getAttribute('aria-hidden') === 'true') return '';
+  return node.getAttribute('aria-label') ?? [...node.childNodes].map(nameFromContent).join(' ');
+}
+
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-run-card-',
@@ -293,6 +300,34 @@ describe('RunCard mounted behavior', () => {
       assert.equal(target.querySelector('[data-run-progress]').getAttribute('data-run-progress'), '50');
       harness.remount();
     }
+  });
+
+  // Issue 1644: the projection's `completesAsTimePasses` is the engine's own automatic-stage
+  // predicate, so the card draws exactly what it is given and invents no rule of its own.
+  it('draws the named bolt before the status chip only for a run that completes as time passes', async () => {
+    const boltKey = 'FABRICATE.App.Journal.WorldClock.CompletesAsTimePasses';
+    const target = await harness.mount({ run: { ...makeCraftingRun(), completesAsTimePasses: true }, now: 0 });
+    const bolt = target.querySelector('[data-run-completes-as-time-passes]');
+    assert.ok(Boolean(bolt), 'the bolt renders');
+    assert.equal(bolt.getAttribute('role'), 'img', 'a glyph alone, so it takes the img role');
+    assert.equal(bolt.getAttribute('aria-label'), boltKey);
+    assert.equal(bolt.dataset.tooltip, boltKey, 'the hover text is the same one key');
+    assert.equal(bolt.querySelector('i').getAttribute('aria-hidden'), 'true');
+    assert.ok(bolt.nextElementSibling.classList.contains('journal-run-status'), 'before the status');
+    harness.remount();
+    for (const completesAsTimePasses of [false, undefined]) {
+      const other = await harness.mount({ run: { ...makeCraftingRun(), completesAsTimePasses }, now: 0 });
+      assert.ok(!other.querySelector('[data-run-completes-as-time-passes]'), `${completesAsTimePasses}`);
+      harness.remount();
+    }
+  });
+
+  it('names the card with the bolt, since the card takes its name from its content', async () => {
+    const target = await harness.mount({ run: { ...makeCraftingRun(), completesAsTimePasses: true }, now: 0 });
+    const card = target.querySelector('.journal-run-card');
+    assert.ok(!card.hasAttribute('aria-label') && !card.hasAttribute('aria-labelledby'));
+    const name = nameFromContent(card).replaceAll(/\s+/g, ' ');
+    assert.match(name, /Healing Potion FABRICATE\.App\.Journal\.WorldClock\.CompletesAsTimePasses/);
   });
 
   it('invokes onSelect with the composite-identity run on click', async () => {

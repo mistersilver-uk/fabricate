@@ -1392,7 +1392,8 @@
           "Label": "Progress"
         },
         "WorldClock": {
-          "Label": "World time"
+          "Label": "World time",
+          "CompletesAsTimePasses": "Completes as time passes"
         },
         "Notice": {
           "PausedTitle": "Run paused",

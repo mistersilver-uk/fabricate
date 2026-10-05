@@ -1,3 +1,4 @@
+import { completesAsTimePasses } from '../../systems/automaticStageBlocker.js';
 import { resolveActiveCraftingCheckFormula } from '../../systems/checkModifierResolver.js';
 import { craftingStepHistoryEvidence } from '../../systems/CraftingRunManager.js';
 import {
@@ -167,9 +168,6 @@ function dedupeRunModelsById(models, phase) {
  * into a non-negative second count. Mirrors `CraftingRunManager._durationToSeconds`
  * (months = 30 days, years = 365 days) so the projection's required-time read
  * matches the gate the engine arms.
- *
- * @param {object|null} timeRequirement
- * @returns {number}
  */
 function durationToSeconds(timeRequirement = null) {
   if (!timeRequirement || typeof timeRequirement !== 'object') return 0;
@@ -202,7 +200,8 @@ function durationToSeconds(timeRequirement = null) {
  * Native actor/type/id keys retain identity while `activityKind` distinguishes alchemy.
  * Lifecycle actions, paused-first readiness, current-stage selection intent and allowlisted
  * recovery evidence supplement the legacy `manualAdvance` compatibility flag.
- * The completion-preference action describes visibility, not automatic material-spending eligibility.
+ * The completion-preference action describes visibility; `completesAsTimePasses` is the engine's own
+ * automatic-stage predicate, so it states eligibility.
  * Authored requirements and possible yields remain distinct from actual spending and awards.
  *
  * Like {@link GatheringListingBuilder} it never returns raw Foundry documents:
@@ -751,7 +750,8 @@ export class RunJournalBuilder {
       describe: { system, currencyUnits, taughtName, localize },
       claimability: () => this._awardChoiceClaimability({ run, actor }),
     });
-    return { ...model, ...fields };
+    const completes = completesAsTimePasses({ run, recipe, system });
+    return { ...model, ...fields, completesAsTimePasses: completes };
   }
 
   /** The current stage's readiness, held while an earlier stage owes a claimable pick. */

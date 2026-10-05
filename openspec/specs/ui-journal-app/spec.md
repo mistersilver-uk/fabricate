@@ -122,6 +122,13 @@ That signal is carried BESIDE the run's status rather than in place of it, becau
 Waiting on a choice MUST read as guidance and MUST NOT raise a refusal: an unbegun stage is ordinary play, exactly as `stageNotStarted` is.
 Waiting on MATERIALS MUST read differently from waiting on a choice on every one of those surfaces, because one is fixed by choosing and the other by acquiring.
 
+#### Completing as time passes
+
+A crafting run that will complete as time passes MUST carry a bolt on its Active list row, before its status chip.
+It will complete as time passes only when its completion preference is `worldTime`, it is not paused, it is counting world time down, and its current stage carries no automatic blocker: no materials, no tools and no player check.
+The projection MUST answer that from the same predicate the engine uses to refuse an automatic execute (`automaticStageBlocker`), so the bolt never promises a completion the engine would refuse.
+The bolt is a glyph alone, so it MUST carry `role="img"` and one localized name, "Completes as time passes", as both its accessible name and its tooltip, and the row's own accessible name MUST include it.
+
 #### Ordinary closed history
 
 Ordinary history MUST NOT show active progress, StageNav, editable materials, primary/pause/cancel/preference controls, countdowns, the TIME/CHECK pair, expanded Run record, or a titled What to expect card, except an award pending composition's confirm.
