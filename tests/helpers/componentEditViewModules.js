@@ -82,6 +82,10 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/dropUtils.js',
   // The rules editor's own Validation tab model (issue 1371, parity round 4).
   'src/ui/svelte/apps/manager/component/componentRulesValidation.js',
+  // …and its row action's focus and announcement halves (issue 1522).
+  'src/ui/svelte/apps/manager/validationFocus.js',
+  'src/ui/svelte/apps/manager/validationAnnouncement.js',
+  'src/ui/svelte/util/announceAfterFocus.js',
   // Both salvage result rows are the requirement row (issue 1516), whose search is a typeahead.
   ...RESULT_ROW_RAW_MODULES,
   'src/ui/svelte/actions/typeaheadPanel.js',
@@ -185,6 +189,18 @@ export function componentCardHarness(name) {
     runeModules: TYPEAHEAD_RUNE_MODULES,
     compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
     componentPath: `src/ui/svelte/apps/manager/component/${name}.svelte`,
+  });
+}
+
+/** A mount harness for the whole `ComponentEditView` (issue 1522). */
+export function componentEditViewHarness(tmpPrefix) {
+  return createMountedComponentHarness({
+    repoRoot: resolve(import.meta.dirname, '../..'),
+    tmpPrefix,
+    rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+    runeModules: TYPEAHEAD_RUNE_MODULES,
+    compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
+    componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
   });
 }
 

@@ -585,6 +585,28 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'components'],
     sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),
+  // Issue 1522: the Validation tab, whose failing rows each draw a View routed to the Rules tab.
+  managerCase({
+    id: 'manager-component-edit-validation',
+    label: 'Manager — Component edit validation',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-runework' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '.manager-component-row[data-component-id="rw-slag"] [data-component-edit]' },
+      { selector: '[data-component-edit-tab="validation"]' },
+    ],
+    expectView: 'component-edit',
+    expectSelector: '.fabricate-manager [data-component-edit-validation]',
+    expectCenterHit:
+      '[data-component-validation-check="salvageRouting"] [data-component-validation-view]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      ...COMPONENT_EDITOR_MATCHES,
+      /^src\/ui\/svelte\/apps\/manager\/component\/componentRulesValidation\.js$/,
+    ],
+  }),
   managerCase({
     // The other consumer of the shared frame, stacked (issue 1371 r19-entry2).
     id: 'manager-component-edit-stacked',

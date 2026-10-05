@@ -103,7 +103,9 @@
   <div class="manager-component-rules-card-head">
     <i class="fas fa-recycle manager-component-rules-card-glyph is-accent" aria-hidden="true"></i>
     <div>
-      <h3>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Title', 'Salvage')}</h3>
+      <h3 id={`${instanceId}-salvage-title`}>
+        {text('FABRICATE.Admin.Manager.Component.SalvageEditor.Title', 'Salvage')}
+      </h3>
       <p class="manager-component-rules-card-sub">
         {format(
           'FABRICATE.Admin.Manager.Component.SalvageEditor.Hint',
@@ -205,7 +207,15 @@
     />
   {/if}
 
-  <Field as="div" data-salvage-result-groups="">
+  <!-- The two salvage result rows' focus destination (issue 1522): their fix is any row in it. -->
+  <Field
+    as="div"
+    data-salvage-result-groups=""
+    data-validation-target="component-salvage-results"
+    aria-labelledby={`${instanceId}-salvage-title`}
+    tabindex="-1"
+    data-keyboard-focus="true"
+  >
     {#if salvageProgressive}
       <ComponentSalvageStages
         {text}
@@ -420,7 +430,13 @@
                 options={salvageRouteOptions}
                 ariaLabelledBy={`${instanceId}-salvage-route-${routeIndex}`}
                 disabled={saving}
-                triggerProps={{ 'data-salvage-route': outcomeName }}
+                triggerProps={{
+                  'data-salvage-route': outcomeName,
+                  // The routing row's control: querySelector lands on the FIRST unrouted outcome.
+                  ...(salvageDraft.outcomeRouting[outcomeName]
+                    ? {}
+                    : { 'data-validation-target': 'component-salvage-routing' }),
+                }}
                 onChange={(next) => onSetRoute(outcomeName, next)}
               />
             </div>

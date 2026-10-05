@@ -3,6 +3,8 @@
   import EditorTabs from '../../components/EditorTabs.svelte';
   import WorldComponentEntryPreviewRail from './scoped/WorldComponentEntryPreviewRail.svelte';
   import { componentRulesValidationPresentation } from './component/componentRulesValidation.js';
+  import { focusValidationTarget } from './validationFocus.js';
+  import { announceValidationOutcome } from './validationAnnouncement.js';
   import { localize } from '../../util/foundryBridge.js';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
   import ComponentCategoryTagsCards from './component/ComponentCategoryTagsCards.svelte';
@@ -362,16 +364,6 @@
     )
   );
 
-  /**
-   * The Validation tab's badge, in the shape `EditorTabs` takes. An early-return chain rather than a
-   * nested ternary, which SonarCloud reports as S3358.
-   */
-  function validationBadge(counts) {
-    if (counts.blocking > 0) return { count: counts.blocking, tone: 'danger' };
-    if (counts.warnings > 0) return { count: counts.warnings, tone: 'warning' };
-    return null;
-  }
-
   const tabs = $derived([
     {
       id: 'rules',
@@ -386,33 +378,27 @@
       label: 'Validation',
     },
   ]);
-  const badges = $derived({ validation: validationBadge(validation.counts) });
+  const badges = $derived({ validation: validation.badge });
 
-  /** The overall status the validation hero paints, from the counts the rows are grouped by. */
-  function worstValidationStatus(counts) {
-    if (counts.blocking > 0) return 'block';
-    if (counts.warnings > 0) return 'warn';
-    return 'pass';
+  // The row action's three seats: this editor's root, the route-only fallback, and the live region.
+  let editorRoot = $state(null);
+  let tabPanel = $state(null);
+  let issueAnnouncement = $state('');
+
+  /** A validation row's action: the route is written FIRST, so the focus move finds its panel. */
+  function selectIssue(targetTab, focusTarget) {
+    const route = tabs.find((tab) => tab.id === targetTab && tab.id !== 'validation') ?? null;
+    if (route) activeTab = route.id;
+    announceValidationOutcome({
+      root: editorRoot,
+      routeLabel: route ? text(route.labelKey, route.label) : '',
+      focus: () => focusValidationTarget(editorRoot, focusTarget),
+      fallbackPanel: tabPanel,
+      announce: (sentence) => {
+        issueAnnouncement = sentence;
+      },
+    });
   }
-
-  const validationSummary = $derived({
-    status: worstValidationStatus(validation.counts),
-    icon:
-      worstValidationStatus(validation.counts) === 'pass'
-        ? 'fas fa-circle-check'
-        : worstValidationStatus(validation.counts) === 'warn'
-          ? 'fas fa-triangle-exclamation'
-          : 'fas fa-circle-xmark',
-    title:
-      worstValidationStatus(validation.counts) === 'pass'
-        ? text('FABRICATE.Admin.Manager.Component.Validation.HeadPass', 'These rules are complete')
-        : text('FABRICATE.Admin.Manager.Component.Validation.HeadIssues', 'These rules have gaps'),
-    sub: format(
-      'FABRICATE.Admin.Manager.Component.Validation.HeadSub',
-      'What {system} needs from this component before it can be crafted with, or broken down.',
-      { system: systemLabel }
-    ),
-  });
 
   // THE CATEGORY CONTROL IS ONE SELECT: `Inherit from world · {value}` is the select's first
   // option, in the body, full width.
@@ -1061,7 +1047,12 @@
 <main
   class="manager-main manager-component-edit-main manager-component-entry-page"
   aria-label={text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component')}
+  bind:this={editorRoot}
 >
+  <!-- The row action's live region, outside the tab chain its own route change unmounts. -->
+  <div class="visually-hidden" role="status" aria-live="polite" data-component-issue-announcement>
+    {#if issueAnnouncement}{issueAnnouncement}{/if}
+  </div>
   <!--
     THE FORM IS THE FRAME'S CONTENT COLUMN (M26), wearing the column class beside its own.
     `manager-component-edit-view` is the form the header's Save submits BY ID, pinned by the smoke
@@ -1111,6 +1102,7 @@
       aria-labelledby={`component-rules-tab-${activeTab}`}
       tabindex="-1"
       data-keyboard-focus="true"
+      bind:this={tabPanel}
     >
       {#if activeTab === 'rules'}
         <!-- The rules tab's heading block; see `ComponentIdentityStrip` for its two smoke hooks. -->
@@ -1248,7 +1240,13 @@
           }}
         />
       {:else}
-        <ComponentRulesValidationTab {text} summary={validationSummary} {validation} />
+        <ComponentRulesValidationTab
+          {text}
+          {format}
+          {systemLabel}
+          {validation}
+          onSelectIssue={selectIssue}
+        />
       {/if}
     </div>
   </form>
