@@ -15,7 +15,7 @@ import {
   itemReceipt,
   retainUncertainReceipt,
 } from './runHistoryEvidence.js';
-import { interruptedJournals, RUN_JOURNAL_KEYS } from './runJournalReconstruction.js';
+import { interruptedJournals } from './runJournalReconstruction.js';
 import {
   assertRunLifecycleMutation,
   buildNewRunLifecycleFields,
@@ -26,6 +26,7 @@ import {
   persistResumedRun,
   RunLifecycleError,
 } from './runLifecycleState.js';
+import { worldTimeDueStep } from './worldTimeDueStep.js';
 import { selectWritableActors } from './writableActors.js';
 
 export { craftingStepHistoryEvidence } from './craftingStepHistoryEvidence.js';
@@ -540,7 +541,8 @@ export class CraftingRunManager extends RunContainerManagerBase {
       this.invalidateCache(actor.id);
       const container = this._getContainer(actor);
       for (const run of Object.values(container.active || {})) {
-        if (!this._dueVersionedStep(run, worldTime) || awardChoiceBlocks(run, actor)) continue;
+        const owesAwardChoice = (candidate) => awardChoiceBlocks(candidate, actor);
+        if (!worldTimeDueStep(run, { worldTime, owesAwardChoice })) continue;
         const currentStepIndex = Number(run.currentStepIndex);
         due.push({
           actor,
@@ -552,19 +554,6 @@ export class CraftingRunManager extends RunContainerManagerBase {
       }
     }
     return due;
-  }
-
-  _dueVersionedStep(run, worldTime) {
-    if (getRunLifecycleContract(run) !== 'current') return null;
-    if (run.status !== 'waitingTime' || run.completionMode !== 'worldTime' || run.pauseState) {
-      return null;
-    }
-    if (RUN_JOURNAL_KEYS.some((key) => run[key] && run[key].status !== 'committed')) return null;
-    const index = Number(run.currentStepIndex);
-    if (!Number.isSafeInteger(index)) return null;
-    const step = run.steps?.[index];
-    if (!step?.timeGate || Number(worldTime) < Number(step.timeGate.availableAt || 0)) return null;
-    return step;
   }
 
   async setCompletionMode(actor, runId, completionMode, { expectedRevision } = {}) {

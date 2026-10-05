@@ -3,6 +3,8 @@
  * an automatic execute on this answer and the Journal draws its bolt on it, so the two cannot drift.
  */
 import { resolveActiveCraftingCheckFormula } from './checkModifierResolver.js';
+import { owesClaimablePick } from './choiceGroupAward.js';
+import { worldTimeDueStep } from './worldTimeDueStep.js';
 
 /** The stage's chosen ingredient set, or its first authored one when none is chosen. */
 export function stageIngredientSet(step, selectedId) {
@@ -36,18 +38,18 @@ export function automaticStageBlocker({ run, recipe, step, selectedSet, system }
 }
 
 /**
- * Whether the world clock will finish this crafting run: unpaused, counting down, and its current
- * stage, read with the selection a timed execute reads, carries no automatic blocker.
+ * Whether the world clock will finish this crafting run's current stage: the world-time scan takes
+ * it once its gate passes, and that stage, read with the selection and the recipe's system a timed
+ * execute reads, carries no automatic blocker. `claimability` is the settle's owed-pick rule.
  */
-export function completesAsTimePasses({ run, recipe, system }) {
-  if (run?.status !== 'waitingTime' || run?.pauseState) return false;
-  const stepIndex = Number(run.currentStepIndex);
+export function completesAsTimePasses({ run, recipe, getSystem, claimability }) {
+  const owesAwardChoice = () => owesClaimablePick(run, claimability);
+  const runStep = worldTimeDueStep(run, { owesAwardChoice });
+  if (!runStep) return false;
   const steps = typeof recipe?.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
-  const step = steps[stepIndex];
-  const selectedSet = stageIngredientSet(
-    step,
-    run.steps?.[stepIndex]?.selectionPlan?.selectedIngredientSetId
-  );
+  const step = steps[Number(run.currentStepIndex)];
+  const selectedSet = stageIngredientSet(step, runStep.selectionPlan?.selectedIngredientSetId);
   if (!step || !selectedSet) return false;
+  const system = getSystem(recipe?.craftingSystemId);
   return automaticStageBlocker({ run, recipe, step, selectedSet, system }) === null;
 }
