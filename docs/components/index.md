@@ -25,10 +25,10 @@ Two more pages sit beneath this one: [Complications]({% link components/complica
 {: .note }
 > While Fabricate's **Experimental Features** setting is on and Fabricate Premium is not installed, the header of both screens below can show a dismissable Fabricate Premium advert for crafting icons.
 > Closing it hides it in your Manager window at once.
-> Fabricate also tries to save that dismissal for the whole world, which hides it for every GM from then on.
+> Fabricate also tries to save that dismissal for the whole world, which hides it for every GM the next time they open the Manager.
 > If that save does not go through, for example because your account cannot change world settings, the advert returns the next time you open the Manager.
 > There is no control to bring it back once the world-wide dismissal is saved.
-> The advert disappears for good once Fabricate Premium is installed.
+> The advert does not appear while Fabricate Premium is installed.
 
 ## The world Component catalogue
 
