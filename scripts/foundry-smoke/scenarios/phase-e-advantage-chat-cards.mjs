@@ -13,8 +13,9 @@ import {
 } from '../../lib/advantageChatCardEvidence.js';
 import {
   ROLL_PROMPT,
+  abandonCraft,
+  clearStandingPrompts,
   craftAndCollect,
-  dismissStandingPrompts,
   readBackAllRolls,
   rollPublicly,
   seedChatCardForge,
@@ -45,10 +46,16 @@ async function captureAdvantageCard(ctx, caseId, messageId) {
   await frames[caseId]();
 }
 
+// A hang guard: each case starts with no prompt standing, so the one that shows is its craft's.
+const PROMPT_CEILING_MS = 60_000;
+// The Journal command reopens a prompt whose prepared check changed while it stood; a player
+// answers it again, and so does the case, up to the command's own retry limit.
+const ANSWERS = 4;
+
 /** The footer's Advantage button, present for every case but `off`, which offers none. */
 async function assertFooterOffer(page, caseId) {
   const prompt = page.locator(ROLL_PROMPT).last();
-  await prompt.waitFor({ state: 'visible', timeout: 15_000 });
+  await prompt.waitFor({ state: 'visible', timeout: PROMPT_CEILING_MS });
   const hasAdvantage = (await prompt.locator('button[data-action="advantage"]').count()) > 0;
   if (caseId === 'off' && hasAdvantage) {
     throw new Error('off: the footer still offers an Advantage button');
@@ -58,19 +65,39 @@ async function assertFooterOffer(page, caseId) {
   }
 }
 
+/** Answer this case's prompt, and any prompt its craft reopens, until the craft settles. */
+async function answerCase(page, crafted, entry, step) {
+  const settled = crafted.then(
+    () => 'settled',
+    () => 'settled'
+  );
+  for (let answered = 0; answered < ANSWERS; answered += 1) {
+    await assertFooterOffer(page, entry.id);
+    await rollPublicly(page, { choice: entry.choice });
+    const reopened = page
+      .locator(ROLL_PROMPT)
+      .first()
+      .waitFor({ state: 'visible', timeout: PROMPT_CEILING_MS })
+      .then(() => 'reopened');
+    if ((await Promise.race([settled, reopened.catch(() => 'settled')])) === 'settled') return;
+    process.stdout.write(`  ${step}: the craft reopened its prompt; answering it again\n`);
+  }
+}
+
 /** One case: craft, answer with its choice, bind to the messages it created, and assert. */
 async function runAdvantageCase(ctx, forge, entry) {
   const step = `chat-craft-card-advantage-${entry.id}`;
+  let crafted = null;
   try {
+    await clearStandingPrompts(ctx.page);
     await writeCaseCheck(ctx.page, forge.systemId, { check: entry.check });
-    const crafted = craftAndCollect(ctx.page, {
+    crafted = craftAndCollect(ctx.page, {
       ...forge,
       crafterId: ctx.shared.cleanup.crafterId,
     });
     // Awaited below; this keeps a craft abandoned by a failed prompt from rejecting unobserved.
     crafted.catch(() => {});
-    await assertFooterOffer(ctx.page, entry.id);
-    await rollPublicly(ctx.page, { choice: entry.choice });
+    await answerCase(ctx.page, crafted, entry, step);
     const { messages } = await withinTime(crafted, 60_000, 'the craft never settled');
     const picked = pickCraftCardMessage(messages);
     if (picked.error) throw new Error(picked.error);
@@ -85,8 +112,9 @@ async function runAdvantageCase(ctx, forge, entry) {
       await captureAdvantageCard(ctx, entry.id, picked.message.id);
     }
   } catch (error) {
-    // A prompt left standing would answer the next case's craft instead of its own.
-    await dismissStandingPrompts(ctx.page);
+    // A prompt left standing, or one still to mount, would answer the next case's craft instead.
+    if (crafted) await abandonCraft(ctx.page, crafted);
+    await clearStandingPrompts(ctx.page).catch(() => {});
     ctx.results.steps.push({ step, passed: false, error: String(error?.message ?? error) });
     process.stderr.write(`  ${step} failed: ${error?.message ?? error}\n`);
   }
@@ -95,7 +123,7 @@ async function runAdvantageCase(ctx, forge, entry) {
 export async function runAdvantageChatCards(ctx) {
   const { cleanup } = ctx.shared;
   process.stdout.write('  Crafting the advantage rule chat card cases (#2007)...\n');
-  await dismissStandingPrompts(ctx.page);
+  await clearStandingPrompts(ctx.page).catch(() => {});
   let forge;
   try {
     forge = await seedChatCardForge(ctx.page, cleanup.crafterId, ADVANTAGE_FORGE);

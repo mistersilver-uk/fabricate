@@ -23,6 +23,33 @@ export async function dismissStandingPrompts(page) {
   }
 }
 
+/** Close every standing prompt and resolve once none is left, so the next prompt is one craft's. */
+export async function clearStandingPrompts(page, timeout = 30_000) {
+  await dismissStandingPrompts(page);
+  await page.locator(ROLL_PROMPT).first().waitFor({ state: 'detached', timeout });
+}
+
+/**
+ * End a craft a failed case abandoned: dismiss its prompt whenever one shows, until the craft
+ * itself settles, so a prompt that mounts late can never answer the next case's craft.
+ */
+export async function abandonCraft(page, crafted, timeout = 60_000) {
+  let settled = false;
+  const done = crafted.then(
+    () => (settled = true),
+    () => (settled = true)
+  );
+  const deadline = Date.now() + timeout;
+  while (!settled && Date.now() < deadline) {
+    const shown = page
+      .locator(ROLL_PROMPT)
+      .first()
+      .waitFor({ state: 'visible', timeout: Math.max(deadline - Date.now(), 1) });
+    await Promise.race([done, shown.catch(() => {})]);
+    await clearStandingPrompts(page).catch(() => {});
+  }
+}
+
 /**
  * Seed a forge: its token and charm, a one-token recipe whose one result group is named `group`,
  * and `crafts` tokens on the crafter. Returns `{ systemId, recipeId, recipeName, itemIds }`.
