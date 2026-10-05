@@ -4649,7 +4649,25 @@
               "Label": "Gathering task sections",
               "Overview": "Overview",
               "Requirements": "Requirements",
-              "Results": "Results"
+              "Results": "Results",
+              "Validation": "Validation"
+            },
+            "Validation": {
+              "NamePass": "It has a name",
+              "NameFail": "It needs a name",
+              "DropRulesPass": "Every drop rule is complete",
+              "DropRuleFail": "A drop rule is incomplete",
+              "ResultSetsPass": "Every result set is complete",
+              "ResultSetFail": "The result sets are incomplete",
+              "RoutedTiersPass": "The gathering check defines outcome tiers",
+              "RewardRulePass": "Each component has one drop row",
+              "StatusBlock": "Blocks save",
+              "SummaryBlocked": "Cannot be saved",
+              "SummaryBlockedSub": "Clear every blocking issue before this task can be saved.",
+              "SummaryWarnings": "Saves with warnings",
+              "SummaryWarningsSub": "It saves — review the warnings when you can.",
+              "SummaryAllClearSub": "Every check passes. Ready to save.",
+              "Review": "Review in Validation"
             },
             "Name": "Name",
             "Description": "Description",

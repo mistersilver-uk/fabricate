@@ -4945,7 +4945,7 @@
         checkConfig={selectedSystem?.gatheringCraftingCheck?.routed ?? null}
         previewActors={overridePreviewActors}
         {resolvePreviewCharacter}
-        resultValidationErrors={gathering.gatheringTaskValidation.resultErrors || []}
+        validation={gathering.gatheringTaskValidation}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={modifiers.gatheringConditionOptions('weather')}

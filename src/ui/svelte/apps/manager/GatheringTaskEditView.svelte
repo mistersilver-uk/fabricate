@@ -1,9 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The gathering task editor (issue 1522): a fixed tab strip over one scrolling tab panel — Overview,
-  Requirements and Results, each in `gathering-task/`. The tab is the caller's (`activeTab`,
-  `onTabChange`). The lists' searches, pages and tag picks live here, so they survive a tab switch;
-  the Results tab's blocking errors and warnings mark its tab, so they show from every tab.
+  Requirements, Results and Validation, each in `gathering-task/`. The tab is the caller's
+  (`activeTab`, `onTabChange`). The lists' searches, pages and tag picks live here, so they survive
+  a tab switch. One readiness reading feeds the Validation tab, its marks and the Results notices.
 -->
 <script>
   import EmptyState from '../../components/EmptyState.svelte';
@@ -13,7 +13,10 @@
   import GatheringTaskOverviewTab from './gathering-task/GatheringTaskOverviewTab.svelte';
   import GatheringTaskRequirementsTab from './gathering-task/GatheringTaskRequirementsTab.svelte';
   import GatheringTaskResultsTab from './gathering-task/GatheringTaskResultsTab.svelte';
-  import { resultNoticeCopy } from './gathering-task/taskResultNoticeCopy.js';
+  import GatheringTaskValidationTab from './gathering-task/GatheringTaskValidationTab.svelte';
+  import { gatheringTaskValidation } from './gathering-task/gatheringTaskReadiness.js';
+  import { focusValidationTarget } from './validationFocus.js';
+  import { announceValidationOutcome } from './validationAnnouncement.js';
 
   let {
     task = null,
@@ -27,7 +30,8 @@
     checkConfig = null,
     previewActors = [],
     resolvePreviewCharacter = () => null,
-    resultValidationErrors = [],
+    // The header Save's own evaluation, `{ valid, errors }`: its errors are the blocking rows.
+    validation = null,
     itemCards = [],
     managedItemOptions = [],
     weatherOptions = [],
@@ -86,47 +90,37 @@
   const selectedDrop = $derived(
     dropRows.find((row) => row.id === selectedDropId) || dropRows[0] || null
   );
-  const repeatedComponentRows = $derived(
-    dropRows.filter((row) => row.componentId && row.componentId === selectedDrop?.componentId)
-  );
-  const showRewardRuleNotice = $derived(
-    selectedDrop?.componentId &&
-      repeatedComponentRows.length > 1 &&
-      rewardRules?.rewardSelectionMode !== 'allDrops'
+
+  const readiness = $derived(
+    gatheringTaskValidation(
+      { task, mode: taskResolutionMode, validation, routedOutcomeTiers, rewardRules },
+      text
+    )
   );
 
-  const copy = resultNoticeCopy(text);
-  const resultErrors = $derived(
-    taskResolutionMode === 'straight' || taskResolutionMode === 'routed'
-      ? (Array.isArray(resultValidationErrors) ? resultValidationErrors : [])
-          .map((error) => String(error || '').trim())
-          .filter(Boolean)
-      : []
-  );
-  const noRoutedTiers = $derived(
-    taskResolutionMode === 'routed' &&
-      (Array.isArray(routedOutcomeTiers) ? routedOutcomeTiers : []).length === 0
-  );
-  const rewardRuleWarning = $derived(
-    taskResolutionMode === 'd100' && Boolean(showRewardRuleNotice)
-  );
-  const resultMarks = $derived(
-    [
-      resultErrors.length > 0 && {
-        vehicle: 'issue',
-        tone: 'danger',
-        label: resultErrors.length,
-        name: copy.validation(resultErrors.length),
+  // The row action's three seats: this editor's root, the route-only fallback, and the live region.
+  let editorRoot = $state(null);
+  let tabPanel = $state(null);
+  let issueAnnouncement = $state('');
+  const ISSUE_TABS = {
+    overview: ['FABRICATE.Admin.Manager.Environment.Tasks.Tabs.Overview', 'Overview'],
+    results: ['FABRICATE.Admin.Manager.Environment.Tasks.Tabs.Results', 'Results'],
+  };
+
+  /** A validation row's action: the host's tab is written FIRST, so the focus move finds its panel. */
+  function selectIssue(targetTab, focusTarget) {
+    const route = Object.hasOwn(ISSUE_TABS, targetTab) ? targetTab : null;
+    if (route) onTabChange(route);
+    announceValidationOutcome({
+      root: editorRoot,
+      routeLabel: route ? text(...ISSUE_TABS[route]) : '',
+      focus: () => focusValidationTarget(editorRoot, focusTarget),
+      fallbackPanel: tabPanel,
+      announce: (sentence) => {
+        issueAnnouncement = sentence;
       },
-      noRoutedTiers && { vehicle: 'issue', tone: 'warning', label: 1, name: copy.noRoutedTiers() },
-      rewardRuleWarning && {
-        vehicle: 'issue',
-        tone: 'warning',
-        label: 1,
-        name: copy.rewardRule(),
-      },
-    ].filter(Boolean)
-  );
+    });
+  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -136,20 +130,39 @@
 
 <main
   class="manager-main manager-gathering-task-edit-view"
-  class:has-reward-rule-notice={showRewardRuleNotice}
   aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task')}
   data-gathering-task-editor
+  bind:this={editorRoot}
 >
+  <!-- The row action's live region, outside the tab chain its own route change re-renders. -->
+  <div
+    class="visually-hidden"
+    role="status"
+    aria-live="polite"
+    data-gathering-task-issue-announcement
+  >
+    {#if issueAnnouncement}{issueAnnouncement}{/if}
+  </div>
   {#if task}
-    <GatheringTaskEditorTabs {activeTab} badges={{ results: resultMarks }} onSelect={onTabChange} />
+    <GatheringTaskEditorTabs
+      {activeTab}
+      badges={{ validation: readiness.marks }}
+      onSelect={onTabChange}
+    />
     <!-- The blocking notice's page position, outside the scroller so it stays in view. -->
-    {#if activeTab === 'results' && resultErrors.length > 0}
+    {#if activeTab === 'results' && readiness.blockingNotice}
       <div class="manager-editor-notice-position" data-notice-position="page">
         <Notice
           blocking
           tone="danger"
-          title={copy.validation(resultErrors.length)}
-          detail={resultErrors.join('; ')}
+          title={readiness.blockingNotice}
+          action={{
+            label: text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.Validation.Review',
+              'Review in Validation'
+            ),
+            onClick: () => onTabChange('validation'),
+          }}
           data-gathering-task-results-validation
         />
       </div>
@@ -162,8 +175,11 @@
       tabindex="-1"
       data-keyboard-focus="true"
       data-gathering-task-panel={activeTab}
+      bind:this={tabPanel}
     >
-      {#if activeTab === 'requirements'}
+      {#if activeTab === 'validation'}
+        <GatheringTaskValidationTab {text} validation={readiness} onSelectIssue={selectIssue} />
+      {:else if activeTab === 'requirements'}
         <GatheringTaskRequirementsTab
           {text}
           {task}
@@ -195,8 +211,7 @@
           {task}
           {taskResolutionMode}
           {routedOutcomeTiers}
-          {noRoutedTiers}
-          {rewardRuleWarning}
+          warnings={readiness.warnings}
           selectedRowId={selectedDrop?.id || ''}
           {rewardRules}
           {itemCards}

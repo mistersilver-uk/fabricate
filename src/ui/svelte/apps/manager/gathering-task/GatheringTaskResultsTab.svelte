@@ -1,8 +1,9 @@
 <!--
   The gathering task editor's Results tab (issue 1522): a Direct or Check task's result sets, a
   d100 task's component browser and drop rules, or a legacy Progressive task's pointer to Overview.
-  The routed-tier and reward-rule warnings lead it in the stacking region; the view holds the
-  save-blocking notice above the panel. Result sets are written whole via `onUpdateTask`.
+  Its readiness warnings (`warnings`, the Validation tab's own rows) lead it in the stacking region;
+  the view holds the save-blocking notice above the panel. Result sets are written whole via
+  `onUpdateTask`.
 -->
 <script>
   import Button from '../../../components/Button.svelte';
@@ -15,15 +16,13 @@
   import GatheringTaskCard from './GatheringTaskCard.svelte';
   import GatheringTaskComponentBrowserCard from './GatheringTaskComponentBrowserCard.svelte';
   import GatheringTaskDropsCard from './GatheringTaskDropsCard.svelte';
-  import { resultNoticeCopy } from './taskResultNoticeCopy.js';
 
   let {
     text,
     task,
     taskResolutionMode,
     routedOutcomeTiers = [],
-    noRoutedTiers = false,
-    rewardRuleWarning = false,
+    warnings = [],
     selectedRowId = '',
     rewardRules = null,
     itemCards = [],
@@ -48,7 +47,6 @@
     onImportDrop = () => {},
   } = $props();
 
-  const copy = $derived(resultNoticeCopy(text));
   const resultGroups = $derived(Array.isArray(task?.resultGroups) ? task.resultGroups : []);
   const dropRows = $derived(Array.isArray(task?.dropRows) ? task.dropRows : []);
   function normalizeRoutedName(value) {
@@ -95,14 +93,16 @@
   }
 </script>
 
-{#if noRoutedTiers || rewardRuleWarning}
+{#if warnings.length > 0}
   <div class="manager-task-notices" data-notice-position="stack">
-    {#if noRoutedTiers}
-      <Notice tone="warning" title={copy.noRoutedTiers()} data-gathering-routed-no-tiers />
-    {/if}
-    {#if rewardRuleWarning}
-      <Notice tone="warning" title={copy.rewardRule()} data-gathering-task-reward-rule-notice />
-    {/if}
+    {#each warnings as warning (warning.id)}
+      <Notice
+        tone="warning"
+        title={warning.title}
+        data-gathering-routed-no-tiers={warning.id === 'routedTiers' ? '' : undefined}
+        data-gathering-task-reward-rule-notice={warning.id === 'rewardRule' ? '' : undefined}
+      />
+    {/each}
   </div>
 {/if}
 
