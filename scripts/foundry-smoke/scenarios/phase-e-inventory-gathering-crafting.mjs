@@ -762,9 +762,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             [...document.querySelectorAll('#fabricate-app [data-essence-meter]')].map((node) => ({
               essenceId: node.dataset.essenceMeter,
               state: node.dataset.essenceMeterState,
-              ratio: String(
-                node.querySelector('.essence-pool-meter-ratio')?.textContent ?? ''
-              ).trim(),
+              ratio: String(node.querySelector('[data-essence-total]')?.textContent ?? '').trim(),
             }))
           );
         // Container-level wait: the rail's slot row, not a particular tile. An over-specific
@@ -914,15 +912,16 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             `Shared pool was ${JSON.stringify(sharedMeters)}, expected one met and one part-delivered meter`
           );
         }
-        // Issue 917 re-point: the chip's class is `.essence-contribution`
-        // (`EssenceContribution.svelte`) — `.essence-pool-contribution` never existed and
-        // always counted zero.
-        const duskContributions = await appShell
-          .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal") .essence-contribution')
-          .count();
+        // Issue 1644: the shared pool states a carrier's yield as one reading, `+N <essence>` per
+        // pool it funds, so the dual carrier's row must name two contributions.
+        const duskReading = await appShell
+          .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal")')
+          .first()
+          .textContent();
+        const duskContributions = (String(duskReading).match(/\+\d/g) ?? []).length;
         if (duskContributions < 2) {
           throw new Error(
-            `Dual carrier showed ${duskContributions} contribution chips, expected one per essence it funds`
+            `Dual carrier stated ${duskContributions} contributions, expected one per essence it funds`
           );
         }
         await assertNoScreenshotOverlays(page);

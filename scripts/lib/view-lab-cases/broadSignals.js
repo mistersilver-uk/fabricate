@@ -42,8 +42,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/ChoiceOptionList.svelte': Object.freeze([
     'fabricate-journal-lifecycle-waiting-open-choice',
   ]),
+  // The Journal's shared essence stage and, since issue 1644, crafting's pool.
   'src/ui/svelte/components/EssencePool.svelte': Object.freeze([
     'fabricate-journal-lifecycle-essence-shared',
+    'player-crafting-essence-pool',
   ]),
   'src/ui/svelte/components/RunProgress.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
@@ -58,7 +60,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-waiting-auto-eligible',
   ]),
-  // The crafting essence pool's requirement meters and the journal's shared essence stage.
+  // The essence pool's per-essence meters, in crafting and on the journal's shared essence stage.
   'src/ui/svelte/components/Meter.svelte': Object.freeze([
     'player-crafting-essence-pool',
     'fabricate-journal-lifecycle-essence-shared',

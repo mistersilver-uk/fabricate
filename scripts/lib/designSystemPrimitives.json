@@ -14,7 +14,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified pool on its active StepDetails and HistoricalRunDetail consumers. Its history prop renders recorded contributions and source-qualified carriers without active controls. The components path selects broad evidence; rendered acceptance remains pending."
+      "why": "Issue 1648 promotes the specified pool on its active StepDetails and HistoricalRunDetail consumers. Its history prop renders recorded contributions and source-qualified carriers without active controls. Issue 1644 adopts it in crafting through the EssencePoolPanel adapter, which passes capAtHeld and per-item hooks. Measured against its specimen, it stays target pending a maintainer ruling on five geometry figures. The components path selects broad evidence."
     },
     {
       "path": "src/ui/svelte/components/StageCard.svelte",
@@ -598,7 +598,7 @@
       "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1782 builds the specified meter over `FillBar`: a `meter` with its own value, maximum and caller-formatted `aria-valuetext`, named by the caller's own head (`labelId`) or by a visually hidden `label`. Three importers: `components/EssencePool.svelte`'s per-essence thresholds, `apps/crafting/detail/EssencePoolPanel.svelte`'s per-requirement meters and `apps/ActorSelectTopBar.svelte`'s stamina strip, each keeping its markup above the track. Scoped `shared`: the player window and the journal both draw it. Its broad-signal override names the crafting essence pool and the journal's shared essence stage."
+      "why": "Issue 1782 builds the specified meter over `FillBar`: a `meter` with its own value, maximum and caller-formatted `aria-valuetext`, named by the caller's own head (`labelId`) or by a visually hidden `label`. Two importers: `components/EssencePool.svelte`'s per-essence thresholds, which crafting's pool now composes, and `apps/ActorSelectTopBar.svelte`'s stamina strip, each keeping its markup above the track. Scoped `shared`: the player window and the journal both draw it. Its broad-signal override names the crafting essence pool and the journal's shared essence stage."
     },
     {
       "path": "src/ui/svelte/components/BandedBar.svelte",

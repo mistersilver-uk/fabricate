@@ -1003,8 +1003,8 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - A set's essence requirements are funded from one shared, player-editable **essence pool**, scoped to a single ingredient set on a single step, because that is the granularity at which the engine consumes.
 - Each carrier row offers a keyboard-operable stepper allocating units of one held item to the pool, and the allocation the player sees is exactly what the craft consumes.
 - A carrier's allocatable maximum is its `ownedUnits` — the units left AFTER the set's non-essence plan has claimed — never the raw stack quantity, so the stepper cannot allocate the player into an infeasible state.
-- A requirement's ratio reports `delivered / need` as essence amounts, so a satisfied requirement reads exactly `need / need` rather than the whole matching inventory.
-  Unit-granular overshoot is visible in the per-carrier allocation, never in a requirement's ratio.
+  The pool composes the shared `EssencePool` with `capAtHeld`, so that cap holds after every requirement is met: the player may over-fund deliberately, up to the units owned.
+- A requirement's ratio reports what the allocation contributes over its `need`, as essence amounts, never the whole matching inventory; the bar stops at the need while the ratio states an over-funded pool as it is, `4 / 2`, as the library specimen does.
   It is stated in words beneath the source list, one sentence per essence naming the surplus ("{essence}: {amount} more than required", the journal stage's own wording), and the consumption-plan panel states the same line; the sentence outlives the essence pool's replacement under issue 1644.
 - The **consumption-plan panel** states what the craft will spend before it is spent: one row per planned item with the quantity that item contributes, plus a pending line naming the requirements still to choose.
   That "still to choose" list is joined with the platform list formatter rather than an authored separator key, so the join is correct in every locale.
