@@ -136,7 +136,8 @@ function standUpSpecimen(slot, problems, results) {
 
   const settled = new Promise((resolve) => {
     globalThis.addEventListener('message', function onMessage(event) {
-      if (event.source !== iframe.contentWindow) return;
+      if (event.origin !== globalThis.location.origin || event.source !== iframe.contentWindow)
+        return;
       const data = event.data ?? {};
       if (data.type === SPECIMEN_READY) {
         iframe.contentWindow.postMessage(
