@@ -1,0 +1,58 @@
+/*
+ * The seam between the harvested Foundry chrome and the one component a specimen document shows.
+ * Unlayered, so it beats `foundry2.css`, which is layered end to end.
+ */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/*
+ * `configureLabPage()` stamps core's `vtt game` body classes, and core answers `body.game` with a
+ * fixed flex viewport. A flex body blockifies `.pl-specimen` and breaks its shrink-wrap
+ * measurement, so only the layout is overridden; the classes stay for the rules keyed off them.
+ */
+body.game {
+  position: static;
+  display: block;
+  height: auto;
+  overflow: visible;
+}
+
+/* Core paints `body` black; a specimen shows the library's surface through, as the drawing did. */
+body {
+  background: transparent;
+}
+
+/*
+ * Default slot: the window subtree stays in the inheritance chain (type base, custom properties,
+ * theme tokens) but generates no boxes, so the component's own root is what is laid out.
+ */
+body:not(.pl-boxed) .application,
+body:not(.pl-boxed) .window-content,
+body:not(.pl-boxed) .fabricate-manager {
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+  display: contents;
+}
+
+/* The one box a default slot must generate: `specimenMount.js` measures it to size the iframe. */
+body:not(.pl-boxed) .pl-specimen {
+  display: inline-block;
+}
+
+/*
+ * Boxed slot: the window's box at the row's declared size, with production's position, containment
+ * and manager surface, and without the border, radius, shadow and z-index of a floating window.
+ */
+body.pl-boxed .application {
+  inline-size: var(--pl-slot-inline-size, auto);
+  block-size: var(--pl-slot-block-size, auto);
+  position: relative;
+  z-index: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}

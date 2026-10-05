@@ -1,0 +1,133 @@
+[
+  {
+    "spec": "<PageHeader> <TabBar>",
+    "draws": ".stage.b0.col > div > div:nth-child(2)",
+    "path": "src/ui/svelte/apps/manager/EditorTabs.svelte",
+    "props": {
+      "tabs": [
+        { "id": "tiers", "label": "Tiers" },
+        { "id": "businesses", "label": "Businesses" },
+        { "id": "validation", "label": "Validation" },
+        { "id": "settings", "label": "Settings" }
+      ],
+      "activeTab": "tiers",
+      "badges": {
+        "tiers": { "vehicle": "count", "label": 3 },
+        "businesses": { "vehicle": "count", "label": 23 },
+        "validation": { "tone": "warning", "label": 3 }
+      },
+      "ariaLabel": "Frontier Outpost sections"
+    }
+  },
+  {
+    "spec": "<SelectionBar> <BulkEditPanel>",
+    "draws": ".stage.col > div:nth-child(1)",
+    "path": "src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte",
+    "props": {
+      "pageSelectionState": "some",
+      "count": 4,
+      "showSelectAllResults": true,
+      "selectAllResultsCount": 412
+    }
+  },
+  {
+    "spec": "<SelectionBar> <BulkEditPanel>",
+    "draws": ".stage.col > .k-card",
+    "path": "src/ui/svelte/apps/manager/BulkEditPanelShell.svelte",
+    "props": {
+      "heading": "4 components selected",
+      "applyLabel": "Apply to 3",
+      "canApply": true
+    },
+    "content": [
+      {
+        "tag": "label",
+        "children": [
+          { "tag": "span", "text": "Category" },
+          {
+            "tag": "select",
+            "attrs": { "aria-label": "Category" },
+            "children": [
+              { "tag": "option", "text": "Leave unchanged" },
+              { "tag": "option", "text": "Metal" },
+              { "tag": "option", "text": "Reagent" }
+            ]
+          }
+        ]
+      },
+      {
+        "tag": "p",
+        "text": "1 of 4 cannot be changed: Moonsilver is referenced by a locked compendium and will be skipped."
+      }
+    ]
+  },
+  {
+    "spec": "<Modal>",
+    "draws": ".stage.b0 > div",
+    "path": "src/ui/svelte/apps/manager/ManagerModal.svelte",
+    "slot": { "width": 640, "height": 260 },
+    "props": {
+      "open": true,
+      "title": "Map imported folders",
+      "subtitle": "Three folders in this pack have no match in your world.",
+      "closeLabel": "Close"
+    }
+  },
+  {
+    "spec": "<Pagination> <FilterBar>",
+    "cap": "pagination — count left, pager centred, size right",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/Pagination.svelte",
+    "props": {
+      "totalCount": 412,
+      "pageSize": 25,
+      "pageIndex": 0,
+      "pageSizeOptions": [10, 25, 50]
+    }
+  },
+  {
+    "spec": "<Pagination> <FilterBar>",
+    "cap": "filter bar — inline form, with sort",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/ManagerToolbar.svelte",
+    "props": {
+      "ariaLabel": "Recipe filters"
+    },
+    "content": [
+      {
+        "tag": "div",
+        "attrs": { "class": "manager-recipe-filter-row" },
+        "children": [
+          {
+            "tag": "label",
+            "attrs": { "class": "manager-search" },
+            "children": [
+              { "tag": "i", "attrs": { "class": "fas fa-search", "aria-hidden": "true" } },
+              {
+                "tag": "input",
+                "attrs": {
+                  "type": "search",
+                  "placeholder": "Search recipes…",
+                  "aria-label": "Search recipes"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "select",
+            "attrs": {
+              "class": "manager-recipe-category-filter",
+              "aria-label": "Filter recipes by category"
+            },
+            "children": [
+              { "tag": "option", "text": "All categories" },
+              { "tag": "option", "text": "Metal" },
+              { "tag": "option", "text": "Reagent" }
+            ]
+          },
+          { "tag": "span", "attrs": { "class": "manager-recipe-count" }, "text": "1–18 of 412" }
+        ]
+      }
+    ]
+  }
+]

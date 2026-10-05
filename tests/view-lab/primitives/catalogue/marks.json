@@ -1,0 +1,63 @@
+[
+  {
+    "spec": "The mark vocabulary",
+    "cap": "chip — a filter or mode you can click, or authored data you can remove",
+    "draws": ".k-chip",
+    "path": "src/ui/svelte/apps/manager/Chip.svelte",
+    "props": {
+      "tag": "button",
+      "type": "button",
+      "tone": "tag",
+      "icon": "fas fa-tag",
+      "aria-pressed": true
+    },
+    "content": ["#Hardwood"]
+  },
+  {
+    "spec": "The mark vocabulary",
+    "cap": "chip — a filter or mode you can click, or authored data you can remove",
+    "draws": ".k-chip",
+    "path": "src/ui/svelte/apps/manager/Chip.svelte",
+    "props": {
+      "tag": "button",
+      "type": "button",
+      "tone": "neutral",
+      "icon": "fas fa-tag",
+      "aria-pressed": false
+    },
+    "content": ["#Refined"]
+  },
+  {
+    "spec": "The mark vocabulary",
+    "cap": "chip — a filter or mode you can click, or authored data you can remove",
+    "draws": ".k-chip",
+    "path": "src/ui/svelte/apps/manager/Chip.svelte",
+    "props": {
+      "tag": "button",
+      "type": "button"
+    },
+    "content": ["Metal"]
+  },
+  {
+    "spec": "The mark vocabulary",
+    "cap": "chip — a filter or mode you can click, or authored data you can remove",
+    "draws": ".k-chip",
+    "path": "src/ui/svelte/apps/manager/Chip.svelte",
+    "props": {
+      "tag": "button",
+      "type": "button",
+      "tone": "tag",
+      "icon": "fas fa-tag"
+    },
+    "content": [
+      "#Alchemy",
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-xmark",
+          "aria-hidden": "true"
+        }
+      }
+    ]
+  }
+]

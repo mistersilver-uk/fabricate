@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fabricate Build Reference — live</title>
+    <!-- Foundry serves the game view from the web root, so module-relative asset paths resolve against `/`. -->
+    <base href="/" />
+    <!--
+      No Foundry stylesheet on this page, so core cannot repaint the library's drawings; each live
+      specimen is an iframe carrying the cascade. `fabricate.css` is linked for its `--fab-*` tokens
+      and self-hosted faces only: it has no bare-element selector. `library.js` appends the
+      library's own stylesheet.
+    -->
+    <link rel="stylesheet" href="/@fabricate-styles/fabricate.css" />
+    <link rel="stylesheet" href="/@view-lab/primitives/page.css" />
+  </head>
+  <body>
+    <script type="module" src="/tests/view-lab/primitives/mount.js"></script>
+  </body>
+</html>

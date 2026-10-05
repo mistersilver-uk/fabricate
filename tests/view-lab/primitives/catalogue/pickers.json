@@ -1,0 +1,156 @@
+[
+  {
+    "spec": "<RangeBar>",
+    "cap": "outcome bands — 46px, fixed",
+    "draws": ":scope > div:first-of-type",
+    "path": "src/ui/svelte/components/ThresholdBandStrip.svelte",
+    "props": {
+      "binding": "relative",
+      "bands": [
+        {
+          "id": "fumble",
+          "name": "Fumble",
+          "color": "color-mix(in oklab, var(--fab-danger) 26%, var(--fab-bg-0))",
+          "ink": "var(--fab-danger-text)",
+          "from": 1,
+          "to": 9,
+          "index": 0
+        },
+        {
+          "id": "failure",
+          "name": "Failure",
+          "color": "color-mix(in oklab, var(--fab-warning) 26%, var(--fab-bg-0))",
+          "ink": "var(--fab-warning-text)",
+          "from": 10,
+          "to": 14,
+          "index": 1
+        },
+        {
+          "id": "success",
+          "name": "Success",
+          "color": "color-mix(in oklab, var(--fab-success) 26%, var(--fab-bg-0))",
+          "ink": "var(--fab-success-text)",
+          "from": 15,
+          "to": 19,
+          "index": 2
+        },
+        {
+          "id": "critical",
+          "name": "Critical",
+          "color": "color-mix(in oklab, var(--fab-accent) 26%, var(--fab-bg-0))",
+          "ink": "var(--fab-accent-text)",
+          "from": 20,
+          "index": 3
+        }
+      ],
+      "previewDc": 15,
+      "previewLabel": "Smith's Tools",
+      "min": 1,
+      "max": 30,
+      "fallbackNote": "These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers below; the strip returns once the ranges meet."
+    }
+  },
+  {
+    "spec": "<LinkField>",
+    "cap": "empty",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
+    "props": {
+      "title": "Drop a game-world item here",
+      "hint": "or click to search the catalogue",
+      "emptyIcon": "fas fa-link"
+    }
+  },
+  {
+    "spec": "<LinkField>",
+    "cap": "linked",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
+    "props": {
+      "item": {
+        "name": "Blacksmith's Compendium"
+      },
+      "uuid": "Item.kR3nQ8sT1vW2xY4z",
+      "emptyIcon": "fas fa-book"
+    }
+  },
+  {
+    "spec": "<LinkField>",
+    "cap": "missing",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
+    "props": {
+      "item": {
+        "name": "Untitled"
+      },
+      "uuid": "Item.9pQr2sT4uV6wX8yZ",
+      "state": "missing",
+      "hint": "This document no longer resolves.",
+      "emptyIcon": "fas fa-triangle-exclamation"
+    }
+  },
+  {
+    "spec": "<SearchPopover>",
+    "cap": "list form",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/SearchablePopover.svelte",
+    "slot": {
+      "width": 300,
+      "height": 320
+    },
+    "props": {
+      "open": true,
+      "value": "steel-ingot",
+      "triggerIcon": "fas fa-hammer",
+      "triggerLabel": "Steel Ingot",
+      "triggerAriaLabel": "Choose a component",
+      "dialogAriaLabel": "Choose a component",
+      "searchAriaLabel": "Search components",
+      "searchPlaceholder": "Search components",
+      "popoverTitle": "Components",
+      "showFilteredCount": true,
+      "filteredCountTemplate": "{matched} of {total}",
+      "options": [
+        {
+          "id": "steel-ingot",
+          "label": "Steel Ingot",
+          "meta": "Metal · #Refined",
+          "icon": "fas fa-hammer"
+        },
+        {
+          "id": "iron-ingot",
+          "label": "Iron Ingot",
+          "meta": "Metal · #Raw",
+          "icon": "fas fa-hammer"
+        },
+        {
+          "id": "ingotwort-oil",
+          "label": "Ingotwort Oil",
+          "meta": "Reagent · #Alchemy",
+          "icon": "fas fa-flask"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<TintPicker> <ArtPathPicker> <Menu>",
+    "cap": "tint — eight tokens, plus an optional custom colour",
+    "draws": ":scope > div:first-of-type",
+    "path": "src/ui/svelte/components/ManagerColorPopover.svelte",
+    "props": {
+      "colorToken": "sage",
+      "layout": "inline"
+    }
+  },
+  {
+    "spec": "<TintPicker> <ArtPathPicker> <Menu>",
+    "cap": "art path — the image, never the path",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/ImagePathPicker.svelte",
+    "props": {
+      "value": "icons/commodities/metal/ingot-worn-steel.webp",
+      "chooseLabel": "Choose image",
+      "unavailableLabel": "Image picker is not available."
+    }
+  }
+]
