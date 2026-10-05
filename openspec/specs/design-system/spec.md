@@ -1793,6 +1793,7 @@ A site whose DOM hooks, root classes, status words or reported counts differ pas
 The shared count, status and verdict vocabulary lives once, under `FABRICATE.Admin.Manager.Validation.*`, and a surface localizes only the words that are genuinely its own.
 That shared wording is the ENABLE-GATED one — `Blocks enable`, `Cannot be enabled`, `Saves and enables` — because most of these records are things a GM enables.
 A surface whose record has no enable gate localizes the words that gate colours, and only those: a recipe item is used rather than enabled, so it says `Block` and `Cannot be used` and takes every other word from the shared home.
+A gathering task is gated by Save rather than by its enabled switch, so it says `Blocks save`, `Cannot be saved` and `Saves with warnings`.
 The counts are a closed, ordered vocabulary the surface owns — pass, then warning, then blocking — and a site reports the subset it can answer rather than choosing an order or inventing a fourth.
 The count rail, the verdict and the rendered rows are one reading of one state.
 The surface is HANDED its counts, so the rule belongs to the site: the site derives the counts from the rows it renders, rather than reading the evaluation a second time, so a rail cannot report a state its own list contradicts.
