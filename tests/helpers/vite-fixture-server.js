@@ -50,6 +50,8 @@ export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] })
   let server = null;
   let browser = null;
   let origin = '';
+  /** One context per distinct option set, so its pages share the HTTP cache of the dev server. */
+  const contexts = new Map();
 
   return {
     async start() {
@@ -75,6 +77,7 @@ export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] })
     },
 
     async stop() {
+      contexts.clear();
       await browser?.close();
       await server?.close();
       browser = null;
@@ -92,11 +95,13 @@ export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] })
     },
 
     /**
-     * @param {object} [options] Forwarded to `browser.newPage`.
+     * @param {object} [options] Forwarded to `browser.newContext`.
      * @returns {Promise<import('playwright').Page>}
      */
-    newPage(options = {}) {
-      return browser.newPage(options);
+    async newPage(options = {}) {
+      const key = JSON.stringify(options);
+      if (!contexts.has(key)) contexts.set(key, browser.newContext(options));
+      return (await contexts.get(key)).newPage();
     },
   };
 }
