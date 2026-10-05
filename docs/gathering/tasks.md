@@ -11,9 +11,10 @@ nav_order: 2
 
 The selected crafting system's Gathering Tasks are managed from the Gathering **Tasks** tab.
 The task browser supports search, status/biome/availability filters, paging, row selection, enable toggles, duplicate and delete actions, and a right-side inspector with availability, a matching-environment count, and drop summaries.
-The row **Edit** action opens a one-page Gathering Task editor for identity, availability, drop rules, and per-drop modifier tuning.
+The row **Edit** action opens the Gathering Task editor, which splits identity, availability, drop rules, and per-drop modifier tuning across three tabs.
+See [Editor tabs](#editor-tabs).
 
-{% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor, opened from the task browser." %}
+{% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor, opened from the task browser, on its Overview tab." %}
 
 Environment authoring composes Gathering Tasks and reusable events by matching environment biome (and danger for events) only.
 Geography (the realm) is not a composition axis.
@@ -45,6 +46,31 @@ Disabled Gathering Tasks never match for player gathering.
 
 Reusable events are authored separately.
 See [Events]({% link gathering/events.md %}).
+
+## Editor tabs
+
+The Gathering Task editor has three tabs: **Overview**, **Requirements** and **Results**.
+The tab bar stays fixed while the selected tab's panel scrolls.
+The editor opens on Overview, and returns to it when you open a different task.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Tab              | What lives there                                                                                                                                       |
+| :--------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**     | Task identity, the **Gathering resolution** card, and the nodes card. A legacy Progressive task also shows a warning here.                              |
+| **Requirements** | Availability, stamina, the check modifier, the check override and **Required tools**.                                                                   |
+| **Results**      | The result sets (or, for a d100 task, the component browser and the Drops table) and the notices about them. A d100 task's selected-drop rail appears only here. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Overview and Requirements use the full width of the window.
+
+The Results tab carries marks when something needs attention.
+A danger mark shows while the results have errors that block saving, such as "1 result issue blocks save".
+An amber mark shows for each of the two drop-stack warnings: no outcome tiers defined for routing, and several drop rows using the same component under a rule that may award only one.
+
+A legacy Progressive task keeps its own results, so its Results tab shows an empty state titled "Results are not authored here".
+It points you to the **Gathering resolution** card on Overview, where you can choose another mode to author results.
 
 ## How Drops Are Rolled
 
