@@ -1,5 +1,5 @@
 <!--
-  The gathering task editor's Results tab (issue 1522): a Direct or Check task's result sets, a
+  The gathering task editor's Results tab (issue 1522): a straight or routed task's result sets, a
   d100 task's component browser and drop rules, or a legacy Progressive task's pointer to Overview.
   Its readiness warnings (`warnings`, the Validation tab's own rows) lead it in the stacking region;
   the view holds the save-blocking notice above the panel. Result sets are written whole via

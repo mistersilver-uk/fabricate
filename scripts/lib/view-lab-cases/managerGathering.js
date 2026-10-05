@@ -36,7 +36,7 @@ const OPEN_SLOWBLOOM_TASK = Object.freeze([
 /** Blanks the task's name, the one Overview error the Validation tab can draw. */
 const BLANK_NAME = Object.freeze([{ selector: '[data-gathering-task-field="name"]', fill: '' }]);
 const AVAILABLE_SPRING_ROW = '[data-section="available-to-add"] [data-record-id="hb-task-spring"]';
-/** A Direct task's result rows; a step or a single-element check reads the first. */
+/** A straight task's result rows; a step or a single-element check reads the first. */
 const STRAIGHT_RESULT = '[data-gathering-task-results="straight"] [data-recipe-result-item]';
 const taskOverrideCase = ({ id, label, field, frame, sees, claim = '' }) =>
   managerCase({
@@ -251,9 +251,9 @@ export const CASES = Object.freeze([
       sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
     })
   ),
-  // The Validation tab's three verdicts (issue 1522), full width on every task mode: a clean d100
-  // task, a d100 task warned of a repeated component, and a Check task whose blank name and
-  // unmatched tier block Save, at the normal and the narrow width.
+  // The Validation tab's three verdicts (issue 1522), full width on a d100 and a routed task: a
+  // clean d100 task, a d100 task warned of a repeated component, and a routed task whose blank
+  // name and unmatched tier block Save, at the normal and the narrow width.
   ...[
     ['validation', {}, [], 'pass', null],
     ['validation-warnings', { gatheringTaskMode: 'reward-rule' }, [], 'warn', null],
