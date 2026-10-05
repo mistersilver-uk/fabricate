@@ -9,6 +9,7 @@ import {
   COMPONENT_EDITOR_MATCHES,
   REQUIREMENT_SUGGESTION,
   TYPEAHEAD_COMBOBOX_SOURCE,
+  WORLD_SCOPE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
 
@@ -146,6 +147,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       /^src\/ui\/model\/(?:component|entity)BrowserModel\.js$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -242,7 +244,7 @@ export const CASES = Object.freeze([
     // The switch is a new control on this card (issue 1371), so it owns a real pointer hit rather than a DOM assertion.
     expectCenterHit: '[data-scoped-inherit-toggle="essences"]',
     kinds: ['manager', 'components'],
-    sourceMatches: COMPONENT_EDITOR_MATCHES,
+    sourceMatches: [...COMPONENT_EDITOR_MATCHES, WORLD_SCOPE_MODEL_PATTERN],
   }),
   // The first open-panel frame in the component studio (issue 1510): the option list exists only
   // while the panel is open, so a closed-state frame cannot double for it (the portal occludes
@@ -330,6 +332,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/components\/ComponentRow\.svelte$/,
+      WORLD_SCOPE_MODEL_PATTERN,
     ],
   }),
   managerCase({

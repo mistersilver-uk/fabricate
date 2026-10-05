@@ -5,10 +5,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import { isGameMaster, localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
-  import { resolveDropUuid } from '../../util/dropUtils.js';
   import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
-  // THE SHARED SOURCE-REFERENCE WALK (issue 1373).
-  import { getItemMatchUuids } from '../../../../utils/sourceReferenceUnion.js';
   import {
     routedOutcomeTierOptions,
     routedTierOptionsForPolicy,
@@ -152,8 +149,8 @@
   import WorldToolCataloguePage from './scoped/WorldToolCataloguePage.svelte';
   import WorldToolEntryPage from './scoped/WorldToolEntryPage.svelte';
   import WorldVocabularyPage from './scoped/WorldVocabularyPage.svelte';
-  import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
-  import { essenceShortValueName, mintEssenceId } from './scoped/essenceScoped.js';
+  import { scopedEntryName } from './scoped/scopedEntryRoutes.js';
+  import { essenceShortValueName } from './scoped/essenceScoped.js';
   // The shipped two-step destructive control, for the world Tool entry's header `Delete` (issue
   // 1373).
   import ArmedDangerButton from '../../components/ArmedDangerButton.svelte';
@@ -165,6 +162,7 @@
   import { createBulkSelectionOwner } from './bulkSelection.svelte.js';
   import { createNavRailModel } from './navRailModel.svelte.js';
   import { createHeaderModel } from './headerModel.svelte.js';
+  import { createWorldScopeModel } from './worldScopeModel.svelte.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -596,8 +594,8 @@
 
   // The world projection's entry for the SELECTED row, and that entry's row for THIS system.
   const componentInspectorWorldEntry = $derived(
-    (Array.isArray(worldScopeState.component?.entries)
-      ? worldScopeState.component.entries
+    (Array.isArray(worldScope.worldScopeState.component?.entries)
+      ? worldScope.worldScopeState.component.entries
       : []
     ).find((entry) => String(entry?.id ?? '') === String(selectedComponent?.id ?? '')) ?? null
   );
@@ -1137,99 +1135,50 @@
     'world-vocabulary',
   ]);
   const isWorldScopedRoute = $derived(WORLD_SCOPED_VIEWS.includes(currentView));
-  // The world corpus behind the rail leaves' count badges.
-  const worldScopeState = $derived($viewState.worldScope || {});
-  const worldScopedCounts = $derived({
-    components: worldScopeState.component?.entities?.length ?? 0,
-    essences: worldScopeState.essence?.entities?.length ?? 0,
-    tools: worldScopeState.tool?.entities?.length ?? 0,
-    // The World Vocabulary count, WIRED NOW even though its corpus arrives with PR 7, and the
-    // reason is a one-way door.
-    vocabulary: worldScopeState.vocabulary?.total ?? 0,
+  // The world corpus, the open entry and its editors, and the world writes a drop makes.
+  const worldScope = createWorldScopeModel({
+    store: () => store,
+    services: () => services,
+    viewState: () => $viewState,
+    view: () => currentView,
+    selectedSystemId: () => selectedSystemId,
+    selectedEssenceForInspector: () => selectedEssenceForInspector,
+    parseUuid: () => globalThis.foundry?.utils?.parseUuid,
+    openWorldScopedEntry,
+    text,
+    format,
   });
 
   // ── THE WORLD-SCOPE DATA SEAM (issue 1374) ─────────────────────────────────────────────
   const componentScopeProps = $derived({
-    scope: worldScopeState.component ?? null,
+    scope: worldScope.worldScopeState.component ?? null,
     actions: store?.worldScope?.component ?? null,
     systems: allSystems,
     systemId: selectedSystemId || '',
   });
   const essenceScopeProps = $derived({
-    scope: worldScopeState.essence ?? null,
+    scope: worldScope.worldScopeState.essence ?? null,
     actions: store?.worldScope?.essence ?? null,
     systems: allSystems,
     systemId: selectedSystemId || '',
   });
   const toolScopeProps = $derived({
-    scope: worldScopeState.tool ?? null,
+    scope: worldScope.worldScopeState.tool ?? null,
     actions: store?.worldScope?.tool ?? null,
     systems: allSystems,
     systemId: selectedSystemId || '',
   });
 
-  // ── THE WORLD INGREDIENT ROSTERS (issue 1373, maintainer round 2) ────────────────────────
-  const worldComponentOptions = $derived(
-    (worldScopeState.component?.entries ?? []).map((entry) => ({
-      id: entry.id,
-      name: entry.entity?.name || entry.id,
-      img: entry.entity?.img || '',
-      // CARRIED FOR THE DROP TARGET.
-      ...(entry.entity?.registeredItemUuid && {
-        registeredItemUuid: entry.entity.registeredItemUuid,
-      }),
-      ...(entry.entity?.originItemUuid && { originItemUuid: entry.entity.originItemUuid }),
-    }))
-  );
-
-  // WORLD-DISABLED ESSENCES ARE WITHHELD FROM THE OFFER, which is exactly what
-  // `selectableEssenceOptions` does with a system-disabled one.
-  const worldEssenceOptions = $derived(
-    (worldScopeState.essence?.entries ?? []).map((entry) => ({
-      ...(entry.entity ?? {}),
-      id: entry.id,
-      enabled: entry.worldEnabled !== false,
-    }))
-  );
-
-  // THE WORLD TAG VOCABULARY, DERIVED FROM THE RECORDS THAT CARRY IT.
-  const worldComponentTags = $derived(
-    [
-      ...new Set(
-        (worldScopeState.component?.entries ?? []).flatMap((entry) =>
-          Array.isArray(entry.defaults?.tags) ? entry.defaults.tags : []
-        )
-      ),
-    ].sort((left, right) => String(left).localeCompare(String(right)))
-  );
-
-  // ── WHAT THE ESSENCE RULES INSPECTOR NEEDS FROM THE WORLD JOIN (issue 1372, round 8) ──────
-  const inspectedEssenceWorldEntry = $derived(
-    (worldScopeState.essence?.entries ?? []).find(
-      (candidate) => candidate?.id === selectedEssenceForInspector?.id
-    ) ?? null
-  );
-  const inspectedEssenceSystemRows = $derived(
-    worldScopeState.essence?.available === true &&
-      Array.isArray(inspectedEssenceWorldEntry?.systems)
-      ? inspectedEssenceWorldEntry.systems
-      : []
-  );
-  // The inherit map for THIS system, or `null` when there is no membership record.
-  const inspectedEssenceInherited = $derived(
-    inspectedEssenceSystemRows.find((row) => row?.systemId === selectedSystemId)?.inherited ?? null
-  );
-
   // ── THE SYSTEM ESSENCE RULES HEADER (issue 1372, maintainer parity round 7) ───────────────
   const essenceRulesWorldEntry = $derived(
     currentView === 'essence-edit' && selectedEssenceId
-      ? ((worldScopeState.essence?.entries ?? []).find(
+      ? ((worldScope.worldScopeState.essence?.entries ?? []).find(
           (candidate) => candidate?.id === selectedEssenceId
         ) ?? null)
       : null
   );
   const essenceRulesMode = $derived(
-    worldScopeState.essence?.available === true && essenceRulesWorldEntry !== null
+    worldScope.worldScopeState.essence?.available === true && essenceRulesWorldEntry !== null
   );
 
   // Name and glyph follow the world record wherever there is one (issue 1654): `1.34.0` merges
@@ -1264,236 +1213,21 @@
     })
   );
 
-  // WHICH WORLD ENTITY AN ENTRY ROUTE IS OPEN ON (issue 1362).
-  let worldScopedEntryId = $state('');
-  const worldScopedEntryRoute = $derived(scopedEntryRoute(currentView));
-
-  /**
-   * THE BUFFERED IDENTITY OF WHICHEVER SCOPED ENTRY EDITOR IS OPEN (issue 1372, maintainer parity
-   * round 6).
-   */
-  let scopedEntryDraftIdentity = $state(null);
-
-  /** One scoped entry editor's buffered identity, or `null` to withdraw it. */
-  function handleScopedEntryDraftIdentity(identity) {
-    scopedEntryDraftIdentity = identity && typeof identity === 'object' ? { ...identity } : null;
-  }
-
-  /** One buffered identity field as a string, or `null` when no editor is reporting one. */
-  function scopedEntryDraftField(field) {
-    if (!scopedEntryDraftIdentity) return null;
-    const value = scopedEntryDraftIdentity[field];
-    return typeof value === 'string' ? value : null;
-  }
-
   // TRIMMED on both branches, because `scopedEntryName` trims and a crumb that changed its
   // whitespace handling the moment an editor opened would be a difference nobody authored.
   const worldScopedEntryCrumb = $derived(
-    scopedEntryDraftField('name')?.trim() ??
+    worldScope.scopedEntryDraftField('name')?.trim() ??
       scopedEntryName(
-        worldScopeState[worldScopedEntryRoute?.entityType]?.entities,
-        worldScopedEntryId
+        worldScope.worldScopeState[worldScope.worldScopedEntryRoute?.entityType]?.entities,
+        worldScope.worldScopedEntryId
       )
   );
-
-  // THE ESSENCE ENTRY ROUTE'S HEADER NAMES THE ESSENCE (issue 1372, maintainer parity round 4).
-  const worldEssenceEntryRecord = $derived(
-    currentView === 'world-essence-entry'
-      ? ((worldScopeState.essence?.entries ?? []).find(
-          (candidate) => candidate?.id === worldScopedEntryId
-        ) ?? null)
-      : null
-  );
-
-  // `count` is the projection's own member total and `total` is the crafting-system roster the same
-  // entry was built against.
-  const worldEssenceEntrySubtitle = $derived(
-    worldEssenceEntryRecord
-      ? interpolate(
-          text(
-            'FABRICATE.Admin.Manager.Scoped.EssenceEntryIdentitySubtitle',
-            'World definition · used by {count} of {total} systems'
-          ),
-          {
-            count: Number(worldEssenceEntryRecord.membershipCount) || 0,
-            total: Array.isArray(worldEssenceEntryRecord.systems)
-              ? worldEssenceEntryRecord.systems.length
-              : 0,
-          }
-        )
-      : ''
-  );
-
-  /** THE WORLD ESSENCE ENTRY EDITOR'S BUFFERED EDIT. */
-  let worldEssenceEntryHandle = null;
-  let worldEssenceEntryDirty = $state(false);
-  let worldEssenceEntrySaving = $state(false);
-
-  function handleWorldEssenceEntryDraft(handle) {
-    worldEssenceEntryHandle = handle ?? null;
-    if (!handle) worldEssenceEntryDirty = false;
-  }
-
-  function handleWorldEssenceEntryDirty(dirty) {
-    worldEssenceEntryDirty = dirty === true;
-  }
-
-  // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK (issue 1372, maintainer parity round 5).
-  const worldEssenceEntryName = $derived(
-    worldEssenceEntryRecord
-      ? (scopedEntryDraftField('name') ?? worldEssenceEntryRecord.entity?.name ?? '')
-      : ''
-  );
-
-  // AND SO DOES THE MEDALLION BESIDE IT (issue 1372, maintainer parity round 6).
-  const worldEssenceEntryIcon = $derived(
-    worldEssenceEntryRecord
-      ? (scopedEntryDraftField('icon') ?? worldEssenceEntryRecord.entity?.icon ?? '')
-      : ''
-  );
-  const worldEssenceEntryTint = $derived(
-    worldEssenceEntryRecord
-      ? (scopedEntryDraftField('colorToken') ?? worldEssenceEntryRecord.entity?.colorToken ?? '')
-      : ''
-  );
-
-  // THE TOOL ENTRY ROUTE'S HEADER NAMES THE TOOL.
-  const worldToolEntryRecord = $derived(
-    currentView === 'world-tool-entry'
-      ? ((worldScopeState.tool?.entries ?? []).find(
-          (candidate) => candidate?.id === worldScopedEntryId
-        ) ?? null)
-      : null
-  );
-
-  /** WHAT THE RECORD IS, under its name, REPORTED BY THE PAGE rather than derived here. */
-  let worldToolEntrySubtitle = $state('');
-
-  function handleWorldToolEntrySubline(subline) {
-    worldToolEntrySubtitle = typeof subline === 'string' ? subline : '';
-  }
-
-  /** THE WORLD TOOL ENTRY EDITOR'S BUFFERED EDIT, held where its two consumers are. */
-  let worldToolEntryHandle = null;
-  let worldToolEntryDirty = $state(false);
-  let worldToolEntrySaving = $state(false);
-
-  function handleWorldToolEntryDraft(handle) {
-    worldToolEntryHandle = handle ?? null;
-    if (!handle) {
-      worldToolEntryDirty = false;
-      worldToolEntrySubtitle = '';
-    }
-  }
-
-  function handleWorldToolEntryDirty(dirty) {
-    worldToolEntryDirty = dirty === true;
-  }
-
-  /**
-   * THE WORLD TOOL ENTRY'S HEADER `Delete`, which the design draws between Back and Save
-   * (`tmp/proto/tool-entry.png`) and which this screen did not have (issue 1373).
-   */
-  let worldToolEntryDelete = $state(null);
-  let worldToolEntryDeleteArmed = $state('');
-
-  function handleWorldToolEntryDelete(descriptor) {
-    worldToolEntryDelete = descriptor ?? null;
-    if (!descriptor) worldToolEntryDeleteArmed = '';
-  }
-
-  // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK — consistent with the essence entry and
-  // with the linked-item tile this page draws from the same buffered value.
-  const worldToolEntryName = $derived(
-    worldToolEntryRecord
-      ? (scopedEntryDraftField('name') ?? worldToolEntryRecord.entity?.name ?? '')
-      : ''
-  );
-
-  /** Flush the world tool entry editor's buffered edit. */
-  async function saveWorldToolEntry() {
-    if (!worldToolEntryHandle) return false;
-    worldToolEntrySaving = true;
-    try {
-      return (await worldToolEntryHandle.save()) !== false;
-    } finally {
-      worldToolEntrySaving = false;
-    }
-  }
-
-  /** THE WORLD COMPONENT ENTRY EDITOR'S DRAFT (issue 1371). */
-  let worldComponentEntryHandle = null;
-  let worldComponentEntryDirty = $state(false);
-  let worldComponentEntrySaving = $state(false);
-
-  function handleWorldComponentEntryDraft(handle) {
-    worldComponentEntryHandle = handle ?? null;
-    if (!handle) {
-      worldComponentEntryDirty = false;
-      worldComponentEntrySubtitle = '';
-    }
-  }
-
-  function handleWorldComponentEntryDirty(dirty) {
-    worldComponentEntryDirty = dirty === true;
-  }
-
-  /** THE WORLD COMPONENT ENTRY ROUTE'S HEADER NAMES THE COMPONENT (issue 1371, parity round 4). */
-  const worldComponentEntryRecord = $derived(
-    currentView === 'world-component-entry'
-      ? ((worldScopeState.component?.entries ?? []).find(
-          (candidate) => candidate?.id === worldScopedEntryId
-        ) ?? null)
-      : null
-  );
-
-  /** WHAT THE RECORD IS, under its name, REPORTED BY THE PAGE rather than derived here. */
-  let worldComponentEntrySubtitle = $state('');
-
-  function handleWorldComponentEntrySubline(subline) {
-    worldComponentEntrySubtitle = typeof subline === 'string' ? subline : '';
-  }
-
-  // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK, off the shared `scopedEntryDraftIdentity`
-  // channel the breadcrumb's last crumb also reads.
-  const worldComponentEntryName = $derived(
-    worldComponentEntryRecord
-      ? (scopedEntryDraftField('name') ?? worldComponentEntryRecord.entity?.name ?? '')
-      : ''
-  );
-  const worldComponentEntryImage = $derived(
-    worldComponentEntryRecord
-      ? (scopedEntryDraftField('img') ?? worldComponentEntryRecord.entity?.img ?? '')
-      : ''
-  );
-
-  /** Flush the world component entry editor's buffered edit. */
-  async function saveWorldComponentEntry() {
-    if (!worldComponentEntryHandle) return false;
-    worldComponentEntrySaving = true;
-    try {
-      return (await worldComponentEntryHandle.save()) !== false;
-    } finally {
-      worldComponentEntrySaving = false;
-    }
-  }
-
-  /** Flush the world essence entry editor's buffered edit. */
-  async function saveWorldEssenceEntry() {
-    if (!worldEssenceEntryHandle) return false;
-    worldEssenceEntrySaving = true;
-    try {
-      return (await worldEssenceEntryHandle.save()) !== false;
-    } finally {
-      worldEssenceEntrySaving = false;
-    }
-  }
 
   // Open an entry route ON a world entity.
   function openWorldScopedEntry(view, entityId) {
     const nextEntryId = typeof entityId === 'string' ? entityId : String(entityId ?? '');
     return afterTruthyResult(confirmRouteExit(view), () => {
-      worldScopedEntryId = nextEntryId;
+      worldScope.worldScopedEntryId = nextEntryId;
       activeView = view;
     });
   }
@@ -1550,25 +1284,6 @@
       resetComponentSelectionFor(systemId, String(entityId ?? ''));
       activeView = 'components';
     });
-  }
-
-  async function createWorldEssence() {
-    const name = text('FABRICATE.Admin.Manager.Scoped.Essence.NewName', 'New essence');
-    // The retired leg is required here (issue 1654): this mints from a fixed placeholder name.
-    const id = mintEssenceId(
-      name,
-      worldScopeState.essence?.entities ?? [],
-      worldScopeState.essence?.retiredIds ?? []
-    );
-    const created = await store?.worldScope?.essence?.createEntity?.({
-      id,
-      name,
-      icon: 'fas fa-flask-vial',
-      colorToken: '',
-      description: '',
-    });
-    if (created === false) return;
-    openWorldScopedEntry('world-essence-entry', id);
   }
 
   // -- Full width: ONE mechanically checked decision over a THREE-state classification ---
@@ -2123,8 +1838,9 @@
   let unadoptedToolId = $state('');
   const unadoptedWorldTool = $derived(
     unadoptedToolId
-      ? ((worldScopeState.tool?.entries ?? []).find((entry) => entry.id === unadoptedToolId) ??
-          null)
+      ? ((worldScope.worldScopeState.tool?.entries ?? []).find(
+          (entry) => entry.id === unadoptedToolId
+        ) ?? null)
       : null
   );
 
@@ -2135,7 +1851,7 @@
   const selectedLibraryToolInherited = $derived.by(() => {
     const toolId = String(inspectedLibraryTool?.id ?? '');
     if (!toolId) return {};
-    const entry = (worldScopeState.tool?.entries ?? []).find(
+    const entry = (worldScope.worldScopeState.tool?.entries ?? []).find(
       (candidate) => String(candidate?.id ?? '') === toolId
     );
     const systemRow = (Array.isArray(entry?.systems) ? entry.systems : []).find(
@@ -2393,10 +2109,10 @@
       showEssenceSourceUi: () => showEssenceSourceUi,
       text: () => text,
       travelParties: () => travelParties,
-      worldComponentEntryRecord: () => worldComponentEntryRecord,
-      worldEssenceEntryRecord: () => worldEssenceEntryRecord,
+      worldComponentEntryRecord: () => worldScope.worldComponentEntryRecord,
+      worldEssenceEntryRecord: () => worldScope.worldEssenceEntryRecord,
       worldRulesPageTitle: () => worldRulesPageTitle,
-      worldToolEntryRecord: () => worldToolEntryRecord,
+      worldToolEntryRecord: () => worldScope.worldToolEntryRecord,
     },
   });
 
@@ -2483,27 +2199,27 @@
   const routeExitGuards = buildRouteExitGuards({
     'world-essence-entry': {
       active: () => activeView === 'world-essence-entry',
-      subject: () => worldScopedEntryId,
-      isDirty: () => worldEssenceEntryHandle?.isDirty() === true,
+      subject: () => worldScope.worldScopedEntryId,
+      isDirty: () => worldScope.essenceEntry.isDirty(),
       confirm: () => store?.confirmDiscardDirtyEssenceDraft?.(),
-      save: () => saveWorldEssenceEntry(),
-      discard: () => worldEssenceEntryHandle?.discard?.(),
+      save: () => worldScope.essenceEntry.save(),
+      discard: () => worldScope.essenceEntry.discard(),
     },
     'world-tool-entry': {
       active: () => activeView === 'world-tool-entry',
-      subject: () => worldScopedEntryId,
-      isDirty: () => worldToolEntryHandle?.isDirty() === true,
+      subject: () => worldScope.worldScopedEntryId,
+      isDirty: () => worldScope.toolEntry.isDirty(),
       confirm: () => store?.confirmDiscardDirtyToolEntryDraft?.(),
-      save: () => saveWorldToolEntry(),
-      discard: () => worldToolEntryHandle?.discard?.(),
+      save: () => worldScope.toolEntry.save(),
+      discard: () => worldScope.toolEntry.discard(),
     },
     'world-component-entry': {
       active: () => activeView === 'world-component-entry',
-      subject: () => worldScopedEntryId,
-      isDirty: () => worldComponentEntryHandle?.isDirty() === true,
+      subject: () => worldScope.worldScopedEntryId,
+      isDirty: () => worldScope.componentEntry.isDirty(),
       confirm: () => store?.confirmDiscardDirtyComponentDraft?.(),
-      save: () => saveWorldComponentEntry(),
-      discard: () => worldComponentEntryHandle?.discard?.(),
+      save: () => worldScope.componentEntry.save(),
+      discard: () => worldScope.componentEntry.discard(),
     },
     'environment-edit': {
       active: () => activeView === 'environment-edit',
@@ -3963,228 +3679,6 @@
       .replace('{disabled}', disabled);
   }
 
-  /**
-   * The world Tool that ALREADY names `uuid` as its source Item, or `null`.
-   *
-   * @returns {object|null} The world scope entry, or `null` when no record names that Item.
-   */
-  function worldToolForSourceItem(uuid) {
-    const needle = String(uuid ?? '').trim();
-    if (!needle) return null;
-    return (
-      (worldScopeState.tool?.entries ?? []).find((entry) =>
-        getItemMatchUuids(entry?.entity).includes(needle)
-      ) ?? null
-    );
-  }
-
-  /** Create a WORLD Tool from an Item dropped on the world Tools Catalogue, and open its entry. */
-  async function createWorldToolFromItemDrop(data) {
-    if (!data) return false;
-    const uuid = resolveDropUuid(data);
-    if (!uuid) return false;
-    const source = await services?.resolveToolSource?.(uuid);
-    if (!source) return false;
-    const sourceUuid = source.uuid || uuid;
-    const existing = worldToolForSourceItem(sourceUuid);
-    if (existing) {
-      notifyInfo(existingWorldToolMessage(existing));
-      openWorldScopedEntry('world-tool-entry', existing.id);
-      return true;
-    }
-    const entityId = String(store?.randomID?.() || '');
-    if (!entityId) return false;
-    const created = await store?.worldScope?.tool?.createEntity?.({
-      id: entityId,
-      name: source.name || '',
-      img: source.img || '',
-      description: source.description || '',
-      originItemUuid: sourceUuid,
-      registeredItemUuid: sourceUuid,
-    });
-    if (created !== true) return false;
-    // CHAINED, so the drop lands the GM on the record it just made rather than on a list they
-    // then have to find it in. Routed through the same guard every other entry navigation uses.
-    openWorldScopedEntry('world-tool-entry', entityId);
-    return true;
-  }
-
-  /** What a GM is told when their drop landed on a world Tool that already existed. */
-  function existingWorldToolMessage(entry) {
-    const name = String(entry?.entity?.name || entry?.id || '');
-    // BOTH KEYS ARE WRITTEN OUT WHOLE rather than composed from a suffix.
-    const message =
-      entry?.worldEnabled === false
-        ? text(
-            'FABRICATE.Admin.Manager.Scoped.Tool.DropExistingDisabled',
-            '{name} already exists for that Item and is disabled at world scope. Opened it instead of creating a second.'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.Scoped.Tool.DropExisting',
-            '{name} already exists for that Item. Opened it instead of creating a second.'
-          );
-    return message.replace('{name}', name);
-  }
-
-  /** RE-POINT a world Tool at another world Item. */
-  /** The actors the world Tool entry's `Preview as` region offers. */
-  const worldToolPreviewActors = $derived(
-    currentView === 'world-tool-entry'
-      ? ($viewState.actorOptions || [])
-          .filter((actor) => actor?.uuid && actor.isPlayerCharacter === true)
-          .map((actor) => ({
-            id: String(actor.uuid),
-            name: String(actor.name ?? actor.uuid),
-            img: typeof actor.img === 'string' ? actor.img : '',
-          }))
-      : []
-  );
-
-  /** ONE actor's prepared roll data, for resolving a Tool's world-default prerequisites. */
-  function worldToolPreviewRollData(actorUuid) {
-    if (!actorUuid) return null;
-    return store?.getActorRollData?.(actorUuid) ?? null;
-  }
-
-  async function relinkWorldToolSource(data) {
-    const entityId = worldScopedEntryId;
-    if (!entityId || !data) return false;
-    const uuid = resolveDropUuid(data);
-    if (!uuid) return false;
-    const source = await services?.resolveToolSource?.(uuid);
-    if (!source) return false;
-    const patched = await store?.worldScope?.tool?.updateEntity?.(entityId, {
-      name: source.name || '',
-      img: source.img || '',
-      description: source.description || '',
-      originItemUuid: source.uuid || uuid,
-      registeredItemUuid: source.uuid || uuid,
-      aliasItemUuids: [],
-    });
-    return patched === true;
-  }
-
-  /** UNLINK a world Tool from its world Item. */
-  async function unlinkWorldToolSource(entityId) {
-    if (!entityId) return false;
-    const patched = await store?.worldScope?.tool?.updateEntity?.(entityId, {
-      originItemUuid: null,
-      registeredItemUuid: null,
-      aliasItemUuids: [],
-    });
-    return patched === true;
-  }
-
-  /** Whether a uuid names an Item EMBEDDED in another document (issue 1371). */
-  function isEmbeddedItemUuid(uuid) {
-    const parseUuid = globalThis.foundry?.utils?.parseUuid;
-    if (typeof parseUuid !== 'function') return true;
-    try {
-      const parsed = parseUuid(uuid);
-      if (!parsed || typeof parsed !== 'object') return true;
-      return Number(parsed.embedded?.length) > 0;
-    } catch {
-      return true;
-    }
-  }
-
-  /** The world component whose source-link fields already name one Item, or `null`. */
-  function worldComponentForSourceItem(uuid) {
-    const needle = String(uuid ?? '').trim();
-    if (!needle) return null;
-    return (
-      (worldScopeState.component?.entries ?? []).find((entry) =>
-        getItemMatchUuids(entry?.entity).includes(needle)
-      ) ?? null
-    );
-  }
-
-  /** Create a WORLD component from an Item dropped on the world Component Catalogue. */
-  async function createWorldComponentFromItemDrop(data) {
-    if (!data) return false;
-    // The payload arrives UNRESOLVED, so the drop shape is normalised before anything reads it.
-    const uuid = resolveDropUuid(data);
-    if (!uuid) return false;
-    if (isEmbeddedItemUuid(uuid)) {
-      notifyWarn(
-        text(
-          'FABRICATE.Admin.Manager.Scoped.Component.DropEmbeddedRefused',
-          'That Item belongs to an actor, so it cannot be a world component. Drop the Item from the Items directory or a compendium instead.'
-        )
-      );
-      return false;
-    }
-    const source = await services?.resolveToolSource?.(uuid);
-    if (!source) return false;
-    const sourceUuid = source.uuid || uuid;
-    const existing = worldComponentForSourceItem(sourceUuid);
-    if (existing) {
-      notifyInfo(
-        format(
-          'FABRICATE.Admin.Manager.Scoped.Component.DropExisting',
-          '{name} is already a world component, so this drop opened it instead of making a second one.',
-          { name: String(existing.entity?.name || existing.id || '') }
-        )
-      );
-      openWorldScopedEntry('world-component-entry', existing.id);
-      return true;
-    }
-    const entityId = String(store?.randomID?.() || '');
-    if (!entityId) return false;
-    const created = await store?.worldScope?.component?.createEntity?.({
-      id: entityId,
-      name: source.name || '',
-      img: source.img || '',
-      description: source.description || '',
-      originItemUuid: sourceUuid,
-      registeredItemUuid: sourceUuid,
-    });
-    if (created !== true) return false;
-    // CHAINED, so the drop lands the GM on the record it just made rather than on a list they
-    // then have to find it in. Routed through the same guard every other entry navigation uses.
-    openWorldScopedEntry('world-component-entry', entityId);
-    return true;
-  }
-
-  /** RE-POINT a world component at a different world-scoped Item, from the entry's own card. */
-  async function relinkWorldComponentSource(data) {
-    const entityId = worldScopedEntryId;
-    if (!entityId || !data) return false;
-    const uuid = resolveDropUuid(data);
-    if (!uuid) return false;
-    if (isEmbeddedItemUuid(uuid)) {
-      notifyWarn(
-        text(
-          'FABRICATE.Admin.Manager.Scoped.Component.DropEmbeddedRefused',
-          'That Item belongs to an actor, so it cannot be a world component. Drop the Item from the Items directory or a compendium instead.'
-        )
-      );
-      return false;
-    }
-    const source = await services?.resolveToolSource?.(uuid);
-    if (!source) return false;
-    const patched = await store?.worldScope?.component?.updateEntity?.(entityId, {
-      name: source.name || '',
-      img: source.img || '',
-      description: source.description || '',
-      originItemUuid: source.uuid || uuid,
-      registeredItemUuid: source.uuid || uuid,
-      aliasItemUuids: [],
-    });
-    return patched === true;
-  }
-
-  /** UNLINK a world component from its world-scoped Item. */
-  async function unlinkWorldComponentSource(entityId) {
-    if (!entityId) return false;
-    const patched = await store?.worldScope?.component?.updateEntity?.(entityId, {
-      originItemUuid: null,
-      registeredItemUuid: null,
-      aliasItemUuids: [],
-    });
-    return patched === true;
-  }
-
   async function toggleFocusedToolEnabled(enabled) {
     if (!focusedToolDraft?.id || $viewState.toolDraftBaseline === null) return false;
     return store.toggleToolEnabled?.(focusedToolDraft.id, enabled, selectedSystemId);
@@ -4841,20 +4335,20 @@
     {resolveRecipeImage}
     {componentForEdit}
     {downtimeHeaderArtwork}
-    {worldEssenceEntryIcon}
-    {worldEssenceEntryTint}
-    {worldEssenceEntryName}
-    {worldEssenceEntrySubtitle}
+    worldEssenceEntryIcon={worldScope.worldEssenceEntryIcon}
+    worldEssenceEntryTint={worldScope.worldEssenceEntryTint}
+    worldEssenceEntryName={worldScope.worldEssenceEntryName}
+    worldEssenceEntrySubtitle={worldScope.worldEssenceEntrySubtitle}
     {essenceEditIcon}
     {essenceEditTint}
     {essenceEditName}
     {essenceEditSubline}
-    {worldComponentEntryImage}
-    {worldComponentEntryName}
-    {worldComponentEntrySubtitle}
-    {worldToolEntryRecord}
-    {worldToolEntryName}
-    {worldToolEntrySubtitle}
+    worldComponentEntryImage={worldScope.worldComponentEntryImage}
+    worldComponentEntryName={worldScope.worldComponentEntryName}
+    worldComponentEntrySubtitle={worldScope.componentEntry.subline}
+    worldToolEntryRecord={worldScope.worldToolEntryRecord}
+    worldToolEntryName={worldScope.worldToolEntryName}
+    worldToolEntrySubtitle={worldScope.toolEntry.subline}
     environmentDraftForDisplay={gathering.environmentDraftForDisplay}
     {isWorldRoute}
     {isWorldDowntimeRoute}
@@ -4863,7 +4357,7 @@
     {isWorldScopedRoute}
     {isChecksRoute}
     checksActiveTab={checks.checksActiveTab}
-    {worldScopedEntryRoute}
+    worldScopedEntryRoute={worldScope.worldScopedEntryRoute}
     {worldScopedEntryCrumb}
     {worldRulesTab}
     {worldRulesPageTitle}
@@ -4890,21 +4384,21 @@
     backToGatheringTaskLibrary={drafts.backToGatheringTaskLibrary}
     backToGatheringEventLibrary={drafts.backToGatheringEventLibrary}
     {selectedSystemId}
-    {worldEssenceEntryDirty}
-    {worldEssenceEntrySaving}
+    worldEssenceEntryDirty={worldScope.essenceEntry.dirty}
+    worldEssenceEntrySaving={worldScope.essenceEntry.saving}
     {backToWorldEssences}
-    {saveWorldEssenceEntry}
-    {worldToolEntryDirty}
-    {worldToolEntrySaving}
-    {worldToolEntryDelete}
+    saveWorldEssenceEntry={worldScope.essenceEntry.save}
+    worldToolEntryDirty={worldScope.toolEntry.dirty}
+    worldToolEntrySaving={worldScope.toolEntry.saving}
+    worldToolEntryDelete={worldScope.worldToolEntryDelete}
     {worldToolDeleteAction}
     {backToWorldTools}
-    {saveWorldToolEntry}
-    {worldComponentEntryDirty}
-    {worldComponentEntrySaving}
+    saveWorldToolEntry={worldScope.toolEntry.save}
+    worldComponentEntryDirty={worldScope.componentEntry.dirty}
+    worldComponentEntrySaving={worldScope.componentEntry.saving}
     {backToWorldComponents}
-    {saveWorldComponentEntry}
-    {createWorldEssence}
+    saveWorldComponentEntry={worldScope.componentEntry.save}
+    createWorldEssence={worldScope.createWorldEssence}
     {downtimeCoreFallback}
     {downtimeHeaderStatus}
     {downtimeHeaderActions}
@@ -5002,7 +4496,7 @@
       displayedGatheringTab={gathering.displayedGatheringTab}
       openGatheringSection={drafts.openGatheringSection}
       {experimentalFeaturesEnabled}
-      {worldScopedCounts}
+      worldScopedCounts={worldScope.worldScopedCounts}
       {isWorldRoute}
       {openWorldParties}
       {travelParties}
@@ -5041,27 +4535,27 @@
         onOpenEntry={(entityId) => openWorldScopedEntry('world-component-entry', entityId)}
         onOpenSystemRules={(entityId, systemId) => openSystemComponentRules(entityId, systemId)}
         onOpenVocabulary={() => setView('world-vocabulary')}
-        onCreateFromItemDrop={createWorldComponentFromItemDrop}
+        onCreateFromItemDrop={worldScope.createWorldComponentFromItemDrop}
         worldItems={worldItemOptions}
-        worldEssences={worldEssenceOptions}
+        worldEssences={worldScope.worldEssenceOptions}
         bind:browserState={managerBrowserState.worldComponentCatalogue}
       />
     {:else if currentView === 'world-component-entry'}
       <WorldComponentEntryPage
         {...componentScopeProps}
-        entityId={worldScopedEntryId}
+        entityId={worldScope.worldScopedEntryId}
         worldItems={worldItemOptions}
-        worldEssences={worldEssenceOptions}
+        worldEssences={worldScope.worldEssenceOptions}
         onBackToCatalogue={() => setView('world-components')}
         onOpenSystemRules={(entityId, systemId) => openSystemComponentRules(entityId, systemId)}
         onOpenWorldVocabulary={() => setView('world-vocabulary')}
-        onSourceDrop={relinkWorldComponentSource}
-        onUnlinkSource={() => unlinkWorldComponentSource(worldScopedEntryId)}
+        onSourceDrop={worldScope.relinkWorldComponentSource}
+        onUnlinkSource={() => worldScope.unlinkWorldComponentSource(worldScope.worldScopedEntryId)}
         onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
-        onDraftChange={handleWorldComponentEntryDraft}
-        onDirtyChange={handleWorldComponentEntryDirty}
-        onDraftIdentityChange={handleScopedEntryDraftIdentity}
-        onSublineChange={handleWorldComponentEntrySubline}
+        onDraftChange={worldScope.componentEntry.onDraft}
+        onDirtyChange={worldScope.componentEntry.onDirty}
+        onDraftIdentityChange={worldScope.handleScopedEntryDraftIdentity}
+        onSublineChange={worldScope.componentEntry.onSubline}
       />
     {:else if currentView === 'world-essences'}
       <WorldEssenceCataloguePage
@@ -5073,12 +4567,12 @@
     {:else if currentView === 'world-essence-entry'}
       <WorldEssenceEntryPage
         {...essenceScopeProps}
-        entityId={worldScopedEntryId}
+        entityId={worldScope.worldScopedEntryId}
         onBackToCatalogue={() => setView('world-essences')}
         onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
-        onDraftChange={handleWorldEssenceEntryDraft}
-        onDirtyChange={handleWorldEssenceEntryDirty}
-        onDraftIdentityChange={handleScopedEntryDraftIdentity}
+        onDraftChange={worldScope.essenceEntry.onDraft}
+        onDirtyChange={worldScope.essenceEntry.onDirty}
+        onDraftIdentityChange={worldScope.handleScopedEntryDraftIdentity}
       />
     {:else if currentView === 'world-tools'}
       <WorldToolCataloguePage
@@ -5086,33 +4580,33 @@
         onOpenEntry={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
         worldItems={worldItemOptions}
         onOpenSystemRules={(entityId, systemId) => openSystemToolRules(entityId, systemId)}
-        onCreateFromItemDrop={createWorldToolFromItemDrop}
+        onCreateFromItemDrop={worldScope.createWorldToolFromItemDrop}
       />
     {:else if currentView === 'world-tool-entry'}
       <WorldToolEntryPage
         {...toolScopeProps}
-        entityId={worldScopedEntryId}
+        entityId={worldScope.worldScopedEntryId}
         worldItems={worldItemOptions}
         prerequisiteOptions={selectedCharacterPrerequisites}
         modifierOptions={selectedSystemModifiers}
-        componentOptions={worldComponentOptions}
-        essenceOptions={worldEssenceOptions}
-        itemTags={worldComponentTags}
+        componentOptions={worldScope.worldComponentOptions}
+        essenceOptions={worldScope.worldEssenceOptions}
+        itemTags={worldScope.worldComponentTags}
         currencyUnits={selectedCurrencyUnits}
-        previewActors={worldToolPreviewActors}
-        getPreviewRollData={worldToolPreviewRollData}
+        previewActors={worldScope.worldToolPreviewActors}
+        getPreviewRollData={worldScope.worldToolPreviewRollData}
         onBackToCatalogue={() => setView('world-tools')}
-        onSourceDrop={relinkWorldToolSource}
-        onUnlinkSource={() => unlinkWorldToolSource(worldScopedEntryId)}
-        onDraftChange={handleWorldToolEntryDraft}
-        onDirtyChange={handleWorldToolEntryDirty}
-        onDraftIdentityChange={handleScopedEntryDraftIdentity}
-        onSublineChange={handleWorldToolEntrySubline}
-        onDeleteChange={handleWorldToolEntryDelete}
+        onSourceDrop={worldScope.relinkWorldToolSource}
+        onUnlinkSource={() => worldScope.unlinkWorldToolSource(worldScope.worldScopedEntryId)}
+        onDraftChange={worldScope.toolEntry.onDraft}
+        onDirtyChange={worldScope.toolEntry.onDirty}
+        onDraftIdentityChange={worldScope.handleScopedEntryDraftIdentity}
+        onSublineChange={worldScope.toolEntry.onSubline}
+        onDeleteChange={worldScope.handleWorldToolEntryDelete}
       />
     {:else if currentView === 'world-vocabulary'}
       <WorldVocabularyPage
-        vocabulary={worldScopeState.vocabulary ?? null}
+        vocabulary={worldScope.worldScopeState.vocabulary ?? null}
         actions={store?.worldScope?.vocabulary ?? null}
         systems={allSystems}
       />
@@ -5995,8 +5489,8 @@
               sourceName={essenceEditDraft.sourceName || ''}
               macroName={essenceEditDraft.macroName ||
                 essenceShortValueName(essenceEditDraft.propertyMacroUuid)}
-              inherited={inspectedEssenceInherited}
-              previewCarrier={inspectedEssenceWorldEntry?.previewCarrier ?? null}
+              inherited={worldScope.inspectedEssenceInherited}
+              previewCarrier={worldScope.inspectedEssenceWorldEntry?.previewCarrier ?? null}
             />
           {:else if currentView === 'essences' && essenceBulk.count > 0}
             <EssenceBulkEditPanel
@@ -6022,9 +5516,9 @@
               managedItemOptions={selectedSystem?.managedItemOptions || []}
               sourceUuid={selectedEssenceSourceUuid()}
               systemName={selectedSystem?.name || ''}
-              inherited={inspectedEssenceInherited}
-              systemRows={inspectedEssenceSystemRows}
-              memberCount={Number(inspectedEssenceWorldEntry?.membershipCount) || 0}
+              inherited={worldScope.inspectedEssenceInherited}
+              systemRows={worldScope.inspectedEssenceSystemRows}
+              memberCount={Number(worldScope.inspectedEssenceWorldEntry?.membershipCount) || 0}
               rosterSize={allSystems.length}
               onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
               onEdit={(id) => editEssence(id)}
@@ -6407,7 +5901,7 @@
     open={componentAddFromCatalogueOpen}
     systemId={selectedSystemId || ''}
     systemName={selectedSystem?.name || ''}
-    entries={worldScopeState.component?.entries ?? []}
+    entries={worldScope.worldScopeState.component?.entries ?? []}
     onAdd={async (entityId, targetSystemId) =>
       (await store?.worldScope?.component?.addToSystem?.(entityId, targetSystemId)) === true}
     onClose={() => (componentAddFromCatalogueOpen = false)}
@@ -6433,18 +5927,18 @@
 -->
 {#snippet worldToolDeleteAction()}
   <ArmedDangerButton
-    token={worldToolEntryDelete?.token ?? ''}
-    armed={Boolean(worldToolEntryDelete?.token) &&
-      worldToolEntryDeleteArmed === worldToolEntryDelete.token}
-    idleLabel={worldToolEntryDelete?.label ?? ''}
-    armedLabel={worldToolEntryDelete?.armedLabel ?? ''}
-    idleAriaLabel={worldToolEntryDelete?.idleAriaLabel ?? ''}
-    armedAriaLabel={worldToolEntryDelete?.armedAriaLabel ?? ''}
-    onArm={(token) => (worldToolEntryDeleteArmed = token)}
-    onDisarm={() => (worldToolEntryDeleteArmed = '')}
+    token={worldScope.worldToolEntryDelete?.token ?? ''}
+    armed={Boolean(worldScope.worldToolEntryDelete?.token) &&
+      worldScope.worldToolEntryDeleteArmed === worldScope.worldToolEntryDelete.token}
+    idleLabel={worldScope.worldToolEntryDelete?.label ?? ''}
+    armedLabel={worldScope.worldToolEntryDelete?.armedLabel ?? ''}
+    idleAriaLabel={worldScope.worldToolEntryDelete?.idleAriaLabel ?? ''}
+    armedAriaLabel={worldScope.worldToolEntryDelete?.armedAriaLabel ?? ''}
+    onArm={(token) => (worldScope.worldToolEntryDeleteArmed = token)}
+    onDisarm={() => (worldScope.worldToolEntryDeleteArmed = '')}
     onConfirm={() => {
-      worldToolEntryDeleteArmed = '';
-      worldToolEntryDelete?.run?.();
+      worldScope.worldToolEntryDeleteArmed = '';
+      worldScope.worldToolEntryDelete?.run?.();
     }}
   />
 {/snippet}

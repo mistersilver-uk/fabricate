@@ -152,6 +152,8 @@ const GATHERING_DISPLAY = 'src/ui/svelte/apps/manager/gatheringDisplay.js';
 const GATHERING_DRAFT_HANDLERS = 'src/ui/svelte/apps/manager/gatheringDraftHandlers.svelte.js';
 const GATHERING_MODIFIER_HANDLERS =
   'src/ui/svelte/apps/manager/gatheringModifierHandlers.svelte.js';
+// The world corpus, entry editors and drop writes, extracted out of the root (issue 1721).
+const WORLD_SCOPE_MODEL = 'src/ui/svelte/apps/manager/worldScopeModel.svelte.js';
 const GATHERING_UNITS = [
   MANAGER_ROOT,
   GATHERING_ROUTE_MODEL,
@@ -944,6 +946,7 @@ describe('CraftingSystemManager source contract', () => {
       GATHERING_DISPLAY,
       GATHERING_DRAFT_HANDLERS,
       GATHERING_MODIFIER_HANDLERS,
+      WORLD_SCOPE_MODEL,
       ...componentPathsIn('src/ui/svelte/apps/manager/environment'),
       ...componentPathsIn('src/ui/svelte/apps/manager/knowledge'),
     ];
@@ -2182,7 +2185,10 @@ describe('CraftingSystemManager source contract', () => {
   // What the library draws — rows, pager, per-system counts, selection, the three tabs, the
   // absent creation surface and source drop zone, the dirty guard, the armed removal — is driven
   // by `tests/components/manager-tools-mounted.js`. What stays is the wiring behind it.
-  defineStructureContract('wires the Tools library and focused editor', MANAGER_ROOT, {
+  defineStructureContract('wires the Tools library and focused editor', [
+    MANAGER_ROOT,
+    WORLD_SCOPE_MODEL,
+  ], {
     imports: ['./ToolsBrowserView.svelte', './ToolEditView.svelte'],
     compares: ['tools', 'tool-edit'],
     names: [

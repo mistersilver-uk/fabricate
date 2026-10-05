@@ -38,6 +38,8 @@ import { essenceValidationPresentation } from '../src/ui/svelte/apps/manager/ess
 
 const MANAGER = 'src/ui/svelte/apps/manager';
 const ROOT = `${MANAGER}/CraftingSystemManagerRoot.svelte`;
+// The world corpus, the entry editors and the header's create seam (issue 1721).
+const WORLD_SCOPE_MODEL = `${MANAGER}/worldScopeModel.svelte.js`;
 // The page header's action ladder is its own unit since issue 1720, so the seams below are rendered
 // there while the gateway still declares their handlers.
 const HEADER_ACTIONS = `${MANAGER}/ManagerHeaderActions.svelte`;
@@ -75,7 +77,10 @@ function corpusOf({ membership = [], defaults = [] } = {}) {
 // (issue 1372).
 
 describe('requirement 7 correction — the reopened gateway grew a seam, not a dependency', () => {
-  defineStructureContract('IMPORT SURFACE: the essence-family set is exactly this', ROOT, {
+  defineStructureContract('IMPORT SURFACE: the essence-family set is exactly this', [
+    ROOT,
+    WORLD_SCOPE_MODEL,
+  ], {
     importSpecifiers: [
       [
         'essence',
@@ -94,7 +99,10 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
       ],
     ],
     // A NAMESPACE import would be a permanent door: the leaf's next export reachable, no diff here.
-    contains: ["import { essenceShortValueName, mintEssenceId } from './scoped/essenceScoped.js';"],
+    contains: [
+      "import { essenceShortValueName } from './scoped/essenceScoped.js';",
+      "import { mintEssenceId } from './scoped/essenceScoped.js';",
+    ],
   });
 
   defineStructureContract(
@@ -118,10 +126,10 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
   defineStructureContract(
     'SEAM 2 writes through the essence family, mints against the retired ids, and navigates ' +
       'through the shell function the other sites call',
-    { file: ROOT, fn: 'createWorldEssence' },
+    { file: WORLD_SCOPE_MODEL, fn: 'createWorldEssence' },
     {
       contains: [
-        'store?.worldScope?.essence?.createEntity',
+        'store()?.worldScope?.essence?.createEntity',
         "openWorldScopedEntry('world-essence-entry', id)",
         // Issue 1654: the live roster AND the retired ids, or a retired id is reissued.
         'mintEssenceId(name, worldScopeState.essence?.entities ?? [], ' +
@@ -184,7 +192,11 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
         attribute: 'onOpenSystemRules',
         is: '(entityId, systemId) => openSystemEssenceRules(entityId, systemId)',
       },
-      { at: 'WorldEssenceEntryPage', attribute: 'onDirtyChange', is: 'handleWorldEssenceEntryDirty' },
+      {
+        at: 'WorldEssenceEntryPage',
+        attribute: 'onDirtyChange',
+        is: 'worldScope.essenceEntry.onDirty',
+      },
     ],
   });
 
@@ -243,8 +255,8 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
 
   defineStructureContract(
     'SEAM 3 gates navigation on the SAVE landing, so a refused write does not navigate',
-    { file: ROOT, fn: 'saveWorldEssenceEntry' },
-    { contains: ['return (await worldEssenceEntryHandle.save()) !== false;'] }
+    { file: WORLD_SCOPE_MODEL, fn: 'saveEntry' },
+    { contains: ['return (await handle.save()) !== false;'] }
   );
 });
 
