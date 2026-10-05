@@ -302,6 +302,17 @@ test('1773: a choice group is one Produces row holding its alternatives as rows'
   );
 });
 
+test('1773: an up-to group counted by a roll reads its expression as its count', () => {
+  const choice = {
+    id: 'choice',
+    awardStrategy: 'upTo',
+    awardCountFormula: '1d3',
+    alternatives: [{ id: 'a', componentId: 'ore' }, coin()],
+  };
+  const [row] = buildRecipeProduceRows({ resultGroups: [{ id: 'g', results: [choice] }] }, {});
+  assert.equal(row.count, '1d3');
+});
+
 test('1773: an alchemy headline is the first component result, never a reward', () => {
   const builder = new AlchemyListingBuilder({});
   const recipe = {

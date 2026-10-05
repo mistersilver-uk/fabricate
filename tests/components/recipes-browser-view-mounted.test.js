@@ -1881,6 +1881,38 @@ describe('RecipeBrowserInspector (mounted)', () => {
     );
   });
 
+  it('draws a failed check’s choice group and each of its alternatives in the failure tone', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-ruin',
+        resultGroups: [
+          { id: 'ok', results: [{ id: 'r', componentId: 'cmp-potion', quantity: 1 }] },
+          {
+            id: 'ruin',
+            role: 'failure',
+            results: [
+              {
+                id: 'c1',
+                alternatives: [
+                  { id: 'a', componentId: 'cmp-herb', quantity: 1 },
+                  { id: 'b', componentId: 'cmp-potion', quantity: 1 }
+                ]
+              }
+            ]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+    const box = root.querySelector('[data-recipe-produces-choice="failure"]');
+    assert.ok(box, 'the failed check’s group is one failure box');
+    assert.deepEqual(
+      [...box.querySelectorAll('[data-recipe-produces]')].map((row) => row.getAttribute('data-recipe-produces')),
+      ['failure', 'failure']
+    );
+  });
+
   // Issue 884 — the hero medallion is the recipe's own icon.
   itResolvesTheRecipesOwnImage({
     harness: inspector,

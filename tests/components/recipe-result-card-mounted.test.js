@@ -528,6 +528,7 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     assert.deepEqual({ ...first, id: 'x' }, { id: 'x', componentId: 'cmp-herb', quantity: 2 });
     assert.deepEqual({ ...added, id: 'y' }, { id: 'y', kind: 'currency', unit: '', quantity: 1 });
     assert.notEqual(first.id, added.id);
+    assert.notEqual(first.id, group.id, 'the pick takes a fresh id; the row’s id is the group’s');
 
     assert.equal(rows(target).length, 0, 'the bare row became the box');
     assert.equal(members(target).length, 2);
@@ -876,6 +877,16 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     await removeMember(2);
     assert.equal(members(target).length, 2);
     assert.ok(active() === members(target)[1].querySelector(KIND_TRIGGER), 'the one before');
+  });
+
+  it('removing a group’s last alternative removes the whole entry', async () => {
+    const { target, groups } = await mountGroup({
+      id: 'g1',
+      alternatives: [{ id: 'a', componentId: 'cmp-herb', quantity: 1 }],
+    });
+    members(target)[0].querySelector('[data-recipe-remove="result-alternative"]').click();
+    await settle();
+    assert.deepEqual(groups.at(-1).results, []);
   });
 
   it('draws one `alt <kind>` adder per offered kind, appending an empty member that takes focus', async () => {
