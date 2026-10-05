@@ -100,6 +100,95 @@ export function getItemIdentityReferences(item) {
   return refs;
 }
 
+/** A name trimmed, whitespace-collapsed and lowercased for exact matching. A definition's name is
+ * a registration snapshot and a compendium document's name is read live; neither is a localized
+ * key, so the client language cannot move a match. */
+export function normalizeMatchName(name) {
+  return String(name ?? '')
+    .trim()
+    .replaceAll(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+/** A document's stored name, normalized (the prepared one on an index entry or a plain record). */
+export function storedMatchName(document) {
+  return normalizeMatchName(document?._source?.name ?? document?.name);
+}
+
+/** The uuids a registration source owns: the one it is registered from, its document's, and for a
+ * pack document the type-less spelling `addItemsFromPack` registers. */
+export function getOwnSourceUuids(registeredItemUuid, source) {
+  const refs = [];
+  pushUniqueReference(refs, registeredItemUuid);
+  pushUniqueReference(refs, source?.uuid);
+  if (source?.pack && source.id && !source.parent) {
+    pushUniqueReference(refs, `Compendium.${source.pack}.${source.id}`);
+  }
+  return refs;
+}
+
+function claimsAny(definition, uuids) {
+  const held = getItemMatchUuids(definition);
+  return uuids.some((uuid) => held.includes(uuid));
+}
+
+// Whether a durable id naming `named` is an inherited marker (issue 2217): `named` claims none of
+// the uuids in `own`, and the source is a clone, or a derivative (its compendium source is one
+// `snapshot` leaves out) whose stored name `named` does not carry. A clone's name is not read.
+function isInheritedMarker(named, source, snapshot, own) {
+  if (claimsAny(named, own)) return false;
+  if (getDuplicateSourceUuid(source)) return true;
+  const compendiumUuid = getCompendiumSourceUuid(source);
+  if (!compendiumUuid || getItemMatchUuids(snapshot).includes(compendiumUuid)) return false;
+  const name = storedMatchName(source);
+  return !name || name !== normalizeMatchName(named.name);
+}
+
+/** The definition a registration source already has (issue 2217): a durable id its flags carry,
+ * then a claim on its own uuid, then any reference in `claimed`, by default all `snapshot` claims.
+ * A durable id is skipped when `isInheritedMarker` holds for the definition it names. */
+export function findRegisteredDefinition(
+  definitions,
+  snapshot,
+  source,
+  durableIds = [],
+  claimed = getItemMatchUuids(snapshot)
+) {
+  const own = getOwnSourceUuids(snapshot?.registeredItemUuid, source);
+  for (const id of durableIds) {
+    if (id == null) continue;
+    const named = definitions.find((definition) => String(definition?.id) === String(id));
+    if (named && !isInheritedMarker(named, source, snapshot, own)) return named;
+  }
+  return (
+    definitions.find((definition) => claimsAny(definition, own)) ||
+    definitions.find((definition) => claimsAny(definition, claimed)) ||
+    null
+  );
+}
+
+/** A re-registration neither adds nor releases a compendium-source claim (issue 2217): when
+ * `existing` claims the source's own uuid, a claim it lacks is withheld from `snapshot` and one it
+ * holds stays as an alias once the origin moves off it. Any other pairing answers `snapshot`. */
+export function settleCompendiumClaim(snapshot, existing, source) {
+  const compendiumUuid = getDuplicateSourceUuid(source) ? null : getCompendiumSourceUuid(source);
+  const own = getOwnSourceUuids(snapshot?.registeredItemUuid, source);
+  if (!compendiumUuid || own.includes(compendiumUuid) || !claimsAny(existing, own)) return snapshot;
+  const aliasItemUuids = (snapshot.aliasItemUuids || []).filter((ref) => ref !== compendiumUuid);
+  if (!getItemMatchUuids(existing).includes(compendiumUuid)) {
+    const withheld = { ...snapshot, originItemUuid: snapshot.registeredItemUuid, aliasItemUuids };
+    // A withheld claim fell back to nothing, so it reports no broken-source fallback either.
+    if (snapshot.sourceFallbacks) {
+      withheld.sourceFallbacks = snapshot.sourceFallbacks.filter(
+        (fallback) => fallback.brokenUuid !== compendiumUuid
+      );
+    }
+    return withheld;
+  }
+  if (snapshot.originItemUuid === compendiumUuid) return snapshot;
+  return { ...snapshot, aliasItemUuids: [...aliasItemUuids, compendiumUuid] };
+}
+
 // Systems already warned-about, so a per-item resolve loop emits at most one console
 // line per offending system id rather than one per candidate item.
 const _warnedUnsafeSystemIds = new Set();

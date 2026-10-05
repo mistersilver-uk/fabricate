@@ -150,7 +150,7 @@ function resetRegistry() {
 // compendium item, a world item imported from it, and a duplicate of that world item
 // (which inherits the compendium source and gains a duplicateSource).
 function registerCloneChain({ packUuid, worldUuid, worldName, cloneUuid, cloneName, cloneImg }) {
-  register(makeDoc({ uuid: packUuid, name: `${worldName} (pack)` }));
+  register(makeDoc({ uuid: packUuid, name: worldName }));
   register(makeDoc({ uuid: worldUuid, name: worldName, compendiumSource: packUuid }));
   register(
     makeDoc({
@@ -241,7 +241,7 @@ test('555 — flow 4b: registering a component duplicated from a compendium-orig
 
 test('555 — flow 1 double-import (NOT the bug): the same pack book imported to the world twice registers as ONE definition', async () => {
   resetRegistry();
-  register(makeDoc({ uuid: 'Compendium.mod.books.book', name: 'Book (pack)' }));
+  register(makeDoc({ uuid: 'Compendium.mod.books.book', name: 'Book' }));
   // Two DISTINCT world imports of the same pack item — both carry the same compendiumSource
   // and neither is a clone (no duplicateSource).
   register(makeDoc({ uuid: 'Item.book-a', name: 'Book', compendiumSource: 'Compendium.mod.books.book' }));
@@ -678,7 +678,7 @@ test('555 R4 — an actor-owned copy carrying BOTH compendiumSource and duplicat
 
 test('555 A2 — a compendium-imported component resolves owned copies dragged from BOTH the compendium item and the imported world item', async () => {
   resetRegistry();
-  register(makeDoc({ uuid: 'Compendium.mod.items.ore', name: 'Ore (pack)' }));
+  register(makeDoc({ uuid: 'Compendium.mod.items.ore', name: 'Ore' }));
   register(makeDoc({ uuid: 'Item.ore', name: 'Ore', compendiumSource: 'Compendium.mod.items.ore' }));
   const mgr = buildManager({ systems: [{ id: 'sys', name: 'S', components: [] }] });
   const component = (await mgr.addItemFromUuid('sys', 'Item.ore')).item;

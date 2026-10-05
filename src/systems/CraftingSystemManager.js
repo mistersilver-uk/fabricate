@@ -53,13 +53,18 @@ import {
 } from '../utils/recipeItemMembership.js';
 import { resolveRecipeCheckTierOptions } from '../utils/routedOutcomeKeywords.js';
 import {
+  findRegisteredDefinition,
   getCompendiumSourceUuid,
   getDuplicateSourceUuid,
   getItemMatchUuids,
   getItemIdentityReferences,
+  getOwnSourceUuids,
+  normalizeMatchName,
   resolveComponentForItem,
   resolveToolForItem,
   matchRecipeItemDefinition,
+  settleCompendiumClaim,
+  storedMatchName,
 } from '../utils/sourceUuid.js';
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
@@ -112,6 +117,19 @@ const RECIPE_ITEM_FACTS = domainsForSystemFields(['recipeItemDefinitions']);
 const ESSENCE_FACTS = domainsForSystemFields(['essenceDefinitions', 'components']);
 // `repairItemData` refreshes definition names, images and descriptions for BOTH libraries.
 const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
+
+/** Whether a non-clone source is a derivative of its resolved compendium source (issue 2217): its
+ * stored name is neither the entry's stored name nor the original a translation module recorded
+ * on the entry. The source's own recorded original is not read, because `fromCompendium` copies
+ * the entry's flags into everything built from it. A side with no name is no evidence. */
+function isDerivativeOf(source, compendiumDocument) {
+  const name = storedMatchName(source);
+  const entryNames = [
+    storedMatchName(compendiumDocument),
+    normalizeMatchName(compendiumDocument?.flags?.babele?.originalName),
+  ].filter(Boolean);
+  return !!name && entryNames.length > 0 && !entryNames.includes(name);
+}
 
 export class CraftingSystemManager {
   /**
@@ -2934,8 +2952,9 @@ export class CraftingSystemManager {
     // component under an unsafe id.
     const roleFlagKey = this._recipeItemRoleFlagKey(system.id);
 
-    const snapshot = await this._buildRecipeItemSourceSnapshot(itemUuid, source);
-    const existing = this._findRecipeItemDefinitionForSource(system, snapshot, source);
+    const resolved = await this._buildRecipeItemSourceSnapshot(itemUuid, source);
+    const existing = this._findRecipeItemDefinitionForSource(system, resolved, source);
+    const snapshot = settleCompendiumClaim(resolved, existing, source);
     if (existing) {
       const unchanged =
         existing.name === snapshot.name &&
@@ -2958,6 +2977,15 @@ export class CraftingSystemManager {
       existing.img = snapshot.img;
       existing.description = snapshot.description;
       existing.originItemUuid = snapshot.originItemUuid;
+      // An origin move releases no claim the registration still lists, and no alias repeats the
+      // origin or the registered uuid (issue 2217).
+      const aliases = new Set(existing.aliasItemUuids || []);
+      if ((snapshot.aliasItemUuids || []).includes(previousSourceUuid)) {
+        aliases.add(previousSourceUuid);
+      }
+      aliases.delete(existing.originItemUuid);
+      aliases.delete(existing.registeredItemUuid);
+      existing.aliasItemUuids = [...aliases];
       // An element's indexed fields (`name`, source refs) changed at constant array
       // length, which neither the array-identity nor the length clause of the
       // `definitionIndex` invalidation rule can see. Advance explicitly.
@@ -3027,16 +3055,10 @@ export class CraftingSystemManager {
       if (byId) return byId;
     }
     const durableId = flagKey ? getFabricateFlag(source, flagKey, null) : null;
-    if (durableId) {
-      const byDurableId = tools.find((entry) => String(entry?.id) === String(durableId));
-      if (byDurableId) return byDurableId;
-    }
-    const refs = new Set([snapshot?.registeredItemUuid, snapshot?.originItemUuid].filter(Boolean));
-    return (
-      tools.find((entry) =>
-        [entry?.registeredItemUuid, entry?.originItemUuid].some((ref) => refs.has(ref))
-      ) || null
-    );
+    // A tool is not matched through a compendium source the snapshot records only as an alias,
+    // which is one that no longer resolves.
+    const claimed = [snapshot?.registeredItemUuid, snapshot?.originItemUuid].filter(Boolean);
+    return findRegisteredDefinition(tools, snapshot, source, [durableId], claimed);
   }
 
   _sourceFlagState(source, flagKey) {
@@ -3158,9 +3180,10 @@ export class CraftingSystemManager {
     const flagKey = this._toolRoleFlagKey(system.id);
     const hasSourceRequest = typeof itemUuid === 'string' && !!itemUuid.trim();
     const source = hasSourceRequest ? await this._resolveToolSourceItem(itemUuid.trim()) : null;
-    const snapshot = source ? await this._buildToolSourceSnapshot(itemUuid.trim(), source) : null;
+    const resolved = source ? await this._buildToolSourceSnapshot(itemUuid.trim(), source) : null;
     const tools = Array.isArray(system.tools) ? system.tools : [];
-    const existing = this._findToolForUpsert(tools, data, snapshot, source, flagKey);
+    const existing = this._findToolForUpsert(tools, data, resolved, source, flagKey);
+    const snapshot = settleCompendiumClaim(resolved, existing, source);
     const validPrerequisiteIds = new Set(
       (Array.isArray(system.characterPrerequisites) ? system.characterPrerequisites : []).map(
         (entry) => entry.id
@@ -4053,8 +4076,8 @@ export class CraftingSystemManager {
     //
     // This is a REGISTRATION / source-repair rule ONLY. `duplicateSource` means "suspect
     // clone" for a world source being registered, but it means NOTHING for an actor-owned
-    // copy: Foundry stamps `duplicateSource` on every non-compendium drag-drop
-    // (`client-document.mjs`), while that copy's `compendiumSource` is legitimate
+    // copy: an owned copy may carry `duplicateSource` too, depending on the core build,
+    // while that copy's `compendiumSource` is legitimate
     // provenance. So this clone-gate must never reach the runtime matcher — which is why
     // `matchRecipeItemDefinition` carries no clone-gate and trusts tier-3 compendium.
     const isClone = !!getDuplicateSourceUuid(source);
@@ -4070,8 +4093,9 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Resolve component import source references, falling back when Foundry's
-   * recorded canonical source no longer resolves.
+   * Resolve import source references for every kind. A derivative keys on its own uuid as a
+   * clone does, with its `_stats` left alone; a recorded canonical source that no longer
+   * resolves falls back.
    *
    * @param {string} itemUuid
    * @param {Item|object|null} source
@@ -4108,7 +4132,16 @@ export class CraftingSystemManager {
     }
 
     if (canonicalSource) {
-      return { ...sourceData, aliasItemUuids, sourceFallbacks };
+      if (!isDerivativeOf(source, canonicalSource)) {
+        return { ...sourceData, aliasItemUuids, sourceFallbacks };
+      }
+      return {
+        ...sourceData,
+        canonicalUuid: currentUuid,
+        references: sourceData.references.filter((ref) => ref !== recordedCanonicalUuid),
+        aliasItemUuids,
+        sourceFallbacks,
+      };
     }
 
     if (!sourceData.references.includes(recordedCanonicalUuid)) {
@@ -4315,8 +4348,8 @@ export class CraftingSystemManager {
    * world/pack source repair — because a registered SOURCE item that carries
    * `duplicateSource` is a genuine sidebar-Duplicate whose inherited provenance would
    * otherwise collide it with its original. It must NEVER be applied to actor-owned
-   * copies: Foundry stamps `duplicateSource` on every non-compendium drag-drop, so an
-   * ordinary owned copy carries it legitimately, and stripping or distrusting it there
+   * copies: a drop may stamp `duplicateSource`, depending on the core build, so an
+   * ordinary owned copy can carry it legitimately, and stripping or distrusting it there
    * would break the hand-a-player-a-copy case. See {@link matchRecipeItemDefinition} in
    * `src/utils/sourceUuid.js` for the runtime matcher that deliberately has no gate.
    * @private
@@ -4509,53 +4542,30 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Resolve the existing definition a registered source maps to. A NON-clone source's
-   * durable identity flag is authoritative (it resolves to its definition even if the
-   * recorded `originItemUuid` drifted): the per-system `roles[system.id].recipeItemDefinitionId`
-   * leaf (issue 567) is read FIRST, then the legacy scalar `recipeItemDefinitionId` as a
-   * transitional fallback for a source stamped before the restamp backfilled the map. A
-   * CLONE's inherited flag belongs to the ORIGINAL and is ignored (the clone-gate), so a
-   * duplicated source becomes its own definition (issue 555, flow 4b). Falls back to the
-   * `originItemUuid` lookup, which is already clone-gated via `_resolveImportedSourceData`.
+   * Resolve the existing definition a registered source maps to. Its durable identity flag
+   * wins even over a drifted `originItemUuid`: the per-system
+   * `roles[system.id].recipeItemDefinitionId` leaf (issue 567) is read first, then the legacy
+   * scalar `recipeItemDefinitionId` as a transitional fallback for a source stamped before the
+   * restamp backfilled the map. A clone's or a derivative's inherited flag is passed over, so
+   * it becomes its own definition (issues 555, 2217). Falls back to the definition claiming
+   * the source's own uuid, then to any reference the snapshot claims.
    * @private
    */
   _findRecipeItemDefinitionForSource(system, snapshot, source) {
     const definitions = Array.isArray(system.recipeItemDefinitions)
       ? system.recipeItemDefinitions
       : [];
-    if (!getDuplicateSourceUuid(source)) {
-      const roleFlagKey = this._recipeItemRoleFlagKey(system.id);
-      const roleId = roleFlagKey ? getFabricateFlag(source, roleFlagKey, null) : null;
-      if (roleId) {
-        const byRole = definitions.find((def) => def.id === roleId);
-        if (byRole) return byRole;
-      }
-      const flagId = getFabricateFlag(source, 'recipeItemDefinitionId', null);
-      if (flagId) {
-        const byFlag = definitions.find((def) => def.id === flagId);
-        if (byFlag) return byFlag;
-      }
-    }
-    // Union find-existing over the snapshot's full ref set. The snapshot's refs are
-    // already clone-gated by `_resolveImportedSourceData` (a clone contributes only its
-    // own uuid), so a duplicated source can never collide with the original here — the
-    // 4b overwrite stays fixed even with union matching.
-    const claimed = new Set(getItemMatchUuids(snapshot));
-    if (claimed.size === 0) return null;
-    return (
-      definitions.find((def) => getItemMatchUuids(def).some((ref) => claimed.has(ref))) || null
-    );
+    const roleFlagKey = this._recipeItemRoleFlagKey(system.id);
+    return findRegisteredDefinition(definitions, snapshot, source, [
+      roleFlagKey ? getFabricateFlag(source, roleFlagKey, null) : null,
+      getFabricateFlag(source, 'recipeItemDefinitionId', null),
+    ]);
   }
 
-  // Normalize a name for the name-assisted re-point: trim, collapse internal
-  // whitespace, and lowercase. Exact (post-normalization) equality only — no fuzzy or
-  // substring matching. Names are literal snapshot strings captured at registration,
-  // not localized keys, so a client-language change cannot move the match.
+  // Normalize a name for the name-assisted re-point; exact (post-normalization) equality
+  // only, through the shared `normalizeMatchName`.
   _normalizeMatchName(name) {
-    return String(name ?? '')
-      .trim()
-      .replaceAll(/\s+/g, ' ')
-      .toLowerCase();
+    return normalizeMatchName(name);
   }
 
   // Resolve a definition by exact name, unique WITHIN the per-system definition set passed
@@ -4573,28 +4583,25 @@ export class CraftingSystemManager {
     return matches[0];
   }
 
-  // Owner resolution for a WORLD / WRITABLE-PACK SOURCE item. Clone-gated: a source
-  // carrying `_stats.duplicateSource` is a sidebar-Duplicate, so it must NOT be
+  // Owner resolution for a WORLD / WRITABLE-PACK SOURCE item: the definition claiming its own
+  // uuid, and only otherwise one claiming its compendium source (issue 2217). Clone-gated: a
+  // source carrying `_stats.duplicateSource` is a sidebar-Duplicate, so it must NOT be
   // identity-matched onto the ORIGINAL through its inherited `compendiumSource` (the
   // self-corruption hazard — it would be stamped with the original's id). A clone
-  // keys on its own uuid only; a non-clone keys on uuid + compendium source.
+  // keys on its own uuid only.
   _resolveSourceRepairOwner(item, kind) {
-    const isClone = !!getDuplicateSourceUuid(item);
-    const refs = new Set(
-      isClone
-        ? [item?.uuid].filter((ref) => typeof ref === 'string' && ref.trim())
-        : getItemIdentityReferences(item)
-    );
-    if (refs.size === 0) return null;
-    return (
-      kind.definitions.find((def) => kind.refExtractor(def).some((ref) => refs.has(ref))) || null
-    );
+    const claimedBy = (refs) =>
+      kind.definitions.find((def) => kind.refExtractor(def).some((ref) => refs.includes(ref))) ||
+      null;
+    const byOwnUuid = claimedBy(getOwnSourceUuids(item?.uuid, item));
+    if (byOwnUuid || getDuplicateSourceUuid(item)) return byOwnUuid;
+    return claimedBy(getItemIdentityReferences(item));
   }
 
   // Owner resolution for an ACTOR-OWNED item, returning `{definition, tier}`. NO
-  // clone-gate: an owned copy legitimately carries `duplicateSource` (Foundry stamps it
-  // on drag-drop) and its `compendiumSource` is real provenance, so it resolves through
-  // the ordinary runtime matchers — the four-tier recipe-item matcher (which surfaces the
+  // clone-gate: an owned copy may legitimately carry `duplicateSource` (a drop may stamp it,
+  // depending on the core build) and its `compendiumSource` is real provenance, so it resolves
+  // through the ordinary runtime matchers — the four-tier recipe-item matcher (which surfaces the
   // tier), or the component source matcher (`tier: null`).
   _resolveOwnedRepairOwner(item, kind) {
     if (kind.bucket === 'recipeItems') {
@@ -5033,12 +5040,15 @@ export class CraftingSystemManager {
     }
 
     const nextSourceData = await this._resolveImportedComponentSourceData(itemUuid, source);
-    const existing = this._findComponentBySourceReferences(system, nextSourceData.references);
-    const nextSnapshot = await this._buildComponentSourceSnapshot(
-      itemUuid,
-      source,
+    // The component claiming the source's own uuid wins over one claiming only its compendium
+    // source (issue 2217).
+    const existing =
+      this._findComponentBySourceReferences(system, getOwnSourceUuids(itemUuid, source)) ||
+      this._findComponentBySourceReferences(system, nextSourceData.references);
+    const nextSnapshot = settleCompendiumClaim(
+      await this._buildComponentSourceSnapshot(itemUuid, source, existing, nextSourceData),
       existing,
-      nextSourceData
+      source
     );
     if (existing) {
       const nextFallbacks = this._buildFallbackSourceReferences(
@@ -5221,7 +5231,7 @@ export class CraftingSystemManager {
     let dirty = false;
     try {
       for (const item of items) {
-        const uuid = `Compendium.${packId}.${item.id}`;
+        const uuid = item.uuid || `Compendium.${packId}.${item.id}`;
         const result = await this.addItemFromUuid(systemId, uuid, { persist: false });
         if (result.action === 'added') {
           added++;
@@ -5287,11 +5297,10 @@ export class CraftingSystemManager {
     const refreshDescription = this._hasUpdatedItemDescription(changes);
     if (!refreshName && !refreshImg && !refreshDescription) return { updated: 0 };
 
-    // Identity references only: a clone carries duplicateSource → its original,
-    // so matching on the duplicate source would propagate this edit onto the
-    // original item's component as well.
-    const itemRefs = new Set(getItemIdentityReferences(item));
-    if (itemRefs.size === 0) return { updated: 0 };
+    // The edited Item's own uuid only: its compendium and duplicate sources name sibling Items,
+    // whose components must not receive this edit (issue 2217).
+    const ownUuids = getOwnSourceUuids(item?.uuid, item);
+    if (ownUuids.length === 0) return { updated: 0 };
 
     const nextName = refreshName ? item?.name || changes.name || 'Unnamed Item' : null;
     const nextImg = refreshImg ? item?.img || changes.img || 'icons/svg/item-bag.svg' : null;
@@ -5312,8 +5321,7 @@ export class CraftingSystemManager {
     for (const system of this.systems.values()) {
       const components = Array.isArray(system.components) ? system.components : [];
       for (const component of components) {
-        const matches = getItemMatchUuids(component).some((ref) => itemRefs.has(ref));
-        if (!matches) continue;
+        if (getItemMatchUuids(component).every((ref) => !ownUuids.includes(ref))) continue;
 
         let changed = false;
         if (refreshName && component.name !== nextName) {
