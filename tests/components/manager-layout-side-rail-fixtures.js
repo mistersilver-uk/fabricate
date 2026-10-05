@@ -271,59 +271,69 @@ function sideRailMarkup(route, { width, height, collapsed }) {
  * @returns {Promise<object>} boxes, scroll state and rail borders, and the catalogue list's state
  */
 export async function readSideRailGeometry(route, { width, height = 686, collapsed = false }) {
-  const context = await openLayoutContext({
-    viewport: { width: width + 40, height: Math.max(720, height + 34) },
-    deviceScaleFactor: 1,
-  });
-  const page = await context.newPage();
-  try {
-    await page.setContent(sideRailMarkup(route, { width, height, collapsed }));
-    return await page.evaluate(
-      ({ owner, catalogue }) => {
-        const at = (selector) => document.querySelector(selector);
-        const box = (selector) => {
-          const value = at(selector)?.getBoundingClientRect();
-          return value
-            ? { top: value.top, bottom: value.bottom, width: value.width, height: value.height }
-            : null;
-        };
-        const scroll = (selector) => {
-          const node = at(selector);
-          return {
-            scrollHeight: node.scrollHeight,
-            clientHeight: node.clientHeight,
-            overflowY: getComputedStyle(node).overflowY,
-          };
-        };
-        const tracks = (selector) =>
-          getComputedStyle(at(selector)).gridTemplateColumns.trim().split(/\s+/).length;
-        const stacked = Boolean(owner.stackSubject) && tracks(owner.stackSubject) === 1;
-        const ownerSelector = stacked ? owner.stacked : owner.wide;
-        const railStyle = getComputedStyle(at('.manager-rail'));
+  const page = await sideRailPage({ width: width + 40, height: Math.max(720, height + 34) });
+  await page.setContent(sideRailMarkup(route, { width, height, collapsed }));
+  return page.evaluate(
+    ({ owner, catalogue }) => {
+      const at = (selector) => document.querySelector(selector);
+      const box = (selector) => {
+        const value = at(selector)?.getBoundingClientRect();
+        return value
+          ? { top: value.top, bottom: value.bottom, width: value.width, height: value.height }
+          : null;
+      };
+      const scroll = (selector) => {
+        const node = at(selector);
         return {
-          stacked,
-          ownerSelector,
-          bodyTracks: tracks('.manager-body'),
-          rail: box('.manager-rail'),
-          body: box('.manager-body'),
-          main: box('.manager-body > main'),
-          owner: box(ownerSelector),
-          bodyScroll: scroll('.manager-body'),
-          ownerScroll: scroll(ownerSelector),
-          railScroll: scroll('.manager-rail'),
-          railBorder: { right: railStyle.borderRightWidth, bottom: railStyle.borderBottomWidth },
-          list: catalogue
-            ? {
-                layout: box('.manager-scoped-list-layout'),
-                layoutScroll: scroll('.manager-scoped-list-layout'),
-                rowsScroll: scroll('.manager-scoped-list-rows'),
-              }
-            : null,
+          scrollHeight: node.scrollHeight,
+          clientHeight: node.clientHeight,
+          overflowY: getComputedStyle(node).overflowY,
         };
-      },
-      { owner: route.owner, catalogue: Boolean(route.catalogue) }
+      };
+      const tracks = (selector) =>
+        getComputedStyle(at(selector)).gridTemplateColumns.trim().split(/\s+/).length;
+      const stacked = Boolean(owner.stackSubject) && tracks(owner.stackSubject) === 1;
+      const ownerSelector = stacked ? owner.stacked : owner.wide;
+      const railStyle = getComputedStyle(at('.manager-rail'));
+      return {
+        stacked,
+        ownerSelector,
+        bodyTracks: tracks('.manager-body'),
+        rail: box('.manager-rail'),
+        body: box('.manager-body'),
+        main: box('.manager-body > main'),
+        owner: box(ownerSelector),
+        bodyScroll: scroll('.manager-body'),
+        ownerScroll: scroll(ownerSelector),
+        railScroll: scroll('.manager-rail'),
+        railBorder: { right: railStyle.borderRightWidth, bottom: railStyle.borderBottomWidth },
+        list: catalogue
+          ? {
+              layout: box('.manager-scoped-list-layout'),
+              layoutScroll: scroll('.manager-scoped-list-layout'),
+              rowsScroll: scroll('.manager-scoped-list-rows'),
+            }
+          : null,
+      };
+    },
+    { owner: route.owner, catalogue: Boolean(route.catalogue) }
+  );
+}
+
+let pagePromise;
+
+/** The one page every reading lays out on: `setContent` replaces its document, and none hovers. */
+async function sideRailPage(viewport) {
+  if (!pagePromise) {
+    pagePromise = openLayoutContext({ viewport, deviceScaleFactor: 1 }).then((context) =>
+      context.newPage()
     );
-  } finally {
-    await context.close();
+    // A failed open is not kept, so the next reading tries again rather than inheriting it.
+    pagePromise.catch(() => {
+      pagePromise = undefined;
+    });
   }
+  const page = await pagePromise;
+  await page.setViewportSize(viewport);
+  return page;
 }

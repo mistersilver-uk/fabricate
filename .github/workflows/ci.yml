@@ -20,18 +20,26 @@ permissions:
   pull-requests: read
 
 jobs:
-  unit-tests:
+  # The suite runs as four shards (`node --test --test-shard`). Run whole, its ~33 CPU-minutes took
+  # 14-15 minutes wall-clock on a hosted runner and the 15-minute ceiling started cancelling green
+  # runs, main included. The ceiling is not the fix: each shard runs in a few minutes, under 10.
+  unit-test-shards:
+    name: unit-tests (shard ${{ matrix.shard }}/4)
     # Skip on `edited` PR events: editing the title/body doesn't change the head
     # commit, so the existing result for that SHA still stands. Runs on push and
     # all other registered PR events.
     if: github.event_name != 'pull_request' || github.event.action != 'edited'
     runs-on: ubuntu-latest
-    # 10 was the cap that a hung `playwright install` used to consume in full. The install is
-    # now bounded to ~6 minutes by its own per-attempt timeout, so this bound is about the
-    # tests and the build, which run in about 4 minutes warm. Raising it does not reintroduce
-    # the burn it used to hide: nothing here can now hang for the whole budget unnoticed.
-    timeout-minutes: 15
+    strategy:
+      # Every shard reports, so one red shard does not hide another's failures.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    # A shard is a quarter of the suite. A hung `playwright install` is bounded at ~6 minutes by its
+    # own per-attempt timeout, so this bound is about the tests, not the install.
+    timeout-minutes: 10
     env:
+      UNIT_TEST_SHARD: ${{ matrix.shard }}/4
       # The base every merge-base ratchet compares with (tests/helpers/mergeBaseRatchet.js): on a
       # PR's merge ref HEAD^1 is the base tip, and a push compares with the tip it replaced.
       RATCHET_BASE: ${{ github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD^1' }}
@@ -92,10 +100,12 @@ jobs:
       # TEE'd to RUNNER_TEMP rather than the workspace: several suites scan the repository tree, and
       # a stray file appearing there mid-run is a test input. `pipefail` keeps the step's status the
       # runner's rather than `tee`'s, which always succeeds.
+      # `test:shard` is `npm test` plus `--test-shard`, which node only honours BEFORE the glob, so
+      # `npm test -- --test-shard=…` would silently run the whole suite in every shard.
       - name: Run unit tests
         run: |
           set -o pipefail
-          npm test 2>&1 | tee "$RUNNER_TEMP/unit-tests.tap"
+          npm run test:shard 2>&1 | tee "$RUNNER_TEMP/unit-tests.tap"
 
       # THE FAILING TEST NAMES, RE-PRINTED LAST. The TAP reporter writes each failure where it
       # happens and emits ~119,000 lines in total, so on a red run every `not ok` line sits in the
@@ -117,12 +127,31 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: unit-tests-tap
+          name: unit-tests-tap-shard-${{ matrix.shard }}
           path: ${{ runner.temp }}/unit-tests.tap
           retention-days: 7
 
+      # Once, not four times: the build does not depend on the shard.
       - name: Build module
+        if: matrix.shard == 1
         run: npm run build
+
+  # The required `unit-tests` check. It is green only when every shard passed, so a cancelled or
+  # failed shard can never read as a pass, and it is skipped exactly when the shards are.
+  unit-tests:
+    needs: unit-test-shards
+    if: always() && (github.event_name != 'pull_request' || github.event.action != 'edited')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every shard passed
+        env:
+          SHARDS: ${{ needs.unit-test-shards.result }}
+        run: |
+          if [ "$SHARDS" != "success" ]; then
+            echo "::error::the unit-test shards ended $SHARDS; open the red shard for its failing tests"
+            exit 1
+          fi
 
   lint:
     # Skip on `edited` PR events for the same reason as unit-tests: editing the

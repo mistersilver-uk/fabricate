@@ -5,22 +5,47 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { after } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+
+import { createServer, createServerModuleRunner } from 'vite';
 
 import { viteDepCacheDir } from './vite-dep-cache-dir.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
+/**
+ * One server per process, closed by this root hook; it caches transforms, never module instances.
+ * The hook is file-scoped, so a suite that boots inside a nested `describe` shares the same server:
+ * never start a second one.
+ */
+let serverPromise;
+
+// eslint-disable-next-line unicorn/no-top-level-side-effects -- a hook inside a test closes too soon
+after(async () => {
+  if (!serverPromise) return;
+  const vite = await serverPromise;
+  serverPromise = undefined;
+  await vite.close();
+});
+
+/** Each boot evaluates every module afresh in its own runner, against the process's one server. */
 async function startCompositionServer() {
-  const vite = await createServer({
+  serverPromise ??= createServer({
     root: repoRoot,
     cacheDir: viteDepCacheDir(),
     // Test processes own their cache; sequential boots retain warm prebundles.
     server: { middlewareMode: true, hmr: false, ws: false, watch: null },
     appType: 'custom',
+    // Nothing requests the client environment, so its dependency scan of the repository is waste.
+    optimizeDeps: { noDiscovery: true },
   });
-  return { vite, close: () => vite.close() };
+  const vite = await serverPromise;
+  const runner = createServerModuleRunner(vite.environments.ssr, {
+    hmr: false,
+    sourcemapInterceptor: false,
+  });
+  return { load: (path) => runner.import(path), close: () => runner.close() };
 }
 
 /**
@@ -35,7 +60,7 @@ export async function withFabricateLifecycleReplay(run) {
   const originalFetch = globalThis.fetch;
   const originalConfig = globalThis.CONFIG;
   let world = null;
-  const { vite, close } = await startCompositionServer();
+  const { load, close } = await startCompositionServer();
 
   globalThis.fetch = async (url) => {
     if (String(url) !== '/lang/en.json') return new Response('', { status: 404 });
@@ -47,14 +72,14 @@ export async function withFabricateLifecycleReplay(run) {
   globalThis.CONFIG = {};
 
   try {
-    const { buildLabWorld } = await vite.ssrLoadModule('/tests/view-lab/world/labWorld.js');
+    const { buildLabWorld } = await load('/tests/view-lab/world/labWorld.js');
     world = await buildLabWorld();
     const hookEntries = [...globalThis.Hooks.registrations.values()];
     const init = hookEntries.find((entry) => entry.event === 'init')?.handler;
     const ready = hookEntries.find((entry) => entry.event === 'ready')?.handler;
     assert.equal(typeof init, 'function', 'main.js should register its actual init callback');
     assert.equal(typeof ready, 'function', 'main.js should register its actual ready callback');
-    await run({ world, init, ready, loadModule: (path) => vite.ssrLoadModule(path) });
+    await run({ world, init, ready, loadModule: load });
   } finally {
     world?.shim.restore();
     globalThis.fetch = originalFetch;
@@ -75,12 +100,12 @@ export async function withProductionApplication(
   const originalFoundry = globalThis.foundry;
   const originalHooks = globalThis.Hooks;
   const originalGame = globalThis.game;
-  const { vite, close } = await startCompositionServer();
+  const { load, close } = await startCompositionServer();
   try {
     globalThis.foundry = { applications: { api: { ApplicationV2 } } };
     globalThis.Hooks = hooks;
     globalThis.game = { i18n: { localize: (key) => key, format: (key) => key } };
-    const module = await vite.ssrLoadModule(modulePath);
+    const module = await load(modulePath);
     const ApplicationClass = module[exportName];
     assert.equal(typeof ApplicationClass, 'function', `${modulePath} should export ${exportName}`);
     await run(new ApplicationClass());

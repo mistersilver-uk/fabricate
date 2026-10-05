@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { before, describe, it } from 'node:test';
 
-import { chromium } from 'playwright';
+import { borrowBrowser } from '../helpers/layout-harness.js';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createComponentsBrowserViewHarness } from '../helpers/componentScopeMountModules.js';
@@ -236,7 +236,7 @@ describe('the rules list toolbar’s rendered geometry (issue 1371 r16-list, M22
       harness.teardown();
     }
 
-    const browser = await chromium.launch();
+    const browser = await borrowBrowser();
     try {
       const tab = await browser.newPage({ viewport: { width: HOST_WIDTH_PX, height: HOST_HEIGHT_PX } });
       await tab.setContent(page(rendered.markup, rendered.scoped.css), { waitUntil: 'load' });
@@ -318,7 +318,7 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
       harness.teardown();
     }
 
-    const browser = await chromium.launch();
+    const browser = await borrowBrowser();
     try {
       const tab = await browser.newPage({ viewport: { width: HOST_WIDTH_PX, height: HOST_HEIGHT_PX } });
       const rowsUnder = async (options) => {
@@ -474,7 +474,7 @@ describe('absent world components use the Essence Rules row contract (issue 2036
       harness.teardown();
     }
 
-    const browser = await chromium.launch();
+    const browser = await borrowBrowser();
     try {
       for (const width of [HOST_WIDTH_PX, 1024]) {
         const tab = await browser.newPage({ viewport: { width, height: HOST_HEIGHT_PX } });

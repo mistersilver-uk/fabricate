@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { extname, resolve } from 'node:path';
-import { chromium } from 'playwright';
+import { borrowBrowser } from '../helpers/layout-harness.js';
 import { FABRICATE_THEME_IDS } from '../../src/ui/theme.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
@@ -492,7 +492,7 @@ function liveUpdateFixture(origin) {
 }
 
 test('renders all Fabricate themes across representative surfaces with readable, unclipped controls', { timeout: 60_000 }, async () => {
-  const browser = await chromium.launch();
+  const browser = await borrowBrowser();
 
   try {
     const page = await browser.newPage({ viewport: { width: 1120, height: 760 }, deviceScaleFactor: 1 });
@@ -515,7 +515,7 @@ test('renders all Fabricate themes across representative surfaces with readable,
 
 test('updates an already-mounted Fabricate surface through the registered theme onChange behavior', { timeout: 30_000 }, async () => {
   const server = await startStaticServer();
-  const browser = await chromium.launch();
+  const browser = await borrowBrowser();
 
   try {
     const page = await browser.newPage({ viewport: { width: 820, height: 520 }, deviceScaleFactor: 1 });

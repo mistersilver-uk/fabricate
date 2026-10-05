@@ -6,8 +6,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { chromium } from 'playwright';
 import { compile } from 'svelte/compiler';
+
+import { borrowBrowser } from './layout-harness.js';
 
 /** Every scoped `<style>` block in a harness's compiled tree, in manifest order. */
 export function collectScopedCss({ repoRoot, compiledModules }) {
@@ -155,7 +156,7 @@ export const ENTRY_FRAME_STACKED_ARRANGEMENT = `
  * @param {(control: string) => string} pageFor the suite's page builder, given the control rules.
  */
 export async function measureEntryFrameArrangements(pageFor, viewport) {
-  const browser = await chromium.launch();
+  const browser = await borrowBrowser();
   try {
     const tab = await browser.newPage({ viewport });
     const measured = async (control) => {

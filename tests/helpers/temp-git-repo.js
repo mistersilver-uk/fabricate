@@ -4,7 +4,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -36,12 +36,23 @@ export function envWithoutGitLocation(base = process.env) {
  *   files, and a cleanup.
  */
 export function createTempGitRepo(prefix = 'fab-git-') {
-  if (!GIT) throw new Error('git is not on an absolute PATH entry');
+  const repo = repositoryAt(mkdtempSync(path.join(tmpdir(), prefix)));
+  repo.git('init', '-q');
+  return repo;
+}
+
+/** A new throwaway repository holding a copy of `source`'s working tree and history. */
+export function copyTempGitRepo(source, prefix = 'fab-git-') {
   const dir = mkdtempSync(path.join(tmpdir(), prefix));
+  cpSync(source.dir, dir, { recursive: true });
+  return repositoryAt(dir);
+}
+
+function repositoryAt(dir) {
+  if (!GIT) throw new Error('git is not on an absolute PATH entry');
   const env = envWithoutGitLocation();
   const git = (...args) =>
     execFileSync(GIT, [...ISOLATED_CONFIG, '-C', dir, ...args], { encoding: 'utf8', env }).trim();
-  git('init', '-q');
   const commit = (message) => {
     git('commit', '-q', '--allow-empty', '-m', message);
     return git('rev-parse', 'HEAD');
