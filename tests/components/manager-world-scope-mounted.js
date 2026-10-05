@@ -1964,7 +1964,9 @@ export function registerWorldScopeCases() {
         img: '',
         description: '',
       });
-      const SOURCES = Object.freeze({ [HAMMER.uuid]: HAMMER, [AWL.uuid]: AWL });
+      // An actor's embedded copy, which only the component catalogue refuses.
+      const OWNED = Object.freeze({ uuid: 'Actor.a.Item.b', name: 'Owned Pick', img: '', description: '' });
+      const SOURCES = Object.freeze({ [HAMMER.uuid]: HAMMER, [AWL.uuid]: AWL, [OWNED.uuid]: OWNED });
 
       async function settleDrop() {
         for (let i = 0; i < 24; i += 1) await Promise.resolve();
@@ -2054,6 +2056,7 @@ export function registerWorldScopeCases() {
         assert.equal(entryName(), HAMMER.name, 'and it is the record the Item already had');
         assert.equal(secondDrop.length, 1, 'the GM is TOLD they landed on an existing record');
         assert.match(secondDrop[0], /Smith Hammer/, 'and the toast names it');
+        assert.doesNotMatch(secondDrop[0], /disabled/i, 'and an enabled record is not called disabled');
       });
 
       it('resolves the drop through the whole source-reference union, not one field', async () => {
@@ -2116,6 +2119,30 @@ export function registerWorldScopeCases() {
         );
         assert.equal(entryName(), AWL.name, 'and the GM lands on the one they just made');
       });
+
+      it('mints a world Tool from an EMBEDDED Item, which only the component catalogue refuses', async () => {
+        await openToolCatalogue([]);
+        await dropItem(OWNED.uuid);
+
+        assert.equal(worldToolIds().length, 1, 'an actor-owned Item still mints a world Tool');
+        assert.equal(managerView(), 'world-tool-entry');
+        assert.equal(entryName(), OWNED.name);
+      });
+
+      it('relinks a world Tool to an EMBEDDED Item from its entry', async () => {
+        await openToolCatalogue([]);
+        await dropItem(HAMMER.uuid);
+        const zone = target.querySelector('[data-item-drop-zone="tool-source"]');
+        assert.ok(Boolean(zone), 'the entry renders its source drop zone');
+
+        dispatchDrop(zone, { type: 'Item', uuid: OWNED.uuid });
+        await settleDrop();
+
+        const [entity] = scopeStores.tool.corpus().entities;
+        assert.equal(entity.registeredItemUuid, OWNED.uuid, 'the relink patched the record');
+        assert.equal(entity.originItemUuid, OWNED.uuid);
+        assert.equal(entity.name, OWNED.name);
+      });
     });
 
     // ── THE WORLD COMPONENT CATALOGUE'S CREATION ZONE (issue 1371) ────────────────────────
@@ -2140,7 +2167,10 @@ export function registerWorldScopeCases() {
         description: '',
       });
       const PACKED_LEGACY = Object.freeze({ ...PACKED, uuid: 'Compendium.p.b', name: 'Older Ore' });
+      // Resolvable, so a refusal below is the embedded gate and not an unresolved source.
+      const OWNED = Object.freeze({ uuid: 'Actor.a.Item.b', name: 'Owned Resin', img: '', description: '' });
       const COMPONENT_SOURCES = Object.freeze({
+        [OWNED.uuid]: OWNED,
         [RESIN.uuid]: RESIN,
         [SALT.uuid]: SALT,
         [PACKED.uuid]: PACKED,
@@ -2194,7 +2224,7 @@ export function registerWorldScopeCases() {
        * @param {object} payload the raw drag payload.
        * @returns {Promise<{info: string[], warn: string[]}>} the toasts the drop raised.
        */
-      async function dropPayload(payload, { withParser = true } = {}) {
+      async function dropPayload(payload, { withParser = true, zone = 'component-create' } = {}) {
         const info = [];
         const warn = [];
         const previousUi = globalThis.ui;
@@ -2218,7 +2248,7 @@ export function registerWorldScopeCases() {
         // shim, or the gate running before `foundry` is populated.
         if (!withParser) delete globalThis.foundry.utils.parseUuid;
         try {
-          dispatchDrop(target.querySelector('[data-item-drop-zone="component-create"]'), payload);
+          dispatchDrop(target.querySelector(`[data-item-drop-zone="${zone}"]`), payload);
           await settleDrop();
           return { info, warn };
         } finally {
@@ -2298,6 +2328,23 @@ export function registerWorldScopeCases() {
         const legacy = await dropPayload({ type: 'Item', pack: 'p', id: 'b' });
         assert.equal(worldComponentIds().length, 2, 'and so is one dragged the legacy way');
         assert.deepEqual(legacy.warn, []);
+      });
+
+      it('and REFUSES a relink to an embedded Item from the entry, keeping the link', async () => {
+        await openComponentCatalogue([]);
+        await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+        assert.equal(managerView(), 'world-component-entry');
+
+        const refused = await dropPayload(
+          { type: 'Item', uuid: OWNED.uuid },
+          { zone: 'component-source' }
+        );
+
+        assert.equal(refused.warn.length, 1, 'the GM is told why');
+        assert.match(refused.warn[0], /belongs to an actor/);
+        const [entity] = scopeStores.component.corpus().entities;
+        assert.equal(entity.registeredItemUuid, RESIN.uuid, 'and the link is unchanged');
+        assert.equal(entity.name, RESIN.name);
       });
 
       it('and REFUSES a uuid the parser cannot read, because the gate fails CLOSED', async () => {
