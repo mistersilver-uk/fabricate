@@ -403,7 +403,7 @@ Removing any other result row, or an alternative from a group that stays a group
 
 Under a roll each alternative carries a RANGE CELL in its convert control's slot: two inline number fields named **"Lowest roll selecting {name}"** and **"Highest roll selecting {name}"**.
 A range overlapping another's, or one whose lowest roll is above its highest, marks both fields invalid with its reason on a line of its own; at a narrow width the cell leads the row's second line, before the toggle.
-A rolled group with no expression or a missing range, an up-to group with no N, and a group of fewer than two alternatives are flagged by the Validation tab on their set and refused by the save.
+A rolled group with no rollable expression or a missing range, an up-to group with no N, a group of fewer than two alternatives, and any group in a progressive system's set are flagged by the Validation tab on their set and refused by the save, both reading one set of shape rules.
 
 Multi-set authoring is gated by **`Recipe.complex`** plus the mode's structural constraints (`simple` and `progressive` are one set to one group; alchemy forces a single set) — never by `resolutionMode` alone.
 

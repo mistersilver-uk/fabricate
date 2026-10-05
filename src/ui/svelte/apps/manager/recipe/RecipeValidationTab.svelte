@@ -30,6 +30,8 @@
     signatureConflicts = [],
     // The system's unfiltered recipes, which a knowledge result's taught recipe resolves against.
     systemRecipes = [],
+    // A progressive system awards every stage in order, so a set may hold no choice group.
+    progressive = false,
     onSelectIssue = () => {},
   } = $props();
 
@@ -46,6 +48,7 @@
       routedOutcomeTierOptions,
       alchemy,
       signatureConflicts,
+      progressive,
     })
   );
 
@@ -106,6 +109,10 @@
     missingTaughtRecipe: [
       'IssueMissingTaughtRecipe',
       'A result teaches a recipe that is no longer in this system, so every craft is refused.',
+    ],
+    choiceGroupInProgressive: [
+      'IssueChoiceGroupInProgressive',
+      'A progressive system awards every stage in order, so a result set cannot hold a choice of rewards.',
     ],
     choiceGroupTooFew: [
       'IssueChoiceGroupTooFew',

@@ -371,8 +371,10 @@ function collectTaughtRecipeReadiness(executionSteps, isMultiStep, systemRecipes
   return { issues, checks };
 }
 
-/** The issue each `groupProblems` code raises, in the order the Validation tab lists them. */
+/** The issue each `groupProblems` code raises, in the order the Validation tab lists them; a set
+ *  holding a group under progressive, which awards every stage in order, raises `progressive`. */
 const CHOICE_GROUP_ISSUES = Object.freeze({
+  progressive: 'choiceGroupInProgressive',
   tooFew: 'choiceGroupTooFew',
   settings: 'choiceGroupSettings',
   selection: 'choiceGroupSelection',
@@ -384,7 +386,7 @@ const CHOICE_GROUP_ISSUES = Object.freeze({
  * What blocks a result set's choice groups from saving (issue 1773): one critical issue per set and
  * problem, addressed to the set, and a check only on a recipe that holds a group.
  */
-function collectChoiceGroupReadiness(executionSteps, isMultiStep) {
+function collectChoiceGroupReadiness(executionSteps, isMultiStep, progressive) {
   const issues = [];
   let grouped = false;
   for (const step of executionSteps) {
@@ -392,6 +394,7 @@ function collectChoiceGroupReadiness(executionSteps, isMultiStep) {
       const groups = asArray(set?.results).filter(isChoiceGroup);
       grouped ||= groups.length > 0;
       const found = new Set(groups.flatMap(groupProblems));
+      if (progressive && groups.length > 0) found.add('progressive');
       for (const [code, id] of Object.entries(CHOICE_GROUP_ISSUES)) {
         if (!found.has(code)) continue;
         issues.push({
@@ -468,7 +471,8 @@ function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
  * Every check and issue for one projected recipe. `options` carries `systemComponents`, whose
  * absence no-ops overlap detection; `systemRecipes`, whose absence or emptiness no-ops the taught
  * recipe check; `routingProvider`, which gates the routed warnings on `check`;
- * `routedOutcomeTierOptions`, the system's policy-conditional tiers; and `alchemy` with
+ * `routedOutcomeTierOptions`, the system's policy-conditional tiers; `progressive`, the system's
+ * mode, under which a set may hold no choice group; and `alchemy` with
  * `signatureConflicts`, which drive the two enable blockers above and are ignored without it.
  */
 export function evaluateRecipeReadiness(recipe = {}, options = {}) {
@@ -540,7 +544,11 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
     checks.push(...taught.checks);
   }
 
-  const choiceGroups = collectChoiceGroupReadiness(executionSteps, isMultiStep);
+  const choiceGroups = collectChoiceGroupReadiness(
+    executionSteps,
+    isMultiStep,
+    options.progressive === true
+  );
   issues.push(...choiceGroups.issues);
   checks.push(...choiceGroups.checks);
 

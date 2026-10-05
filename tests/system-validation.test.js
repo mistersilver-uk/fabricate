@@ -116,6 +116,23 @@ describe('evaluateSystemValidation — composition', () => {
     assert.equal(report.blocksSystem, false, 'a per-recipe gap is not a system blocker');
   });
 
+  it('flags a choice group in a progressive system’s result set (issue 1773)', () => {
+    const choice = {
+      id: 'cg',
+      alternatives: [
+        { id: 'a', componentId: 'iron' },
+        { id: 'b', componentId: 'gold' },
+      ],
+    };
+    const recipe = makeRecipe({ id: 'r-1', resultGroups: [{ id: 'rg', results: [choice] }] });
+    const codes = (resolutionMode) =>
+      evaluateSystemValidation(makeSystem({ resolutionMode }), { recipes: [recipe] }).issues.map(
+        (issue) => issue.code
+      );
+    assert.ok(codes('progressive').includes('choiceGroupInProgressive'));
+    assert.ok(!codes('simple').includes('choiceGroupInProgressive'));
+  });
+
   it('surfaces the #431 routed warnings for a check-mode recipe (projection + routing context)', () => {
     // A routed check system with two success tiers; the recipe has TWO result groups (so mapping is
     // required) both routed to tier "hit" only — so tier "crit" is unproduced AND nothing would

@@ -805,6 +805,15 @@ describe('evaluateRecipeReadiness: result choice groups', () => {
     ]);
   });
 
+  it('flags a set holding a group under progressive, which awards every stage in order', () => {
+    const progressive = evaluateRecipeReadiness(withResults(PLAYER), { progressive: true });
+    assert.deepEqual(progressive.issues.map(issue => issue.id), ['choiceGroupInProgressive']);
+    assert.equal(progressive.issues[0].focusTarget, 'result-group-g1');
+    assert.equal(check(progressive.checks, 'choiceGroupsValid').satisfied, false);
+    const flat = evaluateRecipeReadiness(withResults({ id: 'r', componentId: 'ore' }), { progressive: true });
+    assert.equal(check(flat.checks, 'choiceGroupsValid'), undefined, 'no group, no check');
+  });
+
   it('reads a group’s alternatives for the recipes it teaches', () => {
     const { checks, issues } = evaluateRecipeReadiness(withResults(PLAYER), { systemRecipes: [{ id: 'r-self' }] });
     assert.deepEqual(issues.map(issue => issue.id), ['missingTaughtRecipe']);

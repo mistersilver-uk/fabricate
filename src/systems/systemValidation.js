@@ -190,6 +190,7 @@ function collectRecipeIssues(system, recipes, systemComponents) {
       systemComponents,
       routingProvider,
       routedOutcomeTierOptions,
+      progressive: mode === 'progressive',
     });
     for (const issue of recipeIssues) {
       issues.push(tagRecipeIssue(issue, projected));

@@ -274,6 +274,21 @@ describe('RecipeValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('flags a choice of rewards in a progressive system’s result set (issue 1773)', async () => {
+    const target = await harness.mount({
+      recipe: {
+        name: 'Staged',
+        enabled: true,
+        ingredientSets: [{ id: 's1' }],
+        resultGroups: [{ id: 'g1', results: [{ id: 'c', alternatives: [{ id: 'a', componentId: 'x' }, { id: 'b', componentId: 'y' }] }] }]
+      },
+      progressive: true
+    });
+    assert.equal(target.querySelector('[data-check="choiceGroupsValid"]')?.dataset.satisfied, 'false');
+    assert.match(target.querySelector('[data-check="choiceGroupsValid"]').textContent, /awards every stage in order/);
+    harness.remount();
+  });
+
   it('reports an alchemy recipe with no blockers as ready (issue 549)', async () => {
     const target = await harness.mount({
       recipe: { name: 'Mana Potion', enabled: true, ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'r1' }] },

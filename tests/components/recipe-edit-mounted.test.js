@@ -5889,6 +5889,31 @@ describe('RecipeEditView (mounted)', () => {
     ]);
   });
 
+  // The system's mode reaches the Validation tab (issue 1773): a progressive set holding a group
+  // is flagged there, and the editor's badge counts it.
+  it('threads progressive to the Validation tab, which flags a choice group in a set', async () => {
+    const choice = {
+      id: 'cg',
+      alternatives: [
+        { id: 'a', componentId: 'cmp-herb' },
+        { id: 'b', componentId: 'cmp-water' },
+      ],
+    };
+    const { target } = await mountResultGroups([{ id: 'grp-1', results: [choice] }], {
+      props: { progressive: true },
+    });
+    await openTab(target, 'validation');
+    assert.equal(
+      target.querySelector('[data-check="choiceGroupsValid"]')?.dataset.satisfied,
+      'false'
+    );
+    assert.match(
+      target.querySelector('[data-check="choiceGroupsValid"]').textContent,
+      /awards every stage in order/
+    );
+    editHarness.remount();
+  });
+
   // Every path the kinds reach a result set through, one each (issue 1773): a forward dropped on
   // one path leaves its sets offering component alone and its currency rows inert.
   it('threads the result kinds to a multi-step step, a routed set and the failure slot', async () => {

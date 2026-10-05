@@ -3315,6 +3315,7 @@
             "IssueUnroutedResultGroup": "A result set is not assigned to any check outcome and will never be produced.",
             "IssueUnproducedOutcomeTier": "A check outcome is not assigned to any result set, so it produces nothing.",
             "IssueMissingTaughtRecipe": "A result teaches a recipe that is no longer in this system, so every craft is refused.",
+            "IssueChoiceGroupInProgressive": "A progressive system awards every stage in order, so a result set cannot hold a choice of rewards.",
             "IssueChoiceGroupTooFew": "A choice of rewards holds fewer than two alternatives.",
             "IssueChoiceGroupSettings": "A choice of rewards names a chooser or an award rule Fabricate does not recognise.",
             "IssueChoiceGroupSelection": "A rolled choice of rewards has no selection roll, or one that cannot be rolled.",
