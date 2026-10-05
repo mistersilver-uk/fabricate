@@ -5574,6 +5574,35 @@ test('a change confined to one rules-editor card selects every frame the editor 
   }
 });
 
+// The gathering task editor's tabs and cards (issue 1522): every file under `gathering-task/`.
+const GATHERING_TASK_EDITOR_VIEW = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
+const GATHERING_TASK_PART_DIR = 'src/ui/svelte/apps/manager/gathering-task/';
+
+test('a change confined to one gathering task tab or card selects every task-editor frame', () => {
+  const taskFrames = (file) =>
+    mapChangedFilesToCases([file])
+      .map((viewCase) => viewCase.id)
+      .filter((id) => id.startsWith('manager-gathering-task-'));
+  const editorFrames = taskFrames(GATHERING_TASK_EDITOR_VIEW);
+  for (const expected of [
+    'manager-gathering-task-editor-normal',
+    'manager-gathering-task-editor-requirements',
+    'manager-gathering-task-editor-results',
+    'manager-gathering-task-editor-straight',
+    'manager-gathering-task-editor-check-add',
+    'manager-gathering-task-stamina-modifier-list',
+  ]) {
+    assert.ok(editorFrames.includes(expected), `the editor selects ${expected}`);
+  }
+  const parts = readdirSync(resolve(ROOT, GATHERING_TASK_PART_DIR)).map(
+    (name) => `${GATHERING_TASK_PART_DIR}${name}`
+  );
+  assert.ok(parts.length >= 14, `found only ${parts.length} parts`);
+  for (const part of parts) {
+    assert.deepEqual(taskFrames(part), editorFrames, `${part} selects the editor's frames`);
+  }
+});
+
 // The environment editor's validation tab (issue 1517). THE DEFECT THIS PINS WAS A STALE CLAIM, NOT
 // AN ABSENT ONE, and the difference is why it survived a green tree for as long as it did.
 const ENVIRONMENT_DIR = 'src/ui/svelte/apps/manager/environment/';

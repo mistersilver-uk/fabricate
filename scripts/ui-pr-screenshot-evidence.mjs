@@ -496,7 +496,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-gathering-tasks',
     label: 'Manager gathering tasks',
     smokeLabels: ['manager-gathering-task-editor-normal', 'manager-gathering-task-editor-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/GatheringTasksBrowserView\.svelte$/],
+    matches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/gathering-task\//, /^src\/ui\/svelte\/apps\/manager\/GatheringTasksBrowserView\.svelte$/],
   },
   {
     id: 'manager-gathering-events',

@@ -39,6 +39,10 @@ export const CHECKS_ROUTE_MODEL_PATTERN =
 export const GATHERING_ROUTE_MODEL_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/gathering(?:RouteModel|Display|DraftHandlers|ModifierHandlers)\./;
 
+/** The gathering task editor and the tabs and cards under `gathering-task/` (issue 1522). */
+export const GATHERING_TASK_EDITOR_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/(?:GatheringTaskEditView\.svelte$|gathering-task\/)/;
+
 /** The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010). */
 export const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/Recipe/,

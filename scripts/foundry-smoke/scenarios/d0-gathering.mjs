@@ -103,7 +103,13 @@ export default {
     // "Selected Drop Rule" only renders when a drop row is selected (the `selectedDrop` branch of
     // `environment/GatheringTaskInspector.svelte`) and its i18n value is now "Selected Drop", so it
     // isn't asserted here.
-    for (const expected of ['Task Identity', 'Task Availability', 'Drop Rules']) {
+    // Each heading on its own tab (issue 1522), ending back on Overview for the captures below.
+    for (const [tab, expected] of [
+      ['requirements', 'Task Availability'],
+      ['results', 'Drop Rules'],
+      ['overview', 'Task Identity'],
+    ]) {
+      await page.locator(`.fabricate-manager [data-gathering-task-tab="${tab}"]`).first().click();
       if ((await page.locator('.fabricate-manager').filter({ hasText: expected }).count()) === 0) {
         throw new Error(`Manager gathering task editor is missing "${expected}".`);
       }

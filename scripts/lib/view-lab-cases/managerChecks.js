@@ -6,6 +6,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   COMPONENT_EDITOR_MATCHES,
   GATHERING_ROUTE_MODEL_PATTERN,
+  GATHERING_TASK_EDITOR_PATTERN,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
 
@@ -1086,6 +1087,8 @@ export const CASES = Object.freeze([
         selector:
           '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
       },
+      // The pick is a Requirements card (issue 1522).
+      { selector: '[data-gathering-task-tab="requirements"]' },
       { selector: '[data-gathering-task-check-modifiers]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
@@ -1098,7 +1101,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      GATHERING_TASK_EDITOR_PATTERN,
     ],
   }),
   managerCase({

@@ -408,6 +408,8 @@ async function authorTaskFormula(page, { systemId, taskId, taskName }) {
     .locator('.fabricate-manager[data-manager-view="gathering-task-edit"]')
     .first()
     .waitFor({ state: 'visible', timeout: 5000 });
+  // The result sets are the Results tab's (issue 1522); the editor opens on Overview.
+  await page.locator('.fabricate-manager [data-gathering-task-tab="results"]').first().click();
   const row = page.locator(TASK_RESULT_ROW).first();
   await row.scrollIntoViewIfNeeded();
   await clickSegment(row, 'data-recipe-option-amount-mode', 'rolled');
