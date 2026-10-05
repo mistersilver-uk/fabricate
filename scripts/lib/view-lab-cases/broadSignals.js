@@ -110,8 +110,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-history-data-legacy-row-rolls-1240',
     'fabricate-journal-history-data-unknown-material-resolution-1240',
   ]),
+  // The Journal's gathering ladder, crafting's routed tiers and salvage's routed bodies (issue 1644).
   'src/ui/svelte/components/OutcomeLadder.svelte': Object.freeze([
     'fabricate-journal-lifecycle-gathering-check',
+    'player-crafting-routed-by-check',
+    'player-crafting-routed-tier-reward',
+    'player-salvage-routed-dc',
+    'player-salvage-count-routed',
+    'player-salvage-count-routed-botch',
+    'player-salvage-fixed-routed',
+    'player-salvage-under-routed',
   ]),
   // The shared die tiles (issue 2006): the simulator's rolled pool, marked, and a botch's cancels.
   'src/ui/svelte/components/DiceTiles.svelte': Object.freeze([

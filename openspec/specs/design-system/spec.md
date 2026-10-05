@@ -2210,6 +2210,10 @@ A known shared roll whose unknown outcomes prevent locating a cut MUST remain vi
 Default preview callers MUST retain the existing shared comparison and ordering.
 An explicitly recorded `cleared` boolean MUST govern historical row outcomes, preserving native high-roll semantics; an explicit unknown outcome MUST remain unknown, while callers omitting that field retain the default low-roll comparison.
 `OutcomeLadder` MUST display the complete noninteractive routed outcome ladder for authored previews; ordinary routed history MUST instead use its recorded outcome log as specified by `ui-journal-app`.
+`OutcomeLadder` MAY mark the one reached tier: `reachedId` matches a tier's merged `ids`, else its `id`, and only the first matching tier carries the `reachedLabel` pill and the accent edge.
+Its band is optional, and a tier with no band MUST draw no chip.
+Each tier, its band chip, its pill and each yield MUST pass a caller's per-item `props` through as hooks.
+Crafting's routed-by-check tiers and salvage's routed body compose `OutcomeLadder`.
 
 #### Scenario: A player views another stage while allocating materials
 
@@ -2223,3 +2227,9 @@ An explicitly recorded `cleared` boolean MUST govern historical row outcomes, pr
 - **WHEN** the player activates the run bar's cancel control
 - **THEN** the bar presents the cancellation consequence and confirm-or-keep actions
 - **AND** pause, completion preference and execution cannot be activated through the armed bar
+
+#### Scenario: A routed roll marks the one tier it reached
+
+- **WHEN** a successful roll routes through a tier that a ladder row merged with others
+- **THEN** that row alone carries the reached pill
+- **AND** a failed roll, or an outcome no row names, marks no row
