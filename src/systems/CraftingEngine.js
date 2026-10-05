@@ -377,7 +377,6 @@ export class CraftingEngine {
     // for why, and `_complicationWriter` for the ambient fallback.
     this.complicationDeliveryWriter = null;
     this.versionedRunAuthority = null;
-    this.awardPlayerChoices = false;
   }
 
   installVersionedRunAuthority(authority = null) {
@@ -2815,15 +2814,19 @@ export class CraftingEngine {
     });
   }
 
-  /** The reward pre-flight and the player-chooser gate every craft entrance runs (issue 1773). */
+  /** The reward pre-flight every craft entrance runs (issue 1773). */
   _refusals() {
-    const { awardPlayerChoices } = this;
-    return { refuseRewards: rewardRefusals(this._rewardSeams()), awardPlayerChoices };
+    return { refuseRewards: rewardRefusals(this._rewardSeams()) };
   }
 
   /** Settle a pending award choice on an active or terminal run under a `chooseAward` grant. */
   settleAwardChoice(request) {
     return this._awardChoices().settle(request);
+  }
+
+  /** Why `actor` cannot claim each alternative `run` owes now, or `null`: the settle's own rule. */
+  awardChoiceClaimability(run, actor) {
+    return this._awardChoices().unclaimable(run, actor);
   }
 
   _awardChoices() {
@@ -2919,12 +2922,8 @@ export class CraftingEngine {
       };
       return ctx;
     }
-    const validation = validateCraft(
-      recipe,
-      craftingActor,
-      ctx.resolutionService,
-      this._refusals()
-    );
+    const refusals = { ...this._refusals(), refusePlayerChoices: true };
+    const validation = validateCraft(recipe, craftingActor, ctx.resolutionService, refusals);
     if (!validation.valid) {
       ctx.refusal = {
         success: false,

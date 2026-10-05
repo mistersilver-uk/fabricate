@@ -133,11 +133,13 @@ async function assertFillsGrid(page, grid, { gridSelector, fillSelector }, label
 /**
  * The requirement row's geometry (issue 1516): `oneLineRows` rows whose direct children share a
  * line, `wrappedRows` `{ rows, lines }` rows whose `lines` of selectors each share a line below the
- * last, `alignedRight` and `alignedLeft` controls on one edge, and `minInlineSize`
- * `{ selector, pixels }` fields no narrower than their stated minimum.
+ * last, `alignedRight` and `alignedLeft` controls on one edge, `minInlineSize`
+ * `{ selector, pixels }` fields no narrower than their stated minimum, and `unclipped` labels whose
+ * text fits their box rather than overflowing it to an ellipsis.
  */
 async function assertRowGeometry(page, expectation, label) {
-  const { oneLineRows, wrappedRows, alignedRight, alignedLeft, minInlineSize } = expectation;
+  const { oneLineRows, wrappedRows, alignedRight, alignedLeft, minInlineSize, unclipped } =
+    expectation;
   if (oneLineRows) {
     const rows = await measureAll(page, oneLineRows, { label, measure: childSpans });
     for (const [index, spans] of rows.entries()) {
@@ -191,6 +193,19 @@ async function assertRowGeometry(page, expectation, label) {
       );
     }
   }
+  if (unclipped) {
+    const overflows = await measureAll(page, unclipped, { label, measure: hiddenOverflow });
+    const clipped = overflows.findIndex((overflow) => overflow > 0);
+    if (clipped !== -1) {
+      throw new Error(
+        `${label}: ${unclipped} #${clipped + 1} is clipped by ${overflows[clipped]}px of its text`
+      );
+    }
+  }
+}
+
+function hiddenOverflow(elements) {
+  return elements.map((element) => element.scrollWidth - element.clientWidth);
 }
 
 // Both run in the page, so each is self-contained: no closure reaches back into this module.

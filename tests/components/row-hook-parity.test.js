@@ -41,7 +41,7 @@ const SITES = Object.freeze([
     'row.id || true',
   ],
   [
-    `${MANAGER}/ComponentEditView.svelte`,
+    `${MANAGER}/component/ComponentSalvageStages.svelte`,
     'ComplicationSummaryRow',
     'data-salvage-stage-complication',
     'complication.id || true',

@@ -2,7 +2,11 @@
  * System scope: the Checks rail, its modifier panels, and the tags and categories route.
  */
 
-import { ANCHORED_POPOVER_SOURCES, GATHERING_ROUTE_MODEL_PATTERN } from './caseConstants.js';
+import {
+  ANCHORED_POPOVER_SOURCES,
+  COMPONENT_EDITOR_MATCHES,
+  GATHERING_ROUTE_MODEL_PATTERN,
+} from './caseConstants.js';
 import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
 
 const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
@@ -1061,7 +1065,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      ...COMPONENT_EDITOR_MATCHES,
     ],
   }),
   managerCase({

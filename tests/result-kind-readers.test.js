@@ -45,7 +45,8 @@ test('1773: the crafting output rows preview a credit by its label and a grant b
       coin({ label: 'Bounty', quantityFormula: '1d6' }),
       coin({ unit: 'mark' }),
       lore(),
-      lore({ recipeId: 'secret' })
+      lore({ recipeId: 'secret' }),
+      coin({ unit: '' })
     ),
     {
       system: { components: [{ id: 'ore', name: 'Iron ore', img: 'ore.webp' }] },
@@ -67,9 +68,10 @@ test('1773: the crafting output rows preview a credit by its label and a grant b
   assert.equal(rows[1].glyph, 'fa-solid fa-coins');
   assert.deepEqual(
     [rows[2].name, rows[2].amountText],
-    ['FABRICATE.App.Crafting.Io.CurrencyReward', '5 Crown mark'],
-    'an unlabelled credit reads by its kind, its unit by the one display-name resolver'
+    ['Crown mark', '5 Crown mark'],
+    'an unlabelled credit reads as its unit, as the editor and the chat card name it'
   );
+  assert.equal(rows[5].name, 'FABRICATE.App.Crafting.Io.CurrencyReward', 'with no unit, its kind');
   assert.equal(rows[3].name, 'Healing draught');
   assert.equal(rows[3].amountText, 'FABRICATE.App.Crafting.Io.RecipeKnowledge');
   assert.equal(

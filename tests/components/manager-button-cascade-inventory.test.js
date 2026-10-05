@@ -150,11 +150,16 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 9,
     files: Object.freeze([
-      // 38 sites across the remaining nineteen components, all `<button>`. The salvage DC card's
-      // Manage presets moved into `CheckOverrideField` with the card (issue 2005).
+      // 38 sites across the remaining twenty components, all `<button>`. The salvage DC card's
+      // Manage presets moved into `CheckOverrideField` with the card (issue 2005), and the three
+      // salvage adds into the salvage card and its stage list (issue 1522).
       Object.freeze({
-        file: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
-        sites: 3,
+        file: 'src/ui/svelte/apps/manager/component/ComponentSalvageCard.svelte',
+        sites: 2,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte',
+        sites: 1,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
@@ -1099,11 +1104,11 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    47,
-    // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), and one for the
-    // salvage DC card's move into `CheckOverrideField` (issue 2005); the site total above is
-    // unchanged by those, because nothing converted.
-    'across 47 components'
+    48,
+    // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), one for the
+    // salvage DC card's move into `CheckOverrideField` (issue 2005), and one for the salvage adds'
+    // split across two files (issue 1522); the site total above is unchanged by those.
+    'across 48 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the

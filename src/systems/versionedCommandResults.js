@@ -1,3 +1,5 @@
+import { holdsUnsettledAwardChoice } from './choiceGroupAward.js';
+
 /** The answers a versioned crafting command returns: a transition, an authority outage, a refusal. */
 
 export function versionedTransitionResult(run, outcome = {}) {
@@ -13,6 +15,8 @@ export function versionedTransitionResult(run, outcome = {}) {
       ? [...outcome.createdResultUuids]
       : [],
     ...(Object.hasOwn(outcome || {}, 'consumed') && { consumed: outcome.consumed === true }),
+    // A stage that left the player a reward to pick says so (issue 1773).
+    ...(holdsUnsettledAwardChoice(run) && { awardChoicePending: true }),
   };
 }
 

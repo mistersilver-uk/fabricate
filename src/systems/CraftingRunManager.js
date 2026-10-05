@@ -15,6 +15,7 @@ import {
   itemReceipt,
   retainUncertainReceipt,
 } from './runHistoryEvidence.js';
+import { interruptedJournals, RUN_JOURNAL_KEYS } from './runJournalReconstruction.js';
 import {
   assertRunLifecycleMutation,
   buildNewRunLifecycleFields,
@@ -30,9 +31,6 @@ import { selectWritableActors } from './writableActors.js';
 export { craftingStepHistoryEvidence } from './craftingStepHistoryEvidence.js';
 
 const HISTORY_LIMIT = 50;
-
-/** A versioned run's two journals: its stages', and its award choices' (issue 1773). */
-const RUN_JOURNAL_KEYS = Object.freeze(['executionJournal', 'awardChoiceJournal']);
 
 /**
  * Manages actor-scoped crafting runs (active + history). The per-actor cache, baseline
@@ -679,8 +677,14 @@ export class CraftingRunManager extends RunContainerManagerBase {
         ...(Array.isArray(container.history) ? container.history : []),
       ];
       for (const run of runs) {
-        for (const key of interruptedJournals(run, normalizedOperationId)) {
-          candidates.push({ actor, runId: run.id, expectedRevision: run.runRevision, key });
+        for (const { key, transition } of interruptedJournals(run, normalizedOperationId)) {
+          candidates.push({
+            actor,
+            runId: run.id,
+            expectedRevision: run.runRevision,
+            key,
+            transition,
+          });
         }
       }
     }
@@ -690,7 +694,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       const reconstructed = await this.updateExecutionJournal(
         candidate.actor,
         candidate.runId,
-        { type: 'reconstructAfterReload' },
+        candidate.transition,
         { expectedRevision: candidate.expectedRevision, journal: candidate.key }
       );
       if (!reconstructed) {
@@ -704,7 +708,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
         runId: reconstructed.id,
         status: reconstructed.status,
         runRevision: reconstructed.runRevision,
-        journalStatus: reconstructed[candidate.key].status,
+        journalStatus: reconstructed[candidate.key]?.status ?? null,
       });
     }
 
@@ -949,17 +953,6 @@ function applyStepHistoryEvidence(step, payload, run) {
       awards: payload.historySettlement?.awards ?? 'complete',
     };
   }
-}
-
-/** The journals of `run` an interrupted effect left applying, of `operationId` when one is named. */
-function interruptedJournals(run, operationId) {
-  if (getRunLifecycleContract(run) !== 'current') return [];
-  return RUN_JOURNAL_KEYS.filter((key) => {
-    const journal = run[key] ? observeExecutionJournal(run[key]) : null;
-    if (journal?.status !== 'planned') return false;
-    if (operationId && journal.operationId !== operationId) return false;
-    return journal.effects.some((effect) => effect.phase === 'applying');
-  });
 }
 
 /**

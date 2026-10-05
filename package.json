@@ -36,6 +36,7 @@
     "viewlab:chrome:clean": "node scripts/view-lab-chrome.mjs clean",
     "viewlab:chrome:baseline": "node scripts/view-lab-screenshots.mjs chrome",
     "test": "node --conditions=browser --test --test-timeout=300000 \"tests/**/*.test.js\"",
+    "test:shard": "node --conditions=browser --test --test-timeout=300000 --test-shard=$UNIT_TEST_SHARD \"tests/**/*.test.js\"",
     "test:foundry:install": "playwright install chromium --with-deps",
     "test:foundry:up": "node scripts/foundry-test-up.mjs",
     "test:foundry:run": "node scripts/foundry-test-run.mjs",

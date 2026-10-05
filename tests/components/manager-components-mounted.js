@@ -637,9 +637,11 @@ export function registerComponentsCases() {
   for (const { name, options } of difficultyConsumerCases) {
     it(`shows the component difficulty control for ${name}`, async () => {
       await openComponentEditor([], options);
-      const card = target.querySelector('[data-component-edit-section="difficulty"]');
-      assert.ok(card, `difficulty control should render for ${name}`);
-      assert.ok(card.querySelector('input'), 'the difficulty control should expose an input');
+      const cards = target.querySelectorAll('[data-component-edit-section="difficulty"]');
+      assert.equal(cards.length, 1, `exactly one difficulty control should render for ${name}`);
+      const input = cards[0].querySelector('input');
+      assert.ok(input, 'the difficulty control should expose an input');
+      assert.equal(input.value, '2', 'and it reads the persisted difficulty at either placement');
     });
   }
 

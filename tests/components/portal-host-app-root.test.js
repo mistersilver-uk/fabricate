@@ -203,7 +203,7 @@ test('the portal population is the set of components that actually portal', () =
     // A SCREEN REGION rather than a shared component.
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
     // A typeahead combobox, which names neither earlier route.
-    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
     // The selectors themselves, which is the shape the clipping boundary took when it left the
     // components. Without this file the offence clause reads no boundary selector at all.
     'src/ui/svelte/util/overlayBounds.js',

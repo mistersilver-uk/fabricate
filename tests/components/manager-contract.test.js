@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { COMPONENT_EDITOR_CARD_FILES } from '../helpers/componentEditorCards.js';
 import {
   calledName,
   identifierNames,
@@ -1695,10 +1696,12 @@ describe('CraftingSystemManager source contract', () => {
 
   // `foundry` is not in the global set: the editor reaches `globalThis.foundry.utils.randomID`.
   // What it must never reach is an application class, which is the member read below.
-  defineStructureContract('keeps the component editor free of Foundry globals', COMPONENT_EDIT, {
-    readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
-    readsNo: ['globalThis.foundry.applications', 'foundry.applications'],
-  });
+  for (const file of [COMPONENT_EDIT, ...COMPONENT_EDITOR_CARD_FILES]) {
+    defineStructureContract(`keeps the component editor free of Foundry globals: ${file}`, file, {
+      readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
+      readsNo: ['globalThis.foundry.applications', 'foundry.applications'],
+    });
+  }
 
   // The v2 environment editor is a composition editor (issue 429): it wraps records the libraries
   // author rather than authoring tasks of its own, so every task-authoring store action stays out

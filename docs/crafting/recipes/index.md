@@ -73,6 +73,73 @@ Adding a component that a result set already produces raises that row's quantity
 If that row is rolled, a second row is added instead.
 A progressive recipe always adds a new stage, so repeat a component there to produce it again.
 
+### Result Kinds: Items, Currency and Recipe Knowledge
+
+A result does not have to be an item.
+The **+ Result** button at the end of a result set opens a menu headed **Add a result**.
+It offers each kind of result the set can hold, adds an empty row of the kind you pick, and puts the cursor in that row's name field.
+
+- **Component** awards an item, as every result did before.
+- **Currency** pays the crafting character an amount of one of the world's currency units.
+  It is offered only while the system takes part in currency and the world has at least one unit.
+- **Recipe knowledge** teaches the crafting character a recipe.
+  It is offered only while the system can show a player a recipe they have learned.
+
+When only one kind is available, **+ Result** adds that row straight away, with no menu.
+A progressive recipe's stages can only be components, so its adder offers nothing else.
+
+#### Currency results
+
+Search for the currency unit in the row's name field, then set the amount with the **Fixed** and **Rolled** choice described above.
+A fixed currency amount must be a whole number, and a row with a fraction is marked until you fix it.
+Once a unit is named, two optional fields open beneath the row.
+
+| Field | What it does |
+|:------|:-------------|
+| **Call it** | Replaces the unit's name when the player reads the result, so "Reward" or "Finder's fee" instead of "gp". |
+| **Why they get it** | A short reason, shown after the name. |
+
+A closing line under the fields shows what the player will read, such as "The player sees: Finder's fee · for the safe return of the cargo".
+When both fields are empty it says that the player just sees the unit's name.
+The fields are optional, so a currency row is complete without them.
+
+#### Recipe knowledge results
+
+Search for the recipe to teach in the row's name field.
+Any recipe in the crafting system can be chosen, including the recipe being edited.
+A knowledge row has no amount, because a recipe is either known or not.
+
+A help line under the row says what a player sees.
+Players see the taught recipe's name in the results only if they could already see that recipe.
+Otherwise they see **Unknown recipe**.
+
+#### Rows the system cannot honour
+
+A row stays in the recipe, but turns read-only, when its system cannot honour it.
+A currency row shows **Currency off** when the system's currency is switched off.
+A knowledge row shows **Learning off** when players on the system never see a learned recipe, because its visibility mode does not reveal learned recipes.
+Each says why in place of its usual help, keeps its value on show, and can still be removed.
+Turn the setting back on, or choose a visibility mode that reveals learned recipes, and the row is editable again.
+See [Knowledge]({% link crafting/knowledge.md %}) for what a character has learned.
+
+#### A taught recipe that is gone
+
+If a recipe a row teaches is deleted, the row shows **Missing recipe** in place of the recipe's name.
+No craft can award it, so the recipe cannot be enabled until you remove the row or choose another recipe.
+The recipe's validation tab lists this as a blocking issue.
+
+### Rewards the Player Chooses
+
+A result choice group offers one reward, or up to a set number, from several alternatives.
+You decide whether the dice or the player choose.
+When the player chooses, the craft pauses at that result until the player picks.
+They settle it in the Journal's run detail, where the [Journal]({% link player-app/journal.md %}) page describes the pick.
+The GM can always settle a pick for a player.
+A rolled group needs no pick, because the roll decides.
+
+A reward the player chooses needs a run on the current lifecycle.
+A run on the older lifecycle refuses to award one.
+
 ### Moving a World Back to an Older Version
 
 {: .warning }

@@ -77,6 +77,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/chipTone.js': 'legacy-scan',
   'tests/helpers/companionContractOutcomes.js': 'fixture',
   'tests/helpers/compile-svelte-module.js': 'fixture',
+  'tests/helpers/componentEditViewModules.js': 'fixture',
   'tests/helpers/componentScopeMountModules.js': 'fixture',
   'tests/helpers/designLibrary.js': 'fixture',
   'tests/helpers/designSystemRatchet.js': 'corpus',

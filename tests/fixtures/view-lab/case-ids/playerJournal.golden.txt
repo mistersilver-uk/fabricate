@@ -126,3 +126,10 @@ fabricate-journal-history-data-salvage-1024
 player-journal-reward-awards
 player-journal-reward-awards-multi
 player-journal-reward-just-resolved
+player-journal-award-choice
+player-journal-award-choice-hearth-herb
+player-journal-award-choice-ceiling
+player-journal-award-choice-narrow
+player-journal-award-choice-forfeit
+player-journal-list-award-pending
+player-journal-award-choice-history

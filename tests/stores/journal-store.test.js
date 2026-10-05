@@ -135,7 +135,8 @@ const JOURNAL_STORE_SHAPE = {
     'selectedRunId', 'selectedRunKey', 'viewedStage', 'viewedStageIndex', 'worldTime',
   ],
   methods: [
-    'advance', 'beginStep', 'cancel', 'dismiss', 'execute', 'load', 'pause', 'resume',
+    'advance', 'awardChoiceSettled', 'beginStep', 'cancel', 'chooseAward', 'dismiss', 'execute',
+    'load', 'pause', 'resume',
     'retryCommandError', 'returnToCurrentStage', 'select', 'setActivePage', 'setActivePageSize',
     'setActiveSort', 'setActiveStatusFilter', 'setCompletionMode', 'setHistoryPage',
     'setHistoryPageSize', 'setHistorySort', 'setSearch', 'setSelection', 'tickWorldTime',
@@ -156,12 +157,45 @@ describe('journalStore', () => {
     compiler.cleanup();
   });
 
-  it('returns exactly the 57 public members the journal view reads, each still a getter', () => {
+  it('returns exactly the 59 public members the journal view reads, each still a getter', () => {
     const store = createJournalStore({ services: makeServices().services });
     const shape = expectedMemberKinds(JOURNAL_STORE_SHAPE);
 
     assert.deepEqual(Object.keys(store).sort(), Object.keys(shape));
     assert.deepEqual(storeMemberKinds(store), shape);
+  });
+
+  it('1773: chooseAward sends the picks as one chooseAward command and remembers the settled run', async () => {
+    const owed = run({ id: 'owed', lifecycleContract: 'current', actions: { chooseAward: true } });
+    const setup = makeServices({ listing: baseListing({ activeRuns: [owed], history: [] }) });
+    const store = await loadedStore(setup);
+    assert.equal(store.awardChoiceSettled('owed'), false);
+    const settled = await store.chooseAward(owed, { choiceId: 'pick', picks: ['coin'] });
+    assert.equal(settled.success, true, 'the reply answers the caller');
+    assert.deepEqual(
+      setup.calls.command.map(({ action, payload, requestId }) => ({ action, payload, requestId })),
+      [{ action: 'chooseAward', payload: { choiceId: 'pick', picks: ['coin'] }, requestId: undefined }]
+    );
+    assert.equal(store.awardChoiceSettled('owed'), true, 'the crafting outcome stops naming it');
+  });
+
+  it('1773: a run owing a reward is counted and filtered under Ready, whatever its own status', async () => {
+    const activeRuns = [
+      run({ id: 'owed-closed', derivedStatus: 'succeeded', awardChoicePending: true }),
+      run({ id: 'owed-live', derivedStatus: 'inProgress', awardChoicePending: true }),
+      run({ id: 'owed-paused', derivedStatus: 'paused', awardChoicePending: true }),
+      run({ id: 'craft-wait', derivedStatus: 'waiting', awardChoicePending: false }),
+    ];
+    const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns, history: [] }) }));
+    flushSync();
+    assert.deepEqual(store.activeCounts, { all: 4, ready: 2, inProgress: 1, paused: 1 });
+    store.setActiveStatusFilter('ready');
+    flushSync();
+    assert.deepEqual(
+      store.activeRuns.map((entry) => entry.id).sort((a, b) => a.localeCompare(b)),
+      ['owed-closed', 'owed-live'],
+      'the owed runs are reachable from Ready; a paused one stays under Paused'
+    );
   });
 
   it('correlates a trusted completed command notice and clears it on reselect', async () => {

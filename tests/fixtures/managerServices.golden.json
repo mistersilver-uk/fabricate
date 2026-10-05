@@ -738,6 +738,7 @@
     },
     "localize": "[FABRICATE.Key]",
     "navigateToCraftingRecipe": "<undefined>",
+    "navigateToJournalRun": "<undefined>",
     "notify": "<undefined>",
     "progressiveOrderRevertMessage": "[FABRICATE.App.Crafting.Detail.StageOrderSaveFailed]",
     "reconcileJournalRunAuthority": {

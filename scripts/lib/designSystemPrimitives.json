@@ -230,7 +230,7 @@
       "status": "target",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "The subject-and-modifier picker (2 callers, `ComponentEditView.svelte` and `GatheringTaskEditView.svelte`). `library.html:1486` specifies `<RuleRow>` and `<RuleSentence>` as the condition editor behind \"triggers, gates and modifiers\", so this picker is specified as part of that editor rather than as an entry of its own. Targeted: one modifier-pick frame per caller claims it. Scoped `manager-only`: it authors a check’s subject modifiers, which is a GM authoring task."
+      "why": "The subject-and-modifier picker (2 callers, `ComponentSalvageCard.svelte` and `GatheringTaskEditView.svelte`). `library.html:1486` specifies `<RuleRow>` and `<RuleSentence>` as the condition editor behind \"triggers, gates and modifiers\", so this picker is specified as part of that editor rather than as an entry of its own. Targeted: one modifier-pick frame per caller claims it. Scoped `manager-only`: it authors a check’s subject modifiers, which is a GM authoring task."
     },
     {
       "path": "src/ui/svelte/components/ToggleCard.svelte",
@@ -615,6 +615,14 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "Issue 1782 builds the specified set-membership picker over `SearchablePopover`'s `multiple` panel, which gained an async `source`, `loading` and `error` for it: a token run bounded at `maxTokens`, a `+N more` button named \"and N more\", a dashed Add, and a panel counting matched-of-total. Two importers, one per form of \"Set membership is edited through a bounded, staged picker\": `apps/manager/recipe-item/RecipeItemContentsTab.svelte` is one record's membership and takes the default `staged` commit, buffering choices for Apply and discarding them on Escape or an outside press; `apps/crafting/ComponentSourcesBar.svelte` is the session control and takes `commit=\"choose\"`, writing each choice and drawing no token run, its portrait row and its `+` trigger staying its own markup. Scoped `shared`: one importer is a manager tab and the other the player window's crafting bar. Its broad-signal override names the sources picker, the contents tab and its picker, staged and over its bound."
+    },
+    {
+      "path": "src/ui/svelte/components/RequirementChooser.svelte",
+      "library": "<RequirementChooser>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1518 ships the specified player-side chooser as one component (maintainer ruling, 2026-09-18): a row of slot tiles over `SlotTile`, one open slot through a caller-owned `openSlotId` the component never writes, the open slot's alternatives as pressable tiles with `onChoose` as the only selection event, and a `panel` snippet for the caller's essence pool. Issue 1773 adds the award face: an `award` slot draws no row tile and an always-open well of reward tiles, an alternative may be native `disabled` with its reason, and the slot's ceiling sentence is a visible `role=\"status\"` every tile is described by. Two importers: `apps/crafting/detail/RequirementRail.svelte`, the crafting rail, and `apps/journal/RunAwardChoice.svelte`, the Journal's award face. Scoped `shared`: both the player window's crafting and journal trees draw it. `player-crafting-chooser-open` draws it open on a choice slot, and `player-journal-award-choice` and `player-journal-award-choice-ceiling` draw the award face."
     }
   ],
   "notAPrimitive": [
@@ -752,15 +760,6 @@
         "src/ui/svelte/apps/journal/RunDetail.svelte"
       ],
       "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
-    },
-    {
-      "path": "src/ui/svelte/components/RequirementChooser.svelte",
-      "library": "<RequirementChooser>",
-      "evidence": "broad",
-      "callers": [
-        "src/ui/svelte/apps/crafting/detail/RequirementRail.svelte"
-      ],
-      "why": "Issue 1518 ships the specified player-side chooser as one component (maintainer ruling, 2026-09-18): a row of slot tiles over `SlotTile`, one open slot through a caller-owned `openSlotId` the component never writes, the open slot's alternatives as pressable tiles with `onChoose` as the only selection event, and a `panel` snippet for the caller's essence pool. The rail supplies each choice slot's options as those tiles and routes `onChoose` to the crafting store, with a `wrapperProps` map keeping the smoke harness's `crafting-alt-option` and `data-option-index` hooks on each; a short alternative's shortfall is a visible sentence its tile is described by, and an unchosen slot presses no alternative. Only a tag option's held-stack picker still renders inside the `panel` snippet. ONE independent importer, `src/ui/svelte/apps/crafting/detail/RequirementRail.svelte`, is below the two-importer membership bar; the award face of issue 1773 is the second, and the `pip` text is caller-formatted for it. The specimen declares it `shipped`, and `player-crafting-chooser-open` draws it open on a choice slot, one alternative pressed and one short."
     },
     {
       "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",

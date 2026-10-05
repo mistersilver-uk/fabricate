@@ -239,10 +239,12 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
   'src/ui/svelte/apps/manager/recipe/resultRows.js',
+  'src/ui/svelte/util/recipeCurrency.js',
   'src/systems/characterModifierPrerequisiteCopy.js',
   'src/systems/characterPrerequisites.js',
   'src/utils/scalars.js',
   'src/models/Result.js',
+  'src/utils/choiceGroupShape.js',
   'src/models/reconstructibleDefaults.js',
   'src/utils/rollFormulaRollability.js'
 ]);
@@ -256,7 +258,13 @@ export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
-  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte'
+  'src/ui/svelte/apps/manager/recipe/PickerRowNameField.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowRewardBody.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+  // Issue 1773: a recipe result set's one adder.
+  'src/ui/svelte/components/Button.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeResultAdder.svelte'
 ]);
 
 // THE ONE TONE MAP the retired status pill's call sites read (issue 1506). THE QUANTITY READINGS
@@ -371,8 +379,9 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/systems/characterLibraries.js',
   'src/ui/presenters/CraftingListingBuilder.js',
   'src/ui/presenters/resultOutputRows.js',
-  // Issue 1773: a reward row's glyph and its unit's display name.
+  // Issue 1773: a reward row's glyph and its unit's display name, and the choice-group shape.
   'src/ui/presenters/resultKindGlyphs.js',
+  'src/utils/choiceGroupShape.js',
   'src/systems/currencyProfile.js',
   'src/config/currencyPresets.js',
   // Issue 2005: the check card's roll-under or character-value target line.

@@ -1122,8 +1122,9 @@ describe('1286 ComponentEditView — the complications draft survives Save', () 
 
 /* THE SHARED ROW MUST NOT HARD-CODE ONE TYPE TREATMENT. */
 describe('1286 the complication row exposes its name treatment, and prose is not mono', () => {
-  const componentEditViewSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
+  // The Component Studio's band is the progressive stage list's body (issue 1522).
+  const salvageStagesSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/component/ComponentSalvageStages.svelte'),
     'utf8'
   );
   // The Recipe Studio's band is the shared ordered list's BODY (issue 1512), so
@@ -1160,7 +1161,7 @@ describe('1286 the complication row exposes its name treatment, and prose is not
     // different claims and only the second one is the finding. A prop nothing passes leaves
     // both strips exactly as they were.
     for (const [name, source] of [
-      ['the Component Studio salvage strip', componentEditViewSource],
+      ['the Component Studio salvage strip', salvageStagesSource],
       ['the Recipe Studio stage strip', recipeStageBandSource],
     ]) {
       assert.match(

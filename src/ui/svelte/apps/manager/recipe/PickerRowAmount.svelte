@@ -9,8 +9,8 @@
   | `value` | the row's `value` | `{}` | Reads `kind`, `quantity` and `quantityFormula`; an absent or non-positive `quantity` shows as 1 and is not written back. |
   | `amount` | `{ min, max, unit, inputProps, ariaLabel, fixedLabel, rolledLabel, modeAriaLabel, formulaAriaLabel }` | `{}` | The stepper's bounds, a unit drawn after it, attributes added to its input beside the row's own hook, and copy that overrides this slot's own: the stepper's name, the two segment words, and the toggle's and the expression's names. |
   | `name` | string | `''` | The subject's name, or the kind word while unnamed: the stepper is `Quantity for {name}`, the toggle `Amount for {name}` and the expression `Rolled amount for {name}`. |
-  | `rollable` | boolean | `false` | Draws the Fixed \| Rolled toggle. Only a `component` row has a formula, so every other kind ignores it. |
-  | `readonly` / `disabled` | booleans | `false` | The static read-only amount; and every control off. |
+  | `rollable` | boolean | `false` | Draws the Fixed \| Rolled toggle. Only a `component` or `currency` result has a formula, so every other kind ignores it. |
+  | `readonly` / `disabled` | booleans | `false` | The static read-only amount, a rolled one as its expression; and every control off. |
   | `invalid` | string | `''` | A message: sets `aria-invalid` on the amount control and describes it with the message. |
 
   Callbacks:
@@ -64,7 +64,9 @@
   }
 
   const shown = $derived(shownAmount(value?.quantity));
-  const togglable = $derived(rollable && value?.kind === 'component' && !readonly);
+  const togglable = $derived(
+    rollable && ['component', 'currency'].includes(value?.kind) && !readonly
+  );
   const stored = $derived(typeof value?.quantityFormula === 'string' ? value.quantityFormula : '');
 
   // Whether the GM has opened Rolled on this row, and what they last typed into it.
@@ -146,7 +148,7 @@
   <span
     class="manager-recipe-option-quantity is-readonly"
     data-recipe-currency-amount
-    data-recipe-currency-readonly-amount>{shown}</span
+    data-recipe-currency-readonly-amount>{stored || shown}</span
   >
 {:else if togglable}
   <SegmentedControl

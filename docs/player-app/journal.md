@@ -155,6 +155,40 @@ A recipe's result can also pay out currency or teach a recipe's knowledge instea
 A currency result shows its amount with the unit's name, such as "2d6 gp" in a preview and the rolled amount once awarded.
 A knowledge result shows as **Recipe knowledge**, and once awarded the history states that the recipe was learned, or that it was already known.
 A recipe you are not entitled to see is named **Unknown recipe** rather than by its real name.
+A currency result shows the name the GM gave it, such as "Finder's fee", and the reason they wrote, in place of the unit's name.
+The GM sets these on the recipe's Results tab; see [Result Kinds]({% link crafting/recipes/index.md %}#result-kinds-items-currency-and-recipe-knowledge).
+
+### Choosing a reward
+
+A recipe's result can be a group of alternatives from which the player chooses.
+The recipe preview shows it as "You choose one of…" or "You choose up to N of…".
+A group that the dice decide shows as "One of these, by roll", and you have nothing to pick.
+
+When a run reaches a result that you choose, the run owes you a pick and nothing from that result is yours until you make it.
+The run shows **Choose your reward** and waits.
+Pick the alternatives you want in the run's detail in the Journal.
+A line above the tiles states the ceiling, such as "Choose up to 2 rewards".
+You may tick fewer, and unticking one frees a slot for another.
+Then use the claim button, such as **Claim 2 rewards**, to take what you ticked.
+
+An alternative you cannot claim is shown as a disabled tile with the reason beside it.
+Examples are "You already know Bend Horseshoe." for a recipe you have learned, or a note that a component or currency is no longer available.
+When nothing in the group can be claimed, the only action left is **Close without a reward**.
+It awards nothing and moves the run to Finished.
+
+A pending reward is signalled in several places so it is hard to miss:
+
+- The run's row in the Journal list reads **Choose your reward** and is ranked ahead of other active runs.
+  A viewer who cannot make the pick sees **Reward pending** instead.
+- The run's notice in the detail repeats **Choose your reward**.
+- The crafting outcome says "Pick it there to claim it." and offers **Open in Journal**.
+- The chat card says "A reward is waiting to be chosen in the Journal".
+
+The owner of the character and the GM can settle the pick.
+Another player is told this character's owner or the GM chooses it.
+A player who is not entitled to see the run's evidence is told "Your GM can choose this reward for you."
+Only one settle runs at a time for a run.
+If a reload interrupts a settle, Fabricate resolves it for you on the next load.
 
 ### Reading a closed run
 

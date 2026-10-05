@@ -1,7 +1,7 @@
 /** Invariants for the View Lab case registry. */
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
-import { basename, dirname, relative, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { basename, dirname, relative, resolve, sep as SEP } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { parse } from 'svelte/compiler';
@@ -52,10 +52,13 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
+import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
 import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
+import { componentAstOf } from './helpers/parsedSource.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
+import { importedModules } from './helpers/svelteStructureContract.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
 import { LAB_JOURNAL_CASE_STATE_RUN_IDS } from './view-lab/world/labRunStates.js';
@@ -704,7 +707,11 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-recipe-edit-results-rolled',
   'manager-recipe-edit-results-rolled-hearth-herb',
   'manager-recipe-edit-results-rolled-narrow',
+  'manager-recipe-edit-results-kinds',
+  'manager-recipe-edit-results-kinds-narrow',
+  'manager-recipe-edit-results-adder-menu',
   'manager-recipe-edit-results-progressive',
+  'manager-recipe-edit-results-progressive-adder',
   'manager-recipe-edit-results-narrow',
   'manager-gathering-task-editor-straight-rolled',
   'manager-component-edit-salvage-rolled-narrow',
@@ -820,9 +827,7 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     // And the side rail runs the body's full height below the 1120px rung (issue 1976).
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
   }
-  for (const viewCase of declared.filter((entry) =>
-    RAIL_FILL_LAYOUT_CASE_IDS.includes(entry.id)
-  )) {
+  for (const viewCase of declared.filter((entry) => RAIL_FILL_LAYOUT_CASE_IDS.includes(entry.id))) {
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
     assert.equal(viewCase.expectLayout.expectedTracks, RAIL_FILL_LAYOUT_CASES[viewCase.id].tracks);
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
@@ -912,7 +917,9 @@ function layoutCasePosition(id) {
 }
 
 test('compact Journal captures add full, short, empty, restored and tool witnesses at both widths', () => {
-  const cases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'));
+  const cases = VIEW_LAB_CASES.filter((entry) =>
+    entry.id.startsWith('fabricate-journal-history-batch-')
+  );
   assert.equal(cases.length, 10);
   for (const width of [1240, 1024]) {
     for (const state of ['full', 'partial', 'empty', 'restored', 'tools']) {
@@ -920,7 +927,11 @@ test('compact Journal captures add full, short, empty, restored and tool witness
       assert.equal(capture.position.width, width);
       assert.equal(capture.expectTab, 'journal');
       assert.match(capture.expectSelector, /data-history-items="tools"/);
-      if (state === 'partial') assert.equal(capture.steps.filter((step) => step.selector.includes('data-pagination-next')).length, 4);
+      if (state === 'partial')
+        assert.equal(
+          capture.steps.filter((step) => step.selector.includes('data-pagination-next')).length,
+          4
+        );
       if (state === 'restored') assert.equal(capture.steps.at(-1).fill, '');
       if (state === 'empty') assert.match(capture.expectSelector, /is-fill/);
     }
@@ -930,14 +941,57 @@ test('compact Journal captures add full, short, empty, restored and tool witness
 // The evidence each history-data state exists to photograph, keyed by its own witness.
 const HISTORY_DATA_EVIDENCE = [
   // The saved world's two independent rolls, and the global cut that must NOT be synthesised.
-  ['legacy-row-rolls', [/legacy-iron-ore-roll-12"\]\.is-cleared/, /legacy-copper-ore-roll-94"\]\.is-cleared/, /:not\(:has\(\[data-yield-cut\]\)\)/]],
+  [
+    'legacy-row-rolls',
+    [
+      /legacy-iron-ore-roll-12"\]\.is-cleared/,
+      /legacy-copper-ore-roll-94"\]\.is-cleared/,
+      /:not\(:has\(\[data-yield-cut\]\)\)/,
+    ],
+  ],
   ['shared-roll-control', [/:has\(\[data-yield-cut\]\)/, /shared-ruby:2"\]\.is-missed/]],
-  ['recovered-materials', [/title="Steel Billet"/, /title="Coal"/, /consumed"\] i\.fa-box/, /produced"\] \[title="Steel Ingot"\]/]],
-  ['unknown-material-resolution', [/data-yield-shared-roll/, /data-history-unattributed\] \+ \[data-history-items="produced"/, /:not\(:has\(\[data-yield-entry="unknown-ruby"\]\.is-cleared\)\)/]],
-  ['settled-zero', [/data-journal-verdict="failed"/, /barren-iron-ore"\]\.is-missed/, /:not\(:has\(\[data-yield-entry\]\.is-cleared\)\)/]],
-  ['uncertain-awards', [/data-effect-phase="applied"\] \[data-list-row\]/, /data-effect-phase="applying"\] \[data-list-row\]/, /data-journal-recovery-evidence\] ~ \[data-journal-history-detail\] \[data-journal-guidance\]/]],
+  [
+    'recovered-materials',
+    [
+      /title="Steel Billet"/,
+      /title="Coal"/,
+      /consumed"\] i\.fa-box/,
+      /produced"\] \[title="Steel Ingot"\]/,
+    ],
+  ],
+  [
+    'unknown-material-resolution',
+    [
+      /data-yield-shared-roll/,
+      /data-history-unattributed\] \+ \[data-history-items="produced"/,
+      /:not\(:has\(\[data-yield-entry="unknown-ruby"\]\.is-cleared\)\)/,
+    ],
+  ],
+  [
+    'settled-zero',
+    [
+      /data-journal-verdict="failed"/,
+      /barren-iron-ore"\]\.is-missed/,
+      /:not\(:has\(\[data-yield-entry\]\.is-cleared\)\)/,
+    ],
+  ],
+  [
+    'uncertain-awards',
+    [
+      /data-effect-phase="applied"\] \[data-list-row\]/,
+      /data-effect-phase="applying"\] \[data-list-row\]/,
+      /data-journal-recovery-evidence\] ~ \[data-journal-history-detail\] \[data-journal-guidance\]/,
+    ],
+  ],
   ['fizzle', [/data-history-summary="none"/, /title="Quicksilver"/, /img\.fab-medallion-img/]],
-  ['salvage', [/data-history-items="produced"\] \+ \[data-journal-fact\]/, /produced"\] \[data-list-row\] ~ \[data-list-row\]/, /:not\(:has\(\[data-history-items="consumed"\]\)\)/]],
+  [
+    'salvage',
+    [
+      /data-history-items="produced"\] \+ \[data-journal-fact\]/,
+      /produced"\] \[data-list-row\] ~ \[data-list-row\]/,
+      /:not\(:has\(\[data-history-items="consumed"\]\)\)/,
+    ],
+  ],
 ];
 
 test('the history-data witnesses name their defining evidence on the selected record', () => {
@@ -979,7 +1033,8 @@ test('the history-data witnesses name their defining evidence on the selected re
     73
   );
   assert.equal(
-    VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-')).length,
+    VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'))
+      .length,
     10
   );
 });
@@ -1125,6 +1180,7 @@ test('layout expectation selectors name UI that still exists', () => {
       ...(rows.wrappedRows?.lines.flat() ?? []),
       rows.alignedRight,
       rows.alignedLeft,
+      rows.unclipped,
       minInlineSize?.selector,
       ...controls.map((control) => control.selector),
     ]) {
@@ -2439,8 +2495,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    128,
-    `expected the 128 crafting-path cases to be examined, saw ${examined.length}`
+    131,
+    `expected the 131 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -2689,6 +2745,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-ingredients-suggestions',
+  'manager-recipe-edit-results-adder-menu',
   'manager-recipe-edit-results-suggestions',
   'manager-recipe-edit-tag-picker',
   'manager-recipe-item-contents-picker',
@@ -3228,7 +3285,9 @@ test('adding one run state to labRunStates selects only the cases that render it
 });
 
 test('an unattributable labRunStates patch widens to every player-window case, by union', () => {
-  const helper = labRunStatesFile.lineOf('function stageBrowserRun(context, recipe, pastCheck = null) {');
+  const helper = labRunStatesFile.lineOf(
+    'function stageBrowserRun(context, recipe, pastCheck = null) {'
+  );
   const importLine = labRunStatesFile.lineOf("} from './labJournalPrototype.js';");
   // Derived, not listed: every player case, so one added tomorrow is covered unmapped.
   const players = publishableCases()
@@ -3245,7 +3304,10 @@ test('an unattributable labRunStates patch widens to every player-window case, b
   }
 
   const withState = new Set(
-    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([helper, ...runStateLines('paused')]))
+    selectedIds(
+      [LAB_RUN_STATES_PATH],
+      labRunStatesFile.patches([helper, ...runStateLines('paused')])
+    )
   );
   for (const id of [...players, ...casesOfRunState('paused')]) {
     assert.ok(withState.has(id), `the union dropped "${id}"`);
@@ -3525,11 +3587,7 @@ test('a region-attributed input widens by union too, and so does a straddling hu
   // shared code and therefore inside no region at all.
   const journal = fileAt(fileDeclaring('  ...journalBlindRunCases(),'));
   const spread = journal.lineOf('  ...journalBlindRunCases(),');
-  assert.equal(
-    journal.source[spread - 2],
-    '  }),',
-    'the line above the spread must close a case'
-  );
+  assert.equal(journal.source[spread - 2], '  }),', 'the line above the spread must close a case');
   const closedCase = caseIdByLineIn(journal.path).get(spread - 1);
   assert.ok(closedCase, 'the line above the spread must be inside a parsed case region');
 
@@ -3720,6 +3778,7 @@ const SHARED_CASE_MODULES = Object.freeze([
   'broadSignals.js',
   'caseConstants.js',
   'caseFactories.js',
+  'journalAwardChoiceCases.js',
   'journalBlindRunCases.js',
   'journalHistoryCases.js',
   'journalLifecycleCases.js',
@@ -3781,7 +3840,7 @@ test('every case file opens its array exactly once, on the line the selector par
   }
 });
 
-test('a patch inside any case file attributes to that file\'s own case, and nothing else', () => {
+test("a patch inside any case file attributes to that file's own case, and nothing else", () => {
   const attributed = new Set();
   for (const { path, cases } of VIEW_LAB_CASE_FILES) {
     const file = fileAt(path);
@@ -4007,7 +4066,8 @@ test('a registry change OUTSIDE a case literal selects surface coverage', () => 
 test('a comment-only registry change selects one frame — not 157, and not none', () => {
   // A comment cannot change a pixel, so widening to a twenty-minute capture for a typo fix is the
   // cost this narrowing exists to remove.
-  const COMMENT = "    // Reached the way the smoke reaches it, by clicking the system row's identity.";
+  const COMMENT =
+    "    // Reached the way the smoke reaches it, by clicking the system row's identity.";
   const file = fileAt(fileDeclaring(COMMENT));
   assert.deepEqual(selectedIds([file.path], file.patches([file.lineOf(COMMENT)])), [
     FALLBACK_CASE_ID,
@@ -5457,6 +5517,63 @@ test('a change confined to recipeReadiness.js selects the recipe-editor cases, n
   );
 });
 
+// The component rules editor's cards (issue 1522), named files rather than a directory walk, so a
+// pattern that stops matching a file that still exists fails here. The identity strip predates
+// the extraction and draws on every frame the editor does.
+const COMPONENT_EDITOR_VIEW = 'src/ui/svelte/apps/manager/ComponentEditView.svelte';
+const COMPONENT_CARD_DIR = 'src/ui/svelte/apps/manager/component/';
+const COMPONENT_EDITOR_CARDS = Object.freeze([
+  ...COMPONENT_EDITOR_CARD_FILES,
+  `${COMPONENT_CARD_DIR}ComponentIdentityStrip.svelte`,
+]);
+
+/** The `component/*.svelte` files the editor imports, and those they import in turn. */
+function componentCardClosure(file, found = new Set()) {
+  for (const specifier of importedModules(componentAstOf(file))) {
+    const path = relative(ROOT, resolve(ROOT, dirname(file), specifier)).replaceAll(SEP, '/');
+    if (!path.startsWith(COMPONENT_CARD_DIR) || !path.endsWith('.svelte') || found.has(path)) {
+      continue;
+    }
+    found.add(path);
+    componentCardClosure(path, found);
+  }
+  return found;
+}
+
+test('the rules-editor card list is every card the editor renders without frames of its own', () => {
+  const ids = (file) => mapChangedFilesToCases([file]).map((viewCase) => viewCase.id);
+  const editorFrames = ids(COMPONENT_EDITOR_VIEW);
+  for (const card of COMPONENT_EDITOR_CARDS) {
+    assert.ok(existsSync(resolve(ROOT, card)), `${card} exists`);
+  }
+  const closure = [...componentCardClosure(COMPONENT_EDITOR_VIEW)];
+  // A file selecting a frame the editor does not has cases of its own, and routes by them.
+  const ownFramed = closure.filter((file) => ids(file).some((id) => !editorFrames.includes(id)));
+  assert.ok(ownFramed.length > 0, 'the exclusion is exercised');
+  assert.deepEqual(
+    new Set(closure.filter((file) => !ownFramed.includes(file))),
+    new Set(COMPONENT_EDITOR_CARDS),
+    'a new card joins this list and COMPONENT_EDITOR_MATCHES'
+  );
+});
+
+test('a change confined to one rules-editor card selects every frame the editor selects', () => {
+  const ids = (file) => mapChangedFilesToCases([file]).map((viewCase) => viewCase.id);
+  const editorFrames = ids(COMPONENT_EDITOR_VIEW);
+  for (const expected of [
+    'manager-component-edit-normal',
+    'manager-component-edit-inheriting',
+    'manager-component-edit-salvage',
+    'manager-component-edit-salvage-simple',
+    'manager-component-complications-salvage-stage-strip',
+  ]) {
+    assert.ok(editorFrames.includes(expected), `the editor selects ${expected}`);
+  }
+  for (const card of COMPONENT_EDITOR_CARDS) {
+    assert.deepEqual(ids(card), editorFrames, `${card} selects the editor's frames`);
+  }
+});
+
 // The environment editor's validation tab (issue 1517). THE DEFECT THIS PINS WAS A STALE CLAIM, NOT
 // AN ABSENT ONE, and the difference is why it survived a green tree for as long as it did.
 const ENVIRONMENT_DIR = 'src/ui/svelte/apps/manager/environment/';
@@ -6221,7 +6338,11 @@ test('every unit the shell extracted selects the shell\u2019s own case set', () 
   const expected = ids(shell);
   // NON-VACUITY: the shell selects a real, large case set, so an empty answer cannot pass.
   assert.ok(expected.length > 40, `the shell selects only ${expected.length} cases`);
-  assert.deepEqual(ids(extracted), expected, 'the page header no longer reaches the shell\u2019s views');
+  assert.deepEqual(
+    ids(extracted),
+    expected,
+    'the page header no longer reaches the shell\u2019s views'
+  );
   for (const path of extracted) {
     assert.deepEqual(ids([path]), expected, `${path} alone selects a different set`);
   }

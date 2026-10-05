@@ -676,6 +676,7 @@ export function buildRecipeList(
     return {
       recipes: [],
       rosterRecipes: [],
+      recipeRoster: [],
       recipeCategories: [],
       recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
@@ -720,6 +721,9 @@ export function buildRecipeList(
     // resolve correctly without being told there was a choice, which is the shape this change
     // exists to reduce rather than duplicate.
     rosterRecipes,
+    // Its published RESOLUTION TABLE, `{ id, name, img }` alone so no reader takes it for rows: a
+    // knowledge result names its taught recipe from it, which a search must not hide (issue 1773).
+    recipeRoster: rosterRecipes.map(({ id, name, img }) => ({ id, name, img })),
     recipeCategories,
     // The recipe half of the Tags & Categories reference count, folded here off the RECIPE
     // MODELS (issue 1081). Its consumer is the manager's persistent left nav rail, which is

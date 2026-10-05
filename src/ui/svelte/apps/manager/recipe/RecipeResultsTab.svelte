@@ -16,6 +16,7 @@
   import Callout from '../../../components/Callout.svelte';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeResultsSection from './RecipeResultsSection.svelte';
+  import { recipeResultKinds } from './resultRows.js';
 
   let {
     // The resolution-mode callout, rendered in this tab's heading block (issue 1522).
@@ -31,6 +32,12 @@
     // only the explanatory note; the surface is the normal single-step one.
     collapsed = false,
     componentOptions = [],
+    // What a result row may name besides a component (issue 1773): the world's currency units
+    // while the system takes part in currency, and the system's recipes while learning is observable.
+    currencyUnits = [],
+    currencyEnabled = false,
+    recipeOptions = [],
+    knowledgeObservable = false,
     // Result routing: the provider and the system's outcome tiers feed the per-result-set
     // assignment controls.
     routingProvider = null,
@@ -62,6 +69,15 @@
     Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []
   );
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
+  const resultKinds = $derived(
+    recipeResultKinds({
+      componentOptions,
+      currencyUnits,
+      currencyEnabled,
+      recipeOptions,
+      knowledgeObservable,
+    })
+  );
 
   // Per-mode heading and intro, OUTSIDE any card. The progressive heading is "Results", matching
   // the progressive SALVAGE editor: the two are the same surface and must not drift, and the
@@ -185,6 +201,8 @@
             resultGroups={stepResultGroups(step)}
             {alchemySimple}
             {componentOptions}
+            surface="recipe"
+            {resultKinds}
             {routingProvider}
             {progressive}
             isTerminalStep={index === steps.length - 1}
@@ -205,6 +223,8 @@
       {resultGroups}
       alchemySimple={alchemySimple || simpleFailureSlot}
       {componentOptions}
+      surface="recipe"
+      {resultKinds}
       {routingProvider}
       {progressive}
       {onOpenComponent}

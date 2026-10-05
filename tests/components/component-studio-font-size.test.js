@@ -576,7 +576,7 @@ test('component studio font-sizes are pinned under real Foundry core CSS', async
 
 test('the category fixture spells `-form`, matching the product Select that declares no size', () => {
   const editViewSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/component/ComponentCategoryTagsCards.svelte'),
     'utf8'
   );
   const tagStart = editViewSource.indexOf('class="manager-component-category-select"');

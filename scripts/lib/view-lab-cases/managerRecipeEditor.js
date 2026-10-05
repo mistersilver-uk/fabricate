@@ -28,6 +28,26 @@ const FLAT_RESULT_GEOMETRY = Object.freeze({
   alignedLeft: `${RESULT_ROWS} [role="radiogroup"]`,
 });
 
+/** Add a component result through the `Result` adder: the empty row it appends names it by search. */
+const ADD_COMPONENT_RESULT = (row, name) => [
+  { selector: '[data-recipe-add="result-item"]' },
+  { selector: `${RESULT_ROW(row)} [data-recipe-option-search]`, fill: name },
+  { selector: `${RESULT_ROW(row)} [data-recipe-option-search]`, press: 'Enter' },
+];
+
+/** The horseshoe's results with a currency and two knowledge rewards authored (issue 1773). */
+const REWARD_RESULTS_STEPS = Object.freeze([
+  'Crafting',
+  { selector: '[data-recipe-edit="sm-r-horseshoe"]' },
+  { selector: '#recipe-tab-results' },
+]);
+const REWARD_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+  /^src\/systems\/learnedKnowledgeObservability\.js$/,
+]);
+const BOUNTY_ROW = '[data-recipe-result-item]:has([data-recipe-reward-body])';
+
 /** A progressive stage list's row geometry, its name field held at the row's stated minimum. */
 const STAGE_ROWS = '[data-recipe-result-row] [data-recipe-result-item]';
 const STAGE_RESULT_GEOMETRY = Object.freeze({
@@ -882,12 +902,9 @@ export const CASES = Object.freeze([
         'Crafting',
         { selector: '[data-recipe-edit="sm-r-horseshoe"]' },
         { selector: '#recipe-tab-results' },
-        { selector: '[data-recipe-add="result-item"]' },
-        { selector: '.manager-travel-option:has-text("Iron Ingot")' },
-        { selector: '[data-recipe-add="result-item"]' },
-        { selector: '.manager-travel-option:has-text("Steel Ingot")' },
-        { selector: '[data-recipe-add="result-item"]' },
-        { selector: '.manager-travel-option:has-text("Silver Ingot")' },
+        ...ADD_COMPONENT_RESULT(2, 'Iron Ingot'),
+        ...ADD_COMPONENT_RESULT(3, 'Steel Ingot'),
+        ...ADD_COMPONENT_RESULT(4, 'Silver Ingot'),
         { selector: `${RESULT_ROW(2)} [data-recipe-option-amount-mode="rolled"]` },
         { selector: `${RESULT_ROW(2)} [data-recipe-option-formula]`, fill: '1d4+1' },
         { selector: `${RESULT_ROW(3)} [data-recipe-option-amount-mode="rolled"]` },
@@ -958,6 +975,146 @@ export const CASES = Object.freeze([
       TYPEAHEAD_COMBOBOX_SOURCE,
       ...ANCHORED_POPOVER_SOURCES,
     ],
+  }),
+  // Result kinds (issue 1773): a component, a labelled rolled bounty and two taught recipes, under a
+  // Smithing that takes part in currency and observes learning, so every kind is offered.
+  ...[
+    { suffix: '', position: null },
+    { suffix: '-narrow', position: { width: 1024, height: 640 } },
+  ].map(({ suffix, position }) =>
+    managerCase({
+      id: `manager-recipe-edit-results-kinds${suffix}`,
+      label: `Manager — Recipe edit results, a component, a currency and a recipe’s knowledge${suffix ? ', at the declared floor' : ''}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-smithing', resultRowState: 'reward-craft' },
+      // At the floor, the help line's wrap is what the frame is for.
+      steps: [
+        ...REWARD_RESULTS_STEPS,
+        ...(position ? [{ selector: '[data-recipe-knowledge-hint]', scroll: true }] : []),
+      ],
+      expectView: 'recipe-edit',
+      // A knowledge row draws its help line, and the bounty rolls and opens its body.
+      expectSelector:
+        '.manager-recipe-ingredient-set-groups:has(> [data-recipe-result-item] [data-recipe-knowledge-hint])' +
+        ` > ${BOUNTY_ROW} [data-recipe-option-formula]`,
+      expectLayout: {
+        containerSelector: '.manager-recipe-ingredient-set-groups',
+        // The component row, the one with nothing beneath it, stays on one line.
+        oneLineRows: `${RESULT_ROWS}:not(:has([data-recipe-reward-body], [data-recipe-knowledge-hint]))`,
+        // A kind slot grown past the others by a longer kind word pushes its name field out.
+        alignedLeft: `${RESULT_ROWS} .manager-recipe-option-name-field`,
+        // "Recipe knowledge" reads whole in its kind slot, never cut to an ellipsis.
+        unclipped: `${RESULT_ROWS} [data-recipe-option-kind] .fabricate-select-value`,
+      },
+      expectNoHorizontalOverflow: '.manager-recipe-ingredient-set-groups',
+      ...(position && { position }),
+      kinds: ['manager', 'recipes', ...(position ? ['responsive'] : [])],
+      sourceMatches: [...REWARD_SOURCES],
+    })
+  ),
+  // The currency naming body, both fields cleared: the closing line says so, and the row stays whole.
+  managerCase({
+    id: 'manager-recipe-edit-results-currency-body-empty',
+    label: 'Manager — Recipe edit results, a currency reward with no description',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-craft' },
+    steps: [
+      ...REWARD_RESULTS_STEPS,
+      { selector: '[data-recipe-reward-label]', fill: '' },
+      { selector: '[data-recipe-reward-reason]', fill: '' },
+      // A click on the selected tab moves focus off the field without changing the screen.
+      { selector: '#recipe-tab-results' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector: `${BOUNTY_ROW} [data-recipe-reward-closing]:has-text("No description — the player just sees")`,
+    expectContained: [
+      { container: BOUNTY_ROW, target: `${BOUNTY_ROW} [data-recipe-reward-closing]` },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...REWARD_SOURCES],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-results-currency-body-filled',
+    label: 'Manager — Recipe edit results, a currency reward with what it is called and why',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-craft' },
+    steps: [...REWARD_RESULTS_STEPS, { selector: '[data-recipe-reward-body]', scroll: true }],
+    expectView: 'recipe-edit',
+    expectSelector: `${BOUNTY_ROW} [data-recipe-reward-closing]:has-text("The player sees: Guild bounty · ")`,
+    expectCenterHit: `${BOUNTY_ROW} [data-recipe-reward-reason]`,
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...REWARD_SOURCES],
+  }),
+  // The `Result` adder's kind menu, headed "Add a result" over the three kinds this set offers.
+  managerCase({
+    id: 'manager-recipe-edit-results-adder-menu',
+    label: 'Manager — Recipe edit results, the Result adder’s kind menu open',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-craft' },
+    steps: [...REWARD_RESULTS_STEPS, { selector: '[data-recipe-add="result-item"]' }],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-action-menu-panel.manager-recipe-result-menu:has(.manager-action-menu-heading) ' +
+      '[role="menu"][aria-labelledby] [data-recipe-add="result-knowledge"]',
+    // The menu opens from the adder's start edge, over the list it adds to and never the nav rail.
+    expectLayout: {
+      containerSelector: '.manager-recipe-results-section',
+      oneLineRows: `${RESULT_ROWS}:not(:has([data-recipe-reward-body], [data-recipe-knowledge-hint]))`,
+      alignedLeft: '[data-recipe-add="result-item"], .manager-recipe-result-menu',
+    },
+    expectContained: [
+      { container: '.manager-recipe-results-section', target: '.manager-recipe-result-menu' },
+    ],
+    expectCenterHit: '.manager-recipe-result-menu [data-recipe-add="result-currency"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...REWARD_SOURCES, ...ANCHORED_POPOVER_SOURCES],
+  }),
+  // A knowledge result on a Smithing whose learned recipes no player sees: drawn read-only, saying why.
+  managerCase({
+    id: 'manager-recipe-edit-results-learning-off',
+    label: 'Manager — Recipe edit results, a knowledge reward where learning is not observable',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-kinds' },
+    steps: [
+      ...REWARD_RESULTS_STEPS,
+      { selector: '[data-recipe-knowledge-hint="learning-off"]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '[data-recipe-result-item]:has([data-recipe-knowledge-disabled]) ' +
+      '[data-recipe-knowledge-hint="learning-off"]',
+    expectNoHorizontalOverflow: '.manager-recipe-ingredient-set-groups',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...REWARD_SOURCES],
+  }),
+  // A knowledge result teaching a recipe Smithing no longer holds: named missing, with its remove.
+  managerCase({
+    id: 'manager-recipe-edit-results-missing-recipe',
+    label: 'Manager — Recipe edit results, a knowledge reward whose recipe is gone',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'reward-missing' },
+    steps: [
+      ...REWARD_RESULTS_STEPS,
+      {
+        selector:
+          '[data-recipe-result-item]:has([data-recipe-option-missing]) [data-recipe-knowledge-hint]',
+        scroll: true,
+      },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '[data-recipe-result-item]:has([data-recipe-option-missing="sm-r-retired-lore"]) ' +
+      '[data-recipe-remove="result-item"]',
+    expectCenterHit:
+      '[data-recipe-result-item]:has([data-recipe-option-missing]) [data-recipe-remove="result-item"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [...REWARD_SOURCES],
   }),
   managerCase({
     id: 'manager-multistep-disable-confirm',
@@ -1041,6 +1198,28 @@ export const CASES = Object.freeze([
     expectView: 'recipe-edit',
     // The stage row's Edit link sits in the requirement row's trailing controls (issue 1516).
     expectCenterHit: '[data-recipe-result-row] [data-recipe-result-edit]',
+    expectLayout: STAGE_RESULT_GEOMETRY,
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  // A progressive set's adder appends an unnamed stage, whose name field takes focus (issue 1773).
+  managerCase({
+    id: 'manager-recipe-edit-results-progressive-adder',
+    label: 'Manager — Recipe edit results progressive, a stage added',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-grind"]' },
+      { selector: '#recipe-tab-results' },
+      { selector: '[data-recipe-set] [data-recipe-add="result-item"]' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector: `${STAGE_ROWS} [data-recipe-option-search]:focus`,
     expectLayout: STAGE_RESULT_GEOMETRY,
     kinds: ['manager', 'recipes'],
     sourceMatches: [

@@ -18,7 +18,7 @@ import {
   styleTextFor,
 } from './styleBlockScan.js';
 import { lineOf, walkElements } from './svelteTemplateScan.js';
-import { createTempGitRepo } from './temp-git-repo.js';
+import { copyTempGitRepo, createTempGitRepo } from './temp-git-repo.js';
 
 export const DESIGN_SYSTEM_FAMILY = 'design-system';
 
@@ -190,12 +190,29 @@ export function checkGate(t, gate, guidance) {
   return result;
 }
 
+/** Each distinct base, committed once per process; a case writes only to its own copy of it. */
+const baseRepos = new Map();
+
+function baseRepoFor(files) {
+  const key = JSON.stringify(Object.entries(files).sort(([a], [b]) => byCodePoint(a, b)));
+  if (!baseRepos.has(key)) {
+    if (baseRepos.size === 0) {
+      process.once('exit', () => {
+        for (const { repo } of baseRepos.values()) repo.dispose();
+      });
+    }
+    const repo = createTempGitRepo('design-system-ratchet-base-');
+    repo.write(files);
+    baseRepos.set(key, { repo, base: repo.commitAll('base') });
+  }
+  return baseRepos.get(key);
+}
+
 /** A throwaway repository whose one commit holds `files`, comparing gates against that commit. */
 export function gateRepo(t, files) {
-  const repo = createTempGitRepo('design-system-ratchet-');
+  const { repo: template, base } = baseRepoFor(files);
+  const repo = copyTempGitRepo(template, 'design-system-ratchet-');
   t.after(() => repo.dispose());
-  repo.write(files);
-  const base = repo.commitAll('base');
   return {
     write: (changes) => repo.write(changes),
     compare: (gate) => compareDesignSystem({ ...gate, cwd: repo.dir, env: { RATCHET_BASE: base } }),

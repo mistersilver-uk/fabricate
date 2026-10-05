@@ -968,6 +968,12 @@ function createStore(calls = [], options = {}) {
       blocksSystem: false,
     },
   });
+  // The real store publishes the unfiltered roster beside the searched rows (issue 1773).
+  viewState.update((state) => ({
+    ...state,
+    recipeRoster:
+      options.recipeRoster ?? state.recipes.map(({ id, name, img }) => ({ id, name, img })),
+  }));
 
   function applySelectedSystem(id) {
     const nextSelected = systemDetails[id] || null;

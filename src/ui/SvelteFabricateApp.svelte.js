@@ -73,6 +73,15 @@ function offeredRoutes(extensionSurfaces) {
   return routes;
 }
 
+/** Open run `runId` in the Journal, as a crafting outcome that left a reward to pick does
+ *  (issue 1773). */
+function journalRunNavigator(services, selectTab) {
+  return (runId) => {
+    if (runId) services.journal?.select?.(runId, 'crafting');
+    selectTab('journal');
+  };
+}
+
 function normalizeInteractableRef(ref) {
   if (!ref || typeof ref !== 'object') return null;
   const sceneId = typeof ref.sceneId === 'string' ? ref.sceneId : null;
@@ -328,13 +337,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // All three tab stores read the SAME actor and source selection, so they agree on what the
     // player owns; only the workbench and discipline state is local to this one.
     services.alchemy = createAlchemyStore({ services });
-    // Both stores are the singletons the Crafting tab reads, so the selection is already applied
-    // by the time that tab renders.
+    // Both stores are the Crafting tab's singletons, so the selection lands before it renders.
     services.navigateToCraftingRecipe = (recipeId) => {
       if (recipeId) services.crafting?.select?.(recipeId);
       this._selectTab('crafting');
     };
     services.journal = createJournalStore({ services });
+    services.navigateToJournalRun = journalRunNavigator(services, (tab) => this._selectTab(tab));
     return services;
   }
 
