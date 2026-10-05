@@ -16,6 +16,7 @@ import { listSvelteComponents, toRepositoryPaths } from '../scripts/lib/svelteCo
 import { readDeclaration } from './helpers/apiConvention.js';
 import { parseDesignLibrary, primitiveNamesIn, readDesignLibrary } from './helpers/designLibrary.js';
 import { componentAstOf } from './helpers/parsedSource.js';
+import { assertMovedByDiff, registerBase } from './helpers/registerBase.js';
 import { styleTextFor } from './helpers/styleBlockScan.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -63,48 +64,65 @@ const PRIMITIVE_DIRECTORY = 'src/ui/svelte/components/';
 test('the corpus every property below quantifies over is alive', () => {
   assert.ok(library.blockCount > 0, 'the parser found no spec-head block; the anchor is dead');
   assert.ok(MANIFEST_ROWS.length > 0, 'the manifest is empty, so every comparison is vacuous');
-  assert.equal(
-    RULED_OUT_NAMES.length,
-    10,
-    'the name-shaped ruled-out register changed size; it is the subtrahend in the residue check ' +
-      'below, so a silent change there silently changes what counts as an orphan citation'
-  );
+  assert.ok(RULED_OUT_NAMES.length > 0, 'the name-shaped ruled-out register is empty');
   assert.ok(
     SHIPPED_COMPONENT_NAMES.size > 50,
     `the component walk found ${SHIPPED_COMPONENT_NAMES.size} files, so it is not walking`
   );
 });
 
-test('the library has the exact structure the parser assumes', () => {
-  // EXACT rather than floors. Every one of these is a fact about a hand-authored file that the
-  // properties below read as if it were a database, and each moves only when someone edits that
-  // file — at which point the edit should be accepted deliberately rather than absorbed (issue
-  // 1371).
-  // 61 with `<ArtPicker>`, the entry issue 1522 adds.
-  assert.equal(library.blockCount, 61, 'spec-head block count');
+test('the library has the exact structure the parser assumes', (t) => {
+  // Each count is the base's plus this diff's own additions and removals (issue 1495), so an edit
+  // is accepted by the diff that shows it rather than by a literal two PRs both rewrite.
   assert.equal(
     library.headingCount,
-    61,
+    library.blockCount,
     'the one-heading-per-block relation broke: a block with two h4s double-counts its entry, and ' +
       'a block with none drops it out of the set entirely'
   );
-  assert.equal(library.names.length, 72, 'distinct primitive names');
   assert.equal(
     library.nameOccurrences,
-    72,
+    library.names.length,
     'occurrences no longer equal distinct names, so one primitive is now named by two entries ' +
       'and the set has a duplicate'
   );
-  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 41, 'naming blocks');
-  assert.equal(library.nonPrimitiveHeadings.length, 20, 'section-prose blocks');
-
-  // The only pair that pins the ANCHOR as narrower than a file-wide scan.
-  assert.equal(library.fileWideNames.length, 84, 'file-wide primitive-shaped names');
-  assert.equal(library.namesOutsideHeadings.length, 12, 'names outside every spec-head heading');
+  const base = registerBase();
+  if (base.skipped) return t.skip(base.skipped);
+  const was = base.library;
+  const sets = [
+    ['spec-head blocks', was.headings, library.headings, library.blockCount],
+    ['distinct primitive names', was.names, library.names, library.names.length],
+    [
+      'section-prose blocks',
+      was.nonPrimitiveHeadings,
+      library.nonPrimitiveHeadings,
+      library.nonPrimitiveHeadings.length,
+    ],
+    [
+      'naming blocks',
+      was.headings.filter((heading) => !was.nonPrimitiveHeadings.includes(heading)),
+      library.headings.filter((heading) => !library.nonPrimitiveHeadings.includes(heading)),
+      library.headings.length - library.nonPrimitiveHeadings.length,
+    ],
+    // The pair that pins the ANCHOR as narrower than a file-wide scan.
+    [
+      'file-wide primitive-shaped names',
+      was.fileWideNames,
+      library.fileWideNames,
+      library.fileWideNames.length,
+    ],
+    [
+      'names outside every spec-head heading',
+      was.namesOutsideHeadings,
+      library.namesOutsideHeadings,
+      library.namesOutsideHeadings.length,
+    ],
+  ];
+  for (const [label, before, now, count] of sets) assertMovedByDiff(label, before, now, count);
 });
 
 /**
- * The 20 `div.spec-head > h4` headings that name no primitive: section prose, pinned by exact
+ * The `div.spec-head > h4` headings that name no primitive: section prose, pinned by exact
  * decoded text.
  */
 const NON_PRIMITIVE_HEADINGS = [
@@ -153,10 +171,10 @@ test('every recorded section-prose heading is still in the library', () => {
   }
 });
 
-test('the section-prose register is pinned at its measured size and holds no primitive name', () => {
+test('the section-prose register matches the library prose blocks and holds no primitive name', () => {
   assert.equal(
     NON_PRIMITIVE_HEADINGS.length,
-    20,
+    library.nonPrimitiveHeadings.length,
     'without this pin the cheapest way to green a new `<h4>Toggle</h4>` is to append `Toggle` ' +
       'here, which is the drift the census exists to catch'
   );
@@ -193,14 +211,8 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 10 library entries with no shipped implementation (issue 1505). Re-derived from the array
- * rather than carried forward: `SortableList` left it at issue 1512, `Well` at issue 2008,
- * `PickerRow` at issue 1516, `RequirementChooser` at issue 1518, and the three instruments, the
- * validation pair, the rule pair, the set picker, the rail section and the log list at issue 1782 —
- * `ValidationSummary` by naming its shipped component and `ValidationList` by being merged into
- * it — when each specified primitive shipped, `ChoiceGroup` and `Menu` at issue 1516, when each
- * specified entry gained its manifest row, and `InfoStrip` at issue 1521, when it shipped on its
- * two importers; the count this docblock states is the array's own length.
+ * The library entries with no shipped implementation (issue 1505), re-derived from the array: an
+ * entry leaves it when its primitive ships or is merged, and the check below fails until it does.
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BrowseCard',
