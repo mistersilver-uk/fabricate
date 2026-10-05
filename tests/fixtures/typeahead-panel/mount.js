@@ -118,15 +118,19 @@ const FAMILIES = {
     clip: 'manager-task-component-browser-card',
     input: '[data-gathering-component-tag-search] input',
     ownsScroller: true,
-    mount: (target) =>
-      mount(GatheringTaskEditView, {
+    mount: (target) => {
+      // The component browser is a Results card (issue 1522), so the page above it is drawn here.
+      target.append(element('div', 'fixture-above'));
+      return mount(GatheringTaskEditView, {
         target,
         props: {
           task: { id: 'task-1', name: 'Forage', dropRows: [] },
+          activeTab: 'results',
           resolutionMode: 'd100',
           itemCards: NAMES.map((entry) => ({ ...entry, tags: [entry.id.replace('-', '')] })),
         },
-      }),
+      });
+    },
   },
 };
 

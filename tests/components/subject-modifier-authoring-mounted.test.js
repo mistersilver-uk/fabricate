@@ -18,6 +18,10 @@ import {
   COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  GATHERING_TASK_EDITOR_COMPILED_MODULES,
+  GATHERING_TASK_EDITOR_RAW_MODULES,
+} from '../helpers/gatheringTaskEditorModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -320,6 +324,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/systems/characterPrerequisites.js',
     // The gathering host's seven converted option vocabularies (issue 1510).
     'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',
+    ...GATHERING_TASK_EDITOR_RAW_MODULES,
     // The task check override reads the evaluation and formats an adjustment (issue 2005).
     'src/systems/normalize/checkEvaluation.js',
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
@@ -368,6 +373,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
     // The task's identity and depleted-marker art (issue 1522).
     'src/ui/svelte/components/ArtPicker.svelte',
+    ...GATHERING_TASK_EDITOR_COMPILED_MODULES,
     GATHERING_PATH,
   ],
   componentPath: GATHERING_PATH,
@@ -377,6 +383,8 @@ async function mountGathering(overrides = {}) {
   const updates = [];
   const target = await gatheringHarness.mount({
     task: { id: 'task-1', name: 'Forage', dropRows: [] },
+    // The pick is a Requirements card (issue 1522).
+    activeTab: 'requirements',
     resolutionMode: 'routed',
     checkModifierOptions: CATALOGUE,
     gatheringModifierPolicy: 'bySubject',

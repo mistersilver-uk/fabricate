@@ -1239,6 +1239,10 @@ export function registerComponentsCases() {
         .click();
       await tick();
       flushSync();
+      // The picker is a Results card (issue 1522).
+      target.querySelector('[data-gathering-task-tab="results"]').click();
+      await tick();
+      flushSync();
 
       assert.equal(
         target.querySelector('.fabricate-manager').dataset.managerView,

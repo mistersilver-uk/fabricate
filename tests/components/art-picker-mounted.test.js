@@ -161,11 +161,14 @@ describe('ArtPicker — the task editor sizes it through its one custom property
     ],
   });
 
-  defineStructureContract(
-    'both task-editor pickers carry the sizing class',
-    'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
-    { passesValues: [['ArtPicker', 'class', 'manager-task-art']] }
-  );
+  // The identity art on Overview and the depleted marker in the node card (issue 1522).
+  for (const part of ['GatheringTaskOverviewTab', 'GatheringTaskNodesCard']) {
+    defineStructureContract(
+      `the ${part} picker carries the sizing class`,
+      `src/ui/svelte/apps/manager/gathering-task/${part}.svelte`,
+      { passesValues: [['ArtPicker', 'class', 'manager-task-art']] }
+    );
+  }
 
   it('sets that property to 88px for the task editor, and nothing else', () => {
     const sheet = 'styles/fabricate.css';

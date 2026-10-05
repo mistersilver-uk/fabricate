@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,7 +23,16 @@ const eventInspectorPath = resolve(
 );
 const langPath = resolve(repoRoot, 'lang/en.json');
 
-const editorSource = readFileSync(editorPath, 'utf8');
+// The editor with the tabs and cards it renders (issue 1522), read as one source.
+const taskPartsDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/gathering-task');
+const editorSource = [
+  editorPath,
+  ...readdirSync(taskPartsDir)
+    .filter((name) => name.endsWith('.svelte'))
+    .map((name) => resolve(taskPartsDir, name)),
+]
+  .map((path) => readFileSync(path, 'utf8'))
+  .join('\n');
 const economySource = readFileSync(economyPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
 const taskInspectorSource = readFileSync(taskInspectorPath, 'utf8');

@@ -941,6 +941,10 @@ export function registerEnvironmentsCases() {
         'Edit identity, availability, resolution, and results for the selected gathering task.'
       )
     );
+    // The drop table and the rail that edits a row are the Results tab's (issue 1522).
+    target.querySelector('[data-gathering-task-tab="results"]').click();
+    await tick();
+    flushSync();
     assert.ok(target.querySelector('[data-gathering-task-drops-table]'));
     assert.ok(target.querySelector('[data-gathering-task-drop-inspector]'));
     const dropInspector = target.querySelector('[data-gathering-task-drop-inspector]');
@@ -1294,9 +1298,14 @@ export function registerEnvironmentsCases() {
     assert.equal(refreshedInspectorCountInput.value, '5');
     assert.equal(populatedDropRow.querySelector('[aria-label="Select drop rule"]'), null);
     assert.equal(populatedDropRow.querySelector('[aria-label="Edit drop rule"]'), null);
-    const mediaColumn = coreEditor.querySelector('.manager-task-media-column');
-    const taskImagePicker = coreEditor.querySelector('.fab-art-picker');
-    const taskStatus = coreEditor.querySelector('.manager-task-core-status');
+    // Back to Overview for the identity card, which the tab switch redrew (issue 1522).
+    target.querySelector('[data-gathering-task-tab="overview"]').click();
+    await tick();
+    flushSync();
+    const identityCard = target.querySelector('[data-gathering-task-core-editor]');
+    const mediaColumn = identityCard.querySelector('.manager-task-media-column');
+    const taskImagePicker = identityCard.querySelector('.fab-art-picker');
+    const taskStatus = identityCard.querySelector('.manager-task-core-status');
     const taskStatusToggle = taskStatus.querySelector('.fabricate-toggle');
     assert.equal(mediaColumn.firstElementChild, taskImagePicker);
     assert.equal(mediaColumn.children[1], taskStatus);
@@ -1326,6 +1335,10 @@ export function registerEnvironmentsCases() {
     await tick();
     flushSync();
     assert.equal(taskNameInput.value, 'Gather Sun Herbs');
+    // Availability is a Requirements card (issue 1522).
+    target.querySelector('[data-gathering-task-tab="requirements"]').click();
+    await tick();
+    flushSync();
     const biomeAvailability = target.querySelector('[data-gathering-task-field="biomes"]');
     const timeAvailability = target.querySelector('[data-gathering-task-field="timeOfDay"]');
     const weatherAvailability = target.querySelector('[data-gathering-task-field="weather"]');
@@ -1488,6 +1501,10 @@ export function registerEnvironmentsCases() {
         'picker menu should dismiss on outside mousedown'
       );
     }
+    // Back to the drop table and its rail (issue 1522).
+    target.querySelector('[data-gathering-task-tab="results"]').click();
+    await tick();
+    flushSync();
     const inspectorSlider = target.querySelector(
       '[data-gathering-task-drop-inspector] input[type="range"]'
     );

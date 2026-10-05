@@ -182,6 +182,13 @@ async function openToolEditor(storeOptions = {}) {
   );
 }
 
+async function openTaskEditor(storeOptions = {}) {
+  mountManager([], storeOptions);
+  await press(navButton('Gathering'), 'Gathering');
+  await press(gatheringSubitem('Tasks'), 'Tasks');
+  await press(target.querySelector('[aria-label="Edit Gather Moon Herbs"]'), 'the herbs editor');
+}
+
 /** Press the header's primary, which submits the editor's form or saves the root's draft. */
 async function pressHeaderSave() {
   await press(
@@ -288,6 +295,26 @@ const EDITORS = {
       await press(target.querySelector('[data-tool-editor-save]'), 'the Tool Save');
     },
     notice: '[data-tool-save-error][role="alert"]',
+    position: 'page',
+  },
+  // A Direct task whose result set fails validation raises the save-blocking notice on Results.
+  [`${MANAGER}/GatheringTaskEditView.svelte`]: {
+    open: () => openTaskEditor(),
+    cards:
+      '.manager-task-core-card, .manager-task-availability-card, .manager-task-results-card, ' +
+      '.manager-task-component-browser-card',
+    raise: async () => {
+      await openTaskEditor({
+        taskResolutionMode: 'straight',
+        gatheringTaskValidation: () => ({
+          valid: false,
+          errors: ['Direct mode requires exactly one result group'],
+          resultErrors: ['Direct mode requires exactly one result group'],
+        }),
+      });
+      await press(target.querySelector('[data-gathering-task-tab="results"]'), 'Results');
+    },
+    notice: '[data-gathering-task-results-validation][role="alert"]',
     position: 'page',
   },
   [`${MANAGER}/EnvironmentEditView.svelte`]: {

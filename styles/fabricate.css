@@ -12040,23 +12040,6 @@
   display: none;
 }
 
-.fabricate-manager .manager-warning-band {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-warning-border);
-  border-radius: 8px;
-  color: var(--fab-text);
-  background: var(--fab-warning-soft);
-}
-
-.fabricate-manager .manager-warning-band.is-formula {
-  justify-content: flex-start;
-  background: var(--fab-overlay-light-035);
-}
-
 .fabricate-manager .manager-gathering-task-drops-table {
   --fab-manager-task-drop-grid: minmax(0, 1.05fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);
 

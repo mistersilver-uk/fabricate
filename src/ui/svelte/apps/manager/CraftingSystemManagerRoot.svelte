@@ -1598,7 +1598,10 @@
   // stylesheet's own, so a route released here and not there (or the reverse) fails at test
   // time rather than as a dead 300px strip.
   function isGatheringTaskFullWidth(view, context) {
-    return view === 'gathering-task-edit' && context.resultGroupTaskMode === true;
+    return (
+      view === 'gathering-task-edit' &&
+      (context.resultGroupTaskMode === true || context.gatheringTaskTab !== 'results')
+    );
   }
 
   const FULL_WIDTH_VIEWS = Object.freeze([
@@ -1609,8 +1612,8 @@
       predicate: (view) => view === 'environment-edit',
     },
     {
-      // ROUTE + EDITOR MODE. d100 keeps its drop inspector; Direct and Check own all of
-      // their result authoring in the main pane, so the shared inspector has no content.
+      // ROUTE + EDITOR MODE + TAB. Only a d100 task's Results tab keeps the drop inspector;
+      // Direct and Check own all of their result authoring in the main pane.
       id: 'gathering-task-edit',
       layoutClass: 'full-width-2-track',
       selector:
@@ -2093,17 +2096,14 @@
       selectedMapRegionUuid = mapCurrentSceneRegions[0].sceneRegionUuid;
     }
   });
-  function isGatheringResultGroupMode(mode) {
-    return ['straight', 'routed'].includes(mode);
-  }
-  // The ONE read of the full-width set. `null` means the route keeps its inspector. Gathering
-  // passes its selected task mode into this same decision so aside suppression and track release
-  // cannot disagree during a mode switch.
+  // The ONE read of the full-width set; `null` keeps the inspector. The task editor's mode and tab
+  // feed this same decision, so aside suppression and track release cannot disagree.
   const fullWidthLayout = $derived(
     FULL_WIDTH_VIEWS.find((entry) =>
       entry.predicate(currentView, {
         travelTab: activeTravelTab,
-        resultGroupTaskMode: isGatheringResultGroupMode(gathering.gatheringTaskResolutionMode),
+        resultGroupTaskMode: gathering.gatheringTaskResultGroupMode,
+        gatheringTaskTab: gathering.gatheringTaskTab,
       })
     ) ?? null
   );
@@ -2182,6 +2182,7 @@
   $effect(() => gathering.reselectTask());
   $effect(() => gathering.reselectEvent());
   $effect(() => gathering.reselectDrop());
+  $effect(() => gathering.resetTaskTab());
 
   $effect(() => {
     services?.registerEssenceDirtyGuard?.(() =>
@@ -5441,6 +5442,8 @@
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
       <GatheringTaskEditView
         task={gathering.editingGatheringTask}
+        activeTab={gathering.gatheringTaskTab}
+        onTabChange={(tab) => (gathering.gatheringTaskTab = tab)}
         staminaEnabled={gathering.selectedGatheringTaskStaminaEnabled}
         nodesEnabled={gathering.selectedGatheringTaskNodesEnabled}
         resolutionMode={gathering.gatheringTaskResolutionMode}
@@ -5474,9 +5477,6 @@
         onUpdateDrop={drafts.updateGatheringTaskDrop}
         onMoveDrop={drafts.moveGatheringTaskDrop}
         onImportDrop={drafts.importGatheringTaskDrop}
-        onAddModifier={modifiers.addGatheringDropModifier}
-        onUpdateModifier={modifiers.updateGatheringDropModifier}
-        onDeleteModifier={modifiers.deleteGatheringDropModifier}
         onAddToolReference={drafts.addToolReferenceToSelectedTask}
         onRemoveToolReference={drafts.removeToolReferenceFromSelectedTask}
       />

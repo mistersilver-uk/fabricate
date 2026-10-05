@@ -22,6 +22,10 @@ import {
 } from '../helpers/select-control.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  GATHERING_TASK_EDITOR_COMPILED_MODULES,
+  GATHERING_TASK_EDITOR_RAW_MODULES,
+} from '../helpers/gatheringTaskEditorModules.js';
 
 const { missingCensusHooks } = await import('../helpers/resultRowCensus.js');
 const { normalizeGatheringResultGroups } = await import(
@@ -30,6 +34,7 @@ const { normalizeGatheringResultGroups } = await import(
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const EDITOR_PATH = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
+const NODES_CARD_PATH = 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskNodesCard.svelte';
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -69,6 +74,7 @@ const harness = createMountedComponentHarness({
     'src/systems/characterPrerequisites.js',
     // The seven converted option vocabularies (issue 1510).
     'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',
+    ...GATHERING_TASK_EDITOR_RAW_MODULES,
     // The task check override reads the evaluation and formats an adjustment (issue 2005).
     'src/systems/normalize/checkEvaluation.js',
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
@@ -120,6 +126,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
     // The task's identity art and its depleted-marker art (issue 1522).
     'src/ui/svelte/components/ArtPicker.svelte',
+    ...GATHERING_TASK_EDITOR_COMPILED_MODULES,
     EDITOR_PATH,
   ],
   componentPath: EDITOR_PATH,
@@ -153,12 +160,13 @@ function taskFixture() {
   };
 }
 
-/** Mount the editor and return its recorded `onUpdateTask` payloads plus a field lookup. */
-async function mountEditor(resolutionMode = 'routed') {
+/** Mount the editor on one tab and return its `onUpdateTask` payloads plus a field lookup. */
+async function mountEditor(resolutionMode = 'routed', activeTab = 'overview') {
   const updates = [];
   let task = taskFixture();
   const root = await harness.mount({
     task,
+    activeTab,
     staminaEnabled: true,
     nodesEnabled: true,
     // `routed`, because the DC override card renders only under a routed gathering check
@@ -184,6 +192,8 @@ async function mountEditor(resolutionMode = 'routed') {
     updates,
     /** Feed the recorded patches back in, the way the real host does. */
     sync: () => harness.setProps({ task }),
+    /** Open another tab, the way the host's `onTabChange` does. */
+    showTab: (tab) => harness.setProps({ activeTab: tab }),
     /** The real `<input>` behind a Stepper, located by its test hook or its accessible name. */
     field: (selector) => {
       const input = root.querySelector(selector);
@@ -215,12 +225,14 @@ function lastWrite(updates, read) {
 const CLEARS_TO_ABSENCE = [
   {
     id: 'dcOverride',
+    tab: 'requirements',
     selector: '[data-gathering-task-dc-override]',
     read: (patch) => patch.dcOverride,
     expected: null,
   },
   {
     id: 'nodes.max',
+    tab: 'overview',
     selector: '[data-gathering-task-node-count]',
     // Clearing the pool nulls the whole `nodes` object.
     read: (patch) => patch.nodes,
@@ -228,12 +240,14 @@ const CLEARS_TO_ABSENCE = [
   },
   {
     id: 'stamina modifier min',
+    tab: 'requirements',
     selector: 'input[aria-label="Minimum"]',
     read: (patch) => patch.staminaCostModifiers?.[0]?.min,
     expected: null,
   },
   {
     id: 'stamina modifier max',
+    tab: 'requirements',
     selector: 'input[aria-label="Maximum"]',
     read: (patch) => patch.staminaCostModifiers?.[0]?.max,
     expected: null,
@@ -244,16 +258,19 @@ const CLEARS_TO_ABSENCE = [
 const NEVER_RECEIVES_NULL = [
   {
     id: 'staminaCost',
+    tab: 'requirements',
     selector: '[data-gathering-task-stamina-cost]',
     read: (patch) => patch.staminaCost,
   },
   {
     id: 'respawn.intervalAmount',
+    tab: 'overview',
     selector: '[data-gathering-task-node-interval]',
     read: (patch) => patch.nodes?.respawn?.intervalAmount,
   },
   {
     id: 'respawn.chance',
+    tab: 'overview',
     selector: '[data-gathering-task-node-chance]',
     read: (patch) => patch.nodes?.respawn?.chance,
   },
@@ -262,7 +279,7 @@ const NEVER_RECEIVES_NULL = [
 describe('Gathering task editor steppers (issue 1050)', () => {
   // ── Two adds on one screen, two roles.
   it('paints Add modifier as a dashed append and Add drop rule as the toolbar primary', async () => {
-    const { root } = await mountEditor('d100');
+    const { root, showTab } = await mountEditor('d100', 'requirements');
 
     const addModifier = root.querySelector('[data-gathering-add-stamina-modifier]');
     assert.ok(Boolean(addModifier), 'the stamina card renders its Add modifier control');
@@ -279,6 +296,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
       `and is deliberately NOT full width, got ${addModifier.className}`
     );
 
+    await showTab('results');
     const addDrop = root.querySelector('[data-gathering-add-drop="toolbar"]');
     assert.ok(Boolean(addDrop), 'the drops toolbar renders its Add drop rule control');
     assert.ok(
@@ -301,8 +319,9 @@ describe('Gathering task editor steppers (issue 1050)', () => {
 
   it('renders every migrated field as a real number input inside a Stepper', async () => {
     // Fail closed: if a selector stopped resolving.
-    const { field } = await mountEditor();
-    for (const { selector } of [...CLEARS_TO_ABSENCE, ...NEVER_RECEIVES_NULL]) {
+    const { field, showTab } = await mountEditor();
+    for (const { selector, tab } of [...CLEARS_TO_ABSENCE, ...NEVER_RECEIVES_NULL]) {
+      await showTab(tab);
       assert.equal(field(selector).type, 'number', `${selector} is still a number input`);
       assert.ok(
         Boolean(field(selector).closest('.fab-stepper')),
@@ -313,7 +332,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
 
   it('persists absence when a genuine-absence field is cleared', async () => {
     for (const testCase of CLEARS_TO_ABSENCE) {
-      const { field, updates } = await mountEditor();
+      const { field, updates } = await mountEditor('routed', testCase.tab);
       clear(field(testCase.selector));
       assert.equal(
         lastWrite(updates, testCase.read),
@@ -326,7 +345,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
 
   it('never hands a cosmetic-zero field null, and still commits a real edit', async () => {
     for (const testCase of NEVER_RECEIVES_NULL) {
-      const { field, updates } = await mountEditor();
+      const { field, updates } = await mountEditor('routed', testCase.tab);
       const input = field(testCase.selector);
       clear(input);
       assert.ok(
@@ -347,7 +366,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
 
   it('still steps from the keyboard, which is native number-input behaviour', async () => {
     // Phase 3's keyboard non-regression check. `Stepper` has no keydown handler of its own.
-    const { field, updates, sync } = await mountEditor();
+    const { field, updates, sync } = await mountEditor('routed', 'requirements');
     const dc = field('[data-gathering-task-dc-override]');
     assert.equal(
       stepMigratedNumberField(dc, 'up', 'the DC override'),
@@ -390,7 +409,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
 
   it('lets the respawn unit picker size to its content, on specificity not source order', () => {
     // The attribute qualifier makes it win; `:global()` is what lets it reach the trigger at all.
-    const compiled = scopedComponentCss(resolve(repoRoot, EDITOR_PATH)).css;
+    const compiled = scopedComponentCss(resolve(repoRoot, NODES_CARD_PATH)).css;
     const rule =
       /\.manager-task-node-interval-row[^{]*\.fabricate-select-trigger\[data-gathering-task-node-interval-unit\][^{]*\{[^}]*\}/.exec(
         compiled.replace(/\/\*[\s\S]*?\*\//g, '')
@@ -411,6 +430,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
   const CONVERTED = [
     {
       id: 'default environment',
+    tab: 'overview',
       trigger: '[data-gathering-task-field="defaultEnvironmentId"]',
       name: 'Default environment (canvas drop)',
       offers: ['__unchanged__', 'env-forest', 'env-cave'],
@@ -420,6 +440,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     },
     {
       id: 'stamina cost modifier',
+    tab: 'requirements',
       trigger: '.fabricate-select-trigger[aria-label="Per-actor cost modifiers"]',
       name: 'Per-actor cost modifiers',
       offers: ['mod-a', 'mod-b'],
@@ -429,6 +450,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     },
     {
       id: 'stamina modifier sign',
+    tab: 'requirements',
       trigger: '.fabricate-select-trigger[aria-label="Operator"]',
       name: 'Operator',
       offers: ['-', '+'],
@@ -438,6 +460,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     },
     {
       id: 'deplete',
+    tab: 'overview',
       trigger: '[data-gathering-task-node-deplete]',
       name: 'Deplete',
       offers: ['onStart', 'onSuccess'],
@@ -447,6 +470,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     },
     {
       id: 'respawn policy',
+    tab: 'overview',
       trigger: '[data-gathering-task-node-respawn]',
       name: 'Respawn',
       offers: ['manual', 'overTime', 'nonRegenerating'],
@@ -456,6 +480,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     },
     {
       id: 'respawn interval unit',
+    tab: 'overview',
       trigger: '[data-gathering-task-node-interval-unit]',
       name: 'Respawn interval unit',
       offers: ['minutes', 'hours', 'days', 'weeks'],
@@ -465,6 +490,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     },
     {
       id: 'gain mode',
+    tab: 'overview',
       trigger: '[data-gathering-task-node-gain-mode]',
       name: 'Each interval',
       offers: ['guaranteed', 'chance', 'expression'],
@@ -475,8 +501,9 @@ describe('Gathering task editor steppers (issue 1050)', () => {
   ];
 
   it('renders every converted picker as a named trigger, offering the rows it used to', async () => {
-    const { root } = await mountEditor();
+    const { root, showTab } = await mountEditor();
     for (const control of CONVERTED) {
+      await showTab(control.tab);
       const trigger = root.querySelector(control.trigger);
       assert.ok(Boolean(trigger), `${control.id}: no trigger matches ${control.trigger}`);
       assert.equal(trigger.tagName, 'BUTTON', `${control.id} renders the shared picker's trigger`);
@@ -540,7 +567,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
 
   it('forwards the chosen value of every converted picker to the update function', async () => {
     for (const control of CONVERTED) {
-      const { root, updates } = await mountEditor();
+      const { root, updates } = await mountEditor('routed', control.tab);
       chooseSelectOption(root, control.trigger, control.choose);
       assert.equal(
         lastWrite(updates, control.read),
@@ -574,6 +601,7 @@ describe('the task check override follows the routed check evaluation (issue 200
     let current = { id: 'task-1', name: 'Riverbed Ore', dropRows: [], ...task };
     const root = await harness.mount({
       task: current,
+      activeTab: 'requirements',
       resolutionMode: 'routed',
       checkConfig: { thresholdMode: 'meet', ...config },
       previewActors: roster,
@@ -869,6 +897,7 @@ describe('the gathering task result row is the requirement row (issue 1516)', ()
     let task = { ...taskFixture(), resolutionMode: 'straight', resultGroups };
     const root = await harness.mount({
       task,
+      activeTab: 'results',
       resolutionMode: 'straight',
       managedItemOptions: [{ id: 'cmp-ore', name: 'Iron Ore', img: 'icons/ore.webp' }],
       onUpdateTask: (patch) => {
@@ -981,5 +1010,121 @@ describe('the task identity art picker (issue 1522)', () => {
     const depleted = root.querySelector(':scope [data-gathering-task-depleted-image]');
     assert.equal(identity.disabled, true, 'the identity art cannot open a picker');
     assert.equal(depleted.disabled, true, 'nor can the depleted marker');
+  });
+});
+
+describe('the task editor`s three tabs (issue 1522)', () => {
+  // The cards each tab draws, under a routed task with every gated card on.
+  const TAB_CARDS = {
+    overview: [
+      '[data-gathering-task-core-editor]',
+      '[data-gathering-task-resolution]',
+      '[data-gathering-task-nodes]',
+    ],
+    requirements: [
+      '[data-gathering-task-availability]',
+      '[data-gathering-task-stamina]',
+      '[data-gathering-task-check-modifiers]',
+      '[data-gathering-task-dc]',
+      '[data-gathering-task-required-tools]',
+    ],
+    results: ['[data-gathering-task-results="routed"]'],
+  };
+
+  async function mountTabs(props = {}) {
+    const chosen = [];
+    const root = await harness.mount({
+      task: taskFixture(),
+      resolutionMode: 'routed',
+      staminaEnabled: true,
+      nodesEnabled: true,
+      gatheringModifierPolicy: 'bySubject',
+      onTabChange: (tab) => chosen.push(tab),
+      ...props,
+    });
+    return { root, chosen };
+  }
+
+  it('draws each card on its own tab only, under the shared strip', async () => {
+    const { root } = await mountTabs();
+    const strip = root.querySelector('[role="tablist"].fabricate-tabs');
+    assert.ok(Boolean(strip), 'the strip is the shared EditorTabs');
+    assert.deepEqual(
+      [...strip.querySelectorAll('[role="tab"]')].map((tab) => tab.dataset.gatheringTaskTab),
+      ['overview', 'requirements', 'results']
+    );
+    for (const [tab, cards] of Object.entries(TAB_CARDS)) {
+      await harness.setProps({ activeTab: tab });
+      const panel = root.querySelector('[role="tabpanel"]');
+      assert.equal(panel.getAttribute('aria-labelledby'), `gathering-task-tab-${tab}`);
+      for (const [other, otherCards] of Object.entries(TAB_CARDS)) {
+        for (const card of otherCards) {
+          assert.equal(
+            Boolean(panel.querySelector(card)),
+            other === tab,
+            `${card} renders ${other === tab ? 'on' : 'off'} ${tab}`
+          );
+        }
+      }
+    }
+  });
+
+  it('asks its host for a tab and holds none of its own', async () => {
+    const { root, chosen } = await mountTabs();
+    root.querySelector('[data-gathering-task-tab="results"]').click();
+    await harness.setProps({});
+    assert.deepEqual(chosen, ['results'], 'the strip reports the GM`s choice');
+    assert.ok(
+      Boolean(root.querySelector('[data-gathering-task-core-editor]')),
+      'and the panel waits for the host to change the tab'
+    );
+  });
+
+  it('leads Results with its notices: the blocking errors, then the warnings', async () => {
+    const { root } = await mountTabs({
+      activeTab: 'results',
+      routedOutcomeTiers: [],
+      resultValidationErrors: ['Rich tier needs a result set', 'A set has no results'],
+    });
+    const panel = root.querySelector('[role="tabpanel"]');
+    const [page, stack, firstCard] = panel.children;
+    assert.equal(page.dataset.noticePosition, 'page');
+    const blocking = page.querySelector('[data-gathering-task-results-validation]');
+    assert.equal(blocking.getAttribute('role'), 'alert');
+    assert.equal(blocking.dataset.noticeTone, 'danger');
+    assert.match(blocking.textContent, /2 result issues block save/);
+    assert.match(blocking.textContent, /Rich tier needs a result set; A set has no results/);
+    assert.equal(stack.dataset.noticePosition, 'stack');
+    const noTiers = stack.querySelector('[data-gathering-routed-no-tiers]');
+    assert.equal(noTiers.getAttribute('role'), 'status');
+    assert.equal(noTiers.dataset.noticeTone, 'warning');
+    assert.equal(firstCard.dataset.gatheringTaskResults, 'routed', 'and then the first card');
+  });
+
+  it('warns of a repeated drop component in the stacking region of a d100 task', async () => {
+    const row = (id) => ({ id, componentId: 'c1', quantity: 1, dropRate: 10, enabled: true });
+    const { root } = await mountTabs({
+      activeTab: 'results',
+      resolutionMode: 'd100',
+      task: { ...taskFixture(), dropRows: [row('drop-a'), row('drop-b')] },
+      rewardRules: { rewardSelectionMode: 'highestRankedDrop' },
+    });
+    const notice = root.querySelector(
+      '[data-notice-position="stack"] [data-gathering-task-reward-rule-notice]'
+    );
+    assert.equal(notice?.getAttribute('role'), 'status');
+    assert.equal(notice.dataset.noticeTone, 'warning');
+  });
+
+  it('puts each standing statement directly before the card it explains', async () => {
+    const { root } = await mountTabs({ resolutionMode: 'progressive' });
+    const legacy = root.querySelector('[data-gathering-progressive-legacy]');
+    assert.equal(legacy.dataset.calloutTone, 'warning', 'leaving Progressive is a hazard');
+    assert.ok(legacy.nextElementSibling.matches('[data-gathering-task-resolution]'));
+
+    await harness.setProps({ resolutionMode: 'd100', activeTab: 'results' });
+    const formula = root.querySelector('[data-gathering-task-drop-formula]');
+    assert.equal(formula.dataset.calloutTone, 'neutral', 'the formula is a permanent rule');
+    assert.ok(formula.nextElementSibling.matches('.manager-task-drops-card'));
   });
 });
