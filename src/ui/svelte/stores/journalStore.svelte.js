@@ -259,6 +259,10 @@ export function createJournalStore({ services } = {}) {
     return runCommand(run, 'setCompletionMode', { completionMode });
   }
 
+  const settledAwards = createSettledAwards();
+  const chooseAward = async (run, request) =>
+    settledAwards.settled(run, await runCommand(run, 'chooseAward', awardPayload(request)));
+
   async function setSelection(run, selection) {
     return runCommand(run, 'setSelection', {
       stepIndex: run?.stepIndex,
@@ -295,18 +299,11 @@ export function createJournalStore({ services } = {}) {
         action,
         payload: payload ?? {},
       });
-      // A DISMISSED prompt is a refusal that carries `cancelled`, and nothing happened, so
-      // there is nothing to re-read. A CANCEL command answers `{success: true, cancelled: true}`
-      // for the run it just cancelled — which is a change, and the most disruptive one the
-      // Journal has. Returning here for it skipped the refresh below, leaving the view on the
-      // listing this command's own actor write had triggered mid-flight, while the execution
-      // claim was still held: every other run frozen at `claim-held` against a claim that had
-      // since been released, unfixable without reloading Foundry (issue 1648, M25).
+      // A DISMISSED prompt changed nothing, so nothing is re-read; a CANCEL also answers
+      // `cancelled`, as `success: true`, and must reach the refresh below (issue 1648, M25).
       if (result?.success === false && result?.cancelled === true) return;
-      // Two different `success: false` results. A REFUSAL carries `reason` and no `message`
-      // (which recorded an EMPTY command error and toasted nothing); a resolved failed check
-      // is an OUTCOME the run's own history records, so it raises no command error and never
-      // takes the generic craft error's "Nothing was consumed" promise.
+      // A REFUSAL carries `reason` and no `message`; a resolved failed check is an OUTCOME the
+      // run's history records, raising no command error and no "Nothing was consumed" promise.
       const outcome = isResolvedFailureOutcome(result);
       const refused = result?.success === false && !outcome;
       let message = safeCommandMessage(result?.message);
@@ -328,6 +325,7 @@ export function createJournalStore({ services } = {}) {
         if (completed && !completed.recoveryEvidence?.required && !completed.redacted)
           commandResult = { runKey: request.runKey };
       }
+      return result;
     } catch (err) {
       console.error(`Fabricate | Error running Journal ${action} command:`, err);
       const message = safeCommandMessage(services?.craftErrorMessage?.());
@@ -560,6 +558,8 @@ export function createJournalStore({ services } = {}) {
     resume,
     setCompletionMode,
     setSelection,
+    chooseAward,
+    awardChoiceSettled: settledAwards.has,
     advance: execute,
     cancel,
     dismiss,
@@ -593,10 +593,36 @@ function matchesSearch(query) {
     );
 }
 
+const awardPayload = ({ choiceId, picks } = {}) => ({ choiceId, picks: [...(picks ?? [])] });
+
+/**
+ * The runs whose last owed pick this client settled (issue 1773), so the crafting outcome stops
+ * naming it: `settled(run, result)` records a settle's reply and answers it.
+ */
+function createSettledAwards() {
+  let runIds = $state.raw([]);
+  return {
+    settled(run, result) {
+      if (result?.success === true && result.awardChoicePending !== true) {
+        runIds = [...runIds, run.id];
+      }
+      return result;
+    },
+    has: (runId) => runIds.includes(runId),
+  };
+}
+
+/** The status a run is tabbed by: one owing a pick awaits its player, so it is `ready` (issue
+ *  1773) unless paused, whatever its own closed or in-progress status. */
+function activeStatusOf(run) {
+  const owed = run?.awardChoicePending === true && run?.derivedStatus !== 'paused';
+  return owed ? 'ready' : run?.derivedStatus;
+}
+
 function matchesActiveStatus(status) {
   if (status === 'all') return () => true;
   const members = ACTIVE_STATUS_MEMBERS[status] ?? [status];
-  return (run) => members.includes(run?.derivedStatus);
+  return (run) => members.includes(activeStatusOf(run));
 }
 
 function activityKind(run) {
@@ -607,7 +633,7 @@ function countActiveStatuses(runs) {
   const counts = { all: runs.length, ready: 0, inProgress: 0, paused: 0 };
   for (const run of runs) {
     for (const [tab, members] of Object.entries(ACTIVE_STATUS_MEMBERS)) {
-      if (members.includes(run?.derivedStatus)) counts[tab] += 1;
+      if (members.includes(activeStatusOf(run))) counts[tab] += 1;
     }
   }
   return counts;

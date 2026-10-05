@@ -16,9 +16,29 @@ import { journalRefusalMessage, journalRunReasonMessage } from '../../util/journ
  * this code must not also raise the warning-toned blocker banner for it (issue 1648, M15).
  * `routeRequired` is the SAME unmade pick, reported in its own words because a route decision
  * and an option or allocation decision are not the same act (issue 1648, F5), so it is
- * non-blocking for the same reason.
+ * non-blocking for the same reason. `awardChoicePending` is the reward the run's own notice asks
+ * for (issue 1773), so it raises no second banner either.
  */
-const NON_BLOCKING_REASONS = new Set(['stageNotStarted', 'choiceRequired', 'routeRequired']);
+const NON_BLOCKING_REASONS = new Set([
+  'stageNotStarted',
+  'choiceRequired',
+  'routeRequired',
+  'awardChoicePending',
+]);
+
+/**
+ * The reward notice's title and detail for this viewer: one who may not pick is told who does,
+ * and one who may is told to choose below, or that nothing there can be claimed now.
+ */
+function rewardNoticeKeys(run) {
+  const blocker = run?.awardChoiceBlocker;
+  if (blocker === 'notOwner') return ['RewardWaitingTitle', 'RewardOwnerDetail'];
+  if (blocker === 'notEntitled') return ['RewardWaitingTitle', 'RewardGmDetail'];
+  const claimable = (run?.awardChoices ?? []).some((choice) =>
+    (choice.alternatives ?? []).some((alternative) => !alternative.unclaimable)
+  );
+  return ['RewardTitle', claimable ? 'RewardDetail' : 'RewardNoneClaimableDetail'];
+}
 
 /** The blocker code, when execution is actually refused. `''` otherwise. */
 export function runBlockerCode(run) {
@@ -86,6 +106,20 @@ export function runStateNotice(run, localize) {
       hooks: { 'data-journal-action-blocker': blocker, ...pausedHook },
       evidence: false,
       claim,
+    };
+  }
+
+  // A reward waiting for a pick, worded for whether this viewer can make it (issue 1773).
+  if (run?.awardChoicePending === true) {
+    const [title, detail] = rewardNoticeKeys(run);
+    return {
+      tone: 'info',
+      blocking: false,
+      title: text(title),
+      detail: text(detail),
+      hooks: { 'data-journal-award-pending': 'true', ...pausedHook },
+      evidence: false,
+      claim: null,
     };
   }
 

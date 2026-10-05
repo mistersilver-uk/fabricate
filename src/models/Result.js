@@ -1,3 +1,4 @@
+import { isChoiceGroup } from '../utils/choiceGroupShape.js';
 import { hasRollDataPath, maximisedTotal } from '../utils/rollFormulaRollability.js';
 
 import { isNull, omitReconstructibleDefaults } from './reconstructibleDefaults.js';
@@ -9,8 +10,7 @@ export const RESULT_KINDS = Object.freeze(['component', 'currency', 'knowledge']
 export const GROUP_CHOOSERS = Object.freeze(['playerChooses', 'rolled']);
 export const GROUP_AWARD_STRATEGIES = Object.freeze(['anyOne', 'upTo']);
 
-/** Whether a result is a choice group: `alternatives` present, whatever its length. */
-export const isChoiceGroup = (result) => Array.isArray(result?.alternatives);
+export { isChoiceGroup } from '../utils/choiceGroupShape.js';
 
 /** Fields the constructor rebuilds exactly from absence (issue 1135). */
 export const RESULT_OMITTED_WHEN_DEFAULT = {

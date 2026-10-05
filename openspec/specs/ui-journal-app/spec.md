@@ -121,7 +121,7 @@ Waiting on MATERIALS MUST read differently from waiting on a choice on every one
 
 #### Ordinary closed history
 
-Ordinary history MUST NOT show active progress, StageNav, editable materials, primary/pause/cancel/preference controls, countdowns, the TIME/CHECK pair, expanded Run record, or a titled What to expect card.
+Ordinary history MUST NOT show active progress, StageNav, editable materials, primary/pause/cancel/preference controls, countdowns, the TIME/CHECK pair, expanded Run record, or a titled What to expect card, except an award pending composition's confirm.
 Typed recorded evidence, never localized mode text or subsequently edited configuration, selects the history branch.
 Checked successful single-stage history MUST show Final check once, recorded materials/choices, actual Crafted, This run and closed guidance.
 Confirmed no-check history uses Resolution instead; missing check evidence is Not recorded, never proof of No check.
@@ -167,6 +167,7 @@ Its evidence band MUST be withheld entirely when it owns no rows — a multi-sta
 Stage recaps and d100 scales remain visible, and an unrelated notice MUST NOT suppress the selected account.
 Successful positive awards use: "A closed run.
 Its results are already in your inventory; the entry stays here as a record."
+That closed copy is not used while a choice is pending; the guidance reads "A reward is waiting for your choice."
 Failed final checks use: "This run failed its final check.
 Failed runs are kept so you can see what was attempted and when."
 Confirmed failed-no-output uses: "This run could not meet what it needed, so nothing was produced.
@@ -180,6 +181,23 @@ Truthful variants cover actual failure awards, legacy refunds, redaction and mis
 Recovery takes precedence over ordinary closed success or failure, and retains confirmed, uncertain and unstarted distinctions without claiming every planned result reached inventory.
 Versioned gathering awards MUST come from an applied createGatheredResults receipt rather than the terminal record's pre-effect plan.
 An uncertain effect MUST NOT replay or trigger automatic rollback; guidance directs manual reconciliation under the authority contract.
+
+#### A pending award choice is settled in the Journal
+
+A run holding an unsettled award choice (`data-models/spec.md` _CraftingRunStepState_) uses an award pending composition, ranked below Recovery precedence and above ordinary history: the requirement chooser's award face, one owed choice per slot, above the run's history.
+Until the choice is settled the run is counted by the badge and listed under Active with the `reward` attention, "Choose your reward", whatever its status.
+The face's confirm is the one primary allowed on that run, and the run is not dismissible.
+A later stage cannot begin until the choice is settled, and the pick is one `chooseAward` command, settled once.
+The owner of the crafting actor or a GM may settle it, and anyone else sees read-only tiles with no confirm.
+A viewer not entitled to the run's evidence sees no tiles, and the notice tells them the GM can choose the reward; the notice and attention ask only a viewer who can pick to choose.
+One settle runs at a time: while one is in flight another is refused and changes nothing.
+A settle interrupted before it applied anything is discarded when the GM reconciles it or Fabricate reloads, so the choice can be made again; one interrupted after it applied anything reads as recovery, which the run may then be dismissed from.
+
+##### Scenario: No GM is connected
+
+- **WHEN** a player opens a run owing a choice while no GM is connected
+- **THEN** the face states `active-gm-missing` through the reason map
+- **AND** the choice stays pending
 
 ### Run-Type-Aware Actions Panel
 

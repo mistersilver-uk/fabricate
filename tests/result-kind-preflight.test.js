@@ -79,16 +79,6 @@ function textFormulaWorld(results) {
 
 const REFUSALS = Object.freeze([
   {
-    name: 'a player-chooser group (issue 1773, until its pick can be settled)',
-    world: () => rewardWorld({ results: [playerCoins] }),
-    reason: /the player chooses cannot be awarded yet/,
-  },
-  {
-    name: 'a player-chooser group in the failure-role set alone',
-    world: () => rewardWorld({ results: [COIN], failureResults: [playerCoins] }),
-    reason: /the player chooses cannot be awarded yet/,
-  },
-  {
     name: 'a selection formula resolving to text',
     world: () => textFormulaWorld([rolledCoins({ selectionFormula: '@details.name' })]),
     reason: /"@details.name" cannot be rolled for this character/,
@@ -218,6 +208,34 @@ test('1773 V&A 5 control: a rolled group credits the member its selection roll d
     assert.equal(versionedRefusal(world), null);
   });
 });
+
+/** A group whose chooser is the player, in the success set or the failure-role set alone. */
+const PLAYER_CHOOSER_WORLDS = Object.freeze({
+  'the success set': () => rewardWorld({ results: [playerCoins] }),
+  'the failure-role set alone': () =>
+    rewardWorld({ results: [COIN], failureResults: [playerCoins] }),
+});
+
+for (const [where, build] of Object.entries(PLAYER_CHOOSER_WORLDS)) {
+  test(`1773 V&A 18: a player-chooser group in ${where} is refused unversioned and admitted versioned`, async () => {
+    await withRoll(Roll, async () => {
+      const world = build();
+      const result = await world.craftWith(world.crafter, [world.sourceActor]);
+      assert.equal(result.success, false);
+      assert.match(
+        result.message,
+        /only a versioned crafting run can settle\. Nothing was consumed\./
+      );
+      assert.equal(wood(world), 5, 'the wood is all still there');
+      assert.equal(world.crafter.updates.length, 0, 'nothing was credited or granted');
+      assert.equal(
+        versionedRefusal(world),
+        null,
+        'the versioned start, which can settle it, begins'
+      );
+    });
+  });
+}
 
 for (const { name, world: build, reason } of REFUSALS) {
   test(`1773 V&A 5: ${name} is refused before anything is consumed, on both entrances`, async () => {

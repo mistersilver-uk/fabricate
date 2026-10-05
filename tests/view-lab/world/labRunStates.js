@@ -95,6 +95,10 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'unsupported-version': 'lab-unsupported-version',
   'recovery-required': 'lab-v1-recovery-required',
   'claim-retained': 'lab-v1-claim-retained',
+  // Issue 1773: a finished craft owing the player a pick, and the same craft once it was settled.
+  'award-choice': 'lab-v1-award-choice',
+  'award-choice-history': 'lab-v1-award-choice-history',
+  'award-choice-forfeit': 'lab-v1-award-choice-forfeit',
   wide: 'lab-v1-wide',
   narrow: 'lab-v1-wide',
   ...Object.fromEntries(
@@ -662,6 +666,9 @@ function journalCaseFactories(context) {
       ),
     wide: () => wideContainers(context, multi()),
     narrow: () => wideContainers(context, multi()),
+    'award-choice': () => finished(awardChoiceCase(context, single(), {})),
+    'award-choice-history': () => finished(awardChoiceCase(context, single(), { settled: true })),
+    'award-choice-forfeit': () => finished(awardChoiceCase(context, single(), { forfeit: true })),
     loading: readyAlias('lab-v1-ready-single'),
     'error-retry': readyAlias('lab-v1-ready-single'),
     // Persisted history-data witnesses live in their own module; each state seeds one selected
@@ -1437,6 +1444,83 @@ function terminalCraftingCase(context, recipe, status, id = null) {
       ],
     },
   });
+}
+
+/** Every alternative of the forfeit fixture is unclaimable: retired, unpriced, or known. */
+const FORFEIT_ALTERNATIVES = Object.freeze([
+  { id: 'retired', componentId: 'sm-retired-ingot', quantity: 2 },
+  { id: 'marks', kind: 'currency', unit: 'mark', quantity: 3, label: 'Guild marks' },
+  { id: 'known', kind: 'knowledge', recipeId: 'sm-r-horseshoe', quantity: 1 },
+]);
+
+/**
+ * A finished horseshoe that left the player a pick of up to two (issue 1773): an ingot, a guild
+ * bounty, a taught longsword and the horseshoe recipe Brenna already knows under `reward-craft`,
+ * which the face disables with its reason. `settled` picks the ingot and the bounty; `forfeit`
+ * offers only rewards none of which can be claimed.
+ */
+function awardChoiceCase(context, recipe, { settled = false, forfeit = false }) {
+  const id = forfeit
+    ? 'lab-v1-award-choice-forfeit'
+    : settled
+      ? 'lab-v1-award-choice-history'
+      : 'lab-v1-award-choice';
+  const run = terminalCraftingCase(context, recipe, 'succeeded', id);
+  const [step] = run.steps;
+  const choice = {
+    choiceId: 'sm-r-horseshoe-reward',
+    resultGroupId: 'rg',
+    awardStrategy: 'upTo',
+    count: 2,
+    alternatives: forfeit
+      ? [...FORFEIT_ALTERNATIVES]
+      : [
+          { id: 'ingot', componentId: 'sm-iron-ingot', quantity: 2 },
+          { id: 'bounty', kind: 'currency', unit: 'gp', quantity: 12, label: 'Guild bounty' },
+          { id: 'lore', kind: 'knowledge', recipeId: 'sm-r-longsword', quantity: 1 },
+          { id: 'known', kind: 'knowledge', recipeId: 'sm-r-horseshoe', quantity: 1 },
+        ],
+  };
+  if (!settled) {
+    step.pendingAwardChoices = [choice];
+    return run;
+  }
+  const picks = ['ingot', 'bounty'];
+  step.pendingAwardChoices = [{ ...choice, picks, settledAt: NOW - HOUR / 2, outcome: 'awarded' }];
+  step.createdResults = [
+    ...step.createdResults,
+    {
+      componentId: 'sm-iron-ingot',
+      quantity: 2,
+      name: 'Iron Ingot',
+      resultRowId: 'rg:reward:ingot',
+    },
+  ];
+  Object.assign(
+    step,
+    historyEvidenceFields({
+      currencyCredits: [
+        {
+          resultId: choice.choiceId,
+          alternativeId: 'bounty',
+          unit: 'gp',
+          amount: 12,
+          label: 'Guild bounty',
+          unitName: 'gp',
+        },
+      ],
+    })
+  );
+  step.groupAwards = [
+    {
+      choiceId: choice.choiceId,
+      chooser: 'playerChooses',
+      awardStrategy: 'upTo',
+      count: 2,
+      selections: picks.map((alternativeId) => ({ alternativeId })),
+    },
+  ];
+  return run;
 }
 
 /**

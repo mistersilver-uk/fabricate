@@ -93,6 +93,23 @@ describe('IoTable mounted behavior', () => {
     assert.ok(target.querySelector('[data-io-group="outputs"]'));
   });
 
+  it('1773: previews a choice group as its caption over its alternatives', async () => {
+    const members = [
+      { name: 'Gem', img: null, qty: 2 },
+      { name: 'Gold', kind: 'currency', glyph: 'fa-solid fa-coins', qty: 3, amountText: '3 gp' },
+    ];
+    const target = await harness.mount({
+      craftability: null,
+      result: { items: [{ kind: 'group', name: 'You choose one of…', members }] },
+    });
+    const group = target.querySelector('[data-io-output="group"]');
+    assert.equal(group.querySelector('.fab-well').getAttribute('aria-label'), 'You choose one of…');
+    assert.deepEqual(
+      [...group.querySelectorAll('.crafting-io-output-name')].map((node) => node.textContent),
+      ['Gem', 'Gold']
+    );
+  });
+
   it('always states the consumption plan alongside the rail', async () => {
     const target = await harness.mount({ craftability: craftability() });
     assert.ok(target.querySelector('[data-recipe-section="consumption-plan"]'));

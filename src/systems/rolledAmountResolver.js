@@ -3,6 +3,7 @@ import {
   normalizeQuantityFormula,
   quantityFormulaErrors,
 } from '../models/Result.js';
+import { localizeWith } from '../utils/localizeWithFallback.js';
 import { diceEngine } from '../utils/rollFormulaRollability.js';
 
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
@@ -79,17 +80,27 @@ export function rolledAmountRefusals(resultGroups, Roll, rollData) {
     .map((formula) => `Result amount "${formula}" cannot be rolled for this character`);
 }
 
-/** A group whose chooser is the player cannot award until its pick can be settled (issue 1773). */
+/** The unversioned path's refusal of a group whose chooser is the player (issue 1773). */
+const playerChooserRefusal = () =>
+  localizeWith(
+    (key) => globalThis.game?.i18n?.localize?.(key),
+    'FABRICATE.App.Crafting.Refusal.PlayerChoiceUnversioned',
+    undefined,
+    'This recipe awards a reward the player chooses, which only a versioned crafting run can settle. Nothing was consumed.'
+  );
+
+/** A group whose chooser is the player is settled by the Journal's `chooseAward`, which only a
+ *  versioned run has (issue 1773). */
 const playerChooserRefusals = (groups) =>
   groups
     .flatMap((group) => group?.results ?? [])
     .filter((result) => isChoiceGroup(result) && result.chooser !== 'rolled')
-    .map(() => 'A reward the player chooses cannot be awarded yet');
+    .map(() => playerChooserRefusal());
 
 /**
  * Every refusal `groups` raise for `actor` before anything is consumed or awarded: a formula that
- * cannot total (none under progressive), the injected `refuseRewards`, and a group whose chooser is
- * the player unless `awardPlayerChoices` lifts that gate, which only the settle command may do.
+ * cannot total (none under progressive), the injected `refuseRewards`, and, where
+ * `refusePlayerChoices` marks an unversioned path, a group whose chooser is the player.
  */
 export function resultGroupRefusals(groups, options = {}) {
   const { actor, recipe, progressive = false, refuseRewards = null } = options;
@@ -97,7 +108,7 @@ export function resultGroupRefusals(groups, options = {}) {
   return [
     ...(progressive ? [] : rolledAmountRefusals(sets, diceEngine(), actorData(actor))),
     ...(refuseRewards?.(sets, { actor, recipe, progressive }) ?? []),
-    ...(options.awardPlayerChoices === true ? [] : playerChooserRefusals(sets)),
+    ...(options.refusePlayerChoices === true ? playerChooserRefusals(sets) : []),
   ];
 }
 
@@ -117,7 +128,7 @@ export function stageResultRefusal({ actor, recipe, step }, modeService, refusal
 /**
  * `recipe.validate({ Roll })`, then `resultGroupRefusals` over every result group the recipe and
  * its steps author, against `actor`; `refusals` carries its `refuseRewards` and
- * `awardPlayerChoices`. A progressive award drops every formula (`ResolutionModeService`), so the
+ * `refusePlayerChoices`. A progressive award drops every formula (`ResolutionModeService`), so the
  * amount refusals skip it there; `refuseRewards` still refuses any currency, knowledge or group.
  */
 export function validateCraft(recipe, actor, modeService, refusals = {}) {

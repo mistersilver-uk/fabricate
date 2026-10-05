@@ -244,6 +244,7 @@ export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/systems/characterPrerequisites.js',
   'src/utils/scalars.js',
   'src/models/Result.js',
+  'src/utils/choiceGroupShape.js',
   'src/models/reconstructibleDefaults.js',
   'src/utils/rollFormulaRollability.js'
 ]);
@@ -378,8 +379,9 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/systems/characterLibraries.js',
   'src/ui/presenters/CraftingListingBuilder.js',
   'src/ui/presenters/resultOutputRows.js',
-  // Issue 1773: a reward row's glyph and its unit's display name.
+  // Issue 1773: a reward row's glyph and its unit's display name, and the choice-group shape.
   'src/ui/presenters/resultKindGlyphs.js',
+  'src/utils/choiceGroupShape.js',
   'src/systems/currencyProfile.js',
   'src/config/currencyPresets.js',
   // Issue 2005: the check card's roll-under or character-value target line.

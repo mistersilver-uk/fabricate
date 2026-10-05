@@ -24,6 +24,8 @@ const VARIANTS = Object.freeze({
   'manager-recipe-edit-results-rolled-hearth-herb': 'manager-recipe-edit-results-rolled',
   'manager-tool-prerequisites-selected-1280x720-hearth-herb':
     'manager-tool-prerequisites-selected-1280x720',
+  // Issue 1773: the award face, its disabled tile and its reason under another palette.
+  'player-journal-award-choice-hearth-herb': 'player-journal-award-choice',
 });
 
 const themedCases = () => VIEW_LAB_CASES.filter((viewCase) => viewCase.theme);
@@ -38,7 +40,7 @@ afterEach(() => {
   teardownDOM();
 });
 
-test('the three hearth-herb variants reuse their base case under another palette', () => {
+test('the hearth-herb variants reuse their base case under another palette', () => {
   assert.deepEqual(
     themedCases()
       .map((viewCase) => viewCase.id)

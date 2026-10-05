@@ -339,10 +339,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-inventory',
     'player-crafting-simple',
   ]),
-  // The requirement chooser (issue 1518): open on a choice slot, and the rail's three slot states.
+  // The requirement chooser (issue 1518): open on a choice slot, and the rail's three slot states;
+  // and its award face at the ceiling (issue 1773).
   'src/ui/svelte/components/RequirementChooser.svelte': Object.freeze([
     'player-crafting-chooser-open',
     'player-crafting-slot-rail',
+    'player-journal-award-choice-ceiling',
   ]),
   // The track (issue 1516): its 30px inline rung is drawn only by the requirement row's amount toggle.
   'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([
