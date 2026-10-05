@@ -42,7 +42,7 @@
     withSelection,
     withStrategy,
   } from './resultGroupEdits.js';
-  import { resultAmountInvalid } from './resultRows.js';
+  import { formulaFloorProblem } from './resultRows.js';
 
   let { group = {}, class: className = '', onChange = () => {}, ...rest } = $props();
 
@@ -99,11 +99,11 @@
     ],
     'rolled:upTo': [
       'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.HelpRolledUpTo',
-      'Awards up to {count} of these, rolling the selection once per award, and none twice.',
+      'The selection roll awards up to {count} of these, once per award, never the same one twice.',
     ],
     'rolled:repeats': [
       'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.HelpRolledRepeats',
-      'Awards {count} of these, rolling the selection once per award, so the same one may come up twice.',
+      'The selection roll awards {count} of these, once per award, so the same one may come up twice.',
     ],
   };
   const help = $derived.by(() => {
@@ -117,12 +117,35 @@
     quantity: group?.awardCount ?? MIN_AWARD_COUNT,
     quantityFormula: group?.awardCountFormula,
   });
-  const countInvalid = $derived(
-    resultAmountInvalid({ quantityFormula: group?.awardCountFormula }, localizeOr).amount ?? ''
-  );
-  const selectionInvalid = $derived(
-    resultAmountInvalid({ quantityFormula: group?.selectionFormula }, localizeOr).amount ?? ''
-  );
+  // The save's rollability floor, worded for what the expression decides: the selection or N.
+  const FLOOR_WORDS = {
+    selection: {
+      unrollable: [
+        'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.SelectionUnrollable',
+        'This selection roll cannot be rolled.',
+      ],
+      neverPositive: [
+        'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.SelectionNeverPositive',
+        'This selection roll can never total more than 0.',
+      ],
+    },
+    count: {
+      unrollable: [
+        'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.CountUnrollable',
+        'This count cannot be rolled.',
+      ],
+      neverPositive: [
+        'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.CountNeverPositive',
+        'This count can never award anything.',
+      ],
+    },
+  };
+  const floorText = (formula, words) => {
+    const problem = formulaFloorProblem(formula);
+    return problem ? localizeOr(...words[problem]) : '';
+  };
+  const countInvalid = $derived(floorText(group?.awardCountFormula, FLOOR_WORDS.count));
+  const selectionInvalid = $derived(floorText(group?.selectionFormula, FLOOR_WORDS.selection));
 </script>
 
 <div
@@ -168,6 +191,14 @@
             formulaAriaLabel: localizeOr(
               'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.CountFormulaLabel',
               'Rolled count'
+            ),
+            decrementLabel: localizeOr(
+              'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.CountDecrement',
+              'Award fewer'
+            ),
+            incrementLabel: localizeOr(
+              'FABRICATE.Admin.Manager.Recipe.ChoiceGroup.CountIncrement',
+              'Award more'
             ),
             inputProps: { 'data-recipe-group-count': '' },
           }}

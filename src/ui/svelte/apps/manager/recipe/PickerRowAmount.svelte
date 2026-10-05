@@ -8,7 +8,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | the row's `value` | `{}` | Reads `kind`, `quantity` and `quantityFormula`; an absent or non-positive `quantity` shows as 1 and is not written back. |
-  | `amount` | `{ min, max, unit, inputProps, ariaLabel, fixedLabel, rolledLabel, modeAriaLabel, formulaAriaLabel }` | `{}` | The stepper's bounds, a unit drawn after it, attributes added to its input beside the row's own hook, and copy that overrides this slot's own: the stepper's name, the two segment words, and the toggle's and the expression's names. |
+  | `amount` | `{ min, max, unit, inputProps, ariaLabel, decrementLabel, incrementLabel, fixedLabel, rolledLabel, modeAriaLabel, formulaAriaLabel }` | `{}` | The stepper's bounds, a unit drawn after it, attributes added to its input beside the row's own hook, and copy that overrides this slot's own: the stepper's and its two buttons' names, the two segment words, and the toggle's and the expression's names. |
   | `name` | string | `''` | The subject's name, or the kind word while unnamed: the stepper is `Quantity for {name}`, the toggle `Amount for {name}` and the expression `Rolled amount for {name}`. |
   | `rollable` | boolean | `false` | Draws the Fixed \| Rolled toggle. Only a `component` or `currency` result has a formula, so every other kind ignores it. |
   | `readonly` / `disabled` | booleans | `false` | The static read-only amount, a rolled one as its expression; and every control off. |
@@ -120,8 +120,10 @@
     max={amount.max ?? 9999}
     {disabled}
     ariaLabel={stepperName}
-    decrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityDecrement', 'Decrease quantity')}
-    incrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityIncrement', 'Increase quantity')}
+    decrementLabel={amount.decrementLabel ||
+      text('FABRICATE.Admin.Manager.Recipe.QuantityDecrement', 'Decrease quantity')}
+    incrementLabel={amount.incrementLabel ||
+      text('FABRICATE.Admin.Manager.Recipe.QuantityIncrement', 'Increase quantity')}
     inputProps={{
       [AMOUNT_HOOKS[value?.kind] ?? 'data-recipe-option-quantity']: '',
       class: 'fab-stepper-input manager-recipe-option-quantity',

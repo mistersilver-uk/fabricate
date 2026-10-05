@@ -574,7 +574,6 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     assert.ok(!stage.target.querySelector('.manager-recipe-or-trigger'));
   });
 
-
   it('switches to rolled writing no ranges and no expression, and its rows gain range cells', async () => {
     const { target, groups } = await mountGroup(PLAYER_GROUP);
     await choose(chooserRadio(target, 'rolled'));
@@ -644,6 +643,64 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     assert.equal(
       target.querySelector('[data-recipe-group-repeats]').getAttribute('data-recipe-group-repeats'),
       'repeats'
+    );
+  });
+
+  it('restates each cell in its own help line, N included', async () => {
+    const rolled = { chooser: 'rolled', selectionFormula: '1d20' };
+    const CELLS = [
+      [{}, 'The player picks one of these when the result is awarded.'],
+      [
+        { awardStrategy: 'upTo', awardCount: 3 },
+        'The player picks up to 3 of these when the result is awarded.',
+      ],
+      [rolled, 'The selection roll decides which one is awarded.'],
+      [
+        { ...rolled, awardStrategy: 'upTo', awardCount: 3 },
+        'The selection roll awards up to 3 of these, once per award, never the same one twice.',
+      ],
+      [
+        { ...rolled, awardStrategy: 'upTo', awardCountFormula: '1d4', withReplacement: true },
+        'The selection roll awards 1d4 of these, once per award, so the same one may come up twice.',
+      ],
+    ];
+    for (const [settings, said] of CELLS) {
+      const { target } = await mountGroup({ ...PLAYER_GROUP, ...settings });
+      assert.equal(help(target).textContent.trim(), said);
+      harness.remount();
+    }
+  });
+
+  it('words a selection and a count the floor refuses as what each decides', () =>
+    withRoll(SEEDED_ROLL, async () => {
+      const { target } = await mountGroup({
+        ...PLAYER_GROUP,
+        chooser: 'rolled',
+        selectionFormula: '0',
+        awardStrategy: 'upTo',
+        awardCountFormula: 'max(, 2)',
+      });
+      const selection = target.querySelector('[data-recipe-group-selection]');
+      assert.equal(selection.getAttribute('aria-invalid'), 'true');
+      const said = (field) =>
+        target.querySelector(`#${field.getAttribute('aria-describedby')}`)?.textContent.trim();
+      assert.equal(said(selection), 'This selection roll can never total more than 0.');
+      const count = target.querySelector(
+        '[data-recipe-group-header] [data-recipe-option-formula]:not([data-recipe-group-selection])'
+      );
+      assert.equal(said(count), 'This count cannot be rolled.');
+    }));
+
+  it('names the N stepper’s buttons for what they change', async () => {
+    const { target } = await mountGroup({ ...PLAYER_GROUP, awardStrategy: 'upTo', awardCount: 3 });
+    const stepper = target.querySelector('[data-recipe-group-count]').parentElement;
+    assert.equal(
+      stepper.querySelector('[data-stepper-decrement]').getAttribute('aria-label'),
+      'Award fewer'
+    );
+    assert.equal(
+      stepper.querySelector('[data-stepper-increment]').getAttribute('aria-label'),
+      'Award more'
     );
   });
 
