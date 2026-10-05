@@ -222,11 +222,31 @@ function seedGatheringTaskMode(content, mode) {
       },
     },
   };
-  const modes = ['straight', 'routed', 'routed-unmatched', ...Object.keys(underEvaluations)];
+  // Issue 1522's three Results strips: a legacy Progressive task, a Check task under a check with no
+  // tiers, and a d100 task whose two drop rows share a component under a one-drop reward rule.
+  const keepsDrops = { progressive: 'progressive', 'reward-rule': 'd100' };
+  const modes = [
+    'straight',
+    'routed',
+    'routed-unmatched',
+    'routed-no-tiers',
+    ...Object.keys(keepsDrops),
+    ...Object.keys(underEvaluations),
+  ];
   if (!modes.includes(mode)) return;
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
   const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM];
   const task = structuredClone(slice.tasks.find((entry) => entry.id === 'hb-task-slowbloom'));
+  const replaceTask = (entry) => (entry.id === task.id ? task : entry);
+  if (keepsDrops[mode]) {
+    task.resolutionMode = keepsDrops[mode];
+    if (mode === 'reward-rule') {
+      task.dropRows.push({ ...task.dropRows[0], id: 'hb-slowbloom-drop-again', dropRate: 20 });
+    }
+    slice.tasks = slice.tasks.map(replaceTask);
+    content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
+    return;
+  }
   task.resolutionMode = mode === 'straight' ? 'straight' : 'routed';
   task.resultGroups = [
     {
@@ -247,14 +267,16 @@ function seedGatheringTaskMode(content, mode) {
         type: 'relative',
         thresholdMode: 'meet',
         ...(evaluation && { evaluation }),
-        relativeOutcomes: [
-          { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
-          { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
-        ],
+        relativeOutcomes:
+          mode === 'routed-no-tiers'
+            ? []
+            : [
+                { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
+                { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
+              ],
       },
     };
   }
-  const replaceTask = (entry) => (entry.id === task.id ? task : entry);
   slice.tasks = slice.tasks.map(replaceTask);
   content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
 }

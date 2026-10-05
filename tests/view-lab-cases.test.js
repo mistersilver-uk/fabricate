@@ -886,7 +886,8 @@ test('the subtitle ink and the primer items are measured by the cases that draw 
 test('the side-rail band cases name the scroller that owns their overflow', () => {
   const scrollers = {
     'manager-recipe-edit-step-narrow': 'main.manager-recipe-edit-main',
-    'manager-gathering-task-editor-selector-narrow': 'main.manager-gathering-task-edit-view',
+    // The task editor's tab panel scrolls under its fixed tab bar (issue 1522).
+    'manager-gathering-task-editor-selector-narrow': '[data-gathering-task-panel="overview"]',
     // A Results tab of one result card fits the window, so only Overview overflows (issue 1522).
     'manager-gathering-task-editor-straight-narrow': undefined,
     'manager-gathering-task-editor-routed-narrow': undefined,
@@ -5592,6 +5593,13 @@ test('a change confined to one gathering task tab or card selects every task-edi
     'manager-gathering-task-editor-straight',
     'manager-gathering-task-editor-check-add',
     'manager-gathering-task-stamina-modifier-list',
+    'manager-gathering-task-editor-progressive-legacy',
+    'manager-gathering-task-editor-progressive-results',
+    'manager-gathering-task-editor-routed-no-tiers',
+    'manager-gathering-task-editor-reward-rule',
+    // The drop rows these two select sit on the Results tab.
+    'manager-gathering-task-drop-modifiers-normal',
+    'manager-gathering-task-drop-condition-modifier-attached',
   ]) {
     assert.ok(editorFrames.includes(expected), `the editor selects ${expected}`);
   }

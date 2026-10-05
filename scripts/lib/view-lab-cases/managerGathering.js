@@ -207,6 +207,48 @@ export const CASES = Object.freeze([
       sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
     })
   ),
+  // Each standing statement and warning the editor routes to a Callout or a Notice (issue 1522),
+  // on the tab that draws it, and the empty Results tab of a legacy Progressive task.
+  ...[
+    [
+      'progressive-legacy',
+      'progressive',
+      'overview',
+      '[data-gathering-task-panel="overview"] [data-gathering-progressive-legacy] + [data-gathering-task-resolution]',
+    ],
+    [
+      'progressive-results',
+      'progressive',
+      'results',
+      '[data-gathering-task-panel="results"] [data-gathering-task-results="progressive"]',
+    ],
+    [
+      'routed-no-tiers',
+      'routed-no-tiers',
+      'results',
+      '[data-notice-position="stack"] [data-gathering-routed-no-tiers]',
+    ],
+    [
+      'reward-rule',
+      'reward-rule',
+      'results',
+      '[data-notice-position="stack"] [data-gathering-task-reward-rule-notice]',
+    ],
+  ].map(([suffix, mode, tab, claim]) =>
+    managerCase({
+      id: `manager-gathering-task-editor-${suffix}`,
+      label: `Manager — Gathering task editor, ${suffix.replaceAll('-', ' ')}`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-herbalism', gatheringTaskMode: mode },
+      steps: ['Gathering', ...OPEN_SLOWBLOOM_TASK, ...(tab === 'overview' ? [] : [taskTab(tab)])],
+      expectView: 'gathering-task-edit',
+      expectSelector: `.fabricate-manager ${claim}`,
+      expectCenterHit: `[data-gathering-task-tab="${tab}"]`,
+      kinds: ['manager', 'environments'],
+      sourceMatches: [GATHERING_ROUTE_MODEL_PATTERN, GATHERING_TASK_EDITOR_PATTERN],
+    })
+  ),
   ...[
     { suffix: 'normal', width: 1280, height: 820 },
     { suffix: 'narrow', width: 1000, height: 720 },
@@ -508,9 +550,9 @@ export const CASES = Object.freeze([
         mode === 'selector'
           ? '[data-gathering-task-resolution-mode]'
           : `[data-gathering-task-results="${mode}"]`,
-      // The editor's own main, not the body, scrolls below the 1120px rung (issue 1976). Overview
-      // overflows it; a Results tab holding one result card does not (issue 1522).
-      expectScrollable: mode === 'selector' ? 'main.manager-gathering-task-edit-view' : undefined,
+      // The editor's tab panel, not the body, scrolls below the 1120px rung (issues 1976, 1522).
+      // Overview overflows it; a Results tab holding one result card does not.
+      expectScrollable: mode === 'selector' ? '[data-gathering-task-panel="overview"]' : undefined,
       kinds: ['manager', 'environments', 'responsive'],
       sourceMatches: [
         GATHERING_ROUTE_MODEL_PATTERN,
@@ -604,23 +646,19 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
+  // A d100 task's Results tab at the stacking width (issue 1522): the side rail stays, and the drop
+  // rail stacks beneath the editor, so the tab bar sits where Overview left it.
   managerCase({
     id: 'manager-gathering-task-editor-stacked',
-    label: 'Manager — Gathering task editor stacked',
+    label: 'Manager — Gathering task editor stacked, Results',
     smokeLabels: ['manager-gathering-task-editor-stacked'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: [
-      'Gathering',
-      { selector: '#manager-gathering-nav-tasks' },
-      {
-        selector:
-          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
-      },
-      // At 1000px the library stacks, so the scroll to reach Edit carries into the editor's own container.
-      { selector: '[data-gathering-task-core-editor]', scroll: true },
-    ],
+    steps: ['Gathering', ...OPEN_SLOWBLOOM_TASK, taskTab('results')],
     expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager:not([data-gathering-task-layout]) .manager-body > aside.manager-inspector [data-gathering-task-drop-inspector]',
+    expectCenterHit: '[data-gathering-task-tab="results"]',
     // 1000x720, the width its smoke counterpart stacks at; 1280x820 was the normal geometry.
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'responsive'],
@@ -995,6 +1033,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+      // Its drop row sits on the Results tab (issue 1522).
+      GATHERING_TASK_EDITOR_PATTERN,
     ],
   }),
   managerCase({
@@ -1025,6 +1065,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+      GATHERING_TASK_EDITOR_PATTERN,
     ],
   }),
   taskOverrideCase({
