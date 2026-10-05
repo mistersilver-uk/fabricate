@@ -42,6 +42,16 @@ export function getItemIdentityReferences(item) {
   return refs;
 }
 
+/** A name trimmed, whitespace-collapsed and lowercased for exact matching. A definition's name is
+ * a registration snapshot and a compendium document's name is read live; neither is a localized
+ * key, so the client language cannot move a match. */
+export function normalizeMatchName(name) {
+  return String(name ?? '')
+    .trim()
+    .replaceAll(/\s+/g, ' ')
+    .toLowerCase();
+}
+
 // One console line per offending system id, not per candidate item.
 const _warnedUnsafeSystemIds = new Set();
 

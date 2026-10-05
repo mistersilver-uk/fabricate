@@ -9,6 +9,7 @@ import {
   getItemIdentityReferences,
   getItemMatchUuids,
   matchRecipeItemDefinition,
+  normalizeMatchName,
   resolveComponentForItem,
   resolveToolForItem,
 } from '../utils/sourceUuid.js';
@@ -174,15 +175,6 @@ export function findRecipeItemDefinitionForSource(io, system, snapshot, source) 
   const claimed = new Set(getItemMatchUuids(snapshot));
   if (claimed.size === 0) return null;
   return definitions.find((def) => getItemMatchUuids(def).some((ref) => claimed.has(ref))) || null;
-}
-
-// Trimmed, whitespace-collapsed and lowercased for exact matching; names are registration
-// snapshots, not localized keys, so the client language cannot move a match.
-function normalizeMatchName(name) {
-  return String(name ?? '')
-    .trim()
-    .replaceAll(/\s+/g, ' ')
-    .toLowerCase();
 }
 
 // The one definition of this system with the name, `'ambiguous'` for two or more, else `null`;

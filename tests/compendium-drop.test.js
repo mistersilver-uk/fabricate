@@ -241,7 +241,7 @@ test('addItemsFromPack — updates existing component when canonical source UUID
 
   globalThis.fromUuid = async (uuid) => {
     if (uuid === 'Compendium.source.items.iron-ore') {
-      return { documentName: 'Item', name: 'Iron Ore Source' };
+      return { documentName: 'Item', name: 'Iron Ore' };
     }
     if (uuid !== 'Compendium.world.new-pack.item-b') return null;
     return {
@@ -489,7 +489,7 @@ test('addItemFromUuid — keeps resolvable canonical source UUID', async () => {
       };
     }
     if (uuid === 'Compendium.crafting.items.Item.azuryt') {
-      return { documentName: 'Item', name: 'Azuryt Source' };
+      return { documentName: 'Item', name: 'Azuryt' };
     }
     return null;
   };
@@ -897,7 +897,7 @@ test('addItemsFromPack — aggregates broken canonical source fallbacks', async 
       };
     }
     if (uuid === 'Compendium.crafting.items.Item.cytryn') {
-      return { documentName: 'Item', name: 'Cytryn Source' };
+      return { documentName: 'Item', name: 'Cytryn' };
     }
     return null;
   };
@@ -1147,12 +1147,20 @@ test('replaceItemSource — rejects changing a component to a source reference a
     ]
   }]);
 
-  globalThis.fromUuid = async () => ({
-    documentName: 'Item',
-    name: 'Duplicate Iron Ore',
-    img: 'ore.png',
-    _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
-  });
+  // Resolved per uuid, and the dropped copy keeps the entry's name: a renamed copy would be a
+  // derivative, which claims no compendium source and is accepted (issue 2217).
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'Compendium.source.items.iron-ore') {
+      return { documentName: 'Item', name: 'Iron Ore' };
+    }
+    if (uuid !== 'Compendium.world.other-pack.item-z') return null;
+    return {
+      documentName: 'Item',
+      name: 'Iron Ore',
+      img: 'ore.png',
+      _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
+    };
+  };
 
   await assert.rejects(
     () => mgr.replaceItemSource('sys1', 'comp-b', 'Compendium.world.other-pack.item-z'),

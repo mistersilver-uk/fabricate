@@ -252,6 +252,13 @@ async function capturePass(scenario, harness) {
 // to a walk to reach, so a row that stops being exercised reds instead of quietly passing.
 // ---------------------------------------------------------------------------------------------
 
+/** The compendium entry the derivative rows record as their `_stats.compendiumSource`. */
+const BLANK_SCROLL_ENTRY = {
+  uuid: 'Compendium.world.kit.Item.blank-scroll',
+  name: 'Blank Scroll',
+  pack: 'world.kit',
+};
+
 const SNAPSHOT_SOURCES = [
   [
     'clean-world-source',
@@ -279,15 +286,29 @@ const SNAPSHOT_SOURCES = [
       compendiumSource: 'Compendium.gone.kit.Item.relic',
     },
   ],
+  [
+    'derivative-of-a-resolvable-source',
+    { uuid: 'Item.scroll-fire', name: 'Scroll of Fire', compendiumSource: BLANK_SCROLL_ENTRY.uuid },
+    [BLANK_SCROLL_ENTRY],
+  ],
+  [
+    'copy-differing-only-in-case-and-spacing',
+    { uuid: 'Item.scroll-blank', name: ' blank   SCROLL', compendiumSource: BLANK_SCROLL_ENTRY.uuid },
+    [BLANK_SCROLL_ENTRY],
+  ],
 ];
 
-/** All three snapshot builders over one source, so the returned objects are compared in full. */
-function snapshotScenario([id, spec]) {
+/** All three snapshot builders over one source, so the returned objects are compared in full;
+ * `resolvable` lists the other documents `fromUuid` answers, such as its compendium entry. */
+function snapshotScenario([id, spec, resolvable = []]) {
   return {
     id: `snapshots/${id}`,
     build() {
       const source = makeDocument(spec);
-      return createHarness({ items: [source], fixtures: { source } });
+      const resolve = Object.fromEntries(
+        resolvable.map((entry) => [entry.uuid, makeDocument(entry)])
+      );
+      return createHarness({ items: [source], resolve, fixtures: { source } });
     },
     async drive(manager, harness) {
       const { source } = harness.fixtures;

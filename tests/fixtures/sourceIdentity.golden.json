@@ -459,6 +459,268 @@
       }
     }
   },
+  "snapshots/derivative-of-a-resolvable-source": {
+    "first": {
+      "result": {
+        "component": {
+          "name": "Scroll of Fire",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-fire",
+          "originItemUuid": "Item.scroll-fire",
+          "aliasItemUuids": [],
+          "sourceFallbacks": [],
+          "references": [
+            "Item.scroll-fire"
+          ]
+        },
+        "recipeItem": {
+          "name": "Scroll of Fire",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-fire",
+          "originItemUuid": "Item.scroll-fire",
+          "aliasItemUuids": []
+        },
+        "tool": {
+          "name": "Scroll of Fire",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-fire",
+          "originItemUuid": "Item.scroll-fire",
+          "aliasItemUuids": []
+        }
+      },
+      "journals": {
+        "Item.scroll-fire": [],
+        "Compendium.world.kit.Item.blank-scroll": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": [
+          [
+            "Item.scroll-fire",
+            {
+              "document": "Item.scroll-fire"
+            }
+          ],
+          [
+            "Item.scroll-fire",
+            {
+              "document": "Item.scroll-fire"
+            }
+          ],
+          [
+            "Item.scroll-fire",
+            {
+              "document": "Item.scroll-fire"
+            }
+          ]
+        ]
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "component": {
+          "name": "Scroll of Fire",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-fire",
+          "originItemUuid": "Item.scroll-fire",
+          "aliasItemUuids": [],
+          "sourceFallbacks": [],
+          "references": [
+            "Item.scroll-fire"
+          ]
+        },
+        "recipeItem": {
+          "name": "Scroll of Fire",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-fire",
+          "originItemUuid": "Item.scroll-fire",
+          "aliasItemUuids": []
+        },
+        "tool": {
+          "name": "Scroll of Fire",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-fire",
+          "originItemUuid": "Item.scroll-fire",
+          "aliasItemUuids": []
+        }
+      },
+      "journals": {
+        "Item.scroll-fire": [],
+        "Compendium.world.kit.Item.blank-scroll": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": [
+          [
+            "Item.scroll-fire",
+            {
+              "document": "Item.scroll-fire"
+            }
+          ],
+          [
+            "Item.scroll-fire",
+            {
+              "document": "Item.scroll-fire"
+            }
+          ],
+          [
+            "Item.scroll-fire",
+            {
+              "document": "Item.scroll-fire"
+            }
+          ]
+        ]
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "snapshots/copy-differing-only-in-case-and-spacing": {
+    "first": {
+      "result": {
+        "component": {
+          "name": " blank   SCROLL",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-blank",
+          "originItemUuid": "Compendium.world.kit.Item.blank-scroll",
+          "aliasItemUuids": [],
+          "sourceFallbacks": [],
+          "references": [
+            "Item.scroll-blank",
+            "Compendium.world.kit.Item.blank-scroll"
+          ]
+        },
+        "recipeItem": {
+          "name": " blank   SCROLL",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-blank",
+          "originItemUuid": "Compendium.world.kit.Item.blank-scroll",
+          "aliasItemUuids": []
+        },
+        "tool": {
+          "name": " blank   SCROLL",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-blank",
+          "originItemUuid": "Compendium.world.kit.Item.blank-scroll",
+          "aliasItemUuids": []
+        }
+      },
+      "journals": {
+        "Item.scroll-blank": [],
+        "Compendium.world.kit.Item.blank-scroll": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": [
+          [
+            "Item.scroll-blank",
+            {
+              "document": "Item.scroll-blank"
+            }
+          ],
+          [
+            "Item.scroll-blank",
+            {
+              "document": "Item.scroll-blank"
+            }
+          ],
+          [
+            "Item.scroll-blank",
+            {
+              "document": "Item.scroll-blank"
+            }
+          ]
+        ]
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "component": {
+          "name": " blank   SCROLL",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-blank",
+          "originItemUuid": "Compendium.world.kit.Item.blank-scroll",
+          "aliasItemUuids": [],
+          "sourceFallbacks": [],
+          "references": [
+            "Item.scroll-blank",
+            "Compendium.world.kit.Item.blank-scroll"
+          ]
+        },
+        "recipeItem": {
+          "name": " blank   SCROLL",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-blank",
+          "originItemUuid": "Compendium.world.kit.Item.blank-scroll",
+          "aliasItemUuids": []
+        },
+        "tool": {
+          "name": " blank   SCROLL",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.scroll-blank",
+          "originItemUuid": "Compendium.world.kit.Item.blank-scroll",
+          "aliasItemUuids": []
+        }
+      },
+      "journals": {
+        "Item.scroll-blank": [],
+        "Compendium.world.kit.Item.blank-scroll": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": [
+          [
+            "Item.scroll-blank",
+            {
+              "document": "Item.scroll-blank"
+            }
+          ],
+          [
+            "Item.scroll-blank",
+            {
+              "document": "Item.scroll-blank"
+            }
+          ],
+          [
+            "Item.scroll-blank",
+            {
+              "document": "Item.scroll-blank"
+            }
+          ]
+        ]
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
   "descriptions/label-less-uuid-link": {
     "first": {
       "result": "Component Pouch",

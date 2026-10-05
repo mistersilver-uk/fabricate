@@ -11,6 +11,7 @@ import {
   getDuplicateSourceUuid,
   getItemIdentityReferences,
   getItemMatchUuids,
+  normalizeMatchName,
 } from '../../utils/sourceUuid.js';
 
 import { baseCollaborators, COMPONENT_FACTS, RECIPE_ITEM_FACTS } from './collaborators.js';
@@ -239,9 +240,25 @@ function resolveImportedSourceData(itemUuid, source = null) {
   return { currentUuid, canonicalUuid, references, isClone };
 }
 
+/** The names a derivative test compares: the stored name (the prepared one on an index entry or a
+ * plain record) and the original a translation module recorded, normalized, empties dropped. */
+function sourceMatchNames(document) {
+  return [document?._source?.name ?? document?.name, document?.flags?.babele?.originalName]
+    .map((name) => normalizeMatchName(name))
+    .filter(Boolean);
+}
+
+/** Whether a non-clone source is a derivative of its resolved compendium source (issue 2217): the
+ * two share no name. A side with no name is no evidence, so the source is not a derivative. */
+function isDerivativeOf(source, compendiumDocument) {
+  const names = sourceMatchNames(source);
+  const entryNames = new Set(sourceMatchNames(compendiumDocument));
+  return names.length > 0 && entryNames.size > 0 && names.every((name) => !entryNames.has(name));
+}
+
 /**
- * Component import source references, falling back when the recorded canonical source no
- * longer resolves.
+ * Import source references for every kind. A derivative keys on its own uuid as a clone does, with
+ * its `_stats` left alone; a recorded canonical source that no longer resolves falls back.
  * @returns {Promise<{currentUuid: string|null, canonicalUuid: string|null, references: string[],
  *   aliasItemUuids: string[],
  *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>}>}
@@ -268,7 +285,16 @@ export async function resolveImportedComponentSourceData(itemUuid, source = null
   }
 
   if (canonicalSource) {
-    return { ...sourceData, aliasItemUuids, sourceFallbacks };
+    if (!isDerivativeOf(source, canonicalSource)) {
+      return { ...sourceData, aliasItemUuids, sourceFallbacks };
+    }
+    return {
+      ...sourceData,
+      canonicalUuid: currentUuid,
+      references: sourceData.references.filter((ref) => ref !== recordedCanonicalUuid),
+      aliasItemUuids,
+      sourceFallbacks,
+    };
   }
 
   if (!sourceData.references.includes(recordedCanonicalUuid)) {
