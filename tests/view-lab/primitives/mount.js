@@ -135,9 +135,9 @@ function standUpSpecimen(slot, problems, results) {
   iframe.title = `${slot.row.spec}: ${slot.row.path}`;
 
   const settled = new Promise((resolve) => {
-    globalThis.addEventListener('message', function onMessage(event) {
-      if (event.origin !== globalThis.location.origin || event.source !== iframe.contentWindow)
-        return;
+    function onMessage(event) {
+      if (event.origin !== globalThis.location.origin) return;
+      if (event.source !== iframe.contentWindow) return;
       const data = event.data ?? {};
       if (data.type === SPECIMEN_READY) {
         iframe.contentWindow.postMessage(
@@ -163,7 +163,8 @@ function standUpSpecimen(slot, problems, results) {
         globalThis.removeEventListener('message', onMessage);
         resolve();
       }
-    });
+    }
+    globalThis.addEventListener('message', onMessage);
   });
 
   iframe.src = SPECIMEN_URL;

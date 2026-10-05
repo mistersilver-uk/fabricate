@@ -37,7 +37,8 @@ function postToParent(message) {
 function waitForAssignment() {
   return new Promise((resolve) => {
     function onMessage(event) {
-      if (event.origin !== globalThis.location.origin || event.source !== globalThis.parent) return;
+      if (event.origin !== globalThis.location.origin) return;
+      if (event.source !== globalThis.parent) return;
       if (event.data?.type !== SPECIMEN_ASSIGN) return;
       globalThis.removeEventListener('message', onMessage);
       resolve(event.data.row);
