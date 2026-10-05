@@ -90,6 +90,7 @@ const harness = createMountedComponentHarness({
     'src/ui/extensionRegistry.js',
     'src/ui/playerExtensions.js',
     'src/ui/playerNavModel.js',
+    'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     // `ActorSelectTopBar`'s picker is a `<SearchablePopover>` now (issue 1475).
     'src/ui/svelte/actions/portal.js',

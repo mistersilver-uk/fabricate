@@ -1193,6 +1193,35 @@ describe('Tool Studio editor (mounted)', () => {
     });
   });
 
+  it('refuses a drag on the replacement zone of an immune Tool', async () => {
+    let patches = [];
+    const root = await harness.mount(
+      props({
+        activeTab: 'breakage',
+        authority: 'checkDriven',
+        tool: tool({
+          checkBreakable: false,
+          onBreak: { mode: 'replaceWith', replacementTarget: null },
+        }),
+        onPatch: (patch) => {
+          patches = [...patches, patch];
+        },
+      })
+    );
+    const zone = root.querySelector('[data-tool-replacement-drop]');
+    assert.ok(Boolean(zone), 'the zone still renders at rest');
+    const over = new Event('dragover', { bubbles: true, cancelable: true });
+    zone.dispatchEvent(over);
+    await tick();
+    assert.equal(over.defaultPrevented, false, 'a disabled zone does not accept the drag');
+    assert.equal(zone.getAttribute('data-tool-replacement-drop'), 'idle');
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    drop.dataTransfer = { getData: () => JSON.stringify({ componentId: 'scrap' }) };
+    zone.dispatchEvent(drop);
+    await tick();
+    assert.deepEqual(patches, [], 'and a drop writes nothing');
+  });
+
   it('restores focus to the Component picker trigger after Escape and outside dismissal', async () => {
     const root = await harness.mount(
       props({

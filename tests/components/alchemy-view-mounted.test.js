@@ -22,6 +22,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
+    'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/rollPromptOrigin.js',
     'src/ui/svelte/util/overlayHost.js',
   ],
@@ -214,6 +215,37 @@ describe('AlchemyView mounted behavior', () => {
       !target.querySelector('[data-alchemy-state="empty"]'),
       'no empty branch is reachable in this view'
     );
+  });
+
+  it('carries an inventory row onto the bench: the drag payload is JSON a bench drop adds', async () => {
+    let added = [];
+    const target = await harness.mount({
+      services: services(
+        fakeAlchemyStore({
+          components: [{ componentId: 'emberroot', name: 'Emberroot', quantity: 2 }],
+          hasOwnedComponents: true,
+          add: (id) => {
+            added = [...added, id];
+          },
+        })
+      ),
+    });
+    const row = target.querySelector('[data-alchemy-inventory-row="emberroot"]');
+    assert.ok(Boolean(row), 'the inventory row renders');
+    let payload = null;
+    const dragStart = new Event('dragstart', { bubbles: true, cancelable: true });
+    dragStart.dataTransfer = {
+      setData: (_type, value) => {
+        payload = value;
+      },
+    };
+    row.dispatchEvent(dragStart);
+
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    drop.dataTransfer = { getData: () => payload };
+    target.querySelector('[data-alchemy-dropzone]').dispatchEvent(drop);
+
+    assert.deepEqual(added, ['emberroot'], 'the dropped component is added to the bench');
   });
 
   it('renders the discipline chooser ahead of the workbench when one is needed', async () => {

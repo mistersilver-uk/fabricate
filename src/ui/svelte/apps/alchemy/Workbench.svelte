@@ -26,6 +26,7 @@
   import Kicker from '../../components/Kicker.svelte';
   import Button from '../../components/Button.svelte';
   import Medallion from '../../components/Medallion.svelte';
+  import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import EssenceChips from './EssenceChips.svelte';
   import Notice from '../../components/Notice.svelte';
@@ -164,10 +165,8 @@
     return lastBrew.message || localize('FABRICATE.App.Alchemy.Banner.Fizzled');
   });
 
-  function handleDrop(event) {
-    event.preventDefault();
-    dragOver = false;
-    const componentId = event.dataTransfer?.getData('text/plain');
+  function handleDrop(data) {
+    const componentId = data?.componentId;
     if (componentId) onDrop?.(componentId);
   }
 </script>
@@ -192,12 +191,11 @@
     role="group"
     aria-label={localize('FABRICATE.App.Alchemy.DropZone')}
     data-alchemy-dropzone
-    ondragover={(event) => {
-      event.preventDefault();
-      dragOver = true;
+    use:dragDrop={{
+      activeClass: 'is-dragover',
+      onActiveChange: (active) => (dragOver = active),
+      onDrop: handleDrop,
     }}
-    ondragleave={() => (dragOver = false)}
-    ondrop={handleDrop}
   >
     {#if benchEmpty}
       <!--
