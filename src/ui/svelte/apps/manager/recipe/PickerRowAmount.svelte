@@ -1,4 +1,5 @@
 <!-- Svelte 5 runes mode -->
+<!-- ratchet-exempt(design-system): the composition licence of "The primitive set is a closed, versioned vocabulary" — this is `PickerRow`'s amount slot, wholly the members `SegmentedControl`, `Stepper` and `RollDataExpressionInput`, so its second caller, the result choice group header's N (issue 1773), owes it no manifest row -->
 <!--
   The amount slot of a `PickerRow`: a stepper, or behind a Fixed | Rolled toggle a roll expression.
   It renders a fragment into the row's trailing controls and owns no wrapper element.

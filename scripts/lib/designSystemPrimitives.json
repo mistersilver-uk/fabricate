@@ -497,14 +497,6 @@
       "why": "Promoted at issue 1516 on its second independent importer: `src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte` draws the recipe ingredient list, the Tool repair set at both scopes, and a recipe's and a gathering task's flat result rows, and `src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte` draws a progressive set's stages, as `src/ui/svelte/apps/manager/ComponentEditView.svelte` draws a component's salvage results. Shipped at issue 1773, which built the specimen's remaining result side: the Fixed | Rolled toggle on a currency row, the `knowledge` kind, the `Result` adder, and the convert control on a reward row, headed \"Add an alternative\". It is manager-only because its amount slot, `PickerRowAmount.svelte`, imports `src/ui/svelte/apps/manager/RollDataExpressionInput.svelte` and its `manager-recipe-option-*` class family is rooted in the manager sheet; moving the expression field into the primitive directory and re-rooting that family is the change that would make it shared. Targeted: every recipe editor case claims the directory by `sourceMatches`, and the Tool Rules, world Tool entry, gathering task result and salvage result cases name the file."
     },
     {
-      "path": "src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte",
-      "library": null,
-      "status": "target",
-      "evidence": "targeted",
-      "scope": "manager-only",
-      "why": "The requirement row's amount slot: the Fixed | Rolled toggle, the stepper and the roll expression, a part of `<PickerRow>` since issue 1516. Issue 1773 gives it its second independent caller: `src/ui/svelte/apps/manager/recipe/PickerRow.svelte` draws every row's amount through it and `src/ui/svelte/apps/manager/recipe/ChoiceGroupAwardHeader.svelte` draws a result choice group's N through it, the same fixed-or-rolled count. It cannot be recorded on `notAPrimitive`, which holds candidates below the bar, so it takes a member row on the `GatheringModifierEditor` precedent. `library: null` because `library.html` specifies the amount as part of the `<PickerRow>` specimen rather than as an entry. Targeted: the recipe editor's result-group cases claim `apps/manager/recipe/` by `sourceMatches`. Scoped `manager-only`: both callers are manager authoring rows."
-    },
-    {
       "path": "src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte",
       "library": "<ChoiceGroup>",
       "status": "divergent",
