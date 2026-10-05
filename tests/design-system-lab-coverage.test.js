@@ -455,7 +455,7 @@ function unsectionedManifestRows({ library, manifestRows }) {
     .filter((row) => row.library !== null)
     .filter((row) => {
       const name = row.library.slice(1, -1);
-      return !sectioned.some((heading) => primitiveNamesIn(heading).includes(name));
+      return sectioned.every((heading) => !primitiveNamesIn(heading).includes(name));
     })
     .map(
       (row) =>
@@ -484,7 +484,10 @@ test(
   { todo: PHASE_16 },
   () => {
     const named = MANIFEST_ROWS.filter((row) => row.library !== null);
-    assert.ok(named.length > 20, `${named.length} rows name a library entry, so this has no domain`);
+    assert.ok(
+      named.length > 20,
+      `${named.length} rows name a library entry, so this has no domain`
+    );
     assert.deepEqual(
       unsectionedManifestRows({ library: LIBRARY, manifestRows: MANIFEST_ROWS }),
       []
@@ -529,7 +532,10 @@ test('the coverage rule requires every shipped name in a catalogued section, and
   });
   assert.equal(removed.required, 3);
   assert.equal(removed.problems.length, 1, removed.problems.join('\n'));
-  assert.match(removed.problems[0], /entry <Chip> <Kicker> names <Kicker>, and src\/Kicker\.svelte/);
+  assert.match(
+    removed.problems[0],
+    /entry <Chip> <Kicker> names <Kicker>, and src\/Kicker\.svelte/
+  );
 
   const misfiled = uncoveredPrimitives({
     ...corpus,

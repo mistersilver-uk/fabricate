@@ -88,7 +88,10 @@ const installShared = () => installFoundryShim(createMinimalLabWorld({ i18n: STU
 
 test('the Primitive Lab declares the client release the harvested chrome is', () => {
   const [generation, build] = CHROME_PROVENANCE.foundryVersion.split('.').map(Number);
-  assert.deepEqual({ ...LAB_RELEASE }, { generation, build, version: CHROME_PROVENANCE.foundryVersion });
+  assert.deepEqual(
+    { ...LAB_RELEASE },
+    { generation, build, version: CHROME_PROVENANCE.foundryVersion }
+  );
   withGlobals(installLab, () => {
     assert.equal(globalThis.game.release, LAB_RELEASE);
     assert.equal(globalThis.game.version, CHROME_PROVENANCE.foundryVersion);
@@ -103,7 +106,10 @@ test('the shared View Lab shim declares no release, so no View Lab frame changes
 });
 
 test('the lab release parse fails closed on anything but a positive generation and a build', () => {
-  assert.deepEqual({ ...parseLabRelease('13.351') }, { generation: 13, build: 351, version: '13.351' });
+  assert.deepEqual(
+    { ...parseLabRelease('13.351') },
+    { generation: 13, build: 351, version: '13.351' }
+  );
   for (const malformed of ['14.x', 'x.365', '0.365', '-1.365', '14', '14.365.1', '']) {
     assert.throws(
       () => parseLabRelease(malformed),

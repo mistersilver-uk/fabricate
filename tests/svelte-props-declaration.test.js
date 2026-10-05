@@ -45,12 +45,22 @@ test('the $props() reader survives comments, template literals and commas in str
 
 /** Wrap destructure lines in a component's `<script>`. */
 function destructure(...lines) {
-  return ['<script>', '  let {', ...lines.map((line) => `    ${line}`), '  } = $props();', '</script>'].join('\n');
+  return [
+    '<script>',
+    '  let {',
+    ...lines.map((line) => `    ${line}`),
+    '  } = $props();',
+    '</script>',
+  ].join('\n');
 }
 
 test('the $props() reader keeps every scanner hazard inside its own prop', () => {
   const cases = [
-    ['a template literal nested in a hole', ['label = `${`${x}, y`}`,', 'after = 1'], ['after', 'label']],
+    [
+      'a template literal nested in a hole',
+      ['label = `${`${x}, y`}`,', 'after = 1'],
+      ['after', 'label'],
+    ],
     ['a quoted brace inside a hole', ['brace = `${"{"}`,', 'after = 1'], ['after', 'brace']],
     ['an escaped quote', [String.raw`quoted = "a\", b",`, 'after = 1'], ['after', 'quoted']],
     ['an unterminated block comment', ['alpha = 1, /* never closed'], ['alpha']],
@@ -66,7 +76,10 @@ test('the $props() reader never lets a stray closer swallow the commas after it'
 });
 
 test('the $props() reader throws on a source with no `let { … } = $props()` destructure', () => {
-  assert.throws(() => declaredPropNames('<script>let x = 1;</script>'), /no `let \{ … \} = \$props\(\)`/);
+  assert.throws(
+    () => declaredPropNames('<script>let x = 1;</script>'),
+    /no `let \{ … \} = \$props\(\)`/
+  );
   assert.throws(() => declaredPropNames('<script>x } = $props();</script>'), /no `let/);
 });
 
