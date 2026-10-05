@@ -128,6 +128,12 @@ describe('InfoStrip', () => {
     assert.equal(strip.querySelectorAll(FOCUSABLE).length, 0, 'no focusable descendant');
   });
 
+  it('draws no facts wrapper when it has no facts', async () => {
+    const root = await harness.mount({ label: 'Empty', facts: [] });
+    assert.ok(Boolean(stripIn(root).querySelector('.fabricate-info-strip-head')), 'the head draws');
+    assert.ok(!stripIn(root).querySelector('.fabricate-info-strip-facts'), 'no facts wrapper');
+  });
+
   it('appends its class and spreads the rest on the root', async () => {
     const root = await harness.mount({
       ariaLabel: 'X',
@@ -228,6 +234,26 @@ describe('the crafting check card on the strip', () => {
     const formula = root.querySelector('[data-check-formula]');
     assert.equal(formula.textContent.trim(), '1d20 + @prof', 'the raw formula stays shown');
     assert.equal(formula.getAttribute('data-check-formula-resolved'), 'false');
+  });
+
+  it('draws no fact for a target that only states why it is unresolved', async () => {
+    const root = section(
+      await card.mount({ check: check({ dc: null, target: { unresolved: 'No number.' } }) })
+    );
+    const facts = [...root.querySelectorAll('.fabricate-info-strip-fact')];
+    assert.equal(facts.length, 2, 'only the skill and the formula draw');
+    for (const fact of facts) {
+      const value = fact.querySelector('.fabricate-info-strip-value').textContent.trim();
+      assert.notEqual(value, '', 'no fact has an empty value');
+    }
+    assert.ok(!root.querySelector('[data-check-target]'), 'the target draws no fact');
+  });
+
+  it('leaves the resolved flag off the formula when no resolved formula exists', async () => {
+    const root = section(await card.mount({ check: check({ resolvedFormula: undefined }) }));
+    const formula = root.querySelector('[data-check-formula]');
+    assert.equal(formula.textContent.trim(), '1d20 + @prof');
+    assert.ok(!formula.hasAttribute('data-check-formula-resolved'), 'the flag is absent');
   });
 
   it('says an unusable check has no formula as a muted line, never a notice', async () => {

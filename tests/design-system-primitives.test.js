@@ -394,6 +394,11 @@ test('(a) the older overrides still name the frame that renders their state', ()
     ],
     [
       'src/ui/svelte/components/InfoStrip.svelte',
+      'player-crafting-check-descriptor-under-resolved',
+      'the frame that draws the check strip with its target source fact',
+    ],
+    [
+      'src/ui/svelte/components/InfoStrip.svelte',
       'player-crafting-check-formula-unresolved',
       'the one frame that draws the check strip over its danger notice',
     ],

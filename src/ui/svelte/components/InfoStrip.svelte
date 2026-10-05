@@ -9,6 +9,9 @@
   | `badge` | `{ label, tone }` \| `null` | `null` | A read-only state beside the kicker, drawn through `Chip`. |
   | `ariaLabelledBy` / `ariaLabel` | string / string | `''` | The group's name when no kicker is drawn, in that order. |
 
+  Naming: a caller passes one of `label`, `ariaLabelledBy` or `ariaLabel`; with none the group renders
+  unnamed rather than throwing.
+
   Rest spread: `{...rest}` lands on the root, after `class`. Nothing in the strip is focusable.
 -->
 <script>
@@ -85,7 +88,7 @@
 
   .fabricate-info-strip-fact {
     display: inline-flex;
-    align-items: center;
+    align-items: baseline;
     gap: var(--fab-space-chip);
     min-width: 0;
     color: var(--fab-text-muted);

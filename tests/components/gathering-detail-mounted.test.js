@@ -545,6 +545,14 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(!target.querySelector('[data-gathering-nodes-legend]'), 'no legend with nodes off');
   });
 
+  it('stamps the economy strip "none" when the environment states no economy mode', async () => {
+    const env = environment({ staminaEnabled: true, staminaPool: { current: 1, max: 2 } });
+    delete env.economyMode;
+    await mountView(makeServices(listing([env])).services);
+    const strip = target.querySelector('[data-gathering-economy-strip]');
+    assert.equal(strip.getAttribute('data-economy-mode'), 'none');
+  });
+
   it('draws no strip with stamina off, and the node legend alone as a muted line', async () => {
     const env = environment({ nodesEnabled: true, economyMode: 'nodes' });
     await mountView(makeServices(listing([env])).services);
