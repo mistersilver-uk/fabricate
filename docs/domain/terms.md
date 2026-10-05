@@ -103,6 +103,26 @@ Canonical mapping: `Result.chooser`, `Result.selectionFormula`, `Result.selectio
 
 Spec reference: openspec/specs/design-system/spec.md, openspec/specs/resolution-modes/spec.md
 
+## Selection Roll
+
+A roll expression authored only where the ROLL is the **Chooser**, and validated as a rolled amount is: it must roll, and it must be able to total more than 0.
+Each alternative awarded takes one Selection Roll.
+Without repeats an alternative drawn once leaves the ladder for the rest of that award, so `up to N` stops rolling once every alternative is drawn.
+
+Canonical mapping: `Result.selectionFormula`; `drawRolledAwards` (`src/systems/choiceGroupAward.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/design-system/spec.md
+
+## Selection Range
+
+The alternatives' ranges form a ladder ordered by where each range starts.
+A gap is legal and never leaves a roll unanswered: a roll selects the alternative whose range starts highest at or below it, and a roll below every range selects the lowest.
+A setting lives only in the cell that reads it, so ranges persist only on the alternatives of a rolled group; the editor keeps them while the GM switches to the player and drops them on save.
+
+Canonical mapping: `Result.alternatives[].selectionRange`; `selectionLadder` and `selectFromLadder` (`src/systems/choiceGroupAward.js`)
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-entity-editors/spec.md
+
 ## Pending Award Choice
 
 A choice group whose chooser is the player that has been awarded but awaits settlement, persisted in `pendingAwardChoices`.
