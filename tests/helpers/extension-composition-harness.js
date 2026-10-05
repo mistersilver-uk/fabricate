@@ -33,6 +33,8 @@ async function startCompositionServer() {
     // Test processes own their cache; sequential boots retain warm prebundles.
     server: { middlewareMode: true, hmr: false, ws: false, watch: null },
     appType: 'custom',
+    // Nothing requests the client environment, so its dependency scan of the repository is waste.
+    optimizeDeps: { noDiscovery: true },
   });
   const vite = await serverPromise;
   const runner = createServerModuleRunner(vite.environments.ssr, {
