@@ -803,6 +803,15 @@
       "why": "Issue 1782 builds the specified stage instrument over `FillBar`: a named `group` of stage-named `progressbar`s, one bar per stage. ONE importer, `src/ui/svelte/components/RunProgress.svelte`, which the journal's run card and run detail render, so it is below the two-importer membership bar on the `RunActionBar` precedent. Its library specimen reads `shipped`, and its broad-signal override names the run detail's stage track and a run card's."
     },
     {
+      "path": "src/ui/svelte/components/LogList.svelte",
+      "library": "<LogList>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/journal/HistoryList.svelte"
+      ],
+      "why": "Issue 1782 builds the specified log list: a `list` named by its required `ariaLabel`, each entry a `listitem` whose open control is a pressed-while-selected button, an 11px line over a caller-formatted time, an optional 26px tile, a labelled outcome glyph and a caller `action` snippet beside the control. ONE importer, `src/ui/svelte/apps/journal/HistoryList.svelte`, the journal's Finished list, which it was re-derived to so no frame moves; the recent-results rows the specimen also cited are `RecentResults.svelte`, which nothing imports. So it is below the two-importer membership bar on the `RunActionBar` precedent. Its library specimen reads `shipped`, and its broad-signal override names a Finished list holding a failed entry and a cancelled one."
+    },
+    {
       "path": "src/ui/svelte/components/RuleSentence.svelte",
       "library": "<RuleSentence>",
       "evidence": "broad",

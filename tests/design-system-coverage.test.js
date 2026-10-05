@@ -193,10 +193,10 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 11 library entries with no shipped implementation (issue 1505). Re-derived from the array
+ * The 10 library entries with no shipped implementation (issue 1505). Re-derived from the array
  * rather than carried forward: `SortableList` left it at issue 1512, `Well` at issue 2008,
  * `PickerRow` at issue 1516, `RequirementChooser` at issue 1518, and the three instruments, the
- * validation pair, the rule pair, the set picker and the rail section at issue 1782 —
+ * validation pair, the rule pair, the set picker, the rail section and the log list at issue 1782 —
  * `ValidationSummary` by naming its shipped component and `ValidationList` by being merged into
  * it — when each specified primitive shipped, `ChoiceGroup` and `Menu` at issue 1516, when each
  * specified entry gained its manifest row, and `InfoStrip` at issue 1521, when it shipped on its
@@ -204,7 +204,7 @@ test('every manifest library name resolves to a library entry', () => {
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BrowseCard',
-  'DataTable', 'LogList',
+  'DataTable',
   'NavSidebar', 'PageHeader',
   'Search',
   'TierTrack', 'ViewToggle', 'XrefList',
@@ -621,6 +621,7 @@ const BUILT_BY_1782 = [
   'RuleSentence',
   'SetPicker',
   'Rail',
+  'LogList',
 ];
 
 /** Names issue 1782 merged away, which must be no entry and must be on the ruled-out register. */

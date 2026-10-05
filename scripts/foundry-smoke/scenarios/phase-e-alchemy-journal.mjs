@@ -405,7 +405,7 @@ export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
       await journalActiveCard.click();
     } else {
       const journalHistoryRow = appShell
-        .locator('.journal-history-row [data-history-run-id]')
+        .locator('.journal-history-list [data-history-run-id]')
         .first();
       if ((await journalHistoryRow.count()) > 0) {
         await journalHistoryRow.scrollIntoViewIfNeeded();
@@ -423,7 +423,7 @@ export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
     // Phase E guarantees a terminal craft; capture its historical account after the
     // general Journal frame so selecting it cannot disturb that frame's selection.
     if (RUN_SCREENSHOT_PHASES) {
-      const historyRows = appShell.locator('.journal-history-row [data-history-run-id]');
+      const historyRows = appShell.locator('.journal-history-list [data-history-run-id]');
       const historyCount = await historyRows.count();
       let craftingRunSelected = false;
       for (let i = 0; i < historyCount; i += 1) {

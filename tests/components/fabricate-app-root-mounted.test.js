@@ -250,7 +250,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
     'src/ui/svelte/apps/journal/ActiveRunsList.svelte',
     'src/ui/svelte/apps/journal/HistoryList.svelte',
-    'src/ui/svelte/apps/journal/HistoryRow.svelte',
+    'src/ui/svelte/components/LogList.svelte',
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',

@@ -1,6 +1,6 @@
 // Shared, pure tone+icon+label vocabulary for the player-facing Journal run
 // status presentation. The frozen map supplies the active/detail chips and
-// HistoryRow's labeled outcome glyph. HistoryRow explicitly requests unknown,
+// the Finished list's labeled outcome glyph, which explicitly requests unknown,
 // recovery or inProgress for incomplete evidence rather than assuming success.
 //
 // Tones reuse the existing status palette (no new `--fab-*` tokens) and the

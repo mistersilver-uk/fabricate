@@ -48,6 +48,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/RunProgress.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
   ]),
+  // The log list (issue 1782): the Finished list with a failed entry open, and a cancelled one open.
+  'src/ui/svelte/components/LogList.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-finished-failure',
+    'fabricate-journal-lifecycle-finished-cancelled',
+  ]),
   // The instruments over the fill leaf (issue 1782): the run detail's stage track and a run card's.
   'src/ui/svelte/components/StageBars.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
