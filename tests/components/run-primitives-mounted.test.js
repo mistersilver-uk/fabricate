@@ -584,6 +584,42 @@ describe('run primitives mounted behavior', () => {
     expectGeometry('EssencePool', '.fab-essence-pool', [/border-radius:\s*9px/u, /padding:\s*var\(--fab-space-3\)/u]);
   });
 
+  // Issue 1644: crafting's adapter opts into `capAtHeld`; the Journal keeps the freeze-when-met cap.
+  it('caps at held stock on request, passes per-item hooks through and reports the new count', async () => {
+    const steps = [];
+    const props = (capAtHeld) => ({
+      thresholds: [
+        {
+          essence: 'fire',
+          amount: 2,
+          props: { 'data-meter': 'fire' },
+          sources: [{ id: 'ember', label: 'Ember', props: { 'data-carrier': 'ember' }, inputProps: { 'data-allocation': 'ember' } }],
+        },
+      ],
+      allocation: { ember: 1 },
+      yield: () => 2,
+      spare: () => 2,
+      held: () => 3,
+      capAtHeld,
+      onStep: (...args) => {
+        steps.push(args);
+      },
+      incrementLabel: () => 'More ember',
+    });
+    const capped = await essenceHarness.mount(props(true));
+    assert.equal(capped.querySelector('[data-meter="fire"]').dataset.essenceThreshold, 'fire');
+    const input = capped.querySelector(':scope [data-carrier="ember"][data-essence-source="ember"] [data-allocation="ember"]');
+    assert.equal(input.getAttribute('max'), '3', 'a met pool still steps up to the held count');
+    capped.querySelector('[aria-label="More ember"]').click();
+    await flushRender();
+    assert.deepEqual(steps, [['ember', 1, 2]]);
+    essenceHarness.remount();
+
+    const journal = await essenceHarness.mount(props(false));
+    assert.equal(journal.querySelector('[data-allocation="ember"]').getAttribute('max'), '1', 'met freezes it');
+    essenceHarness.remount();
+  });
+
   it('renders progress separately from a five-number viewed-stage window', async () => {
     const stages = Array.from({ length: 8 }, (_, index) => ({ id: `s${index + 1}`, name: `Stage ${index + 1}` }));
     const viewed = [];
