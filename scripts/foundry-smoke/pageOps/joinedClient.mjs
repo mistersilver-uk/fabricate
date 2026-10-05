@@ -3,6 +3,9 @@
  * 2-vCPU runner: no canvas, no join page, and a context that is closed on every failure path.
  */
 
+// Foundry warns, as a console error, on any screen under 1366x768; this matches the GM page.
+export const JOINED_CLIENT_VIEWPORT = Object.freeze({ width: 1920, height: 1080 });
+
 /** A cold client parses Foundry and every module uncached while the GM page shares the CPU. */
 export const JOINED_CLIENT_TIMEOUTS = Object.freeze({ navigation: 120_000, ready: 180_000 });
 
@@ -53,10 +56,7 @@ export async function openJoinedClient(
   );
   if (!userId) throw new Error(`no user is named "${userLabel}"`);
   const origin = new URL(page.url()).origin;
-  const context = await page
-    .context()
-    .browser()
-    .newContext({ viewport: { width: 1280, height: 720 } });
+  const context = await page.context().browser().newContext({ viewport: JOINED_CLIENT_VIEWPORT });
   try {
     await context.addInitScript(disableCanvasBeforeLoad);
     await prepareContext(context);
