@@ -94,6 +94,7 @@
     filtered ? 'FABRICATE.App.Journal.Empty.MatchingHistory' : 'FABRICATE.App.Journal.Empty.History'
   )}
 >
+  <!-- `journal-history-list` is a test and smoke hook only; no stylesheet selects it. -->
   <LogList
     class="journal-history-list"
     {entries}
@@ -108,10 +109,8 @@
         ariaLabel={localize('FABRICATE.App.Journal.History.Dismiss', { name: entry.text })}
         title={localize('FABRICATE.App.Journal.History.Dismiss', { name: entry.text })}
         data-journal-dismiss={entry.id}
-        onclick={(event) => {
-          event.stopPropagation();
-          onDismiss?.(entry.run);
-        }}><i class="fas fa-xmark" aria-hidden="true"></i></IconButton
+        onclick={() => onDismiss?.(entry.run)}
+        ><i class="fas fa-xmark" aria-hidden="true"></i></IconButton
       >
     {/snippet}
   </LogList>

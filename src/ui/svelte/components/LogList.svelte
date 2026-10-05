@@ -67,6 +67,7 @@
             tabindex="0"
             data-keyboard-focus="true"
             aria-pressed={selected}
+            data-selected={selected ? 'true' : 'false'}
             onclick={() => onOpen(entry)}
             onkeydown={(event) => openOnKey(event, entry)}
           >

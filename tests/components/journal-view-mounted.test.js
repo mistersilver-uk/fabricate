@@ -455,6 +455,55 @@ describe('JournalView mounted behavior', () => {
     assert.deepEqual(calls.select, []);
   });
 
+  it('presses exactly the Finished entry whose run key is selected, even among equal ids', async () => {
+    const first = makeSucceededRun({ id: 'same', key: 'history-first' });
+    const second = makeSucceededRun({ id: 'same', key: 'history-second' });
+    const { store } = makeJournal({
+      historyPageItems: [first, second], historyCount: 2, selectedRunKey: 'history-second',
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    const pressed = [...target.querySelectorAll('[data-history-run-id]')]
+      .map((row) => row.getAttribute('aria-pressed'));
+    assert.deepEqual(pressed, ['false', 'true'], 'the run key, not the shared id, picks the row');
+  });
+
+  it('refuses to select a Finished run that has no id', async () => {
+    const run = makeSucceededRun({ id: '', key: 'history-idless' });
+    const { store, calls } = makeJournal({ historyPageItems: [run], historyCount: 1 });
+    const target = await harness.mount({ services: makeServices(store) });
+    const row = target.querySelector(':scope .journal-history-list [role="button"]');
+    row.click();
+    row.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    assert.deepEqual(calls.select, [], 'an id-less run is not opened');
+  });
+
+  it('tones only a failed Finished row as danger, and names its dismiss control by the run', async () => {
+    const failed = makeSucceededRun({
+      id: 'f', key: 'f', status: 'failed', derivedStatus: 'failed', names: { title: 'Cracked Vial', subtitle: '' },
+    });
+    const done = makeSucceededRun({ id: 's', key: 's' });
+    const { store } = makeJournal({ historyPageItems: [failed, done], historyCount: 2 });
+    const target = await harness.mount({ services: makeServices(store) });
+    const [failedItem, doneItem] = target.querySelectorAll(':scope .journal-history-list > [role="listitem"]');
+    assert.ok(failedItem.firstElementChild.classList.contains('is-danger'));
+    assert.ok(!doneItem.firstElementChild.classList.contains('is-danger'));
+    assert.match(
+      target.querySelector('[data-journal-dismiss="f"]').getAttribute('aria-label'),
+      /Cracked Vial/,
+      'the dismiss control is named by the run it dismisses'
+    );
+  });
+
+  it('falls back to the default bag art for a Finished run with no image', async () => {
+    const run = makeSucceededRun({ img: '' });
+    const { store } = makeJournal({ historyPageItems: [run], historyCount: 1 });
+    const target = await harness.mount({ services: makeServices(store) });
+    assert.match(
+      target.querySelector(':scope .journal-history-list img').getAttribute('src'),
+      /icons\/svg\/item-bag\.svg$/
+    );
+  });
+
   it('uses the shared action bar for primary, pause, completion preference, and armed cancellation', async () => {
     const run = makeCraftingRun({
       lifecycleContract: 'current', lifecycleVersion: 1, derivedStatus: 'ready', timeGate: null,

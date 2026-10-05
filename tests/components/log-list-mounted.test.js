@@ -111,6 +111,11 @@ describe('LogList', () => {
     assert.equal(first.getAttribute('data-keyboard-focus'), 'true', 'it declares itself focused');
     assert.equal(first.getAttribute('aria-pressed'), 'false');
     assert.equal(second.getAttribute('aria-pressed'), 'true', 'the selected entry is pressed');
+    assert.deepEqual(
+      [first, second].map((node) => node.getAttribute('data-selected')),
+      ['false', 'true'],
+      'the selected hook the old row carried is kept'
+    );
     first.click();
     const key = (name) =>
       new globalThis.window.KeyboardEvent('keydown', { key: name, bubbles: true });
@@ -149,5 +154,90 @@ describe('LogList', () => {
       assert.ok(!openOf(root, key).contains(control), 'a button is never nested in a button');
       assert.ok(control.parentElement === openOf(root, key).parentElement, 'it is a sibling');
     }
+  });
+
+  it('marks exactly the selected entry, and nothing when no key is selected', async () => {
+    const selectedRows = async (props) => {
+      const root = await harness.mount({ ariaLabel: 'History', onOpen: () => {}, ...props });
+      return [...listIn(root).children].map((item) =>
+        item.firstElementChild.classList.contains('is-selected')
+      );
+    };
+    assert.deepEqual(await selectedRows({ entries: ENTRIES, selectedKey: 'b' }), [false, true]);
+    harness.remount();
+    const keyless = [{ ...ENTRIES[0], key: '' }, ENTRIES[1]];
+    assert.deepEqual(await selectedRows({ entries: keyless }), [false, false]);
+    const root = harness.target;
+    assert.ok(
+      [...root.querySelectorAll('[role="button"]')].every(
+        (node) => node.getAttribute('aria-pressed') === 'false'
+      ),
+      'with no selected key an empty-keyed entry is not pressed'
+    );
+  });
+
+  it('cancels the default of Enter, Space and Spacebar keydowns, and opens on each', async () => {
+    const opened = [];
+    const root = await harness.mount({
+      entries: ENTRIES,
+      ariaLabel: 'History',
+      onOpen: (entry) => {
+        opened.push(entry.key);
+      },
+    });
+    const keydown = (name) =>
+      new globalThis.window.KeyboardEvent('keydown', {
+        key: name,
+        bubbles: true,
+        cancelable: true,
+      });
+    for (const name of ['Enter', ' ', 'Spacebar']) {
+      const event = keydown(name);
+      openOf(root, 'a').dispatchEvent(event);
+      assert.equal(event.defaultPrevented, true, `${JSON.stringify(name)} default is cancelled`);
+    }
+    const tab = keydown('Tab');
+    openOf(root, 'a').dispatchEvent(tab);
+    assert.equal(tab.defaultPrevented, false, 'other keys keep their default');
+    assert.deepEqual(opened, ['a', 'a', 'a']);
+  });
+
+  it('marks an entry row open only when the caller can open it', async () => {
+    const withOpen = await harness.mount({
+      entries: ENTRIES,
+      ariaLabel: 'History',
+      onOpen: () => {},
+    });
+    assert.ok(listIn(withOpen).querySelectorAll('.fab-log-list-entry.is-open').length === 2);
+    harness.remount();
+    const inert = await harness.mount({ entries: ENTRIES, ariaLabel: 'History' });
+    assert.equal(listIn(inert).querySelectorAll('.is-open').length, 0);
+  });
+
+  it('draws the time only when an entry has one', async () => {
+    const root = await harness.mount({ entries: ENTRIES, ariaLabel: 'History' });
+    const [first, second] = listIn(root).children;
+    assert.equal(first.querySelector('.fab-log-list-when').textContent, 'Today');
+    assert.equal(second.querySelector('.fab-log-list-when'), null, 'an empty time draws no span');
+  });
+
+  it('tones an outcome mark by success, danger and warning', async () => {
+    const entries = ['success', 'danger', 'warning', 'neutral'].map((tone) => ({
+      key: tone,
+      text: tone,
+      outcome: { icon: 'fa-circle', label: tone, tone },
+    }));
+    const root = await harness.mount({ entries, ariaLabel: 'History' });
+    const tones = [...root.querySelectorAll('[role="img"]')].map((mark) =>
+      ['is-success', 'is-danger', 'is-warning'].filter((name) => mark.classList.contains(name))
+    );
+    assert.deepEqual(tones, [['is-success'], ['is-danger'], ['is-warning'], []]);
+  });
+
+  it('keeps each entry node when the list is reordered, keyed by entry key', async () => {
+    const root = await harness.mount({ entries: ENTRIES, ariaLabel: 'History' });
+    const [itemA, itemB] = [...listIn(root).children];
+    await harness.setProps({ entries: [ENTRIES[1], ENTRIES[0]] });
+    assert.deepEqual([...listIn(root).children], [itemB, itemA], 'the same nodes, moved');
   });
 });
