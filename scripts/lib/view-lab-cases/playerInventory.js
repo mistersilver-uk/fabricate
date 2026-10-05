@@ -469,7 +469,7 @@ export const CASES = Object.freeze([
     expectSelector:
       '[data-inventory-salvage-body="routed"]' +
       ':has(.salvage-dc[data-inventory-salvage-dc="11"]:text-is("DC 11"))' +
-      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-threshold="16"] .manager-chip)' +
+      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] .manager-chip[data-inventory-outcome-threshold="16"])' +
       ':not(:has([data-inventory-outcome-band]))',
     kinds: ['player', 'inventory'],
     sourceMatches: [
@@ -494,7 +494,7 @@ export const CASES = Object.freeze([
       '[data-inventory-salvage-body="routed"]:not(:has([data-inventory-salvage-dc]))' +
       ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-band="6+"])' +
       ':has([data-inventory-salvage-outcome="rw-salv-standard"] [data-inventory-outcome-band="1–5"])' +
-      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="0"] .manager-chip.is-danger)',
+      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] .manager-chip.is-danger[data-inventory-outcome-band="0"])',
     kinds: ['player', 'inventory'],
     sourceMatches: [
       ...SALVAGE_TARGET_SOURCES,
@@ -519,7 +519,7 @@ export const CASES = Object.freeze([
       '[data-inventory-salvage-body="routed"]' +
       ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="−4 – 0"])' +
       ':has([data-inventory-salvage-outcome="rw-salv-ruined"] + [data-inventory-salvage-outcome="count-botch"]' +
-      ' [data-inventory-outcome-band="<−4"] .manager-chip)',
+      ' .manager-chip[data-inventory-outcome-band="<−4"])',
     kinds: ['player', 'inventory'],
     sourceMatches: [
       ...SALVAGE_TARGET_SOURCES,
