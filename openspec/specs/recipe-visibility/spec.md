@@ -74,8 +74,8 @@ Definition ids are NOT globally unique (generated per system), so `systemId` sco
 Tiers 3 and 4 cover compendium-derived and world-duplicate copies; on Foundry v12+, `_stats.compendiumSource` carries the tier-3 value and on v11 `flags.core.sourceId` does, and the resolver handles both transparently.
 The tier-4 `_stats.duplicateSource` condition was matched at runtime before issue 555 but undocumented here; it is now part of the precedence.
 
-There is no clone-gate in this matcher: tier 3 is always trusted at match time, because an actor-owned copy legitimately carries both an inherited `_stats.compendiumSource` (provenance) and a `_stats.duplicateSource` (Foundry stamps it on every non-compendium drag-drop).
-The clone-gate is a REGISTRATION and source-repair rule only (see the data-models spec) and must never reach this matcher.
+There is no clone-gate in this matcher: tier 3 is always trusted at match time, because an actor-owned copy legitimately carries an inherited `_stats.compendiumSource` (provenance) and may also carry a `_stats.duplicateSource`, depending on the core build.
+The clone gate and the derivative gate are registration rules, and the clone gate a source-repair rule too (see the data-models spec, **Registration Source Identity**); neither reaches this matcher.
 
 **A tier is a provenance label, never an ambiguity signal.**
 The matcher returns exactly one definition and one tier, never a set and never a count, so no tier value can report that an owned copy matched more than one definition.

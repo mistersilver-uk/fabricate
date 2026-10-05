@@ -1806,13 +1806,17 @@ These creation-time stamps write the same `roles[systemId]` leaves the one-shot 
   A CLONE (a world source Item carrying `_stats.duplicateSource` at registration — a sidebar-Duplicate) keys purely on its own uuid: its inherited `compendiumSource` is excluded from both the canonical uuid and the find-existing references.
   So a registered duplicate becomes a NEW definition or component instead of overwriting the original.
   A DERIVATIVE is a non-clone source whose compendium source resolves to a document none of whose names it shares, compared trimmed, whitespace-collapsed and case-insensitive.
-  A document's names are its source name and, when a translation module records one, its original name.
+  The source is compared by its stored name alone; the compendium document by its stored name and, when a translation module records one on it, its original name.
+  The source's own recorded original name is not read, because an Item built from a translated entry inherits that entry's record.
   When the compendium source does not resolve, or a name is empty, the source is not a derivative.
   A derivative keys purely on its own uuid, as a clone does: its compendium source is excluded from the canonical uuid, from the find-existing references and from the aliases the registration adds.
   The test errs toward a separate definition: a renamed copy of a compendium entry is a derivative, so it does not claim the entry, and an owned Item dropped straight from the pack does not resolve to it by source reference.
 - Find-existing prefers the definition that claims the source's own uuid over one that claims only its compendium source.
+  A pack Item's own uuid is read in both spellings, with and without the document-type segment.
   Re-registering a source whose own uuid a definition already claims neither adds nor releases a compendium-source claim on that definition: an existing claim is kept, in `aliasItemUuids` where the source is now a derivative, and an absent one is not added whatever the name now says.
-- At find-existing a source's durable `roles[systemId]` leaf is honoured, except that for a clone or a derivative a leaf naming a definition that does not claim the source's own uuid is an inherited marker, ignored and overwritten by the registration.
+  For a tool, find-existing does not match through an unresolvable compendium source the registration would only record as an alias.
+- At find-existing a source's durable `roles[systemId]` leaf is honoured, except that for a clone, or for a derivative whose name the named definition does not carry, a leaf naming a definition that does not claim the source's own uuid is an inherited marker: it is ignored, and for a world source the registration overwrites it.
+  A pack source is never stamped at registration, so it keeps the inherited leaf until Repair Item Data reaches it in an unlocked pack.
 - The derivative gate never un-merges.
   A component that absorbed several derivatives before this rule holds each one's uuid in `aliasItemUuids` and still matches them; the recovery is to delete that component and import the Items again.
 - The clone gate is a registration, source-replacement and source-repair rule; the derivative gate is a registration and source-replacement rule; neither reaches the runtime matcher.
