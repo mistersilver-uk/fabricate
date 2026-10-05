@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+
 import { Window } from 'happy-dom';
 
 import { accessibleNameOf } from '../src/ui/svelte/apps/manager/validationAnnouncement.js';
@@ -8,7 +9,7 @@ import { accessibleNameOf } from '../src/ui/svelte/apps/manager/validationAnnoun
 function target(markup) {
   const window = new Window();
   window.document.body.innerHTML = markup;
-  return { root: window.document, element: window.document.getElementById('target') };
+  return { root: window.document, element: window.document.querySelector('#target') };
 }
 
 test('a multi-id aria-labelledby reads every id in order, joined by single spaces', () => {
