@@ -54,7 +54,7 @@
     "spec": "<LinkField>",
     "cap": "empty",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
+    "path": "src/ui/svelte/components/ItemDropZone.svelte",
     "props": {
       "title": "Drop a game-world item here",
       "hint": "or click to search the catalogue",
@@ -65,7 +65,7 @@
     "spec": "<LinkField>",
     "cap": "linked",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
+    "path": "src/ui/svelte/components/ItemDropZone.svelte",
     "props": {
       "item": {
         "name": "Blacksmith's Compendium"
@@ -78,7 +78,7 @@
     "spec": "<LinkField>",
     "cap": "missing",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
+    "path": "src/ui/svelte/components/ItemDropZone.svelte",
     "props": {
       "item": {
         "name": "Untitled"
@@ -93,7 +93,7 @@
     "spec": "<SearchPopover>",
     "cap": "list form",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/SearchablePopover.svelte",
+    "path": "src/ui/svelte/components/SearchablePopover.svelte",
     "slot": {
       "width": 300,
       "height": 320
@@ -103,9 +103,9 @@
       "value": "steel-ingot",
       "triggerIcon": "fas fa-hammer",
       "triggerLabel": "Steel Ingot",
-      "triggerAriaLabel": "Choose a component",
-      "dialogAriaLabel": "Choose a component",
-      "searchAriaLabel": "Search components",
+      "ariaLabel": "Choose a component",
+      "panelLabel": "Choose a component",
+      "searchLabel": "Search components",
       "searchPlaceholder": "Search components",
       "popoverTitle": "Components",
       "showFilteredCount": true,
@@ -133,24 +133,13 @@
     }
   },
   {
-    "spec": "<TintPicker> <ArtPathPicker> <Menu>",
+    "spec": "<TintPicker> <Menu>",
     "cap": "tint — eight tokens, plus an optional custom colour",
     "draws": ":scope > div:first-of-type",
-    "path": "src/ui/svelte/components/ManagerColorPopover.svelte",
+    "path": "src/ui/svelte/components/TintPicker.svelte",
     "props": {
       "colorToken": "sage",
       "layout": "inline"
-    }
-  },
-  {
-    "spec": "<TintPicker> <ArtPathPicker> <Menu>",
-    "cap": "art path — the image, never the path",
-    "draws": ":scope > div",
-    "path": "src/ui/svelte/components/ImagePathPicker.svelte",
-    "props": {
-      "value": "icons/commodities/metal/ingot-worn-steel.webp",
-      "chooseLabel": "Choose image",
-      "unavailableLabel": "Image picker is not available."
     }
   }
 ]

@@ -106,7 +106,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "page 38 · the header pair only",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "primary"
     },
@@ -116,7 +116,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "page 38 · the header pair only",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "primary"
     },
@@ -126,7 +126,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "page 38 · the header pair only",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "content": [
       {
         "tag": "i",
@@ -142,7 +142,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "page 38 · the header pair only",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "ghost"
     },
@@ -152,7 +152,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "page 38 · the header pair only",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "danger"
     },
@@ -171,21 +171,21 @@
     "spec": "<Button> <IconButton>",
     "cap": "row 30 · everything in the body",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "content": ["Open editor"]
   },
   {
     "spec": "<Button> <IconButton>",
     "cap": "row 30 · everything in the body",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "content": ["Apply to all"]
   },
   {
     "spec": "<Button> <IconButton>",
     "cap": "row 30 · everything in the body",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "warning"
     },
@@ -204,7 +204,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "row 30 · everything in the body",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "danger"
     },
@@ -214,7 +214,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "row 30 · everything in the body",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "disabled": true
     },
@@ -278,7 +278,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "dashed role · adds to the collection it sits in",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "dashed"
     },
@@ -297,7 +297,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "dashed role · adds to the collection it sits in",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "dashed"
     },
@@ -316,7 +316,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "dashed role · adds to the collection it sits in",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "dashed"
     },
@@ -335,7 +335,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "dashed · block adder closes a list",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "dashed",
       "fullWidth": true
@@ -355,7 +355,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "destructive — arm, then confirm (row carve-out only)",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "danger"
     },
@@ -374,7 +374,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "destructive — arm, then confirm (row carve-out only)",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "danger"
     },
@@ -384,7 +384,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "destructive — arm, then confirm (row carve-out only)",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "ghost"
     },
@@ -394,7 +394,7 @@
     "spec": "<Button> <IconButton>",
     "cap": "destructive — arm, then confirm (row carve-out only)",
     "draws": ".k-btn",
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "path": "src/ui/svelte/components/Button.svelte",
     "props": {
       "role": "danger",
       "disabled": true
@@ -487,7 +487,7 @@
     "spec": "<Segmented>",
     "cap": "default · in a well",
     "draws": ".k-seg",
-    "path": "src/ui/svelte/apps/manager/SegmentedControl.svelte",
+    "path": "src/ui/svelte/components/SegmentedControl.svelte",
     "props": {
       "options": [
         {
@@ -512,7 +512,7 @@
     "spec": "<Segmented>",
     "cap": "bare · no well",
     "draws": ".k-seg",
-    "path": "src/ui/svelte/apps/manager/SegmentedControl.svelte",
+    "path": "src/ui/svelte/components/SegmentedControl.svelte",
     "props": {
       "options": [
         {
@@ -531,9 +531,9 @@
   },
   {
     "spec": "<Segmented>",
-    "cap": "grow",
+    "cap": "fill",
     "draws": ".k-seg",
-    "path": "src/ui/svelte/apps/manager/SegmentedControl.svelte",
+    "path": "src/ui/svelte/components/SegmentedControl.svelte",
     "props": {
       "options": [
         {
@@ -555,7 +555,7 @@
     "spec": "<OptionCards>",
     "cap": "stacked — three or more, with the reveal",
     "draws": ":scope > div:not(.k-well)",
-    "path": "src/ui/svelte/apps/manager/RadioCardGroup.svelte",
+    "path": "src/ui/svelte/components/RadioCardGroup.svelte",
     "props": {
       "legend": "When the tool breaks",
       "groupName": "pl-tool-breakage",

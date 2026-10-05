@@ -2,7 +2,7 @@
   {
     "spec": "<PageHeader> <TabBar>",
     "draws": ".stage.b0.col > div > div:nth-child(2)",
-    "path": "src/ui/svelte/apps/manager/EditorTabs.svelte",
+    "path": "src/ui/svelte/components/EditorTabs.svelte",
     "props": {
       "tabs": [
         { "id": "tiers", "label": "Tiers" },
@@ -32,7 +32,7 @@
   },
   {
     "spec": "<SelectionBar> <BulkEditPanel>",
-    "draws": ".stage.col > .k-card",
+    "draws": ".stage.col > div:nth-child(2)",
     "path": "src/ui/svelte/apps/manager/BulkEditPanelShell.svelte",
     "props": {
       "heading": "4 components selected",
@@ -64,7 +64,7 @@
   {
     "spec": "<Modal>",
     "draws": ".stage.b0 > div",
-    "path": "src/ui/svelte/apps/manager/ManagerModal.svelte",
+    "path": "src/ui/svelte/components/Modal.svelte",
     "slot": { "width": 640, "height": 260 },
     "props": {
       "open": true,
@@ -89,7 +89,7 @@
     "spec": "<Pagination> <FilterBar>",
     "cap": "filter bar — inline form, with sort",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/components/ManagerToolbar.svelte",
+    "path": "src/ui/svelte/components/FilterBar.svelte",
     "props": {
       "ariaLabel": "Recipe filters"
     },
@@ -100,7 +100,7 @@
         "children": [
           {
             "tag": "label",
-            "attrs": { "class": "manager-search" },
+            "attrs": { "class": "fabricate-search" },
             "children": [
               { "tag": "i", "attrs": { "class": "fas fa-search", "aria-hidden": "true" } },
               {

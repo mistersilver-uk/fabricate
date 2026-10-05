@@ -3,7 +3,7 @@
     "spec": "The mark vocabulary",
     "cap": "chip — a filter or mode you can click, or authored data you can remove",
     "draws": ".k-chip",
-    "path": "src/ui/svelte/apps/manager/Chip.svelte",
+    "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
       "tag": "button",
       "type": "button",
@@ -17,7 +17,7 @@
     "spec": "The mark vocabulary",
     "cap": "chip — a filter or mode you can click, or authored data you can remove",
     "draws": ".k-chip",
-    "path": "src/ui/svelte/apps/manager/Chip.svelte",
+    "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
       "tag": "button",
       "type": "button",
@@ -31,7 +31,7 @@
     "spec": "The mark vocabulary",
     "cap": "chip — a filter or mode you can click, or authored data you can remove",
     "draws": ".k-chip",
-    "path": "src/ui/svelte/apps/manager/Chip.svelte",
+    "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
       "tag": "button",
       "type": "button"
@@ -42,7 +42,7 @@
     "spec": "The mark vocabulary",
     "cap": "chip — a filter or mode you can click, or authored data you can remove",
     "draws": ".k-chip",
-    "path": "src/ui/svelte/apps/manager/Chip.svelte",
+    "path": "src/ui/svelte/components/Chip.svelte",
     "props": {
       "tag": "button",
       "type": "button",

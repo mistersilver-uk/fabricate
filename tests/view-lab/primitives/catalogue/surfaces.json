@@ -3,7 +3,7 @@
     "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
     "cap": "callout — explains a rule that is always true, and stays put",
     "draws": ":scope > div",
-    "path": "src/ui/svelte/apps/manager/Callout.svelte",
+    "path": "src/ui/svelte/components/Callout.svelte",
     "props": {
       "text": "Time only — nothing is awarded when this activity resolves. Reach for the info tint only when the note is about live state."
     }
@@ -12,7 +12,7 @@
     "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
     "cap": "empty — says what the emptiness means",
     "draws": ".k-empty",
-    "path": "src/ui/svelte/apps/manager/EmptyState.svelte",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
     "props": {
       "icon": "fas fa-book",
       "title": "No businesses yet",
@@ -32,7 +32,7 @@
     "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
     "cap": "empty — says what the emptiness means",
     "draws": ".k-empty",
-    "path": "src/ui/svelte/apps/manager/EmptyState.svelte",
+    "path": "src/ui/svelte/components/EmptyState.svelte",
     "props": {
       "filtered": true,
       "hint": "No recipes match “ingot” in this system."
@@ -94,7 +94,7 @@
   {
     "spec": "<Card> <Well> <RowDisclosure>",
     "cap": "row disclosure — not the same primitive",
-    "draws": ":scope .k-row > svg",
+    "draws": ":scope .k-row > .k-btn",
     "path": "src/ui/svelte/components/RowDisclosure.svelte",
     "props": {
       "expanded": false,
