@@ -31,9 +31,10 @@ const drop = (id, componentId) => ({ id, componentId, quantity: 1, dropRate: 10 
 /** Mount the tab over one readiness reading, recording each row action. */
 async function mountTab(context) {
   const selected = [];
+  const validation = gatheringTaskValidation(context, text);
   const root = await harness.mount({
     text,
-    validation: gatheringTaskValidation(context, text),
+    validation,
     onSelectIssue: (...args) => {
       selected.push(args);
     },
@@ -46,7 +47,7 @@ async function mountTab(context) {
     ]);
   const verdict = () =>
     root.querySelector(':scope [data-editor-validation-summary]').dataset.editorValidationSummary;
-  return { root, rows, verdict, selected };
+  return { root, rows, verdict, selected, marks: validation.marks };
 }
 
 describe('GatheringTaskValidationTab', () => {
@@ -94,7 +95,7 @@ describe('GatheringTaskValidationTab', () => {
     const { root, rows, verdict, selected } = await mountTab({
       task: { name: '' },
       mode: 'routed',
-      validation: { valid: false, errors },
+      validation: { valid: false, errors, nameErrors: errors.slice(0, 1) },
       routedOutcomeTiers: [{ id: 'rich', name: 'Rich' }],
     });
     assert.deepEqual(rows(), [
@@ -120,6 +121,18 @@ describe('GatheringTaskValidationTab', () => {
       ['results', undefined],
     ]);
   });
+
+  it('blocks on a single error, and marks the tab with it', async () => {
+    const { root, verdict, marks } = await mountTab({
+      task: { name: 'Ore' },
+      mode: 'straight',
+      validation: { valid: false, errors: ['Task "Ore" result group "Ore" requires a result'] },
+    });
+    assert.equal(verdict(), 'block');
+    assert.match(root.textContent, /Cannot be saved/);
+    assert.deepEqual(marks, [{ label: '1', tone: 'danger' }]);
+    assert.deepEqual(railCounts(root), { passing: 1, warnings: 0, blocking: 1 });
+  });
 });
 
 describeValidationAddressPairing({
@@ -139,7 +152,7 @@ describeValidationHostContract({
   title: 'GatheringTaskEditView wires the row action in the order the mechanism needs',
   hostFile: 'GatheringTaskEditView.svelte',
   tabComponent: 'GatheringTaskValidationTab',
-  routeCall: 'onTabChange(route)',
+  routeCall: 'onTabChange(route.id)',
   regionMarker: 'data-gathering-task-issue-announcement',
   regionOutsideNoun: 'tab chain',
   mustPrecede: [

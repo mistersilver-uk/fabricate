@@ -857,14 +857,12 @@ export function registerGatheringCases() {
     routed: { type: 'relative', relativeOutcomes: [], fixedOutcomes: [] },
   };
   const NAME_OR_RESULT_ERRORS = (task) => {
-    const errors = [
-      ...(String(task?.name ?? '').trim() ? [] : ['Task name is required']),
-      'Task check tier "Rich" requires exactly one matching result group',
-    ];
-    return { valid: false, errors, resultErrors: errors.slice(-1) };
+    const nameErrors = String(task?.name ?? '').trim() ? [] : ['Task name is required'];
+    const resultErrors = ['Task check tier "Rich" requires exactly one matching result group'];
+    return { valid: false, errors: [...nameErrors, ...resultErrors], nameErrors, resultErrors };
   };
 
-  it('warns, without blocking, of a Check task under a check with no tiers', async () => {
+  it('warns, without blocking, of a routed task under a check with no tiers', async () => {
     await openTasks({ taskResolutionMode: 'routed', gatheringCraftingCheck: NO_TIERS_CHECK });
     await openEditor('task', 'task-herbs');
     await openTaskTab('validation');
@@ -945,8 +943,13 @@ export function registerGatheringCases() {
   it('counts the Results errors in a notice whose action opens Validation', async () => {
     await openTasks({ taskResolutionMode: 'routed', gatheringTaskValidation: NAME_OR_RESULT_ERRORS });
     await openEditor('task', 'task-herbs');
+    for (const tab of ['overview', 'requirements', 'validation']) {
+      await openTaskTab(tab);
+      const stray = target.querySelector(':scope [data-gathering-task-results-validation]');
+      assert.ok(!stray, `the Results notice stays on Results, not on ${tab}`);
+    }
     await openTaskTab('results');
-    const notice = target.querySelector(':scope [data-notice-position="page"] [data-gathering-task-results-validation]');
+    const notice =target.querySelector(':scope [data-notice-position="page"] [data-gathering-task-results-validation]');
     assert.match(notice.textContent, /1 result issue blocks save/);
     notice.querySelector('button').click();
     await settleRouteExit();
@@ -1164,7 +1167,7 @@ export function registerGatheringCases() {
       target
         .querySelector('[data-gathering-task-results-validation]')
         ?.textContent.includes('1 result issue blocks save'),
-      'the blocking count is rendered beside Direct results'
+      'the blocking count is rendered beside straight results'
     );
     assert.ok(
       !target.querySelector('[data-gathering-task-drop-inspector]'),

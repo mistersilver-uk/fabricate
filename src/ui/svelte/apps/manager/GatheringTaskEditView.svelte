@@ -14,7 +14,10 @@
   import GatheringTaskRequirementsTab from './gathering-task/GatheringTaskRequirementsTab.svelte';
   import GatheringTaskResultsTab from './gathering-task/GatheringTaskResultsTab.svelte';
   import GatheringTaskValidationTab from './gathering-task/GatheringTaskValidationTab.svelte';
-  import { gatheringTaskValidation } from './gathering-task/gatheringTaskReadiness.js';
+  import {
+    gatheringTaskIssueTab,
+    gatheringTaskValidation,
+  } from './gathering-task/gatheringTaskReadiness.js';
   import { focusValidationTarget } from './validationFocus.js';
   import { announceValidationOutcome } from './validationAnnouncement.js';
 
@@ -102,18 +105,14 @@
   let editorRoot = $state(null);
   let tabPanel = $state(null);
   let issueAnnouncement = $state('');
-  const ISSUE_TABS = {
-    overview: ['FABRICATE.Admin.Manager.Environment.Tasks.Tabs.Overview', 'Overview'],
-    results: ['FABRICATE.Admin.Manager.Environment.Tasks.Tabs.Results', 'Results'],
-  };
 
   /** A validation row's action: the host's tab is written FIRST, so the focus move finds its panel. */
   function selectIssue(targetTab, focusTarget) {
-    const route = Object.hasOwn(ISSUE_TABS, targetTab) ? targetTab : null;
-    if (route) onTabChange(route);
+    const route = gatheringTaskIssueTab(targetTab);
+    if (route) onTabChange(route.id);
     announceValidationOutcome({
       root: editorRoot,
-      routeLabel: route ? text(...ISSUE_TABS[route]) : '',
+      routeLabel: route ? text(route.labelKey, route.label) : '',
       focus: () => focusValidationTarget(editorRoot, focusTarget),
       fallbackPanel: tabPanel,
       announce: (sentence) => {

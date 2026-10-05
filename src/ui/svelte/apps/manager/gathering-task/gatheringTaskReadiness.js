@@ -31,10 +31,21 @@ function hasRepeatedComponent(dropRows) {
   return new Set(ids).size < ids.length;
 }
 
+/** The tab a failing row routes to, `{ id, labelKey, label, icon }`, or null. */
+export function gatheringTaskIssueTab(id) {
+  return GROUPS.find((group) => group.id === id) ?? null;
+}
+
+function messages(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((entry) => String(entry ?? '').trim())
+    .filter(Boolean);
+}
+
 /**
- * The rows, string-free: `{ id, group, status, message? }`. The store pushes the name error first,
- * so a blank name claims the first error and every other error is a Results row; Progressive runs
- * no results check, so it draws no passing Results row. A check that does not apply is dropped.
+ * The rows, string-free: `{ id, group, status, message? }`. The store's `nameErrors` is the
+ * Overview row, and every other error in `errors` is a Results row; Progressive runs no results
+ * check, so it draws no passing Results row. A check that does not apply is dropped.
  */
 export function gatheringTaskReadiness({
   task = null,
@@ -43,11 +54,9 @@ export function gatheringTaskReadiness({
   routedOutcomeTiers = [],
   rewardRules = null,
 } = {}) {
-  const errors = (Array.isArray(validation?.errors) ? validation.errors : [])
-    .map((error) => String(error ?? '').trim())
-    .filter(Boolean);
-  const nameError = String(task?.name ?? '').trim() ? null : (errors[0] ?? null);
-  const resultErrors = nameError ? errors.slice(1) : errors;
+  const nameErrors = messages(validation?.nameErrors);
+  const nameError = nameErrors[0] ?? null;
+  const resultErrors = messages(validation?.errors).filter((error) => !nameErrors.includes(error));
   const dropRows = Array.isArray(task?.dropRows) ? task.dropRows : [];
 
   const rows = [
