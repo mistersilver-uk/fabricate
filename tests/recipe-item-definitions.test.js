@@ -851,6 +851,72 @@ test('the legacy recipe-item migration still persists on the active GM', async (
   assert.equal(saves.recipes, 1);
 });
 
+test('the legacy recipe-item migration mints an own-keyed definition for a derivative source, once for every recipe linking it, and converges', async () => {
+  const ENTRY = 'Compendium.kit.templates.Item.blank';
+  const derivative = (uuid, name) => [
+    uuid,
+    { documentName: 'Item', uuid, name, _stats: { compendiumSource: ENTRY } },
+  ];
+  const documents = new Map([
+    [ENTRY, { documentName: 'Item', uuid: ENTRY, name: 'Blank Scroll' }],
+    derivative('Item.scroll-fire', 'Scroll of Fire'),
+    derivative('Item.scroll-frost', 'Scroll of Frost'),
+  ]);
+  const previous = { fromUuid: globalThis.fromUuid, fromUuidSync: globalThis.fromUuidSync };
+  globalThis.fromUuid = async (uuid) => documents.get(uuid) ?? null;
+  globalThis.fromUuidSync = (uuid) => documents.get(uuid) ?? null;
+  try {
+    const saves = { systems: 0, recipes: 0 };
+    const recipes = ['Item.scroll-fire', 'Item.scroll-fire', 'Item.scroll-frost'].map(
+      (linkedRecipeItemUuid, index) => ({
+        id: `recipe-${index + 1}`,
+        name: `Recipe ${index + 1}`,
+        craftingSystemId: 'sys-1',
+        recipeItemId: '',
+        linkedRecipeItemUuid,
+      })
+    );
+    const recipeManager = {
+      getRecipes: () => recipes,
+      save: async () => {
+        saves.recipes += 1;
+      },
+    };
+    const manager = migrationManager({ recipeManager, saves, isActiveGM: () => true });
+
+    assert.equal(await manager._migrateLegacyRecipeItems(), true);
+
+    const definitions = manager.getRecipeItemDefinitions('sys-1');
+    assert.deepEqual(
+      definitions.map((definition) => [
+        definition.registeredItemUuid,
+        definition.originItemUuid,
+        definition.aliasItemUuids,
+      ]),
+      [
+        ['Item.scroll-fire', 'Item.scroll-fire', []],
+        ['Item.scroll-frost', 'Item.scroll-frost', []],
+      ],
+      'one definition per derivative, none claiming the shared entry'
+    );
+    assert.deepEqual(
+      recipes.map((recipe) => recipe.recipeItemId),
+      [definitions[0].id, definitions[0].id, definitions[1].id]
+    );
+
+    assert.equal(
+      await manager._migrateLegacyRecipeItems(),
+      false,
+      'a converged pass persists nothing'
+    );
+    assert.equal(manager.getRecipeItemDefinitions('sys-1').length, 2);
+    assert.deepEqual(saves, { systems: 1, recipes: 1 });
+  } finally {
+    globalThis.fromUuid = previous.fromUuid;
+    globalThis.fromUuidSync = previous.fromUuidSync;
+  }
+});
+
 test('initialize completes on a player client instead of leaving the manager unready', async () => {
   const { saves, recipeManager } = legacyMigrationFixture();
   const manager = migrationManager({ recipeManager, saves, isActiveGM: () => false });

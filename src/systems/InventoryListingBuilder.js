@@ -118,8 +118,8 @@ function finiteOrNull(value) {
  * The per-document identity token used to de-duplicate and cross-system-join owned
  * documents (issue 766). It is `item.uuid` ALONE — never a `getItemSourceReferences`
  * union: `_stats.compendiumSource` and the transitive `_stats.duplicateSource` are
- * shared across DISTINCT physical documents (Foundry stamps a fresh `duplicateSource`
- * on every drag-to-actor), so keying on them would merge two genuinely-owned stacks and
+ * shared across DISTINCT physical documents (Foundry may stamp a fresh `duplicateSource`
+ * on a drag-to-actor), so keying on them would merge two genuinely-owned stacks and
  * UNDERcount real holdings. `getItemIdentityReferences` is the codebase's own precedent
  * for excluding `duplicateSource` from identity; `uuid` is the only per-document-unique
  * reference.

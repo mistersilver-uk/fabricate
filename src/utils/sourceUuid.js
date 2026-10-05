@@ -82,7 +82,7 @@ export function getItemSourceReferences(item) {
  * UUID ({@link getCompendiumSourceUuid}). Unlike {@link getItemSourceReferences}, this
  * deliberately omits `_stats.duplicateSource`, so a world Item cloned from
  * another world Item is treated as a distinct identity. Use this for component
- * *identity* decisions — import de-duplication and source-metadata propagation —
+ * *identity* decisions — import de-duplication and source repair —
  * where conflating a clone with its original would wrongly merge two components
  * or rewrite the wrong one. Use {@link getItemSourceReferences} (which keeps the
  * duplicate source) for craft-time inventory matching, where a player's
@@ -352,8 +352,8 @@ export function itemHasComponentIdentityFlag(item) {
  * per system. The invariant is only that within a single system's set at most one
  * component bears a given id.
  *
- * There is NO clone-gate here and there must never be one — Foundry stamps
- * `_stats.duplicateSource` on every non-compendium drag-drop, so distrusting it here
+ * There is NO clone-gate here and there must never be one — an owned copy may carry
+ * `_stats.duplicateSource`, depending on the core build, so distrusting it here
  * would break the ordinary hand-a-player-a-copy case (issue 555).
  *
  * @param {Item|object|null} item - Item-like object with `uuid`, source metadata, and `getFlag`.
@@ -560,10 +560,10 @@ export const RECIPE_ITEM_MATCH_TIERS = ['identity', 'uuid', 'compendium', 'dupli
  * (`claimedRoleId` returns null via `isSafeFlagKeySegment`) and degrades to the legacy
  * scalar + source-uuid tiers, warning once per offending system rather than throwing.
  *
- * There is no clone-gate here, and there must never be one. Foundry stamps
- * `_stats.duplicateSource` on EVERY non-compendium drag-drop, so every legitimate
- * actor-owned copy carries it: a player's copy of a compendium-imported book holds both
- * an inherited `_stats.compendiumSource` (real provenance, tier 3) and a
+ * There is no clone-gate here, and there must never be one. A drop may stamp
+ * `_stats.duplicateSource`, depending on the core build, so a legitimate actor-owned
+ * copy can carry it: a player's copy of a compendium-imported book holds an inherited
+ * `_stats.compendiumSource` (real provenance, tier 3) and may hold a
  * `_stats.duplicateSource` (tier 4). Treating "has a duplicateSource" as "is a suspect
  * clone" here would misclassify every owned copy and refuse to resolve it through its
  * legitimate compendium source, breaking the common hand-a-player-a-copy case. The
