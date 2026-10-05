@@ -499,6 +499,42 @@ const SELF_CORRUPTION_WORLD = () => {
   };
 };
 
+/** A registered derivative whose entry's own definition is listed first, in two libraries. */
+const REGISTERED_DERIVATIVE_WORLD = () => {
+  const definitions = (prefix) => [
+    {
+      id: `${prefix}-blank`,
+      name: BLANK_SCROLL_ENTRY.name,
+      registeredItemUuid: BLANK_SCROLL_ENTRY.uuid,
+      originItemUuid: BLANK_SCROLL_ENTRY.uuid,
+      aliasItemUuids: [],
+    },
+    {
+      id: `${prefix}-fire`,
+      name: 'Scroll of Fire',
+      registeredItemUuid: 'Item.scroll-fire',
+      originItemUuid: 'Item.scroll-fire',
+      aliasItemUuids: [],
+    },
+  ];
+  return {
+    systems: [
+      makeSystem({
+        id: 'sys1',
+        components: definitions('comp'),
+        recipeItemDefinitions: definitions('ri'),
+      }),
+    ],
+    items: [
+      makeDocument({
+        uuid: 'Item.scroll-fire',
+        name: 'Scroll of Fire',
+        compendiumSource: BLANK_SCROLL_ENTRY.uuid,
+      }),
+    ],
+  };
+};
+
 const REPAIR_ROWS = [
   ['self-corrupting-clone-source', SELF_CORRUPTION_WORLD],
   [
@@ -682,6 +718,7 @@ const REPAIR_ROWS = [
       ],
     }),
   ],
+  ['registered-derivative-listed-after-the-entry-definition', REGISTERED_DERIVATIVE_WORLD],
 ];
 
 /**

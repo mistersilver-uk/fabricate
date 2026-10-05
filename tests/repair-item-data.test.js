@@ -149,6 +149,51 @@ test('repair — skips locked packs and processes unlocked packs', async () => {
   assert.equal(packItem.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), 'comp-embercap');
 });
 
+// Issue 2217: a derivative shares its compendium source with the entry's own definition.
+const TEMPLATE_UUID = 'Compendium.kit.templates.Item.blank';
+const TEMPLATE_COMPONENT = {
+  id: 'comp-template',
+  name: 'Blank Scroll',
+  registeredItemUuid: TEMPLATE_UUID,
+  originItemUuid: TEMPLATE_UUID,
+  aliasItemUuids: [],
+};
+
+test('repair — stamps a registered derivative with its own component id when the entry definition is listed first', async () => {
+  const scroll = makeItem({
+    uuid: 'Item.scroll-fire',
+    name: 'Scroll of Fire',
+    compendiumSource: TEMPLATE_UUID,
+  });
+  const fire = {
+    id: 'comp-fire',
+    name: 'Scroll of Fire',
+    registeredItemUuid: 'Item.scroll-fire',
+    originItemUuid: 'Item.scroll-fire',
+    aliasItemUuids: [],
+  };
+  const mgr = buildManager([TEMPLATE_COMPONENT, fire], { items: [scroll] });
+
+  const summary = await mgr.repairItemData();
+
+  assert.equal(summary.stamped, 1);
+  assert.equal(scroll.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), 'comp-fire');
+});
+
+test('repair — an unregistered derivative is still stamped through the compendium source a definition claims', async () => {
+  // Source repair applies no derivative test: it resolves no document.
+  const scroll = makeItem({
+    uuid: 'Item.scroll-frost',
+    name: 'Scroll of Frost',
+    compendiumSource: TEMPLATE_UUID,
+  });
+  const mgr = buildManager([TEMPLATE_COMPONENT], { items: [scroll] });
+
+  await mgr.repairItemData();
+
+  assert.equal(scroll.getFlag('fabricate', 'fabricate.roles.sys1.componentId'), 'comp-template');
+});
+
 test('repair — requires GM', async () => {
   const mgr = buildManager([EMBERCAP], { items: [] });
   globalThis.game.user.isGM = false;

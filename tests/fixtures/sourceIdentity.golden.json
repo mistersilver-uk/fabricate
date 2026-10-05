@@ -2745,5 +2745,120 @@
         "notify": 0
       }
     }
+  },
+  "repair/registered-derivative-listed-after-the-entry-definition": {
+    "first": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 2,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 1,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 1,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 4,
+          "skippedUnresolved": 4,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Item.scroll-fire": [
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.componentId",
+            "value": "comp-fire"
+          },
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.recipeItemDefinitionId",
+            "value": "ri-fire"
+          }
+        ]
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 4,
+          "skippedUnresolved": 4,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Item.scroll-fire": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
   }
 }

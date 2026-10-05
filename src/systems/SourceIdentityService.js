@@ -9,6 +9,7 @@ import {
   getDuplicateSourceUuid,
   getItemIdentityReferences,
   getItemMatchUuids,
+  getOwnSourceUuids,
   matchRecipeItemDefinition,
   normalizeMatchName,
   resolveComponentForItem,
@@ -177,19 +178,16 @@ function uniqueDefinitionByName(name, definitions) {
   return matches[0];
 }
 
-// A world or writable-pack source's owner, clone-gated: a clone keys on its own uuid alone, or
-// its inherited `compendiumSource` would stamp it with the original's id.
+// A world or writable-pack source's owner: the definition claiming its own uuid, and only
+// otherwise one claiming its compendium source. A clone keys on its own uuid alone, or its
+// inherited `compendiumSource` would stamp it with the original's id.
 function resolveSourceRepairOwner(item, kind) {
-  const isClone = !!getDuplicateSourceUuid(item);
-  const refs = new Set(
-    isClone
-      ? [item?.uuid].filter((ref) => typeof ref === 'string' && ref.trim())
-      : getItemIdentityReferences(item)
-  );
-  if (refs.size === 0) return null;
-  return (
-    kind.definitions.find((def) => kind.refExtractor(def).some((ref) => refs.has(ref))) || null
-  );
+  const claimedBy = (refs) =>
+    kind.definitions.find((def) => kind.refExtractor(def).some((ref) => refs.includes(ref))) ||
+    null;
+  const byOwnUuid = claimedBy(getOwnSourceUuids(item?.uuid));
+  if (byOwnUuid || getDuplicateSourceUuid(item)) return byOwnUuid;
+  return claimedBy(getItemIdentityReferences(item));
 }
 
 // An actor-owned item's `{definition, tier}`, with no clone-gate: Foundry stamps
