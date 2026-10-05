@@ -9,6 +9,7 @@ import { describe, it } from 'node:test';
 import { Result } from '../src/models/Result.js';
 import {
   convertToGroup,
+  keepingRange,
   groupProblems,
   rangeProblems,
   withAlternative,
@@ -128,6 +129,16 @@ describe('the header’s settings', () => {
     );
     assert.equal(Object.hasOwn(withSelection(rolled, '  '), 'selectionFormula'), false);
     assert.equal(withSelection(rolled, '1d20 + 2').selectionFormula, '1d20 + 2');
+  });
+
+  it('a member’s own row edit, a retype included, keeps its range', () => {
+    const member = { id: 'm', componentId: 'ore', selectionRange: { from: 1, to: 4 } };
+    const retyped = { id: 'm', kind: 'currency', unit: '', quantity: 1 };
+    assert.deepEqual(keepingRange(member, retyped), {
+      ...retyped,
+      selectionRange: member.selectionRange,
+    });
+    assert.equal(keepingRange({ id: 'm' }, retyped), retyped, 'nothing to keep');
   });
 
   it('a range with neither end is no range', () => {

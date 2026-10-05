@@ -31,6 +31,7 @@
   import {
     chooserOf,
     convertToGroup,
+    keepingRange,
     rangeProblems,
     withAlternative,
     withRange,
@@ -293,7 +294,9 @@
     trailing={member && rolled ? rangeTrailing : null}
     onSelect={convert}
     onChange={(value) =>
-      member ? updateMember(index, fromValue(entry, value)) : onChange(fromValue(entry, value))}
+      member
+        ? updateMember(index, keepingRange(entry, fromValue(entry, value)))
+        : onChange(fromValue(entry, value))}
     onRemove={() => (member ? removeMember(index) : onRemove())}
   />
 {/snippet}

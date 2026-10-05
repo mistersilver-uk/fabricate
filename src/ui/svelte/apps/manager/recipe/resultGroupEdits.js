@@ -100,6 +100,12 @@ export function withSelection(group, formula) {
   return blank(formula) ? rest : { ...rest, selectionFormula: formula };
 }
 
+/** `next`, a member's own row edit, keeping `member`'s range, which a retype rebuilds without. */
+export function keepingRange(member, next) {
+  if (!member?.selectionRange || next?.selectionRange) return next;
+  return { ...next, selectionRange: member.selectionRange };
+}
+
 /** `member` with its range as typed; a range with neither end is no range. */
 export function withRange(member, range) {
   const ends = { from: range?.from ?? null, to: range?.to ?? null };

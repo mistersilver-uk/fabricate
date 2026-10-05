@@ -661,6 +661,23 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     ]);
   });
 
+  it('retyping a rolled member keeps its range', async () => {
+    const { target, groups } = await mountGroup({
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      alternatives: [
+        { id: 'a', componentId: 'cmp-herb', quantity: 1, selectionRange: { from: 1, to: 10 } },
+        { id: 'b', componentId: 'cmp-water', quantity: 1, selectionRange: { from: 11, to: 20 } },
+      ],
+    });
+    chooseSelectOption(target, KIND_TRIGGER, 'currency');
+    await settle();
+    const [retyped] = groups.at(-1).results[0].alternatives;
+    assert.equal(retyped.kind, 'currency');
+    assert.deepEqual(retyped.selectionRange, { from: 1, to: 10 });
+    assert.equal(members(target)[0].querySelector('[data-recipe-range="to"]').value, '10');
+  });
+
   it('removing down to one member unwraps it, dropping the group’s settings and its range', async () => {
     const { target, groups } = await mountGroup({
       id: 'g1',
