@@ -570,6 +570,30 @@ Where the two disagree about the same view, the smoke is right.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+## The Primitive Lab (`npm run lab`)
+
+A second page in the View Lab's Vite app, at `/tests/view-lab/primitives.html`, renders `openspec/specs/design-system/library.html` and stands each catalogued drawing up as the real component it ships.
+It is not a capture surface and publishes no frame.
+
+```sh
+npm run lab          # open the page in a browser
+npm run lab:check    # mount every catalogued row; fail on any console, page or request error
+npm run lab:parity   # compare every unreplaced element with library.html opened bare
+```
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Fact | Detail |
+|---|---|
+| It renders `library.html` rather than reimplementing it | `tests/view-lab/primitives/library.js` fetches the file through the raw `/@design-library/` mount and adopts its body, and `inject.js` swaps individual drawings for live components. Prose, captions, notes, deltas and cites render as authored, and a drawing with no catalogue row stays a drawing. |
+| The raw mount is not optional | Vite's HTML transform rewrites any `.html` under the dev root, so reading the spec artifact through it would read a rewritten copy. |
+| The library's palette is stripped on purpose | Its `:root` `--fab-*` block is removed and `styles/fabricate.css` supplies the tokens, so drift between the palette the library hardcodes and the one that ships shows on the page. |
+| Each specimen is its own iframe | The page links no Foundry stylesheet, so core cannot repaint the library's drawings. Each specimen document loads `foundry2.css`, Font Awesome and `fabricate.css` in the game view's order and builds `.application > .window-content > .fabricate-manager` around one component; a row without a `slot` sets that subtree to `display: contents`. |
+| `lab:check` and `lab:parity` are maintainer gates, not CI | Both call `resolveChromeCache` and refuse without a harvest, the fail-closed rule this file records for the View Lab: a missing harvest answers 503, and a `<link>` that 503s neither throws nor logs. |
+| It does not boot the runtime | Each specimen installs `installFoundryShim` over `createMinimalLabWorld()` rather than `buildLabWorld()`, so `src/main.js` and its migrations never run. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 ## Foundry integration (smoke) tests
 
 The smoke harness boots a real Foundry VTT instance in Docker, loads the built module, and walks the Crafting System Manager UI and the unified Fabricate shell end-to-end with Playwright.
