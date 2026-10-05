@@ -88,6 +88,7 @@
       disabled={saving}
       triggerProps={{
         'data-component-edit-category': '',
+        'data-validation-target': 'component-category',
         ...(categoryLocked ? { 'data-component-edit-category-locked': '' } : {}),
       }}
       onChange={onCategorySelect}

@@ -45,7 +45,15 @@
   `Essence contribution`, whose subtitle states what a GM must know before authoring one: these
   values are keyed to the essences THIS system uses, and dropping an essence drops them with it.
 -->
-<section class="manager-component-rules-card" data-component-edit-section="essences">
+<!-- The card is the essences row's focus destination (issue 1522): its fix is any one stepper, or
+     the inherit switch while it is locked, so it declares itself focusable. -->
+<section
+  class="manager-component-rules-card"
+  data-component-edit-section="essences"
+  data-validation-target="component-essences"
+  tabindex="-1"
+  data-keyboard-focus="true"
+>
   <div class="manager-component-rules-card-head">
     <i class="fas fa-flask-vial manager-component-rules-card-glyph is-info" aria-hidden="true"></i>
     <div>

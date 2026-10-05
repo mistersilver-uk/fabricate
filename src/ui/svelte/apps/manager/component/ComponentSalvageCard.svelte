@@ -205,7 +205,14 @@
     />
   {/if}
 
-  <Field as="div" data-salvage-result-groups="">
+  <!-- The two salvage result rows' focus destination (issue 1522): their fix is any row in it. -->
+  <Field
+    as="div"
+    data-salvage-result-groups=""
+    data-validation-target="component-salvage-results"
+    tabindex="-1"
+    data-keyboard-focus="true"
+  >
     {#if salvageProgressive}
       <ComponentSalvageStages
         {text}
@@ -420,7 +427,13 @@
                 options={salvageRouteOptions}
                 ariaLabelledBy={`${instanceId}-salvage-route-${routeIndex}`}
                 disabled={saving}
-                triggerProps={{ 'data-salvage-route': outcomeName }}
+                triggerProps={{
+                  'data-salvage-route': outcomeName,
+                  // The routing row's control: querySelector lands on the FIRST unrouted outcome.
+                  ...(salvageDraft.outcomeRouting[outcomeName]
+                    ? {}
+                    : { 'data-validation-target': 'component-salvage-routing' }),
+                }}
                 onChange={(next) => onSetRoute(outcomeName, next)}
               />
             </div>

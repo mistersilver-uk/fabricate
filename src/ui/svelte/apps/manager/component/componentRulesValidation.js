@@ -48,6 +48,22 @@ const SEVERITY = {
   progressiveDc: 'warning',
 };
 
+/**
+ * WHICH CONTROL EACH CHECK NAMES — the `data-validation-target` half, carried by the Rules tab's
+ * cards. Both salvage result checks name the result editor, because their fix is any row in it.
+ */
+export const COMPONENT_RULES_VALIDATION_CONTROLS = Object.freeze({
+  category: 'component-category',
+  essences: 'component-essences',
+  salvageResults: 'component-salvage-results',
+  salvageResultRules: 'component-salvage-results',
+  salvageRouting: 'component-salvage-routing',
+  progressiveDc: 'component-progressive-dc',
+});
+
+/** The one tab every row routes to: the Rules tab, where all six controls live. */
+const RULES_ROUTE = 'rules';
+
 /** The two groups, in render order. */
 export const COMPONENT_RULES_VALIDATION_GROUPS = [
   {
@@ -126,6 +142,16 @@ export function componentRulesValidation(context = {}) {
       blocking: checks.filter((check) => !check.valid && check.severity === 'blocking').length,
     },
   };
+}
+
+/**
+ * The Validation tab's badge, in the shape `EditorTabs` takes: the worst severity's count, or none.
+ * An early-return chain rather than a nested ternary, which SonarCloud reports as S3358.
+ */
+function validationBadge(counts) {
+  if (counts.blocking > 0) return { count: counts.blocking, tone: 'danger' };
+  if (counts.warnings > 0) return { count: counts.warnings, tone: 'warning' };
+  return null;
 }
 
 /** One check's row status; an early-return chain, because SonarCloud reports a nested ternary. */
@@ -207,9 +233,9 @@ const DETAILS = {
 
 /**
  * The grouped rows in the shape `EditorValidationSurface` takes. The check SET, its order and every
- * severity come from the evaluator; this only maps them onto copy, and it FILTERS BEFORE IT MAPS so
- * an absent check is dropped rather than dereferenced half-built inside a render. `phrase` defaults
- * to token replacement over the fallback, so a unit test needs no localization seam.
+ * severity come from the evaluator; this maps them onto copy, a failing row's address and the badge;
+ * it FILTERS BEFORE IT MAPS so an absent check is dropped rather than dereferenced half-built in a
+ * render. `phrase` defaults to token replacement over the fallback, so a test needs no localization.
  */
 export function componentRulesValidationPresentation(
   context = {},
@@ -241,12 +267,18 @@ export function componentRulesValidationPresentation(
         detail: check.valid
           ? ''
           : phrase(detailKey, detailFallback, { names: names[id] ?? '', count: check.count }),
+        // A PASSING check gets no address: it has nothing to fix, so its row draws no View.
+        ...(!check.valid && {
+          target: RULES_ROUTE,
+          focusTarget: COMPONENT_RULES_VALIDATION_CONTROLS[id],
+        }),
       };
     });
 
   return {
     checks,
     counts,
+    badge: validationBadge(counts),
     groups: COMPONENT_RULES_VALIDATION_GROUPS.map((group) => ({
       id: group.id,
       label: phrase(group.labelKey, group.fallback, {}),

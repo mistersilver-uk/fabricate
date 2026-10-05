@@ -3,22 +3,20 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import { componentRulesValidationPresentation } from '../../src/ui/svelte/apps/manager/component/componentRulesValidation.js';
-import { cardFormat, cardText, componentCardHarness } from '../helpers/componentEditViewModules.js';
+import {
+  callRecorder,
+  cardFormat,
+  cardText,
+  componentCardHarness,
+} from '../helpers/componentEditViewModules.js';
 
 const harness = componentCardHarness('ComponentRulesValidationTab');
-
-const SUMMARY = Object.freeze({
-  status: 'block',
-  icon: 'fas fa-circle-xmark',
-  title: 'These rules have gaps',
-  sub: 'What Smithing needs from this component.',
-});
 
 describe('ComponentRulesValidationTab', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
 
-  it('draws one hooked row per check, worded by status, under the summary it is given', async () => {
+  it('draws one hooked row per check, worded by status, under the hero its counts derive', async () => {
     const validation = componentRulesValidationPresentation(
       {
         category: 'general',
@@ -31,7 +29,14 @@ describe('ComponentRulesValidationTab', () => {
       },
       cardFormat
     );
-    const target = await harness.mount({ text: cardText, summary: SUMMARY, validation });
+    const { calls, record } = callRecorder();
+    const target = await harness.mount({
+      text: cardText,
+      format: cardFormat,
+      systemLabel: 'Smithing',
+      validation,
+      onSelectIssue: record('select'),
+    });
 
     const root = target.querySelector('[data-component-edit-validation]');
     assert.ok(Boolean(root), 'the surface carries the editor hook');
@@ -40,6 +45,7 @@ describe('ComponentRulesValidationTab', () => {
       'block'
     );
     assert.match(root.textContent, /These rules have gaps/);
+    assert.match(root.textContent, /What Smithing needs from this component/);
 
     const expected = validation.groups.flatMap((group) => group.rows.map((row) => row.id));
     const rows = [...root.querySelectorAll('[data-component-validation-check]')];
@@ -74,6 +80,17 @@ describe('ComponentRulesValidationTab', () => {
         `a ${status} row reads "${word}"`
       );
     }
+
+    // A failing row's View hands the view its route and control; a passing row offers none.
+    for (const row of rows) {
+      assert.equal(
+        Boolean(row.querySelector('[data-component-validation-view]')),
+        !row.classList.contains('is-pass'),
+        `${row.dataset.componentValidationCheck}: a View exactly when the row fails`
+      );
+    }
+    root.querySelector(':scope [data-component-validation-check="essences"] button').click();
+    assert.deepEqual(calls, [['select', 'rules', 'component-essences']]);
     harness.remount();
   });
 });

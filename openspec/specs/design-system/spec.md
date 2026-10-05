@@ -1792,7 +1792,7 @@ The surface is HANDED its counts, so the rule belongs to the site: the site deri
 The system overview route is the worked case — it reports warning and blocking, omits pass because its report counts ISSUES rather than checks run and so has nothing to derive one from, and gives a severity outside the three, such as `info`, no chip of its own.
 That route is outside this requirement's scope for the reason recorded below, and the subset rule still binds it, because it reaches the route through the VOCABULARY this paragraph closes rather than through the arrangement the requirement fixes — a closed vocabulary is closed wherever its words are used.
 
-The Component Rules tab and the three world scoped entry pages render the shared surface but their producers name no route, so they offer no focus action yet.
+The three world scoped entry pages render the shared surface but their producers name no route, so they offer no focus action yet.
 That is outstanding debt against this requirement rather than an exemption, and a follow-up issue is owed under epic #1495 — owed rather than named, because none has been filed.
 The system overview route is NOT in this requirement's scope and is recorded alongside it so the two are not confused: it collects every issue across a whole crafting system, groups them by the entity that owns each one, and is a route rather than an editor's tab.
 The system overview measurement lives in `scripts/lib/designSystemPrimitives.json` so that it is not re-proposed as an unconverted call site of the shared surface.
