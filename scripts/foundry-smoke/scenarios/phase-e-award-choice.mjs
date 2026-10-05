@@ -7,9 +7,9 @@
  * Asserted in every profile; nothing is captured.
  */
 
-import { joinWorldSession } from '../../lib/foundryBrowserBoot.js';
 import { appendAllowedConsoleErrorPatterns } from '../../lib/foundrySmokeSignal.js';
 import { dismissStandingPrompts, withinTime } from '../pageOps/chatCardCrafts.mjs';
+import { awaitPageResponsive, openJoinedClient } from '../pageOps/joinedClient.mjs';
 import {
   attachConsoleCapture,
   closeOpenApplications,
@@ -252,25 +252,17 @@ async function readJournal(page, { crafterId, runId }) {
 
 /**
  * A second client joined as `userLabel` with Fabricate ready, its console and page errors gated by
- * the run's waivers; `errors()` answers the unwaived ones.
+ * the run's waivers; `errors()` answers the unwaived ones. `openJoinedClient` closes it on failure.
  */
 async function joinAs(page, userLabel) {
-  const context = await page
-    .context()
-    .browser()
-    .newContext({ viewport: { width: 1920, height: 1080 } });
-  await suppressFoundryTours(context);
-  const clientPage = await context.newPage();
   const sinks = { consoleErrors: [], waivedConsoleErrors: [], consoleLog: [] };
   const waivers = appendAllowedConsoleErrorPatterns(
     [/favicon/i],
     readAllowedConsoleErrorPatternsCsv()
   );
-  attachConsoleCapture(clientPage, waivers, sinks);
-  await clientPage.goto(new URL('/join', page.url()).href, { waitUntil: 'domcontentloaded' });
-  await joinWorldSession(clientPage, { userLabel });
-  await clientPage.waitForFunction(() => game?.ready === true && Boolean(game.fabricate), null, {
-    timeout: 120_000,
+  const { context, clientPage } = await openJoinedClient(page, userLabel, {
+    prepareContext: suppressFoundryTours,
+    preparePage: (clientPage) => attachConsoleCapture(clientPage, waivers, sinks),
   });
   return { context, clientPage, errors: () => [...sinks.consoleErrors] };
 }
@@ -511,5 +503,12 @@ export async function runAwardChoice(ctx) {
     const { snapshot, charmName } = forge;
     await restoreWorld(ctx, { crafterId: cleanup.crafterId, snapshot, charmName });
     await closeOpenApplications(page).catch(() => {});
+    await awaitPageResponsive(page).catch((error) => {
+      ctx.results.steps.push({
+        step: 'award-choice-gm-responsive',
+        passed: false,
+        error: error.message,
+      });
+    });
   }
 }

@@ -513,16 +513,27 @@ async function runSystemImport({ file, conflictMode }) {
 }
 
 /**
+ * Refresh the manager's store, resolved when the import lands rather than when it started: the GM
+ * can close the manager mid-import, and closing nulls the store. Answers whether it was still open.
+ */
+async function refreshOpenManager(io) {
+  const store = io.adminStore();
+  if (!store) return false;
+  await store.refresh();
+  return true;
+}
+
+/**
  * Announce one completed import and assemble the GM-readable report, or `null` for an
- * already-existing system that was skipped. The admin-store refresh is unguarded on purpose: it
- * sits outside the import's `try`, so a null store throws out of the service rather than being
- * reported as a failed import.
+ * already-existing system that was skipped or a manager closed while the import ran, whose
+ * announcement toast is then the GM's whole record. Outside the import's `try`, so nothing here
+ * is ever reported as a failed import.
  */
 async function reportSystemImport(summary, io) {
   if (summary.system.skipped) {
     // "already exists — skipped" stays a toast; it does not open the report.
     ui.notifications.info(`System "${summary.system.name}" already exists — skipped.`);
-    await io.adminStore().refresh();
+    await refreshOpenManager(io);
     return null;
   }
 
@@ -536,13 +547,13 @@ async function reportSystemImport(summary, io) {
     ui.notifications.info(message);
   }
 
-  await io.adminStore().refresh();
+  if (!(await refreshOpenManager(io))) return null;
 
   const buildReport = io.importReportBuilder ?? buildImportReportContent;
   return buildReport(summary, (key, data) => localize(key, data));
 }
 
-/** The two import dialogs. Both refresh the admin store; only one does so inside its `try`. */
+/** The two import dialogs. Both refresh the manager's store, and only while it is still open. */
 function importServices(io) {
   return {
     renderImportDialog: async (systemId) => {
@@ -577,7 +588,7 @@ function importServices(io) {
         try {
           const data = JSON.parse(result.raw).map((r) => ({ ...r, craftingSystemId: systemId }));
           await game.fabricate.getRecipeManager().importRecipes(data, result.overwrite);
-          await io.adminStore().refresh();
+          await refreshOpenManager(io);
         } catch (error) {
           ui.notifications.error(`Import failed: ${error.message}`);
         }

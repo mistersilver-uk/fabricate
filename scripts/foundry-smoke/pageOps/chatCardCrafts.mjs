@@ -4,22 +4,100 @@
  * and collect exactly the messages that craft created.
  */
 
+import { describeClickTarget, ensurePageRendering } from './pageRendering.mjs';
 import { chooseSelectOption } from './selectControl.mjs';
 
 export const ROLL_PROMPT = '.manager-modal[data-roll-prompt]';
 
 /**
  * Close every standing roll prompt through its own close control. Never Escape: with focus on the
- * page body Foundry answers it by opening its main menu over the next prompt.
+ * page body Foundry answers it by opening its main menu over the next prompt. The click is the
+ * DOM's own, because a prompt a failed case abandoned is the one Playwright could not act on, and
+ * teardown must not depend on the actionability that just failed.
  */
 export async function dismissStandingPrompts(page) {
-  const close = page.locator(`${ROLL_PROMPT} [data-manager-modal-close]`);
-  for (let attempt = 0; attempt < 5 && (await close.count()) > 0; attempt += 1) {
-    await close
-      .last()
-      .click({ timeout: 5000 })
-      .catch(() => {});
-    await page.waitForTimeout(200);
+  await page.evaluate((selector) => {
+    for (const close of document.querySelectorAll(`${selector} [data-manager-modal-close]`)) {
+      close.click();
+    }
+  }, ROLL_PROMPT);
+}
+
+/**
+ * What a standing prompt looks like to the page when Playwright cannot act on it: how many stand,
+ * where each is hosted, whether its box moves across frames, what covers its centre, and any
+ * disabling ancestor. Diagnostic only; it never throws.
+ */
+export async function describeStandingPrompts(page) {
+  return await page
+    .evaluate(async (selector) => {
+      const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+      const prompts = [...document.querySelectorAll(selector)];
+      const boxes = [];
+      for (let sample = 0; sample < 4 && prompts.length > 0; sample += 1) {
+        const { x, y, width, height } = prompts.at(-1).getBoundingClientRect();
+        boxes.push([x, y, width, height].map(Math.round).join(','));
+        await frame();
+      }
+      return {
+        visibility: document.visibilityState,
+        focused: document.hasFocus(),
+        boxes,
+        prompts: prompts.map((prompt) => {
+          const { x, y, width, height } = prompt.getBoundingClientRect();
+          const top = document.elementFromPoint(x + width / 2, y + height / 2);
+          const style = getComputedStyle(prompt);
+          return {
+            host: prompt.closest('.application')?.id || prompt.parentElement?.className || null,
+            disabledBy: prompt
+              .closest('[aria-disabled="true"], [inert], fieldset[disabled]')
+              ?.outerHTML?.slice(0, 120),
+            coveredBy: prompt.contains(top) ? null : (top?.outerHTML?.slice(0, 120) ?? null),
+            animation: style.animationName,
+            transition: style.transitionProperty,
+          };
+        }),
+      };
+    }, ROLL_PROMPT)
+    .catch((error) => ({ unreadable: error.message }));
+}
+
+/** Close every standing prompt and resolve once none is left, so the next prompt is one craft's. */
+export async function clearStandingPrompts(page, timeout = 30_000) {
+  await dismissStandingPrompts(page);
+  try {
+    await page.locator(ROLL_PROMPT).first().waitFor({ state: 'detached', timeout });
+  } catch (error) {
+    const seen = JSON.stringify(await describeStandingPrompts(page));
+    throw new Error(`a dismissed prompt still stands. The page saw: ${seen}`, { cause: error });
+  }
+}
+
+/**
+ * End a craft a failed case abandoned: dismiss its prompt whenever one shows, until the craft
+ * itself settles, so a prompt that mounts late can never answer the next case's craft.
+ */
+export async function abandonCraft(page, crafted, timeout = 60_000) {
+  const done = crafted.then(
+    () => true,
+    () => true
+  );
+  // A race against an already-settled promise answers false only while the craft is still open.
+  const settledNow = () => Promise.race([done, Promise.resolve(false)]);
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (await settledNow()) return;
+    const shown = page
+      .locator(ROLL_PROMPT)
+      .first()
+      .waitFor({ state: 'visible', timeout: Math.max(deadline - Date.now(), 1) })
+      .then(
+        () => false,
+        () => false
+      );
+    const settled = await Promise.race([done, shown]);
+    await clearStandingPrompts(page).catch(() => {});
+    if (settled) return;
   }
 }
 
@@ -203,15 +281,37 @@ export function withinTime(promise, ms, what) {
 export async function rollPublicly(page, { bonus = '', choice = null } = {}) {
   const prompt = page.locator(ROLL_PROMPT).last();
   await prompt.waitFor({ state: 'visible', timeout: 15_000 });
+  // Every click below waits for its target to hold still across frames, so none can land on a
+  // page that renders none.
+  const stall = await ensurePageRendering(page);
+  if (stall) {
+    process.stdout.write(
+      `  The GM page had stopped rendering; brought it to the front. While stalled: ${JSON.stringify(stall)}\n`
+    );
+  }
   if (bonus) await prompt.locator('input[name="situationalBonus"]').fill(bonus);
-  await chooseSelectOption(page, prompt.locator('.mode-field .fabricate-select-trigger'), {
-    value: 'publicroll',
-  });
+  const trigger = prompt.locator('.mode-field .fabricate-select-trigger');
+  await withTargetDiagnostics(trigger, () =>
+    chooseSelectOption(page, trigger, { value: 'publicroll' })
+  );
   const button = choice
     ? prompt.locator(`button[data-action="${choice}"]`)
     : prompt.locator('button[type="submit"]');
-  await button.click();
+  await withTargetDiagnostics(button, () => button.click());
   await prompt.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+}
+
+/** Run `act` on `target`, adding what the target and its page looked like when it failed. */
+async function withTargetDiagnostics(target, act) {
+  try {
+    await act();
+  } catch (error) {
+    const seen = JSON.stringify({
+      target: await describeClickTarget(target),
+      prompts: await describeStandingPrompts(target.page()),
+    });
+    throw new Error(`${error.message}\nThe page saw: ${seen}`, { cause: error });
+  }
 }
 
 /**
