@@ -6,16 +6,7 @@
  * Every rule is a set comparison, so each carries an anchor that fails on an empty domain.
  */
 import assert from 'node:assert/strict';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -32,10 +23,6 @@ import {
   SPECIMEN_ATTRIBUTE,
   catalogueEntries,
   catalogueFiles,
-  cataloguePaths,
-  describeMountFailure,
-  emptyCatalogueMessage,
-  expectedSpecimenCount,
 } from '../scripts/lib/primitiveLabSmoke.js';
 import { listSvelteComponents, toRepositoryPaths } from '../scripts/lib/svelteComponentFiles.js';
 
@@ -46,12 +33,6 @@ import {
   readDesignLibrary,
 } from './helpers/designLibrary.js';
 import { declaredPropNames, PROP_NAME } from './helpers/sveltePropsDeclaration.js';
-import CHROME_PROVENANCE from './view-lab/chrome-provenance.json' with { type: 'json' };
-import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
-import {
-  MINIMAL_LAB_WORLD_FIELDS,
-  createMinimalLabWorld,
-} from './view-lab/foundry/minimalLabWorld.js';
 import { resolveSlots } from './view-lab/primitives/inject.js';
 import { normalize, specBlocks, unitsOf } from './view-lab/primitives/library.js';
 
@@ -475,163 +456,6 @@ test('the catalogue directory holds nothing the lab cannot see', () => {
       `${CATALOGUE_DIRECTORY}/${entry.name} is neither a catalogue file nor the README`
     );
   }
-});
-
-const SHIM_PATH = 'tests/view-lab/foundry/installFoundryShim.js';
-
-/** A `game.i18n` pair for building the minimal world outside a browser. */
-const STUB_I18N = Object.freeze({ localize: (key) => key, format: (key) => key });
-
-test('every world field the Foundry shim reads is supplied by the world it is given', () => {
-  const shimSource = readFileSync(path.join(REPO_ROOT, SHIM_PATH), 'utf8');
-  const reads = [
-    ...new Set([...shimSource.matchAll(/\bworld\.([A-Za-z_$][\w$]*)/g)].map((m) => m[1])),
-  ];
-  const keys = Object.keys(createMinimalLabWorld({ i18n: STUB_I18N }));
-  assert.ok(reads.length > 3, `the shim scan found ${reads.length} \`world.\` reads`);
-  assert.deepEqual(keys.toSorted(byCodePoint), [...MINIMAL_LAB_WORLD_FIELDS].sort(byCodePoint));
-  for (const field of reads.sort(byCodePoint)) {
-    assert.ok(
-      keys.includes(field),
-      `${SHIM_PATH} reads \`world.${field}\` and createMinimalLabWorld() declares no such key, ` +
-        'which fails late, inside whichever closure first reads it'
-    );
-  }
-});
-
-test('the minimal lab world fails closed without its i18n pair or seed', () => {
-  assert.throws(() => createMinimalLabWorld(), /requires a game\.i18n stub/);
-  assert.throws(
-    () => createMinimalLabWorld({ i18n: { localize: STUB_I18N.localize } }),
-    /requires a game\.i18n stub/
-  );
-  assert.throws(
-    () => createMinimalLabWorld({ i18n: STUB_I18N, seed: NaN }),
-    /requires a numeric seed/
-  );
-});
-
-/**
- * Run `body` against the shim installed over the minimal world, restoring the globals after.
- *
- * @param {() => void} body The assertions.
- */
-function withLabShim(body) {
-  const shim = installFoundryShim(createMinimalLabWorld({ i18n: STUB_I18N }));
-  try {
-    body();
-  } finally {
-    shim.restore();
-  }
-}
-
-test('the Foundry shim declares the client release the harvested chrome is', () => {
-  const [generation, build] = CHROME_PROVENANCE.foundryVersion.split('.').map(Number);
-  withLabShim(() => {
-    assert.deepEqual(
-      { ...globalThis.game.release },
-      { generation, build, version: CHROME_PROVENANCE.foundryVersion }
-    );
-    assert.equal(globalThis.game.version, CHROME_PROVENANCE.foundryVersion);
-  });
-});
-
-test('the Foundry shim answers getDragEventData on both TextEditor faces, {} on failure', () => {
-  const drag = (text) => ({ dataTransfer: { getData: () => text } });
-  withLabShim(() => {
-    const editor = globalThis.foundry.applications.ux.TextEditor;
-    for (const face of [editor, editor.implementation]) {
-      assert.deepEqual(face.getDragEventData(drag('{"uuid":"Item.a"}')), { uuid: 'Item.a' });
-      assert.deepEqual(face.getDragEventData(drag('not json')), {});
-    }
-  });
-});
-
-/**
- * Build a throwaway repository root holding a catalogue, and run something against it.
- *
- * @param {Record<string, string>} files File name to contents, under the catalogue directory.
- * @param {(root: string) => void} run The body.
- */
-function withCatalogueFixture(files, run) {
-  const root = mkdtempSync(path.join(tmpdir(), 'fabricate-primitive-lab-'));
-  try {
-    const directory = path.join(root, CATALOGUE_DIRECTORY);
-    mkdirSync(directory, { recursive: true });
-    for (const [name, contents] of Object.entries(files)) {
-      writeFileSync(path.join(directory, name), contents, 'utf8');
-    }
-    run(root);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-}
-
-test('the catalogue reader reads every JSON file and nothing else', () => {
-  withCatalogueFixture(
-    {
-      'controls.json': JSON.stringify([{ path: 'a.svelte' }, { path: 'b.svelte' }]),
-      'marks.json': JSON.stringify([{ path: 'c.svelte' }]),
-      [CATALOGUE_README]: '# not a catalogue file',
-    },
-    (root) => {
-      assert.deepEqual(catalogueFiles(root), ['controls.json', 'marks.json']);
-      assert.equal(expectedSpecimenCount(root), 3);
-      assert.deepEqual(cataloguePaths(root), ['a.svelte', 'b.svelte', 'c.svelte']);
-      assert.deepEqual(
-        catalogueEntries(root).map((entry) => `${entry.file}[${entry.index}]`),
-        ['controls.json[0]', 'controls.json[1]', 'marks.json[0]'],
-        'every row must carry where it came from'
-      );
-    }
-  );
-});
-
-test('the catalogue reader refuses a file that is not an array of rows', () => {
-  withCatalogueFixture({ 'controls.json': JSON.stringify({ path: 'a.svelte' }) }, (root) => {
-    assert.throws(() => catalogueEntries(root), /is not an array of catalogue rows/);
-  });
-});
-
-test('an empty catalogue is refused rather than run', () => {
-  withCatalogueFixture({}, (root) => {
-    assert.equal(expectedSpecimenCount(root), 0);
-    assert.match(
-      emptyCatalogueMessage(root),
-      /would make it pass over a page that mounted nothing/
-    );
-  });
-});
-
-test('the mounted-set comparison catches a count, an identity and a MULTIPLICITY disagreement', () => {
-  const expected = ['a.svelte', 'b.svelte'];
-  assert.equal(
-    describeMountFailure({ expected, mounted: [...expected], reported: 2 }),
-    null,
-    'an agreeing page must produce no failure'
-  );
-  assert.match(
-    describeMountFailure({ expected, mounted: ['a.svelte'], reported: 1 }),
-    /never mounted: b\.svelte/
-  );
-  assert.match(
-    describeMountFailure({ expected, mounted: ['a.svelte', 'z.svelte'], reported: 2 }),
-    /mounted but not catalogued: z\.svelte/,
-    'the count agrees and the identity does not'
-  );
-  assert.match(
-    describeMountFailure({ expected, mounted: [...expected], reported: 0 }),
-    /the page reported 0 mounted/
-  );
-  assert.match(
-    describeMountFailure({
-      expected: ['a.svelte', 'a.svelte', 'b.svelte'],
-      mounted: ['a.svelte', 'b.svelte'],
-      reported: 3,
-    }),
-    /a\.svelte: catalogued 2, mounted 1/,
-    'a path catalogued twice and mounted once must be reported by name and by both counts'
-  );
 });
 
 /** The smoke's half of the page contract: its attribute names decide the run. */

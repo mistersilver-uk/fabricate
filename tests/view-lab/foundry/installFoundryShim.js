@@ -3,7 +3,6 @@
  * `game.settings` is the entire persistence layer.
  */
 import { registerCountRoll } from '../../../src/systems/countRoll.js';
-import CHROME_PROVENANCE from '../chrome-provenance.json' with { type: 'json' };
 import { createLabDialogV2 } from '../foundryDialog.js';
 import { createLabRollPromptAnswerer } from '../rollPromptAnswer.js';
 import {
@@ -16,17 +15,6 @@ import {
 import { installLabRandom } from './labRandom.js';
 import { createLabRoll } from './labRoll.js';
 import { LAB_TERM_CLASSES } from './labRollTerms.js';
-
-/**
- * The client the lab declares itself, read from the harvested build whose chrome it renders, in
- * core's `ReleaseData` shape (issue 1487). `essenceIcons.js` reads `game.release.generation`.
- */
-const [LAB_GENERATION, LAB_BUILD] = CHROME_PROVENANCE.foundryVersion.split('.').map(Number);
-const LAB_RELEASE = Object.freeze({
-  generation: LAB_GENERATION,
-  build: LAB_BUILD,
-  version: `${LAB_GENERATION}.${LAB_BUILD}`,
-});
 
 /**
  * Compose the Map key for one setting.
@@ -362,8 +350,6 @@ export function installFoundryShim(world) {
 
   const game = {
     ready: true,
-    release: LAB_RELEASE,
-    version: LAB_RELEASE.version,
     user: gmUser,
     users: usersCollection([playerUser]),
     actors: Object.assign(createCollection(world.actorList), {

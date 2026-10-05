@@ -6,12 +6,11 @@
 import { mount } from 'svelte';
 
 import { FABRICATE_THEME_ATTRIBUTE, FABRICATE_THEME_IDS } from '../../../src/ui/theme.js';
-import { installFoundryShim } from '../foundry/installFoundryShim.js';
-import { createMinimalLabWorld } from '../foundry/minimalLabWorld.js';
 import { configureLabPage } from '../foundryFrame.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 
 import { loadComponent } from './importers.js';
+import { installPrimitiveLabFoundry } from './labFoundry.js';
 import LiveSpecimen from './LiveSpecimen.svelte';
 import { applySlotBox, buildSpecimenFrame, describeCollapsedSlot, readSlotBox } from './slot.js';
 import {
@@ -90,7 +89,7 @@ async function boot() {
   const box = readSlotBox(row);
 
   const i18n = toI18nStub(await createLocalizer());
-  installFoundryShim(createMinimalLabWorld({ i18n }));
+  installPrimitiveLabFoundry(i18n);
   configureLabPage();
 
   const { frame, root } = buildSpecimenFrame({
