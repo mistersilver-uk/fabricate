@@ -106,7 +106,14 @@ export function settleCompendiumClaim(snapshot, existing, source) {
   if (!compendiumUuid || own.includes(compendiumUuid) || !claimsAny(existing, own)) return snapshot;
   const aliasItemUuids = (snapshot.aliasItemUuids || []).filter((ref) => ref !== compendiumUuid);
   if (!getItemMatchUuids(existing).includes(compendiumUuid)) {
-    return { ...snapshot, originItemUuid: snapshot.registeredItemUuid, aliasItemUuids };
+    const withheld = { ...snapshot, originItemUuid: snapshot.registeredItemUuid, aliasItemUuids };
+    // A withheld claim fell back to nothing, so it reports no broken-source fallback either.
+    if (snapshot.sourceFallbacks) {
+      withheld.sourceFallbacks = snapshot.sourceFallbacks.filter(
+        (fallback) => fallback.brokenUuid !== compendiumUuid
+      );
+    }
+    return withheld;
   }
   if (snapshot.originItemUuid === compendiumUuid) return snapshot;
   return { ...snapshot, aliasItemUuids: [...aliasItemUuids, compendiumUuid] };

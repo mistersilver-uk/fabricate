@@ -402,6 +402,41 @@ describe('a re-registration neither adds nor releases a compendium-source claim'
   }
 });
 
+describe('a withheld compendium claim reports no broken-source fallback', () => {
+  it('re-importing an own-keyed component whose entry no longer resolves warns of nothing', async () => {
+    const scroll = worldScroll('fire');
+    const { manager } = world({
+      documents: [scroll],
+      components: [
+        {
+          id: 'comp-fire',
+          name: scroll.name,
+          img: 'icons/svg/item-bag.svg',
+          registeredItemUuid: scroll.uuid,
+          originItemUuid: scroll.uuid,
+        },
+      ],
+    });
+
+    const result = await manager.addItemFromUuid('sys1', scroll.uuid);
+
+    assert.equal(result.action, 'skipped');
+    assert.deepEqual(result.sourceFallbacks, []);
+  });
+
+  it('a first import whose entry does not resolve still reports the fallback it took', async () => {
+    const scroll = worldScroll('fire');
+    const { manager } = world({ documents: [scroll] });
+
+    const result = await manager.addItemFromUuid('sys1', scroll.uuid);
+
+    assert.deepEqual(result.item.aliasItemUuids, [ENTRY_UUID]);
+    assert.deepEqual(result.sourceFallbacks, [
+      { itemName: scroll.name, brokenUuid: ENTRY_UUID, fallbackUuid: scroll.uuid },
+    ]);
+  });
+});
+
 describe('a durable leaf at find-existing', () => {
   const leaf = (role, id) => ({ fabricate: { fabricate: { roles: { sys1: { [role]: id } } } } });
   const stamped = (document, role) => document.flags.fabricate.fabricate.roles.sys1[role];
