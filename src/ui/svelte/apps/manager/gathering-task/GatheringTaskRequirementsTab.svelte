@@ -1,7 +1,7 @@
 <!--
   The gathering task editor's Requirements tab (issue 1522): what an attempt needs — availability,
-  stamina, the task's check modifiers and check override, and its required tools. The availability
-  menus and the tool search and page are bound through from the view.
+  stamina, the task's check modifiers and check override, and its required tools. The tool search
+  and page are bound through from the view; the availability menus close when the tab is left.
 -->
 <script>
   import SubjectModifierPicker from '../SubjectModifierPicker.svelte';
@@ -29,7 +29,6 @@
     gatheringModifierDefaultIds = [],
     libraryTools = [],
     managedItemOptions = [],
-    availabilityMenuOpen = $bindable(),
     toolSearchTerm = $bindable(),
     toolPageIndex = $bindable(),
     toolPageSize = $bindable(),
@@ -45,7 +44,6 @@
   {weatherOptions}
   {timeOfDayOptions}
   {biomeOptions}
-  bind:menuOpen={availabilityMenuOpen}
   {onUpdateTask}
 />
 

@@ -689,11 +689,19 @@ export function registerGatheringCases() {
       'the rail holds the selected-drop editor'
     );
 
-    target.querySelector('[data-gathering-task-back]').click();
+    // A save keeps the tab; leaving and re-entering, even the same task, opens on Overview.
+    target.querySelector('[data-gathering-add-drop="toolbar"]').click();
     await settleRouteExit();
-    await openEditor('task', 'task-cavern');
-    assert.equal(selectedTab(), 'overview', 'the next task opens on Overview');
-    assert.ok(!target.querySelector('aside.manager-inspector'), 'with no rail');
+    headerSaveButton(target).click();
+    await settleRouteExit();
+    assert.equal(selectedTab(), 'results', 'Save keeps the tab');
+    for (const task of ['task-herbs', 'task-cavern']) {
+      target.querySelector('[data-gathering-task-back]').click();
+      await settleRouteExit();
+      await openEditor('task', task);
+      assert.equal(selectedTab(), 'overview', `${task} reopens on Overview`);
+      assert.ok(!target.querySelector('aside.manager-inspector'), 'with no rail');
+    }
   });
 
   it('keeps the drop table`s page across a tab round trip', async () => {
@@ -716,6 +724,116 @@ export function registerGatheringCases() {
     await openTaskTab('results');
     assert.equal(page(), 'Page 2 of 2', 'the page survives the round trip');
     assert.ok(Boolean(target.querySelector('[data-gathering-task-drop-id="drop-trip-6"]')));
+  });
+
+  // Every list state the view owns, each set away from its default on its own tab (issue 1522).
+  const DROPS = '.manager-task-drops-card';
+  const BROWSER = '[data-gathering-task-component-browser]';
+  const TOOLS = '[data-gathering-task-required-tools]';
+  const pageOf = (card) => target.querySelector(`${card} [data-pagination-page]`).textContent.trim();
+  const pageSizeOf = (card) => selectTriggerText(target, `${card} [data-pagination-size]`);
+  const pressIn = async (selector) => {
+    target.querySelector(selector).click();
+    await settleRouteExit();
+  };
+  const TAB_SURVIVING_STATES = [
+    {
+      state: 'pageSize',
+      tab: 'results',
+      set: () => chooseSelectOption(target, `${DROPS} [data-pagination-size]`, 10),
+      read: () => pageSizeOf(DROPS),
+      expected: '10',
+    },
+    {
+      state: 'componentPageIndex',
+      tab: 'results',
+      set: () => pressIn(`${BROWSER} [data-pagination-next]`),
+      read: () => pageOf(BROWSER),
+      expected: 'Page 2 of 2',
+    },
+    {
+      state: 'componentPageSize',
+      tab: 'results',
+      set: () => chooseSelectOption(target, `${BROWSER} [data-pagination-size]`, 9),
+      read: () => pageSizeOf(BROWSER),
+      expected: '9',
+    },
+    {
+      state: 'selectedComponentTags',
+      tab: 'results',
+      set: async () => {
+        setInputValue(target.querySelector(':scope [data-gathering-component-tag-search] input'), 'moon');
+        await settleRouteExit();
+        await pressIn('[data-gathering-component-tag-suggestion="moon"]');
+      },
+      read: () =>
+        [...target.querySelectorAll('[data-gathering-component-tag-pill]')]
+          .map((pill) => pill.dataset.gatheringComponentTagPill)
+          .join(','),
+      expected: 'moon',
+    },
+    {
+      state: 'toolPageIndex',
+      tab: 'requirements',
+      set: () => pressIn(`${TOOLS} [data-pagination-next]`),
+      read: () => pageOf(TOOLS),
+      expected: 'Page 2 of 2',
+    },
+    {
+      state: 'toolPageSize',
+      tab: 'requirements',
+      set: () => chooseSelectOption(target, `${TOOLS} [data-pagination-size]`, 9),
+      read: () => pageSizeOf(TOOLS),
+      expected: '9',
+    },
+  ];
+
+  it('keeps every list state the view owns across a tab round trip', async () => {
+    await openTasks({
+      extendedComponentCards: true,
+      taskDropRows: Array.from({ length: 12 }, (_, index) => ({
+        id: `drop-trip-${index + 1}`,
+        componentId: 'c1',
+        quantity: 1,
+        dropRate: 10,
+        enabled: true,
+      })),
+      gatheringLibraryTools: Array.from({ length: 8 }, (_, index) => ({
+        id: `tool-${index}`,
+        label: `Tool ${index}`,
+        enabled: true,
+        componentId: 'c1',
+      })),
+    });
+    await openEditor('task', 'task-herbs');
+    for (const { state, tab, set, read, expected } of TAB_SURVIVING_STATES) {
+      await openTaskTab(tab);
+      await set();
+      await settleRouteExit();
+      assert.equal(read(), expected, `precondition: ${state} is set`);
+      await openTaskTab('overview');
+      await openTaskTab(tab);
+      assert.equal(read(), expected, `${state} survives the round trip`);
+    }
+  });
+
+  // The one piece of editor state that does NOT survive a tab switch: an open menu is transient.
+  it('closes an open availability menu when its tab is left', async () => {
+    await openTasks();
+    await openEditor('task', 'task-herbs');
+    await openTaskTab('requirements');
+    const trigger = () =>
+      target.querySelector(':scope [data-gathering-task-field="biomes"] .manager-condition-menu-button');
+    await pressIn('[data-gathering-task-field="biomes"] .manager-condition-menu-button');
+    assert.equal(trigger().getAttribute('aria-expanded'), 'true', 'precondition: the menu opens');
+    await openTaskTab('overview');
+    assert.ok(
+      !document.querySelector('[data-gathering-task-availability-option]'),
+      'its portaled panel leaves with the tab'
+    );
+    await openTaskTab('requirements');
+    assert.equal(trigger().getAttribute('aria-expanded'), 'false', 'and it is shut on return');
+    assert.ok(!document.querySelector('[data-gathering-task-availability-option]'));
   });
 
   it('shows the economy cards the system economy turns on', async () => {
@@ -807,6 +925,7 @@ export function registerGatheringCases() {
     target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click();
     await tick();
     flushSync();
+    await openTaskTab('results');
 
     const results = target.querySelector('[data-gathering-task-results="straight"]');
     const adder = results.querySelector('[data-recipe-add="result-item"]');

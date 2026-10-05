@@ -1,17 +1,19 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The gathering task editor (issue 1522): a tab strip over one tab panel — Overview, Requirements
-  and Results, each in `gathering-task/`. The tab is the caller's (`activeTab`, `onTabChange`). The
-  lists' searches, pages and tag picks live here, so they survive a tab switch and reset together
-  when the task changes.
+  The gathering task editor (issue 1522): a fixed tab strip over one scrolling tab panel — Overview,
+  Requirements and Results, each in `gathering-task/`. The tab is the caller's (`activeTab`,
+  `onTabChange`). The lists' searches, pages and tag picks live here, so they survive a tab switch;
+  the Results tab's blocking errors and warnings mark its tab, so they show from every tab.
 -->
 <script>
   import EmptyState from '../../components/EmptyState.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import GatheringTaskEditorTabs from './gathering-task/GatheringTaskEditorTabs.svelte';
   import GatheringTaskOverviewTab from './gathering-task/GatheringTaskOverviewTab.svelte';
   import GatheringTaskRequirementsTab from './gathering-task/GatheringTaskRequirementsTab.svelte';
   import GatheringTaskResultsTab from './gathering-task/GatheringTaskResultsTab.svelte';
+  import { resultNoticeCopy } from './gathering-task/taskResultNoticeCopy.js';
 
   let {
     task = null,
@@ -67,6 +69,7 @@
         : 'd100'
   );
 
+  // The route change that switches the task unmounts this view, so it is these lists' reset.
   let searchTerm = $state('');
   let pageIndex = $state(0);
   let pageSize = $state(5);
@@ -74,10 +77,6 @@
   let componentTagSearchTerm = $state('');
   let selectedComponentTags = $state([]);
   let componentPageIndex = $state(0);
-  let lastTaskId = $state('');
-  // One open flag per availability menu (issue 1458), so the task-switch reset below can force
-  // all three shut; mutual exclusion comes from `SearchablePopover`'s outside-click dismissal.
-  let availabilityMenuOpen = $state({ biomes: false, timeOfDay: false, weather: false });
   let componentPageSize = $state(6);
   let toolSearchTerm = $state('');
   let toolPageIndex = $state(0);
@@ -96,19 +95,38 @@
       rewardRules?.rewardSelectionMode !== 'allDrops'
   );
 
-  $effect(() => {
-    if (task?.id === lastTaskId) return;
-    searchTerm = '';
-    pageIndex = 0;
-    componentSearchTerm = '';
-    componentTagSearchTerm = '';
-    selectedComponentTags = [];
-    componentPageIndex = 0;
-    availabilityMenuOpen = { biomes: false, timeOfDay: false, weather: false };
-    toolSearchTerm = '';
-    toolPageIndex = 0;
-    lastTaskId = task?.id || '';
-  });
+  const copy = resultNoticeCopy(text);
+  const resultErrors = $derived(
+    taskResolutionMode === 'straight' || taskResolutionMode === 'routed'
+      ? (Array.isArray(resultValidationErrors) ? resultValidationErrors : [])
+          .map((error) => String(error || '').trim())
+          .filter(Boolean)
+      : []
+  );
+  const noRoutedTiers = $derived(
+    taskResolutionMode === 'routed' &&
+      (Array.isArray(routedOutcomeTiers) ? routedOutcomeTiers : []).length === 0
+  );
+  const rewardRuleWarning = $derived(
+    taskResolutionMode === 'd100' && Boolean(showRewardRuleNotice)
+  );
+  const resultMarks = $derived(
+    [
+      resultErrors.length > 0 && {
+        vehicle: 'issue',
+        tone: 'danger',
+        label: resultErrors.length,
+        name: copy.validation(resultErrors.length),
+      },
+      noRoutedTiers && { vehicle: 'issue', tone: 'warning', label: 1, name: copy.noRoutedTiers() },
+      rewardRuleWarning && {
+        vehicle: 'issue',
+        tone: 'warning',
+        label: 1,
+        name: copy.rewardRule(),
+      },
+    ].filter(Boolean)
+  );
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -123,9 +141,21 @@
   data-gathering-task-editor
 >
   {#if task}
-    <GatheringTaskEditorTabs {activeTab} onSelect={onTabChange} />
+    <GatheringTaskEditorTabs {activeTab} badges={{ results: resultMarks }} onSelect={onTabChange} />
+    <!-- The blocking notice's page position, outside the scroller so it stays in view. -->
+    {#if activeTab === 'results' && resultErrors.length > 0}
+      <div class="manager-editor-notice-position" data-notice-position="page">
+        <Notice
+          blocking
+          tone="danger"
+          title={copy.validation(resultErrors.length)}
+          detail={resultErrors.join('; ')}
+          data-gathering-task-results-validation
+        />
+      </div>
+    {/if}
     <div
-      class="manager-gathering-task-panel"
+      class="manager-editor-tab-panel manager-gathering-task-panel"
       role="tabpanel"
       id={`gathering-task-panel-${activeTab}`}
       aria-labelledby={`gathering-task-tab-${activeTab}`}
@@ -152,7 +182,6 @@
           {gatheringModifierDefaultIds}
           {libraryTools}
           {managedItemOptions}
-          bind:availabilityMenuOpen
           bind:toolSearchTerm
           bind:toolPageIndex
           bind:toolPageSize
@@ -166,8 +195,8 @@
           {task}
           {taskResolutionMode}
           {routedOutcomeTiers}
-          {resultValidationErrors}
-          {showRewardRuleNotice}
+          {noRoutedTiers}
+          {rewardRuleWarning}
           selectedRowId={selectedDrop?.id || ''}
           {rewardRules}
           {itemCards}
@@ -215,11 +244,10 @@
 </main>
 
 <style>
-  /* The panel carries the card stack the view's own grid used to: rows sized to each card. */
+  /* The panel scrolls the card stack the view's own grid used to: rows sized to each card. */
   .manager-gathering-task-panel {
     display: grid;
     grid-auto-rows: auto;
     gap: var(--fab-space-3);
-    min-width: 0;
   }
 </style>

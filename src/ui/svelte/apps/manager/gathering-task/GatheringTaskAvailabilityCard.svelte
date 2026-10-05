@@ -1,7 +1,7 @@
 <!--
   The gathering task's availability card (issue 1522): biome, time-of-day and weather gates, each an
-  add menu over a removable chip row with one polite live summary. `menuOpen` is bound from the view,
-  whose task-switch reset shuts every menu. Writes the kind's whole list through `onUpdateTask`.
+  add menu over a removable chip row with one polite live summary. The menus' open flags are the
+  card's own, so leaving the tab closes them. Writes the kind's whole list through `onUpdateTask`.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -17,9 +17,10 @@
     weatherOptions = [],
     timeOfDayOptions = [],
     biomeOptions = [],
-    menuOpen = $bindable({ biomes: false, timeOfDay: false, weather: false }),
     onUpdateTask = () => {},
   } = $props();
+
+  let menuOpen = $state({ biomes: false, timeOfDay: false, weather: false });
 
   function conditionOptions(kind) {
     if (kind === 'weather') return weatherOptions;
@@ -177,8 +178,7 @@
       <Field as="div" data-gathering-task-field={kind}>
         <span>{availabilityFieldLabel(kind)}</span>
         <!-- `SearchablePopover` (issue 1458). `showSearch={false}` keeps
-             `triggerHasPopup="listbox"` truthful, and `bind:open` lets the view's task-switch reset
-             close a portaled panel that would otherwise outlive its task. -->
+             `triggerHasPopup="listbox"` truthful. -->
         <SearchablePopover
           bind:open={menuOpen[kind]}
           options={availabilityMenuOptions(kind)}

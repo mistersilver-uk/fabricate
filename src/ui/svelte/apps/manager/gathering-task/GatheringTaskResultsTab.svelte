@@ -1,8 +1,8 @@
 <!--
-  The gathering task editor's Results tab (issue 1522): a Direct or Check task's result sets, or a
-  d100 task's component browser and drop rules. Its notices lead the tab: the save-blocking result
-  errors in the page position, then the routed-tier and reward-rule warnings in the stacking region.
-  Result sets are written whole through `onUpdateTask({ resultGroups })`.
+  The gathering task editor's Results tab (issue 1522): a Direct or Check task's result sets, a
+  d100 task's component browser and drop rules, or a legacy Progressive task's pointer to Overview.
+  The routed-tier and reward-rule warnings lead it in the stacking region; the view holds the
+  save-blocking notice above the panel. Result sets are written whole via `onUpdateTask`.
 -->
 <script>
   import Button from '../../../components/Button.svelte';
@@ -15,14 +15,15 @@
   import GatheringTaskCard from './GatheringTaskCard.svelte';
   import GatheringTaskComponentBrowserCard from './GatheringTaskComponentBrowserCard.svelte';
   import GatheringTaskDropsCard from './GatheringTaskDropsCard.svelte';
+  import { resultNoticeCopy } from './taskResultNoticeCopy.js';
 
   let {
     text,
     task,
     taskResolutionMode,
     routedOutcomeTiers = [],
-    resultValidationErrors = [],
-    showRewardRuleNotice = false,
+    noRoutedTiers = false,
+    rewardRuleWarning = false,
     selectedRowId = '',
     rewardRules = null,
     itemCards = [],
@@ -47,16 +48,9 @@
     onImportDrop = () => {},
   } = $props();
 
-  const resultGroupMode = $derived(
-    taskResolutionMode === 'straight' || taskResolutionMode === 'routed'
-  );
+  const copy = $derived(resultNoticeCopy(text));
   const resultGroups = $derived(Array.isArray(task?.resultGroups) ? task.resultGroups : []);
   const dropRows = $derived(Array.isArray(task?.dropRows) ? task.dropRows : []);
-  const activeResultValidationErrors = $derived(
-    (Array.isArray(resultValidationErrors) ? resultValidationErrors : [])
-      .map((error) => String(error || '').trim())
-      .filter(Boolean)
-  );
   function normalizeRoutedName(value) {
     return String(value || '')
       .trim()
@@ -75,24 +69,6 @@
       };
     })
   );
-  const showValidationNotice = $derived(resultGroupMode && activeResultValidationErrors.length > 0);
-  const showNoTiersNotice = $derived(
-    taskResolutionMode === 'routed' && routedTierMatches.length === 0
-  );
-  const showRewardNotice = $derived(taskResolutionMode === 'd100' && showRewardRuleNotice);
-
-  function validationTitle(count) {
-    return count === 1
-      ? text(
-          'FABRICATE.Admin.Manager.Environment.Tasks.Results.ValidationBlocksSaveOne',
-          '1 result issue blocks save'
-        )
-      : text(
-          'FABRICATE.Admin.Manager.Environment.Tasks.Results.ValidationBlocksSave',
-          '{count} result issues block save'
-        ).replace('{count}', String(count));
-  }
-
   function newResultGroupId() {
     const random = globalThis.foundry?.utils?.randomID;
     return typeof random === 'function'
@@ -119,38 +95,13 @@
   }
 </script>
 
-{#if showValidationNotice}
-  <div class="manager-task-notices" data-notice-position="page">
-    <Notice
-      blocking
-      tone="danger"
-      title={validationTitle(activeResultValidationErrors.length)}
-      detail={activeResultValidationErrors.join('; ')}
-      data-gathering-task-results-validation
-    />
-  </div>
-{/if}
-{#if showNoTiersNotice || showRewardNotice}
+{#if noRoutedTiers || rewardRuleWarning}
   <div class="manager-task-notices" data-notice-position="stack">
-    {#if showNoTiersNotice}
-      <Notice
-        tone="warning"
-        title={text(
-          'FABRICATE.Admin.Manager.Environment.Tasks.Results.NoRoutedTiers',
-          'Define outcome tiers in the gathering check before routing result sets.'
-        )}
-        data-gathering-routed-no-tiers
-      />
+    {#if noRoutedTiers}
+      <Notice tone="warning" title={copy.noRoutedTiers()} data-gathering-routed-no-tiers />
     {/if}
-    {#if showRewardNotice}
-      <Notice
-        tone="warning"
-        title={text(
-          'FABRICATE.Admin.Manager.Environment.Tasks.RewardRuleNotice',
-          'Multiple drop rows use this component. Current drop rules may award only one matching row.'
-        )}
-        data-gathering-task-reward-rule-notice
-      />
+    {#if rewardRuleWarning}
+      <Notice tone="warning" title={copy.rewardRule()} data-gathering-task-reward-rule-notice />
     {/if}
   </div>
 {/if}
@@ -308,6 +259,19 @@
     {onUpdateDrop}
     {onMoveDrop}
     {onImportDrop}
+  />
+{:else}
+  <EmptyState
+    icon="fas fa-clock-rotate-left"
+    title={text(
+      'FABRICATE.Admin.Manager.Environment.Tasks.Results.ProgressiveTitle',
+      'Results are not authored here'
+    )}
+    hint={text(
+      'FABRICATE.Admin.Manager.Environment.Tasks.Results.ProgressiveHint',
+      'This legacy Progressive task keeps its own results. Choose another mode in the Gathering resolution card on Overview to author results here.'
+    )}
+    data-gathering-task-results="progressive"
   />
 {/if}
 

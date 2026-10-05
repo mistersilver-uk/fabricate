@@ -1082,14 +1082,16 @@ describe('the task editor`s three tabs (issue 1522)', () => {
     );
   });
 
-  it('leads Results with its notices: the blocking errors, then the warnings', async () => {
+  it('leads Results with its notices: the blocking errors above the panel, then the warnings', async () => {
     const { root } = await mountTabs({
       activeTab: 'results',
       routedOutcomeTiers: [],
       resultValidationErrors: ['Rich tier needs a result set', 'A set has no results'],
     });
     const panel = root.querySelector('[role="tabpanel"]');
-    const [page, stack, firstCard] = panel.children;
+    const page = panel.previousElementSibling;
+    assert.ok(page.previousElementSibling.matches('[role="tablist"]'), 'between the strip and panel');
+    const [stack, firstCard] = panel.children;
     assert.equal(page.dataset.noticePosition, 'page');
     const blocking = page.querySelector('[data-gathering-task-results-validation]');
     assert.equal(blocking.getAttribute('role'), 'alert');
@@ -1128,5 +1130,286 @@ describe('the task editor`s three tabs (issue 1522)', () => {
     const formula = root.querySelector('[data-gathering-task-drop-formula]');
     assert.equal(formula.dataset.calloutTone, 'neutral', 'the formula is a permanent rule');
     assert.ok(formula.nextElementSibling.matches('.manager-task-drops-card'));
+  });
+});
+
+describe('the Results tab`s marks, notices and authoring (issue 1522)', () => {
+  const ROUTED_TIERS = [{ id: 'tier-rich', name: 'Rich' }];
+  const row = (id, extra = {}) => ({ id, componentId: 'c1', quantity: 1, dropRate: 10, ...extra });
+
+  /** Mount with `task` controlled through every host callback, as the root does, recording each. */
+  async function mountControlled({ task, ...props }) {
+    const calls = [];
+    let current = task;
+    const record =
+      (name, write = null) =>
+      (...args) => {
+        calls.push([name, ...args]);
+        if (write) current = write(current, ...args);
+      };
+    const root = await harness.mount({
+      task: current,
+      onUpdateTask: record('update', (draft, patch) => ({ ...draft, ...patch })),
+      onSelectDrop: record('select'),
+      onUpdateDrop: record('updateDrop'),
+      onMoveDrop: record('move'),
+      onAddDrop: record('add', (draft) => ({
+        ...draft,
+        dropRows: [...draft.dropRows, row('drop-new')],
+      })),
+      onAddToolReference: record('addTool', (draft, id) => ({
+        ...draft,
+        toolIds: [...(draft.toolIds || []), id],
+      })),
+      ...props,
+    });
+    const sync = () => harness.setProps({ task: current });
+    return {
+      root,
+      calls,
+      sync,
+      task: () => current,
+      press: async (selector) => {
+        const node = root.querySelector(selector);
+        assert.ok(Boolean(node), `${selector} renders`);
+        node.click();
+        await sync();
+      },
+    };
+  }
+
+  /** The Results tab's marks, each as `[tone, label, accessible name]`. */
+  const resultMarks = (root) =>
+    [
+      ...root.querySelectorAll(
+        ':scope [data-gathering-task-tab="results"] [data-gathering-task-tab-badge]'
+      ),
+    ].map((mark) => [
+      mark.dataset.badgeTone,
+      mark.textContent.trim(),
+      mark.getAttribute('aria-label'),
+    ]);
+  const NO_TIERS = 'Define outcome tiers in the gathering check before routing result sets.';
+  const REWARD_RULE =
+    'Multiple drop rows use this component. Current drop rules may award only one matching row.';
+
+  it('marks Results on every tab with its blocking errors and its warning, named by their notices', async () => {
+    const { root } = await mountControlled({
+      task: taskFixture(),
+      resolutionMode: 'routed',
+      routedOutcomeTiers: [],
+      resultValidationErrors: ['Rich tier needs a result set', 'A set has no results'],
+    });
+    for (const tab of ['overview', 'requirements', 'results']) {
+      await harness.setProps({ activeTab: tab });
+      assert.deepEqual(
+        resultMarks(root),
+        [
+          ['danger', '2', '2 result issues block save'],
+          ['warning', '1', NO_TIERS],
+        ],
+        `the Results tab is marked from ${tab}`
+      );
+      assert.equal(root.querySelectorAll('[data-gathering-task-tab-badge]').length, 2, 'only it');
+    }
+    await harness.setProps({
+      resolutionMode: 'd100',
+      task: { ...taskFixture(), dropRows: [row('a'), row('b')] },
+    });
+    assert.deepEqual(resultMarks(root), [['warning', '1', REWARD_RULE]], 'a d100 reward rule');
+  });
+
+  // Each Results notice and mark belongs to one mode; another mode with the same inputs raises none.
+  const OUT_OF_MODE = [
+    { mode: 'straight', props: { routedOutcomeTiers: [] }, absent: '[data-gathering-routed-no-tiers]' },
+    { mode: 'd100', props: { routedOutcomeTiers: [] }, absent: '[data-gathering-routed-no-tiers]' },
+    {
+      mode: 'd100',
+      props: { resultValidationErrors: ['A set has no results'] },
+      absent: '[data-gathering-task-results-validation]',
+    },
+    {
+      mode: 'straight',
+      props: {
+        routedOutcomeTiers: ROUTED_TIERS,
+        rewardRules: { rewardSelectionMode: 'highestRankedDrop' },
+        task: { ...taskFixture(), dropRows: [row('a'), row('b')] },
+      },
+      absent: '[data-gathering-task-reward-rule-notice]',
+    },
+  ];
+  for (const { mode, props, absent } of OUT_OF_MODE) {
+    it(`raises no ${absent} on a ${mode} task`, async () => {
+      const { root } = await mountControlled({
+        task: taskFixture(),
+        activeTab: 'results',
+        resolutionMode: mode,
+        ...props,
+      });
+      assert.ok(Boolean(root.querySelector(':scope [role="tabpanel"] > *')), 'precondition: it renders');
+      assert.ok(!root.querySelector(absent), `${absent} belongs to another mode`);
+      assert.deepEqual(resultMarks(root), [], 'and the tab carries no mark');
+    });
+  }
+
+  it('points a legacy Progressive task`s Results to Overview', async () => {
+    const { root } = await mountControlled({
+      task: taskFixture(),
+      activeTab: 'results',
+      resolutionMode: 'progressive',
+    });
+    const empty = root.querySelector(
+      ':scope [role="tabpanel"] [data-gathering-task-results="progressive"]'
+    );
+    assert.ok(Boolean(empty), 'the panel says why it is empty');
+    assert.match(empty.textContent, /Results are not authored here/);
+    assert.match(empty.textContent, /Gathering resolution card on Overview/);
+  });
+
+  it('adds, renames and removes a Check task`s result sets', async () => {
+    const view = await mountControlled({
+      task: { ...taskFixture(), resultGroups: [] },
+      activeTab: 'results',
+      resolutionMode: 'routed',
+      routedOutcomeTiers: ROUTED_TIERS,
+    });
+    await view.press('[data-gathering-add-result-set="empty"]');
+    assert.equal(view.task().resultGroups.length, 1, 'the empty state adds the first set');
+    await view.press('[data-gathering-add-result-set="footer"]');
+    const [first, second] = view.task().resultGroups;
+    assert.ok(first.id && second.id && first.id !== second.id, 'the footer adds a second');
+    const name = view.root.querySelectorAll('[data-recipe-result-set-field="name"]')[1];
+    name.value = 'Rich';
+    name.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    await view.sync();
+    assert.deepEqual(
+      view.task().resultGroups.map((group) => group.name),
+      ['', 'Rich']
+    );
+    view.root.querySelectorAll('[data-recipe-remove="result-set"]')[0].click();
+    await view.sync();
+    assert.deepEqual(
+      view.task().resultGroups.map((group) => group.id),
+      [second.id]
+    );
+  });
+
+  it('adds the first drop rule from the empty drop table', async () => {
+    const view = await mountControlled({
+      task: { ...taskFixture(), dropRows: [] },
+      activeTab: 'results',
+      resolutionMode: 'd100',
+    });
+    await view.press('[data-gathering-add-drop="empty"]');
+    assert.deepEqual(
+      view.calls.map(([name]) => name),
+      ['add']
+    );
+    assert.ok(Boolean(view.root.querySelector('[data-gathering-task-drop-id="drop-new"]')));
+  });
+
+  // Each card clamps its own page once the list it pages shrinks under it (decision 5).
+  it('returns each paged list to its first page when its last page empties', async () => {
+    const drops = Array.from({ length: 7 }, (_, index) =>
+      row(`drop-${index}`, { name: index < 4 ? `Moss ${index}` : `Ash ${index}` })
+    );
+    const cards = Array.from({ length: 8 }, (_, index) => ({ id: `c${index}`, name: `Part ${index}` }));
+    const tools = Array.from({ length: 7 }, (_, index) => ({
+      id: `tool-${index}`,
+      label: `Tool ${index}`,
+    }));
+    const view = await mountControlled({
+      task: { ...taskFixture(), dropRows: drops, toolIds: [] },
+      activeTab: 'results',
+      resolutionMode: 'd100',
+      itemCards: cards,
+      libraryTools: tools,
+    });
+    const next = (card) => view.press(`${card} [data-pagination-next]`);
+    const count = (selector) => view.root.querySelectorAll(selector).length;
+
+    await next('.manager-task-drops-card');
+    const search = view.root.querySelector(
+      ':scope .manager-task-drops-card input[aria-label="Search drop rules"]'
+    );
+    search.value = 'Ash';
+    search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await view.sync();
+    assert.equal(count('.manager-gathering-task-drop-row'), 3, 'the drop table');
+
+    await next('[data-gathering-task-component-browser]');
+    await harness.setProps({ itemCards: cards.slice(0, 3) });
+    assert.equal(count('[data-gathering-component-card]'), 3, 'the component browser');
+
+    await harness.setProps({ activeTab: 'requirements' });
+    await next('[data-gathering-task-required-tools]');
+    await view.press('[data-gathering-task-required-tools-card="tool-6"]');
+    assert.equal(count('[data-gathering-task-required-tools-card]'), 6, 'the tool library');
+  });
+
+  it('forwards every drop row control to the host', async () => {
+    const view = await mountControlled({
+      task: { ...taskFixture(), dropRows: [row('drop-a'), row('drop-b', { componentId: '' })] },
+      activeTab: 'results',
+      resolutionMode: 'd100',
+      rewardRules: { rewardSelectionMode: 'highestRankedDrop' },
+    });
+    const rowOf = (id) => view.root.querySelector(`[data-gathering-task-drop-id="${id}"]`);
+    rowOf('drop-b').querySelector('[data-gathering-task-drop-move="up"]').click();
+    rowOf('drop-a').querySelector(':scope [data-gathering-task-drop-component-cell] button').click();
+    const quantity = rowOf('drop-a').querySelector('input[aria-label="Quantity"]');
+    quantity.value = '7';
+    quantity.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    quantity.value = '12';
+    quantity.dispatchEvent(new globalThis.Event('blur'));
+    const drop = new globalThis.Event('drop', { bubbles: true, cancelable: true });
+    const payload = JSON.stringify({ type: 'FabricateManagedComponent', componentId: 'c9' });
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: { getData: (type) => (type === 'text/plain' ? payload : '') },
+    });
+    rowOf('drop-b').dispatchEvent(drop);
+    assert.deepEqual(view.calls, [
+      ['move', 'drop-b', 'up'],
+      ['select', 'drop-a'],
+      ['updateDrop', 'drop-a', { quantity: 7 }],
+      ['updateDrop', 'drop-a', { quantity: 12 }],
+      [
+        'updateDrop',
+        'drop-b',
+        { componentId: 'c9', itemUuid: '', systemItemId: '', name: '', enabled: true },
+      ],
+      ['select', 'drop-b'],
+    ]);
+  });
+
+  it('forwards the description, the respawn expression and the stamina modifier list', async () => {
+    const fixture = taskFixture();
+    const respawn = { ...fixture.nodes.respawn, gainMode: 'expression' };
+    const view = await mountControlled({
+      task: { ...fixture, nodes: { ...fixture.nodes, respawn } },
+      nodesEnabled: true,
+      staminaEnabled: true,
+      characterModifierLibrary: [{ id: 'mod-a', label: 'Herbalism' }],
+    });
+    const type = (selector, value) => {
+      const field = view.root.querySelector(selector);
+      field.value = value;
+      field.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    };
+    type('[data-gathering-task-field="description"]', 'Under old roots');
+    type('[data-gathering-task-node-amount]', '1d6');
+    assert.equal(view.task().description, 'Under old roots');
+    assert.equal(view.task().nodes.respawn.amountExpression, '1d6');
+
+    await harness.setProps({ activeTab: 'requirements', task: view.task() });
+    await view.press('[data-gathering-add-stamina-modifier]');
+    assert.equal(view.task().staminaCostModifiers.length, 2, 'Add modifier appends a row');
+    await view.press('[data-gathering-stamina-modifier="mod-row-1"] [aria-label="Remove"]');
+    assert.deepEqual(
+      view.task().staminaCostModifiers.map((entry) => entry.modifierId),
+      ['mod-a'],
+      'and Remove drops the authored one'
+    );
+    assert.notEqual(view.task().staminaCostModifiers[0].id, 'mod-row-1');
   });
 });

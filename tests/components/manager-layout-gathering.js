@@ -717,12 +717,12 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'tool identity drop zones should fill the stable component column'
   );
   assert.ok(
-    editorBlock.includes('grid-auto-rows: auto;'),
-    'task edit route should size rows to each card so sections can be reordered; the fixed-height cards (component browser, drops) set their own height'
+    editorBlock.includes('flex-direction: column;'),
+    'task editor should stack its fixed tab bar and page notice over the tab panel (issue 1522)'
   );
   assert.ok(
-    editorBlock.includes('overflow: auto;'),
-    'task editor should allow vertical scrolling without horizontal overflow'
+    editorBlock.includes('overflow: hidden;'),
+    'task editor should leave scrolling to its tab panel, so the tab bar stays in view'
   );
   assert.ok(
     availabilityBlock.includes('grid-template-columns: repeat(2, minmax(160px, 1fr));'),

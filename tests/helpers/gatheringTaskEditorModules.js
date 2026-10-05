@@ -27,4 +27,5 @@ export const GATHERING_TASK_EDITOR_COMPILED_MODULES = Object.freeze([
 /** Plain modules the parts import. */
 export const GATHERING_TASK_EDITOR_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/gathering-task/taskEditorLookups.js',
+  'src/ui/svelte/apps/manager/gathering-task/taskResultNoticeCopy.js',
 ]);
