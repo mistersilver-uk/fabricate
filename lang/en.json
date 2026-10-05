@@ -4,7 +4,20 @@
     "Common": {
       "General": "General",
       "Picker": {
-        "NoMatches": "No matches"
+        "NoMatches": "No matches",
+        "Loading": "Loading…",
+        "Error": "The list could not load"
+      },
+      "SetPicker": {
+        "Add": "Add",
+        "Search": "Search…",
+        "Count": "{matched} of {total}",
+        "Selected": "{count} selected",
+        "Pending": "{added} to add · {removed} to remove",
+        "Clear": "Clear all",
+        "Apply": "Apply",
+        "More": "+{count} more",
+        "MoreName": "and {count} more"
       },
       "Stepper": {
         "Decrease": "Decrease {label}",
@@ -8074,12 +8087,11 @@
         "RecipeItem": {
           "BackToBrowse": "Back to Books & Scrolls",
           "Contents": {
-            "Empty": "No recipes linked yet. Use “Link recipe” to add one.",
+            "EditRecipes": "Edit recipes",
+            "Empty": "No recipes linked yet. Use “Edit recipes” to add one.",
             "Heading": "Recipes inside",
-            "Hint": "The recipes a reader can learn from this item. Remove any that shouldn’t be taught here.",
-            "LinkRecipe": "Link recipe",
-            "NoneLinkable": "Every recipe is already linked",
-            "Remove": "Remove recipe",
+            "Hint": "The recipes a reader can learn from this item. Use “Edit recipes” to add or remove them, then Apply.",
+            "NoRecipes": "This system has no recipes yet.",
             "SearchRecipes": "Search recipes…",
             "Title": "Recipes inside",
             "Uncategorized": "General"

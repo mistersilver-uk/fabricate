@@ -167,6 +167,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte',
     'src/ui/svelte/apps/alchemy/Workbench.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+    // Its sources picker (issue 1782).
+    'src/ui/svelte/components/SetPicker.svelte',
     'src/ui/svelte/apps/crafting/CraftButton.svelte',
     'src/ui/svelte/apps/crafting/CraftingView.svelte',
     'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',

@@ -882,10 +882,10 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     query: { tab: 'crafting' },
     steps: [{ selector: '[data-crafting-sources-add]' }],
-    // The portaled form, as of the phase that routed this control onto the shared picker.
+    // The portaled form, as of the phase that routed this control onto the set picker (issue 1782).
     expectSelector:
-      '.fabricate-picker-popover.crafting-sources-popover ' +
-      '.manager-travel-popover-options .crafting-source-option',
+      '.fabricate-picker-popover.fabricate-set-picker-popover ' +
+      '.manager-travel-popover-options .fabricate-set-picker-option',
     kinds: ['player', 'crafting'],
     // `apps/crafting/ComponentSourcesBar.svelte` named explicitly rather than left to `CRAFTING_SHARED`.
     sourceMatches: [
