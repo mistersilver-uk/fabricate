@@ -102,6 +102,23 @@ describe('ComponentCategoryTagsCards', () => {
     const toggles = [...target.querySelectorAll('[data-component-edit-tag-toggle]')];
     assert.equal(toggles.length, 2);
     assert.ok(toggles.every((toggle) => toggle.disabled));
+    assert.ok(target.querySelector('[data-component-edit-category]').disabled, 'the category too');
+    harness.remount();
+  });
+
+  it('re-derives the tag subtitle and own-group label when the world run and system change', async () => {
+    const target = await harness.mount(props({ worldTags: [], hasWorldEntry: false }).props);
+    const subtitle = () =>
+      target.querySelector(
+        ':scope [data-component-edit-section="tags"] .manager-component-rules-card-sub'
+      ).textContent;
+    assert.match(subtitle(), /Smithing’s item tags/);
+    await harness.setProps({ worldTags: ['metal'], hasWorldEntry: true, systemLabel: 'Alchemy' });
+    assert.match(subtitle(), /Alchemy’s own are the ones in effect/);
+    assert.equal(
+      target.querySelector('[data-component-own-tags-label]').textContent,
+      'Alchemy’s tags'
+    );
     harness.remount();
   });
 });

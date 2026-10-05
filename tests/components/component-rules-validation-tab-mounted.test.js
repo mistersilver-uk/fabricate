@@ -22,6 +22,9 @@ describe('ComponentRulesValidationTab', () => {
     const validation = componentRulesValidationPresentation(
       {
         category: 'general',
+        // Offered with no total, so one row warns beside the passing and blocking ones.
+        essencesOffered: true,
+        essenceTotal: 0,
         salvageFeatureEnabled: true,
         salvageEnabled: true,
         resultCount: 0,
@@ -49,6 +52,28 @@ describe('ComponentRulesValidationTab', () => {
       rows.some((row) => /\bBlocks\b/.test(row.textContent)),
       'a blocking row reads the editor’s own status word'
     );
+    const counts = Object.fromEntries(
+      [...root.querySelectorAll('[data-editor-validation-count]')].map((count) => [
+        count.dataset.editorValidationCount,
+        count.textContent.trim(),
+      ])
+    );
+    assert.deepEqual(counts, {
+      passing: String(validation.counts.passing),
+      warnings: String(validation.counts.warnings),
+      blocking: String(validation.counts.blocking),
+    });
+    const statuses = validation.groups.flatMap((group) => group.rows.map((row) => row.status));
+    for (const [status, word] of [
+      ['pass', 'Pass'],
+      ['warn', 'Warning'],
+    ]) {
+      assert.ok(statuses.includes(status), `the fixture yields a ${status} row`);
+      assert.ok(
+        rows.some((row) => row.textContent.includes(word)),
+        `a ${status} row reads "${word}"`
+      );
+    }
     harness.remount();
   });
 });

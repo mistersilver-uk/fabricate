@@ -75,6 +75,21 @@ describe('ComponentEssencesCard', () => {
     harness.remount();
   });
 
+  it('holds the switch and every tile while saving', async () => {
+    const { calls, target } = await mountWith({ essenceInheritOffered: true, saving: true });
+    const toggle = target.querySelector('[data-scoped-inherit-toggle="essences"]');
+    assert.ok(toggle.disabled, 'the switch is inert');
+    toggle.click();
+    assert.ok(
+      [
+        ...target.querySelectorAll(':scope [data-component-edit-essence] [data-stepper-increment]'),
+      ].every((button) => button.disabled),
+      'every tile is inert'
+    );
+    assert.deepEqual(calls, []);
+    harness.remount();
+  });
+
   it('withholds the switch where the world authored no map, and forks its two empty states', async () => {
     const { target } = await mountWith({ essenceDraft: [] });
     assert.ok(!target.querySelector('[data-scoped-inherit-toggle]'), 'no switch is offered');

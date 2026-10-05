@@ -848,6 +848,21 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     assert.equal(groups.length, 2, 'both the success and the reserved failure rows render (data not blanked)');
     harness.remount();
   });
+
+  it('the Validation tab’s hero states the worst status the rules reach', async () => {
+    // Salvage on with no stage blocks, so the hero must say so rather than a resting pass.
+    const target = await harness.mount(
+      props({ component: { salvage: { enabled: true, resultGroups: [] } } })
+    );
+    target.querySelector('[data-component-edit-tab="validation"]').click();
+    await flushRender();
+    const hero = target.querySelector(
+      ':scope [data-component-edit-validation] [data-editor-validation-summary]'
+    );
+    assert.equal(hero.dataset.editorValidationSummary, 'block');
+    assert.match(hero.textContent, /These rules have gaps/);
+    harness.remount();
+  });
 });
 
 /* Issue 772, acceptance 15 — the editor's essences section after the extraction. */

@@ -47,6 +47,14 @@ describe('ComponentDifficultyCard', () => {
     harness.remount();
   });
 
+  it('follows a new difficulty from its host', async () => {
+    const { section } = await mountWith(2);
+    assert.equal(section.querySelector('[data-stepper-input]').value, '2');
+    await harness.setProps({ difficulty: 7 });
+    assert.equal(section.querySelector('[data-stepper-input]').value, '7');
+    harness.remount();
+  });
+
   it('is inert while saving', async () => {
     const { staged, section } = await mountWith(4, { saving: true });
     section.querySelector('[data-stepper-increment]').click();
