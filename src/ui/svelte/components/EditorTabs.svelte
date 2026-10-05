@@ -224,8 +224,18 @@
   }
 
   const SEVERITY_KEYS = {
-    danger: ['TabBlockingOne', 'TabBlockingOther', '{count} blocking', '{count} blocking'],
-    warning: ['TabWarningOne', 'TabWarningOther', '{count} warning', '{count} warnings'],
+    danger: [
+      'FABRICATE.Admin.Manager.Validation.TabBlockingOne',
+      'FABRICATE.Admin.Manager.Validation.TabBlockingOther',
+      '{count} blocking',
+      '{count} blocking',
+    ],
+    warning: [
+      'FABRICATE.Admin.Manager.Validation.TabWarningOne',
+      'FABRICATE.Admin.Manager.Validation.TabWarningOther',
+      '{count} warning',
+      '{count} warnings',
+    ],
   };
 
   // The Validation tab's toned counts as words, so severity is not carried by colour alone.
@@ -240,13 +250,7 @@
       if (!keys || !Number.isFinite(count)) return undefined;
       const [oneKey, otherKey, oneText, otherText] = keys;
       const one = count === 1;
-      parts.push(
-        localizeOr(
-          `FABRICATE.Admin.Manager.Validation.${one ? oneKey : otherKey}`,
-          one ? oneText : otherText,
-          { count }
-        )
-      );
+      parts.push(localizeOr(one ? oneKey : otherKey, one ? oneText : otherText, { count }));
     }
     return localizeOr('FABRICATE.Admin.Manager.Validation.TabNameWithIssues', '{label}, {issues}', {
       label: localizeOr(tab.labelKey, tab.label),
