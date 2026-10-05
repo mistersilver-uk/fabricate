@@ -26,11 +26,13 @@ export function accessibleNameOf(root, element) {
 
 /** The text of each id in an `aria-labelledby` list, joined by spaces; absent ids contribute nothing. */
 function namesFromIds(element, ids) {
-  const doc = element.ownerDocument;
-  if (!ids || typeof doc?.getElementById !== 'function') return '';
+  const scope = element.getRootNode?.() ?? element.ownerDocument;
+  if (!ids || typeof scope?.querySelectorAll !== 'function') return '';
+  // Matched by equality rather than a built selector, so an id needs no CSS escaping.
+  const labelled = [...scope.querySelectorAll('[id]')];
   return ids
     .split(/\s+/u)
-    .map((id) => (doc.getElementById(id)?.textContent || '').trim())
+    .map((id) => (labelled.find((node) => node.id === id)?.textContent || '').trim())
     .filter(Boolean)
     .join(' ');
 }
