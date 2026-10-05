@@ -43,6 +43,33 @@ test('the $props() reader survives comments, template literals and commas in str
   ]);
 });
 
+/** Wrap destructure lines in a component's `<script>`. */
+function destructure(...lines) {
+  return ['<script>', '  let {', ...lines.map((line) => `    ${line}`), '  } = $props();', '</script>'].join('\n');
+}
+
+test('the $props() reader keeps every scanner hazard inside its own prop', () => {
+  const cases = [
+    ['a template literal nested in a hole', ['label = `${`${x}, y`}`,', 'after = 1'], ['after', 'label']],
+    ['a quoted brace inside a hole', ['brace = `${"{"}`,', 'after = 1'], ['after', 'brace']],
+    ['an escaped quote', [String.raw`quoted = "a\", b",`, 'after = 1'], ['after', 'quoted']],
+    ['an unterminated block comment', ['alpha = 1, /* never closed'], ['alpha']],
+    ['a trailing comma', ['alpha = 1,', 'beta = 2,'], ['alpha', 'beta']],
+  ];
+  for (const [hazard, lines, expected] of cases) {
+    assert.deepEqual(declaredPropNames(destructure(...lines)), expected, hazard);
+  }
+});
+
+test('the $props() reader never lets a stray closer swallow the commas after it', () => {
+  assert.ok(declaredPropNames(destructure(') first = 1,', 'second = 2')).includes('second'));
+});
+
+test('the $props() reader throws on a source with no `let { … } = $props()` destructure', () => {
+  assert.throws(() => declaredPropNames('<script>let x = 1;</script>'), /no `let \{ … \} = \$props\(\)`/);
+  assert.throws(() => declaredPropNames('<script>x } = $props();</script>'), /no `let/);
+});
+
 test('the $props() reader reports a name for every prop of the components that broke it', () => {
   // The components the old reader mis-parsed that still ship, with the count each one declares.
   const measured = [

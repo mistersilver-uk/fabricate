@@ -18,10 +18,9 @@ export function declaredPropNames(source) {
   if (start === -1 || end <= start) {
     throw new Error('no `let { … } = $props()` destructure found');
   }
+  // A `...rest` entry has no `=` or `:`, so it comes through verbatim.
   return splitTopLevel(source.slice(start + 'let {'.length, end))
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => (entry.startsWith('...') ? entry : entry.split(/[=:]/)[0].trim()))
+    .map((entry) => entry.split(/[=:]/)[0].trim())
     .filter(Boolean)
     .sort((left, right) => left.localeCompare(right));
 }
