@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
+import { createRawSnippet } from 'svelte';
+
 import { componentCatalogue } from '../../src/ui/svelte/apps/manager/recipe/resultRows.js';
 import {
   callRecorder,
@@ -27,6 +29,7 @@ const STAGES = Object.freeze([
   { id: 'res-2', componentId: 'cmp-dust', quantity: 1 },
 ]);
 const GROUP = Object.freeze({ id: 'grp-1', name: '', results: STAGES });
+const DC_CARD = createRawSnippet(() => ({ render: () => '<section data-test-dc-card></section>' }));
 
 async function mountWith(overrides = {}) {
   const { calls, record } = callRecorder();
@@ -44,7 +47,6 @@ async function mountWith(overrides = {}) {
     onMoveStage: record('move'),
     onUpdateResult: record('update'),
     onOpenComponent: record('open'),
-    onDifficultyChange: record('difficulty'),
     ...overrides,
   });
   return { calls, target };
@@ -94,6 +96,8 @@ describe('ComponentSalvageStages', () => {
     const band = target.querySelectorAll('[data-salvage-stage-complication]');
     assert.equal(band.length, 1, 'the crafting-only complication is filtered out');
     assert.ok(!stage(target, 1).classList.contains('has-band'), 'a stage with no band draws none');
+    assert.ok(stage(target, 2).classList.contains('has-band'), 'the stage with a band is marked');
+    assert.ok(!target.querySelector('[data-test-dc-card]'), 'no DC card without the snippet');
     harness.remount();
   });
 
@@ -101,17 +105,37 @@ describe('ComponentSalvageStages', () => {
     const { calls, target } = await mountWith({
       stageGroup: null,
       stages: [],
-      showDifficulty: true,
-      difficulty: 3,
+      difficultyCard: DC_CARD,
     });
     assert.match(target.textContent, /No results yet\./);
     const adder = target.querySelector('[data-add-salvage-result]');
     assert.ok(adder.hasAttribute('data-add-salvage-group'), 'with no group it adds the group');
     adder.click();
-    target
-      .querySelector(':scope [data-component-edit-section="difficulty"] [data-stepper-increment]')
-      .click();
-    assert.deepEqual(calls, [['add'], ['difficulty', 4]]);
+    assert.deepEqual(calls, [['add']]);
+    const card = target.querySelector('[data-test-dc-card]');
+    assert.ok(Boolean(card), 'the view’s DC card renders');
+    assert.ok(
+      adder.compareDocumentPosition(card) === globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
+      'after the adder, closing the list'
+    );
+    harness.remount();
+  });
+
+  it('holds every control while saving', async () => {
+    const { calls, target } = await mountWith({ saving: true });
+    assert.ok(!target.querySelector('[data-sortable-move]'), 'the list is not reorderable');
+    const disabled = [
+      '[data-remove-salvage-result]',
+      '[data-salvage-result-edit]',
+      '[data-salvage-stage-complications-edit]',
+      '[data-add-salvage-result]',
+    ].map((selector) => [selector, target.querySelector(selector).disabled]);
+    assert.deepEqual(
+      disabled,
+      disabled.map(([selector]) => [selector, true])
+    );
+    target.querySelector('[data-remove-salvage-result]').click();
+    assert.deepEqual(calls, []);
     harness.remount();
   });
 });

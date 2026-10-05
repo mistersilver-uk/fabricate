@@ -1,4 +1,3 @@
-<!-- ratchet-exempt(design-system): one card the Component Rules editor places in two positions, ComponentEditView and its progressive stage list, so its two importers are one caller rather than a vocabulary member (issue 1522) -->
 <!--
   "This component's Progressive DC" (issue 676). `component.difficulty` is ONE component-level
   scalar three engines read, so the Component Rules editor renders this card in one of two places:

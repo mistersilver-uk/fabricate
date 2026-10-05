@@ -1140,6 +1140,18 @@
           onToggleTag={toggleTag}
         />
 
+        <!--
+        THE PROGRESSIVE DC CARD, DECLARED ONCE AND RENDERED IN ONE OF TWO PLACES. `component.difficulty`
+        is ONE component-level scalar THREE engines read — progressive recipes, salvage and gathering
+        — so the root gates the card on `componentDifficultyAxisProgressive`, true on any of them. A
+        progressive-salvage system draws it closing the stage list; every other system, which the
+        smoke harness drives, draws it after the salvage card. A `{#snippet}`, so
+        `data-component-edit-section="difficulty"` resolves to exactly one element.
+      -->
+        {#snippet difficultyCard()}
+          <ComponentDifficultyCard {text} {difficulty} {saving} {onDifficultyChange} />
+        {/snippet}
+
         {#if showEssences}
           <ComponentEssencesCard
             {text}
@@ -1197,9 +1209,7 @@
             componentName={salvageComponentName}
             {salvageStageGroup}
             {salvageStages}
-            {showDifficulty}
-            {difficulty}
-            {onDifficultyChange}
+            difficultyCard={showDifficulty ? difficultyCard : undefined}
             onSalvageChange={setSalvage}
             onAddGroup={addSalvageGroup}
             onRemoveGroup={removeSalvageGroup}
@@ -1216,15 +1226,9 @@
           />
         {/if}
 
-        <!--
-        THE PROGRESSIVE DC CARD'S OTHER PLACEMENT: `component.difficulty` is ONE component-level
-        scalar THREE engines read — progressive recipes, salvage and gathering — so the root gates
-        the card on `componentDifficultyAxisProgressive`, true on any of them. A progressive-salvage
-        system draws it closing the stage list; every other system, which the smoke harness drives,
-        draws it here.
-      -->
+        <!-- The DC card's own placement; see the snippet's declaration. -->
         {#if showDifficulty && !(showSalvage && salvageProgressive)}
-          <ComponentDifficultyCard {text} {difficulty} {saving} {onDifficultyChange} />
+          {@render difficultyCard()}
         {/if}
 
         <!-- COMPLICATIONS (issue 1286), last in the body and after Salvage, since it is a

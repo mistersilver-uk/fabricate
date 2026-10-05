@@ -10,7 +10,8 @@
   - `onAddResult(groupId, componentId)`, `onRemoveResult(groupId, resultId)`,
     `onUpdateResult(groupId, result, value)` — a set's rows; the last also serves the stages.
   - `onSetRoute(outcomeName, groupId)` — an outcome's routed set, `''` for unrouted.
-  - The stage, DC and open callbacks are forwarded to `ComponentSalvageStages` unchanged.
+  - The stage and open callbacks, and the view's `difficultyCard` snippet, are forwarded to
+    `ComponentSalvageStages` unchanged.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -69,9 +70,7 @@
     componentName = () => '',
     salvageStageGroup = null,
     salvageStages = [],
-    showDifficulty = false,
-    difficulty = null,
-    onDifficultyChange = () => {},
+    difficultyCard = undefined,
     onSalvageChange = () => {},
     onAddGroup = () => {},
     onRemoveGroup = () => {},
@@ -220,9 +219,7 @@
         {macroOptions}
         {complicationTriggerOptions}
         {componentName}
-        {showDifficulty}
-        {difficulty}
-        {onDifficultyChange}
+        {difficultyCard}
         {onAddStage}
         {onRemoveStage}
         {onMoveStage}

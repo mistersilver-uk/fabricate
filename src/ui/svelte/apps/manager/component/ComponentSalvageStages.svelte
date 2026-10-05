@@ -7,6 +7,8 @@
   - `onAddStage()`, `onRemoveStage(resultId)`, `onMoveStage(from, to)` — the list's three edits.
   - `onUpdateResult(groupId, result, value)` — a stage's picker change.
   - `onOpenComponent(componentId)` — Edit on a stage or its band opens the YIELD component.
+
+  `difficultyCard` is the view's DC card snippet, absent when no progressive surface reads the DC.
 -->
 <script>
   import Button from '../../../components/Button.svelte';
@@ -17,7 +19,6 @@
   // shape, and SonarCloud's copy-paste detector reads `.svelte`.
   import ComplicationSummaryRow from '../ComplicationSummaryRow.svelte';
   import { complicationSummary } from '../../../../model/complicationSummary.js';
-  import ComponentDifficultyCard from './ComponentDifficultyCard.svelte';
 
   let {
     text,
@@ -31,9 +32,7 @@
     macroOptions = [],
     complicationTriggerOptions = [],
     componentName = () => '',
-    showDifficulty = false,
-    difficulty = null,
-    onDifficultyChange = () => {},
+    difficultyCard = undefined,
     onAddStage = () => {},
     onRemoveStage = () => {},
     onMoveStage = () => {},
@@ -245,11 +244,11 @@
                  the referenced component, whose own editor owns its save lifecycle.
                  Its label names complications, so it differs from the row's Edit
                  link. -->
-            <!-- ratchet-exempt(design-system): moved unchanged from ComponentEditView, whose form it still renders inside -->
             <button
               type="button"
               class="manager-salvage-stage-edit"
               data-salvage-stage-complications-edit={result.componentId}
+              data-keyboard-focus="true"
               aria-label={text(
                 'FABRICATE.Admin.Manager.Component.Complications.StripEdit',
                 'Edit complications on {name}'
@@ -303,9 +302,7 @@
   {@render salvageStageAdder()}
 {/if}
 <!-- The reference closes the progressive body with this component's own DC row. -->
-{#if showDifficulty}
-  <ComponentDifficultyCard {text} {difficulty} {saving} {onDifficultyChange} />
-{/if}
+{@render difficultyCard?.()}
 
 <style>
   /* The read-only complication strip (issue 1286). Component-SCOPED and theme-ROOT tokens only, so

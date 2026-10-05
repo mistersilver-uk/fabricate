@@ -2,13 +2,15 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
+import { createRawSnippet } from 'svelte';
+
 import {
   callRecorder,
   cardFormat,
   cardText,
   componentCardHarness,
 } from '../helpers/componentEditViewModules.js';
-import { chooseSelectOption } from '../helpers/select-control.js';
+import { chooseSelectOption, selectTriggerText } from '../helpers/select-control.js';
 
 const harness = componentCardHarness('ComponentSalvageCard');
 
@@ -24,6 +26,7 @@ const GROUPS = Object.freeze([
   },
   { id: 'grp-2', name: '', results: [] },
 ]);
+const DC_CARD = createRawSnippet(() => ({ render: () => '<section data-test-dc-card></section>' }));
 const settle = () => new Promise((done) => setTimeout(done, 0));
 
 async function mountWith(overrides = {}) {
@@ -93,6 +96,26 @@ describe('ComponentSalvageCard', () => {
     harness.remount();
   });
 
+  it('shows a saved route on its outcome’s select', async () => {
+    const { target } = await mountWith({
+      salvageDraft: { enabled: true, outcomeRouting: { Success: 'grp-1' }, resultGroups: GROUPS },
+    });
+    assert.equal(selectTriggerText(target, '[data-salvage-route="Success"]'), 'Scraps');
+    harness.remount();
+  });
+
+  it('holds the result-set controls while saving', async () => {
+    const { target } = await mountWith({ saving: true });
+    const name = target.querySelector(
+      ':scope [data-salvage-group="grp-1"] [data-salvage-group-name]'
+    );
+    assert.ok(name.disabled, 'the set name is read-only');
+    assert.ok(target.querySelector('[data-remove-salvage-group]').disabled);
+    assert.ok(target.querySelector('button[data-add-salvage-group]').disabled);
+    assert.ok(target.querySelector('[data-salvage-route="Success"]').disabled);
+    harness.remount();
+  });
+
   it('hides Add result set at the simple cap, with its hint, and states the disabled notice', async () => {
     const { target } = await mountWith({
       salvageResolutionMode: 'simple',
@@ -124,8 +147,13 @@ describe('ComponentSalvageCard', () => {
         resultGroups: [],
         allowPlayerResultReorder: true,
       },
+      difficultyCard: DC_CARD,
     });
     assert.ok(Boolean(target.querySelector('[data-salvage-roll-budget]')), 'the budget callout');
+    assert.ok(
+      Boolean(target.querySelector(':scope [data-salvage-result-groups] [data-test-dc-card]')),
+      'the view’s DC card closes the stage list'
+    );
     target.querySelector('[data-recipe-field="salvageAllowPlayerResultReorder"]').click();
     target.querySelector(':scope [data-salvage-result-groups] [data-add-salvage-result]').click();
     assert.deepEqual(calls, [['salvage', { allowPlayerResultReorder: false }], ['addStage']]);
