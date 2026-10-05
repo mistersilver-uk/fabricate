@@ -26,6 +26,7 @@
   import Kicker from '../../components/Kicker.svelte';
   import Button from '../../components/Button.svelte';
   import Medallion from '../../components/Medallion.svelte';
+  import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import EssenceChips from './EssenceChips.svelte';
   import Notice from '../../components/Notice.svelte';
@@ -164,10 +165,8 @@
     return lastBrew.message || localize('FABRICATE.App.Alchemy.Banner.Fizzled');
   });
 
-  function handleDrop(event) {
-    event.preventDefault();
-    dragOver = false;
-    const componentId = event.dataTransfer?.getData('text/plain');
+  function handleDrop(data) {
+    const componentId = data?.componentId;
     if (componentId) onDrop?.(componentId);
   }
 </script>
@@ -192,12 +191,12 @@
     role="group"
     aria-label={localize('FABRICATE.App.Alchemy.DropZone')}
     data-alchemy-dropzone
-    ondragover={(event) => {
-      event.preventDefault();
-      dragOver = true;
+    use:dragDrop={{
+      // `is-dragover` is written by the directive above, never by the action: a class only the
+      // action adds can leave the scoped rule matching nothing, and silently in this file.
+      onActiveChange: (active) => (dragOver = active),
+      onDrop: handleDrop,
     }}
-    ondragleave={() => (dragOver = false)}
-    ondrop={handleDrop}
   >
     {#if benchEmpty}
       <!--

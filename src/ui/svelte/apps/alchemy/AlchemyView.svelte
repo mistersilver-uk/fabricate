@@ -80,7 +80,7 @@
   });
 
   function onDragStart(event, componentId) {
-    event.dataTransfer?.setData('text/plain', componentId);
+    event.dataTransfer?.setData('text/plain', JSON.stringify({ componentId }));
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
   }
 </script>
