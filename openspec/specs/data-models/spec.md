@@ -1456,6 +1456,7 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
    A name resolved under GM authority may be visible to a player who could not have resolved it themselves; this is an accepted consequence of write-time resolution.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
 11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
+    The exception is importing again an Item whose own uuid a component already claims without that compendium source: the import adds no alias and reports no fallback (see **Recipe Item Identity → Registration Source Identity**); replace-source is not excepted.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
     12a.
     Every bulk component-import path — compendium pack import, folder import, and the folder-mapping commit — must persist its whole run with a SINGLE `craftingSystems` world-setting write, and the number of writes must not grow with the number of imported items or with the number of mapped folders.
@@ -1815,7 +1816,8 @@ These creation-time stamps write the same `roles[systemId]` leaves the one-shot 
   A pack Item's own uuid is read in both spellings, with and without the document-type segment.
   Re-registering a source whose own uuid a definition already claims neither adds nor releases a compendium-source claim on that definition: an existing claim is kept, in `aliasItemUuids` where the source is now a derivative, and an absent one is not added whatever the name now says.
   For a tool, find-existing does not match through an unresolvable compendium source the registration would only record as an alias.
-- At find-existing a source's durable `roles[systemId]` leaf is honoured, except that for a clone, or for a derivative whose name the named definition does not carry, a leaf naming a definition that does not claim the source's own uuid is an inherited marker: it is ignored, and for a world source the registration overwrites it.
+- For a recipe item and a tool, find-existing honours a source's durable `roles[systemId]` leaf, except that for a clone, or for a derivative whose name the named definition does not carry, a leaf naming a definition that does not claim the source's own uuid is an inherited marker: it is ignored, and for a world source the registration overwrites it.
+  A component's find-existing reads no durable leaf: it keys on the source references alone, and registration overwrites whatever leaf a world source carries.
   A pack source is never stamped at registration, so it keeps the inherited leaf until Repair Item Data reaches it in an unlocked pack.
 - The derivative gate never un-merges.
   A component that absorbed several derivatives before this rule holds each one's uuid in `aliasItemUuids` and still matches them; the recovery is to delete that component and import the Items again.
