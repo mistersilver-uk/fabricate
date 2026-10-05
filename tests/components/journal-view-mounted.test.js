@@ -88,7 +88,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte',
     'src/ui/svelte/apps/journal/ActiveRunsList.svelte',
-    'src/ui/svelte/apps/journal/HistoryRow.svelte',
+    'src/ui/svelte/components/LogList.svelte',
     'src/ui/svelte/apps/journal/HistoryList.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
@@ -309,8 +309,12 @@ describe('JournalView mounted behavior', () => {
     await settle();
     const rows = [...target.querySelectorAll('[data-history-run-id]')];
     assert.equal(rows.length, 4);
+    const finished = target.querySelector('.journal-history-list');
+    assert.equal(finished.getAttribute('aria-label'), 'FABRICATE.App.Journal.History.Title', 'the Finished list is named');
+    assert.ok(rows.every((row) => row.getAttribute('role') === 'button'), 'each Finished entry opens through a button');
+    assert.equal(finished.querySelectorAll(':scope > [role="listitem"]').length, 4, 'one listitem per entry');
     assert.equal(target.querySelectorAll('[data-pagination-compact]').length, 2);
-    assert.ok(!target.querySelector('[data-history-quantity], .journal-history-meta .manager-chip'));
+    assert.ok(!target.querySelector('[data-history-quantity], .fab-log-list-meta .manager-chip'));
     assert.deepEqual(rows.map((row) => row.querySelector('[data-history-outcome]')?.getAttribute('data-history-outcome')),
       ['succeeded', 'failed', 'cancelled', 'unknown']);
     assert.ok(rows.every((row) => row.querySelector('[data-history-outcome]')?.getAttribute('aria-label')));

@@ -687,7 +687,7 @@ test('shared smoke Journal walk uses selection-button identity and composite det
   assert.ok(start > 0 && end > start);
   const walk = source.slice(start, end);
   assert.ok(walk.includes('.journal-run-card[data-run-id]'));
-  assert.ok(walk.includes('.journal-history-row [data-history-run-id]'));
+  assert.ok(walk.includes('.journal-history-list [data-history-run-id]'));
   assert.ok(walk.includes('[data-journal-detail][data-run-key]'));
   assert.ok(walk.includes('[data-journal-history-detail]'));
   assert.doesNotMatch(

@@ -56,6 +56,8 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/SetPicker.svelte',
   // The inspector rail section (issue 1782): the essence, tool and recipe-item inspectors.
   'src/ui/svelte/components/Rail.svelte',
+  // The log list (issue 1782): every tree holding the journal's Finished list renders it.
+  'src/ui/svelte/components/LogList.svelte',
   // Three the manager and the player window both render, adjudicated in when the two-root clause
   // below arrived (issue 1782): the dice faces of a check's evidence and outcome preview, the
   // segmented choice the browse filters and the Checks Studio share, and the inset well the

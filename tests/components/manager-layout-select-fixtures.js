@@ -302,7 +302,7 @@ export const CONVERTED_PAGER_SITES = Object.freeze([
     padding: '12px',
     area: 'fabricate-app',
     wrapper: 'journal-list-section',
-    component: 'src/ui/svelte/apps/journal/HistoryList.svelte',
+    component: 'src/ui/svelte/apps/journal/JournalListShell.svelte',
     // The recomposed Journal footer uses the Pagination rung's own fill.
     fill: 'bg-2',
     floored: true,
