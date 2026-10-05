@@ -732,6 +732,26 @@ describe('RecipeResultGroupCard: a result choice group (issue 1773)', () => {
     assert.deepEqual(range(), { from: null, to: 12 }, 'a cleared end is no end, not 0');
   });
 
+  it('names an unnamed alternative by its kind, as its row does', async () => {
+    const { target } = await mountGroup({
+      ...PLAYER_GROUP,
+      chooser: 'rolled',
+      alternatives: [
+        { id: 'a', kind: 'currency', unit: '', quantity: 1, selectionRange: { from: 1, to: 10 } },
+        { id: 'b', componentId: 'cmp-water', quantity: 1, selectionRange: { from: 5, to: 20 } },
+      ],
+    });
+    const [unnamed, water] = members(target);
+    assert.equal(
+      water.querySelector('[data-recipe-range-problem]').textContent.trim(),
+      'Its range overlaps the range of Currency.'
+    );
+    assert.equal(
+      unnamed.querySelector('[data-recipe-range="from"]').closest('label').textContent.trim(),
+      'Lowest roll selecting Currency'
+    );
+  });
+
   it('marks a range with a fractional end invalid, saying why', async () => {
     const { target } = await mountGroup({
       ...PLAYER_GROUP,

@@ -23,7 +23,7 @@
   import { currencyUnitIcon, currencyUnitLabel } from '../../../util/recipeCurrency.js';
   import PickerRow from './PickerRow.svelte';
   import Button from '../../../components/Button.svelte';
-  import { fromValue, kindMenuItems, toValue } from './pickerRowKinds.js';
+  import { fromValue, kindMenuItems, subjectName, toValue } from './pickerRowKinds.js';
   import { isChoiceGroup, rangeProblems } from '../../../../../utils/choiceGroupShape.js';
   import { localizeOr } from '../../../util/localizeOr.js';
   import ChoiceGroupAwardHeader from './ChoiceGroupAwardHeader.svelte';
@@ -222,9 +222,8 @@
   // stated before it, so a half-typed number does not flash an overlap.
   let held = $state(null);
   const problems = $derived(held ?? (rolled ? rangeProblems(members) : []));
-  const nameOf = (entry) =>
-    offer.catalogue?.[entry?.kind ?? 'component']?.find((item) => item.id === toValue(entry).id)
-      ?.label || localizeOr('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
+  // An alternative is named as its row names itself: its subject, else its kind's word.
+  const nameOf = (entry) => subjectName(toValue(entry), offer.catalogue, localizeOr);
 
   const RANGE_PROBLEMS = {
     fraction: [

@@ -67,6 +67,8 @@
     READONLY_FACES,
     isKnownKind,
     kindMeta,
+    kindWord as wordOfKind,
+    subjectName as nameOfSubject,
   } from './pickerRowKinds.js';
 
   tagMatchGroupSeq += 1;
@@ -115,7 +117,7 @@
   const chosen = $derived(
     value?.id ? entries.find((entry) => entry.id === value.id) || null : null
   );
-  const subjectName = $derived(chosen?.label || kindWord(matchType));
+  const subjectName = $derived(nameOfSubject(value, catalogue, localizeOr));
   // A taught recipe its system no longer holds: named as missing rather than drawn unnamed.
   const missing = $derived(!readonly && matchType === 'knowledge' && Boolean(value?.id) && !chosen);
 
@@ -126,8 +128,7 @@
       .map(({ id, label, icon }) => ({ id, label, icon }))
   );
 
-  const kindWord = (kind) =>
-    isKnownKind(kind) ? localizeOr(kindMeta(kind).labelKey, kindMeta(kind).label) : String(kind);
+  const kindWord = (kind) => wordOfKind(kind, localizeOr);
   // The caller's kinds in table order, plus this row's own kind always.
   const kindOptions = $derived(
     [...KIND_ORDER, ...(misconfigured ? [matchType] : [])]
