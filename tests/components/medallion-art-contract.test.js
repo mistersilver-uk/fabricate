@@ -26,7 +26,7 @@ const ART_RESOLVER = 'resolveCraftingArt(';
 const MEDALLION_SITES = 73;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 57;
+const ART_BEARING_SITES = 56;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>
