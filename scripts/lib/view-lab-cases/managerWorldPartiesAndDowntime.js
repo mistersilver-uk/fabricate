@@ -60,6 +60,9 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^styles\/fabricate\.css$/,
+      // The collapsed rail draws the Downtime parent, so the group that renders it selects this case
+      // (NavSidebar and its rows are broad signals, which name `manager-world-downtime-collapsed`).
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
     ],
   }),
   managerCase({

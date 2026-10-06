@@ -29,29 +29,29 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 test('manager gathering rail submenu controls clear host mouse focus and keep green keyboard focus', () => {
-  const expandedGroupBlock = blockFor('.fabricate-manager .manager-nav-group.is-expanded');
-  const parentBlock = blockFor('.fabricate-manager .manager-nav-parent');
+  const expandedGroupBlock = blockFor('.fabricate-nav .manager-nav-group.is-expanded');
+  const parentBlock = blockFor('.fabricate-nav .manager-nav-parent');
   const expandedParentBlock = blockFor(
-    '.fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent'
+    '.fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent'
   );
   const expandedParentHoverBlock = blockFor(
-    '.fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent:hover'
+    '.fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent:hover'
   );
-  const submenuBlock = blockFor('.fabricate-manager .manager-nav-submenu');
-  const toggleBlock = blockFor('.fabricate-manager .manager-nav-toggle');
+  const submenuBlock = blockFor('.fabricate-nav .manager-nav-submenu');
+  const toggleBlock = blockFor('.fabricate-nav .manager-nav-toggle');
   const expandedToggleBlock = blockFor(
-    '.fabricate-manager .manager-nav-group.is-expanded .manager-nav-toggle'
+    '.fabricate-nav .manager-nav-group.is-expanded .manager-nav-toggle'
   );
-  const toggleFocusBlock = blockFor('.fabricate-manager .manager-nav-toggle:focus');
-  const toggleFocusVisibleBlock = blockFor('.fabricate-manager .manager-nav-toggle:focus-visible');
-  const subitemBlock = blockFor('.fabricate-manager .manager-nav-subitem');
-  const subitemFocusBlock = blockFor('.fabricate-manager .manager-nav-subitem:focus');
-  const activeSubitemBlock = blockFor('.fabricate-manager .manager-nav-subitem.is-active');
+  const toggleFocusBlock = blockFor('.fabricate-nav .manager-nav-toggle:focus');
+  const toggleFocusVisibleBlock = blockFor('.fabricate-nav .manager-nav-toggle:focus-visible');
+  const subitemBlock = blockFor('.fabricate-nav .manager-nav-subitem');
+  const subitemFocusBlock = blockFor('.fabricate-nav .manager-nav-subitem:focus');
+  const activeSubitemBlock = blockFor('.fabricate-nav .manager-nav-subitem.is-active');
   const activeSubitemFocusBlock = blockFor(
-    '.fabricate-manager .manager-nav-subitem.is-active:focus'
+    '.fabricate-nav .manager-nav-subitem.is-active:focus'
   );
   const subitemFocusVisibleBlock = blockFor(
-    '.fabricate-manager .manager-nav-subitem:focus-visible'
+    '.fabricate-nav .manager-nav-subitem:focus-visible'
   );
 
   // AN EXPANDED GROUP IS INDENTED ROWS AGAINST A GUIDE.
@@ -72,7 +72,7 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
   );
   // THE GUIDE IS ON THE SUBMENU, which is where the children actually are — so it starts and
   // ends exactly where they do, which a rule around the whole group could not do.
-  const submenuGuide = blockFor('.fabricate-manager .manager-nav-submenu');
+  const submenuGuide = blockFor('.fabricate-nav .manager-nav-submenu');
   assert.ok(
     submenuGuide.includes('border-left: 1px solid var(--fab-border);'),
     'the indented children are marked with a thin vertical rule instead'
@@ -1718,11 +1718,6 @@ test('World Parties keeps its card scroller and sibling pager independently reac
   });
   const page = await context.newPage();
   try {
-    const nav = Array.from(
-      { length: 10 },
-      (_, index) =>
-        `<button class="manager-nav-button"><span class="manager-nav-label">Section ${index + 1}</span></button>`
-    ).join('');
     // The component's OWN scoped CSS, after the global sheet.
     await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
       <style>${css}</style>
@@ -1738,7 +1733,11 @@ test('World Parties keeps its card scroller and sibling pager independently reac
         data-manager-view="world" data-world-travel-tab="parties">
         <div class="probe-titlebar"></div><div class="probe-header"></div>
         <div class="manager-body">
-          <aside class="manager-rail"><nav class="manager-nav">${nav}</nav></aside>
+          <aside class="manager-rail"><nav class="fabricate-nav manager-nav">${Array.from(
+            { length: 10 },
+            (_, index) =>
+              `<button class="manager-nav-button"><span class="manager-nav-label">Section ${index + 1}</span></button>`
+          ).join('')}</nav></aside>
           <main class="manager-main">
             <div class="manager-gathering-panel manager-travel-view is-parties-pane">${productContractMarkup}</div>
           </main>
@@ -1950,7 +1949,7 @@ async function measureTravelPane({ width, height }, paneMarkup, probes) {
       <div class="fabricate fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="world-travel">
         <div class="probe-titlebar"></div><div class="probe-header"></div>
         <div class="manager-body">
-          <aside class="manager-rail"><nav class="manager-nav">Rail</nav></aside>
+          <aside class="manager-rail"><nav class="fabricate-nav manager-nav">Rail</nav></aside>
           <main class="manager-main">${paneMarkup}</main>
           <aside class="manager-inspector">Inspector</aside>
         </div>

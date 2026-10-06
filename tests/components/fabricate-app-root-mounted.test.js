@@ -826,6 +826,11 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
         + 'scrollbar in it once a thin classic scrollbar takes its ~12px'
     );
     assert.match(ruleBody(css, 'fabricate-app-nav-label'), /font-size:\s*10px/, 'labels are 10px');
+    assert.match(
+      ruleBody(css, 'fabricate-app-nav-label'),
+      /text-overflow:\s*ellipsis/,
+      'an unbounded companion label truncates rather than scrolling the 72px rail'
+    );
   });
 
   it("puts the journal count pip on the well's outer corner with a ground ring", async () => {
@@ -836,12 +841,13 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
 
     const pip = root.querySelector('[data-nav-count="journal"]');
     assert.equal(pip?.textContent, '3', 'the journal entry renders its active-run count');
+    assert.ok(pip.classList.contains('fabricate-app-nav-count'), 'it is the namespaced pip');
     assert.ok(
       pip.parentElement.classList.contains('fabricate-app-nav-well'),
       'the pip is positioned against the icon well, never against the whole item'
     );
     const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
-    const pipRule = /\.fabricate-app \.fabricate-app-nav-count\s*\{([^}]*)\}/.exec(sheet)?.[1] ?? '';
+    const pipRule = /\.fabricate-nav \.fabricate-app-nav-count\s*\{([^}]*)\}/.exec(sheet)?.[1] ?? '';
     assert.match(pipRule, /top:\s*-3px/, 'the pip overhangs the top edge of the well');
     assert.match(pipRule, /right:\s*-3px/, 'and its right edge, clear of the glyph');
     assert.match(

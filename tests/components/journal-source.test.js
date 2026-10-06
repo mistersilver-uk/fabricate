@@ -45,8 +45,7 @@ describe('FabricateAppRoot Journal wiring', () => {
 
   it('feeds an active-run count badge from the shared store navCount', () => {
     assert.ok(rootSource.includes('services?.journal?.navCount'), 'badge count comes from the store navCount getter');
-    assert.ok(rootSource.includes('fabricate-app-nav-count'), 'badge element uses the namespaced class');
-    assert.ok(rootSource.includes('{#if tab.count > 0}'), 'badge only renders for a positive count');
+    assert.ok(rootSource.includes('tab.count > 0'), 'badge only renders for a positive count');
   });
 
   it('registers shell-level Journal refresh so the badge stays fresh while the tab is closed', () => {
@@ -284,7 +283,7 @@ describe('Journal global CSS treatments', () => {
   });
 
   it('adds the namespaced nav-count badge with no colour literals', () => {
-    assert.ok(cssSource.includes('.fabricate-app .fabricate-app-nav-count'), 'nav-count rule present');
+    assert.ok(cssSource.includes('.fabricate-nav .fabricate-app-nav-count'), 'nav-count rule present');
     assert.ok(cssSource.includes('background: var(--fab-success);'), 'badge tokenized');
   });
 });

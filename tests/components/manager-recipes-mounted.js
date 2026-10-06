@@ -1146,15 +1146,15 @@ export function registerRecipesCases() {
     const target = await openRecipeEditor(calls);
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit');
 
-    const scopeSelect = target.querySelector('[data-manager-scope-select]');
-    const current = scopeSelect.value;
-    const other = Array.from(scopeSelect.options)
-      .map((option) => option.value)
-      .find((value) => value !== current);
+    const current = openSelectPanel(target, '[data-manager-scope-select]').querySelector(
+      '[role="option"][aria-selected="true"]'
+    )?.dataset.popoverOption;
+    const other = selectOptionValues(target, '[data-manager-scope-select]').find(
+      (value) => value !== current
+    );
     assert.ok(other, 'a second crafting system is available to switch to');
 
-    scopeSelect.value = other;
-    scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-manager-scope-select]', other);
     await tick();
     flushSync();
 
@@ -1176,13 +1176,14 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    const scopeSelect = target.querySelector('[data-manager-scope-select]');
-    const other = Array.from(scopeSelect.options)
-      .map((option) => option.value)
-      .find((value) => value !== scopeSelect.value);
+    const current = openSelectPanel(target, '[data-manager-scope-select]').querySelector(
+      '[role="option"][aria-selected="true"]'
+    )?.dataset.popoverOption;
+    const other = selectOptionValues(target, '[data-manager-scope-select]').find(
+      (value) => value !== current
+    );
 
-    scopeSelect.value = other;
-    scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-manager-scope-select]', other);
     await tick();
     flushSync();
 
@@ -1199,6 +1200,32 @@ export function registerRecipesCases() {
       !calls.some((call) => call[0] === 'selectSystem' && call[1] === other),
       'the system is not switched when the discard is cancelled'
     );
+  });
+
+  // The shared Select reports a pick of the ticked row as a change, which the native select never
+  // did; choosing the system already in scope must stay a no-op (issue 1777).
+  it('leaves a dirty recipe editor alone when the GM picks the system already in scope', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls, { confirmDiscardRecipeResult: 'cancel' });
+    editRecipeName(target, 'Dirty Draft');
+    await tick();
+    flushSync();
+
+    const current = openSelectPanel(target, '[data-manager-scope-select]').querySelector(
+      '[role="option"][aria-selected="true"]'
+    )?.dataset.popoverOption;
+    assert.ok(current, 'the scope select ticks the system in scope');
+    const before = calls.length;
+    chooseSelectOption(target, '[data-manager-scope-select]', current);
+    await tick();
+    flushSync();
+
+    assert.deepEqual(
+      calls.slice(before).map((call) => call[0]),
+      [],
+      'no discard confirm and no system switch for the ticked system'
+    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit');
   });
 
   // The Knowledge surface's ROOT wiring (issue 785). The surface's own behaviour is

@@ -34,6 +34,7 @@
     "spec": "<SelectionBar> <BulkEditPanel>",
     "draws": ".stage.col > div:nth-child(2)",
     "path": "src/ui/svelte/apps/manager/BulkEditPanelShell.svelte",
+    "inset": 12,
     "props": {
       "heading": "4 components selected",
       "applyLabel": "Apply to 3",
@@ -65,12 +66,68 @@
     "spec": "<Modal>",
     "draws": ".stage.b0 > div",
     "path": "src/ui/svelte/components/Modal.svelte",
-    "slot": { "width": 640, "height": 260 },
+    "slot": { "width": 640, "height": 300 },
     "props": {
       "open": true,
       "title": "Map imported folders",
       "subtitle": "Three folders in this pack have no match in your world.",
       "closeLabel": "Close"
+    },
+    "snippets": {
+      "body": [
+        {
+          "tag": "div",
+          "attrs": { "style": "display:flex;align-items:center;gap:10px" },
+          "children": [
+            {
+              "tag": "strong",
+              "attrs": { "style": "flex:1;font-size:12px" },
+              "text": "Karrun / Metals"
+            },
+            {
+              "tag": "select",
+              "attrs": { "aria-label": "Category for Karrun / Metals", "style": "width:160px" },
+              "children": [{ "tag": "option", "text": "Metals" }]
+            }
+          ]
+        },
+        {
+          "tag": "div",
+          "attrs": { "style": "display:flex;align-items:center;gap:10px" },
+          "children": [
+            {
+              "tag": "strong",
+              "attrs": { "style": "flex:1;font-size:12px" },
+              "text": "Karrun / Hafts"
+            },
+            {
+              "tag": "select",
+              "attrs": { "aria-label": "Category for Karrun / Hafts", "style": "width:160px" },
+              "children": [{ "tag": "option", "text": "Create new" }]
+            }
+          ]
+        }
+      ],
+      "footer": [
+        {
+          "tag": "button",
+          "attrs": {
+            "type": "button",
+            "class": "fabricate-button fab-manager-button is-ghost",
+            "data-keyboard-focus": "true"
+          },
+          "text": "Cancel"
+        },
+        {
+          "tag": "button",
+          "attrs": {
+            "type": "button",
+            "class": "fabricate-button fab-manager-button is-primary",
+            "data-keyboard-focus": "true"
+          },
+          "text": "Import 412 records"
+        }
+      ]
     }
   },
   {

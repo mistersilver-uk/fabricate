@@ -355,6 +355,9 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   // The strip of current values the stamina pool and the check card draw (issue 1521), and its chip.
   'src/ui/svelte/components/InfoStrip.svelte',
   'src/ui/svelte/components/Chip.svelte',
+  // The rail's icon variant (issue 1777), and the labelled rows part it imports.
+  'src/ui/svelte/components/NavSidebar.svelte',
+  'src/ui/svelte/components/NavSidebarRows.svelte',
 ]);
 
 // The gathering find section (issue 1644): the shared scale, its rows, the one disclosure beneath

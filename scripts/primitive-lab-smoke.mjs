@@ -20,6 +20,7 @@ import {
   SPECIMEN_SELECTOR,
   cataloguePaths,
   describeMountFailure,
+  describeUnstableSizes,
   emptyCatalogueMessage,
   startLabServer,
 } from './lib/primitiveLabSmoke.js';
@@ -99,6 +100,21 @@ async function readLabReport(page, baseUrl) {
   );
 }
 
+/** How long after ready the sizes are read again; a corrective resize lands within a frame or two. */
+const SETTLE_MS = 750;
+
+/** Every specimen iframe's rendered size, in document order. */
+function readSpecimenSizes(page) {
+  return page.evaluate(
+    ([specimen, selector]) =>
+      [...document.querySelectorAll(selector)].map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { specimen: element.getAttribute(specimen), width: rect.width, height: rect.height };
+      }),
+    [SPECIMEN_ATTRIBUTE, SPECIMEN_SELECTOR]
+  );
+}
+
 async function run() {
   // Before the server: a 503'd chrome stylesheet neither throws nor logs in the page.
   const cache = resolveChromeCache(ROOT);
@@ -119,6 +135,10 @@ async function run() {
 
     const report = await readLabReport(page, server.baseUrl);
     if (report.error) throw new Error(`the lab refused to boot: ${report.error}`);
+    const atReady = await readSpecimenSizes(page);
+    await page.waitForTimeout(SETTLE_MS);
+    const unstable = describeUnstableSizes(atReady, await readSpecimenSizes(page));
+    if (unstable) throw new Error(`ready was published before the sizes settled: ${unstable}`);
 
     const mismatch = describeMountFailure({
       expected,

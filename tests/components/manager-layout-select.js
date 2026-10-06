@@ -69,61 +69,26 @@ test('manager pagination footer uses scoped chrome with stable summary, nav, and
 });
 
 /*
-  The OPEN state of a manager `<select>` (issue 772).
+  The manager's NATIVE-select theme went with its last native select (issue 1777).
 
-  `.fabricate-manager select` themes the CLOSED field, so a manager dropdown looks correct
-  until it is opened — and then the option list fell back to the browser's black-on-white
-  default, in every native select the manager renders. The player app carried
-  `.fabricate-app select option` for a long time and stopped needing it at issue 1511, when its
-  last native select converted and that rule was deleted; the manager root is
-  `.fabricate-manager` and never inherited it while it existed.
-
-  This is asserted from the STYLESHEET rather than from a rendered frame because it cannot
-  be photographed: a native select's popup is painted by the browser, not into the page DOM,
-  so Playwright never sees it and no smoke screenshot can contain the defect. It was found
-  by opening the control by hand. A source assertion is therefore the only gate available,
-  and its job is to stop the rule being deleted as "unused".
+  `.fabricate-manager select`, its option rows and the `@supports (appearance: base-select)`
+  picker themed a popup the browser draws (issue 772), and stood as a source assertion because no
+  frame can photograph one. Every manager select is the shared `<Select>` now, whose list is drawn
+  in the page, so those rules painted nothing and are deleted, and
+  `tests/select-element-typed-legs.test.js` holds their absence. The root's dark UA scheme
+  stays, for the browser chrome it still reaches.
 */
-test('the manager themes select options, not just the closed select', () => {
-  const optionRule = blockFor('.fabricate-manager select option');
-  assert.ok(optionRule, 'the manager must theme its option list, not only the closed field');
-  assert.match(
-    optionRule,
-    /background:\s*var\(--fab-bg-3\)/,
-    'an option list must take its background from `--fab-bg-3`, so it re-themes with the ' +
-      'rest of the manager; unpainted, it falls back to whatever the browser draws, which ' +
-      'in every engine tested is a light list inside a dark app'
-  );
-  assert.match(optionRule, /color:\s*var\(--fab-text\)/);
-
-  // The selected row must be marked the SAME way on both rendering paths.
-  const checkedRule = blockFor('.fabricate-manager select option:checked');
-  assert.ok(checkedRule, 'the selected row needs its own treatment');
-  assert.match(
-    checkedRule,
-    /background:\s*var\(--fab-overlay-light-08\)/,
-    'the checked row shares the picker treatment rather than painting a filled bar'
-  );
-  assert.match(checkedRule, /color:\s*var\(--fab-accent\)/);
-
-  // `color-scheme` is the only layer here that reaches every engine.
+test('the manager keeps its dark UA scheme once the native-select theme is gone', () => {
   assert.match(
     blockFor('.fabricate-manager'),
     /color-scheme:\s*dark/,
     'the manager root must declare the dark UA scheme, as the player root already does'
   );
-
-  // …and the opt-in that makes those colours visible at all. Without it the rules above
-  // are correct and inert on the engines most players use, because a legacy select popup
-  // is painted by the platform rather than the page.
-  assert.match(
+  assert.doesNotMatch(
     css,
     /@supports \(appearance: base-select\)/,
-    'the option colours only reach a Chromium popup through the customizable-select opt-in'
+    'the customizable-select opt-in themed native selects only, and no template renders one'
   );
-  const picker = blockFor('.fabricate-manager select::picker(select)');
-  assert.ok(picker, 'the picker surface must be themed, not left as the platform default');
-  assert.match(picker, /background:\s*var\(--fab-bg-3\)/);
 });
 
 /*

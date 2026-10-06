@@ -16,6 +16,7 @@ import {
   catalogueFiles,
   cataloguePaths,
   describeMountFailure,
+  describeUnstableSizes,
   emptyCatalogueMessage,
   expectedSpecimenCount,
 } from '../scripts/lib/primitiveLabSmoke.js';
@@ -28,10 +29,22 @@ import {
   createMinimalLabWorld,
 } from './view-lab/foundry/minimalLabWorld.js';
 import {
+  MAX_APPLIED_RESIZES,
+  createSizeGovernor,
+  describeHost,
+} from './view-lab/primitives/hostLayout.js';
+import {
   LAB_RELEASE,
   installPrimitiveLabFoundry,
   parseLabRelease,
 } from './view-lab/primitives/labFoundry.js';
+import { readSlotInset } from './view-lab/primitives/slot.js';
+import {
+  SPECIMEN_SNIPPET_NAMES,
+  readSpecimenSnippets,
+} from './view-lab/primitives/specimenSnippets.js';
+import { armReadyWatchdog } from './view-lab/primitives/specimenWatchdog.js';
+import { worktreeWatchIgnores } from './view-lab/watchIgnore.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -222,5 +235,157 @@ test('the mounted-set comparison catches a count, an identity and a multiplicity
     describeMountFailure({ expected, mounted: ['a.svelte', 'a.svelte', 'b.svelte'], reported: 2 }),
     /a\.svelte: catalogued 1, mounted 2/,
     'a path mounted more often than catalogued is a disagreement even when the count agrees'
+  );
+});
+
+test('a row inset is a positive pixel count, and absent means none', () => {
+  assert.equal(readSlotInset({}), 0);
+  assert.equal(readSlotInset({ inset: 12 }), 12);
+  for (const inset of [0, -4, '12', NaN, null]) {
+    assert.throws(() => readSlotInset({ inset }), /positive number of CSS pixels/, String(inset));
+  }
+});
+
+test('a row names only the snippets a specimen renders, each as a node array', () => {
+  assert.ok(SPECIMEN_SNIPPET_NAMES.length > 0, 'a specimen renders no named snippet at all');
+  assert.deepEqual(readSpecimenSnippets({}), {});
+  const snippets = { body: ['Body text'], footer: [{ tag: 'button', text: 'Close' }] };
+  assert.deepEqual(readSpecimenSnippets({ snippets }), snippets);
+  assert.throws(() => readSpecimenSnippets({ snippets: { header: [] } }), /snippets\.header/);
+  assert.throws(() => readSpecimenSnippets({ snippets: { body: 'text' } }), /must be a node array/);
+});
+
+test('a row names only the snippets a specimen renders, and never an array', () => {
+  assert.throws(() => readSpecimenSnippets({ snippets: [] }), /must be an object/);
+  assert.throws(() => readSpecimenSnippets({ snippets: ['body'] }), /must be an object/);
+});
+
+test('LiveSpecimen.svelte declares one snippet per name a row may supply, and no other', () => {
+  const source = readFileSync(
+    path.join(REPO_ROOT, 'tests/view-lab/primitives/LiveSpecimen.svelte'),
+    'utf8'
+  );
+  const declared = [...source.matchAll(/\{#snippet (\w+)\(/g)].map((match) => match[1]);
+  for (const name of SPECIMEN_SNIPPET_NAMES) {
+    assert.ok(
+      declared.includes(name),
+      `SPECIMEN_SNIPPET_NAMES lists \`${name}\` and LiveSpecimen.svelte has no \`{#snippet ${name}(\``
+    );
+  }
+  assert.deepEqual(
+    declared.filter((name) => name !== 'nodes').toSorted(byCodePoint),
+    [...SPECIMEN_SNIPPET_NAMES].sort(byCodePoint),
+    'LiveSpecimen.svelte declares a snippet SPECIMEN_SNIPPET_NAMES does not list'
+  );
+});
+
+test('an inset beside a boxed slot is refused, not silently dropped', () => {
+  assert.throws(
+    () => readSlotInset({ inset: 12, slot: { width: 300, height: 200 } }),
+    /does nothing in a boxed `slot`/
+  );
+  assert.equal(readSlotInset({ inset: 12 }), 12);
+});
+
+const HOST = { display: 'block', maxWidth: 'none', drawnWidth: 300, availableWidth: 300 };
+
+test('a block host presizes its specimen frame to the width it drew, before the first report', () => {
+  assert.equal(describeHost(HOST).presize, '300px');
+  assert.equal(describeHost({ ...HOST, drawnWidth: 180.2 }).presize, '181px');
+  assert.equal(describeHost({ ...HOST, display: 'inline-block' }).presize, '');
+  assert.equal(describeHost({ ...HOST, display: 'inline-block' }).fill, false);
+});
+
+test('a stretched host leaves the width to the page and a sized host keeps its own', () => {
+  assert.equal(describeHost(HOST).inlineSize, '');
+  assert.equal(describeHost({ ...HOST, drawnWidth: 180 }).inlineSize, '180px');
+  assert.equal(describeHost({ ...HOST, maxWidth: '300px' }).maxInlineSize, '300px');
+});
+
+test('a host that drew no width (display: contents) is left to the page, never collapsed to 0px', () => {
+  const host = describeHost({ ...HOST, display: 'contents', drawnWidth: 0 });
+  assert.equal(host.inlineSize, '');
+  assert.equal(host.presize, '');
+  assert.equal(host.fill, true);
+});
+
+test('an identical report is a no-op and a changed one applies', () => {
+  const admit = createSizeGovernor();
+  assert.equal(admit({ width: 300, height: 80, fill: true }, 'mounted'), 'apply');
+  assert.equal(admit({ width: 300, height: 80, fill: true }, 'resize'), 'same');
+  assert.equal(admit({ width: 300, height: 90, fill: true }, 'resize'), 'apply');
+  assert.equal(admit({ width: 300, height: 90, fill: false }, 'resize'), 'apply');
+});
+
+test('a height that follows its own iframe stops at the cap instead of growing', () => {
+  const admit = createSizeGovernor();
+  // A `min-height: 100vh` specimen: its content is as tall as the iframe viewport plus a border.
+  let iframeHeight = 10;
+  let applied = 0;
+  let decision = admit({ width: 300, height: iframeHeight }, 'mounted');
+  for (let report = 0; report < 1000 && decision !== 'runaway'; report += 1) {
+    iframeHeight += 2;
+    decision = admit({ width: 300, height: iframeHeight }, 'resize');
+    if (decision === 'apply') applied += 1;
+  }
+  assert.equal(decision, 'runaway');
+  assert.equal(applied, MAX_APPLIED_RESIZES);
+  assert.ok(iframeHeight < 200, `the height ran to ${iframeHeight}px before stopping`);
+});
+
+test('iframes that moved after ready are reported by name, and steady ones are not', () => {
+  const steady = [{ specimen: 'a.svelte', width: 300, height: 40 }];
+  assert.equal(describeUnstableSizes(steady, [{ ...steady[0] }]), null);
+  assert.match(
+    describeUnstableSizes(steady, [{ specimen: 'a.svelte', width: 300, height: 52 }]),
+    /a\.svelte: 300x40 at ready, 300x52 after/
+  );
+  assert.match(
+    describeUnstableSizes(steady, [{ specimen: 'a.svelte', width: 310, height: 40 }]),
+    /a\.svelte: 300x40 at ready, 310x40 after/
+  );
+  assert.match(describeUnstableSizes(steady, []), /a\.svelte: 300x40 at ready, gone after/);
+});
+
+test('the lab watcher ignores the worktrees of the served root and never the served tree itself', () => {
+  const ignored = (root, file) =>
+    worktreeWatchIgnores(root).some((glob) => file.startsWith(glob.replace(/\*\*$/, '')));
+  const primary = path.resolve('/work/fabricate');
+  const lane = path.join(primary, '.worktrees', '1487', 'lane');
+  assert.ok(ignored(primary, path.join(lane, 'src', 'a.svelte').replaceAll(path.sep, '/')));
+  assert.ok(!ignored(primary, path.join(primary, 'src', 'a.svelte').replaceAll(path.sep, '/')));
+  // Served FROM a worktree: its own files sit under `.worktrees/` of the primary checkout.
+  assert.ok(!ignored(lane, path.join(lane, 'src', 'a.svelte').replaceAll(path.sep, '/')));
+  for (const glob of worktreeWatchIgnores(lane))
+    assert.ok(!glob.includes(String.fromCodePoint(92)));
+});
+
+test('a specimen document that never announces ready is reported once its load has passed', () => {
+  const calls = [];
+  const timers = {
+    setTimeout: (fn, ms) => {
+      calls.push({ fn, ms });
+      return calls.length;
+    },
+    clearTimeout: (handle) => {
+      calls.push({ cleared: handle });
+    },
+  };
+  const frame = new EventTarget();
+  let silent = 0;
+  armReadyWatchdog(frame, () => (silent += 1), timers, 50);
+  assert.equal(calls.length, 0, 'the clock must not start before the document has loaded');
+  frame.dispatchEvent(new Event('load'));
+  assert.equal(calls[0].ms, 50);
+  calls[0].fn();
+  assert.equal(silent, 1);
+
+  const answering = new EventTarget();
+  const cancel = armReadyWatchdog(answering, () => (silent += 1), timers, 50);
+  answering.dispatchEvent(new Event('load'));
+  cancel();
+  assert.ok(
+    calls.some((call) => call.cleared === 2),
+    'READY must cancel the pending watchdog'
   );
 });

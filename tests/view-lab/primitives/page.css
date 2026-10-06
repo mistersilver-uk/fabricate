@@ -23,3 +23,14 @@
   visibility: visible;
   left: auto;
 }
+
+/*
+ * Filling: a block specimen standing where a block drawing stood takes that slot's inline size, as
+ * the drawing did, and only its height comes from the report; `mount.js` carries over the
+ * drawing's own `max-width`.
+ */
+.pl-live.pl-specimen-sized.pl-specimen-fill {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
