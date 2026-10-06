@@ -348,7 +348,7 @@ before(async () => {
 
 /** Component Rules' header: the longest title a GM can give a system, the advert, the action. */
 const advertHeader = () => `
-<header class="manager-header">
+<header class="fabricate-page-header manager-header">
   <div class="manager-heading">
     <nav class="manager-breadcrumbs"><span>Crafting Systems</span></nav>
     <h1 class="manager-title">The Most Serene and Ancient Nimithernian Institute Component Rules</h1>
