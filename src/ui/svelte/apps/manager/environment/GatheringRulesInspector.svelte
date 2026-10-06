@@ -7,6 +7,7 @@
   one field, and the two steppers appear only under the `limitedDrops` modes.
 -->
 <script>
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import GatheringRuleLimitStepper from './GatheringRuleLimitStepper.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
@@ -18,7 +19,7 @@
   }
 </script>
 
-<section class="fabricate-card manager-gathering-rules-card" data-gathering-inspector-rules>
+<InspectorCard class="manager-gathering-rules-card" data-gathering-inspector-rules="">
   <div class="manager-inspector-title-row">
     <span class="manager-inspector-icon" aria-hidden="true">
       <i class="fas fa-scale-balanced"></i>
@@ -447,4 +448,4 @@
       </span>
     </div>
   </div>
-</section>
+</InspectorCard>

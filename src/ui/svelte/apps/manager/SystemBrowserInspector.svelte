@@ -23,6 +23,7 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
   import Button from '../../components/Button.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
@@ -174,7 +175,7 @@
 </script>
 
 {#if selectedSystem}
-  <section class="fabricate-card">
+  <InspectorCard>
     <div class="manager-inspector-title-row is-hero-large">
       <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
         <i class="fas fa-layer-group"></i>
@@ -201,9 +202,9 @@
       {selectedSystem.description ||
         text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
     </p>
-  </section>
+  </InspectorCard>
 
-  <section class="fabricate-card">
+  <InspectorCard>
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Counts', 'Counts')}</h3>
     <div class="manager-fact-grid">
       {#each selectedCountFacts as fact (fact.id)}
@@ -232,12 +233,9 @@
         </div>
       {/each}
     </div>
-  </section>
+  </InspectorCard>
 
-  <section
-    class="fabricate-card"
-    aria-label={text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
-  >
+  <InspectorCard aria-label={text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}>
     <h3 class="manager-card-title">
       {text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
     </h3>
@@ -252,12 +250,12 @@
         {text('FABRICATE.Admin.Manager.NoOptionalFeatures', 'No optional features enabled.')}
       </p>
     {/if}
-  </section>
+  </InspectorCard>
 
   {#if selectedGatheringConditionShortcuts.length > 0}
-    <section
-      class="fabricate-card manager-condition-shortcut-card"
-      data-systems-gathering-conditions
+    <InspectorCard
+      class="manager-condition-shortcut-card"
+      data-systems-gathering-conditions=""
       aria-label={text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}
     >
       <h3 class="manager-card-title">
@@ -285,7 +283,7 @@
           </label>
         {/each}
       </div>
-    </section>
+    </InspectorCard>
   {/if}
 {:else if systemsLoading}
   <section

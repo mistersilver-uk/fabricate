@@ -9,6 +9,7 @@
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import Button from '../../../components/Button.svelte';
   import InlineRenameField from '../InlineRenameField.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
@@ -28,12 +29,15 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
+
+  const isEmpty = $derived(
+    (travelTab === 'realms' && !realm) || (travelTab === 'map' && !mapRegion)
+  );
 </script>
 
-<section
-  class="fabricate-card manager-travel-inspector"
-  class:is-empty={(travelTab === 'realms' && !realm) || (travelTab === 'map' && !mapRegion)}
-  data-gathering-inspector-travel
+<InspectorCard
+  class={isEmpty ? 'manager-travel-inspector is-empty' : 'manager-travel-inspector'}
+  data-gathering-inspector-travel=""
   data-travel-inspector={travelTab}
   aria-label={travelTab === 'map'
     ? text('FABRICATE.Admin.Manager.Travel.MapLinksInspector', 'Selected map region link')
@@ -60,16 +64,16 @@
         </Button>
       </div>
 
-      <section class="fabricate-card">
+      <InspectorCard>
         <InlineRenameField
           name={realm.name}
           labelled
           disabled={travelSaving}
           onRename={(name) => onRenameRealm(realm.id, name)}
         />
-      </section>
+      </InspectorCard>
 
-      <section class="fabricate-card">
+      <InspectorCard>
         <h3 class="manager-card-title">
           <i class="fas fa-seedling" aria-hidden="true"></i>
           {text('FABRICATE.Admin.Manager.Travel.Realms.EnvironmentsCardTitle', 'Environments')}
@@ -95,9 +99,9 @@
             )}
           </p>
         {/if}
-      </section>
+      </InspectorCard>
 
-      <section class="fabricate-card">
+      <InspectorCard>
         <h3 class="manager-card-title">
           <i class="fas fa-people-group" aria-hidden="true"></i>
           {text('FABRICATE.Admin.Manager.Travel.Realms.PartiesCardTitle', 'Parties in this realm')}
@@ -122,7 +126,7 @@
             )}
           </p>
         {/if}
-      </section>
+      </InspectorCard>
     {:else}
       <EmptyState
         fill
@@ -137,7 +141,7 @@
     {/if}
   {:else if travelTab === 'map'}
     {#if mapRegion}
-      <section class="fabricate-card manager-map-link-region-card">
+      <InspectorCard class="manager-map-link-region-card">
         <div class="manager-inspector-title-row">
           <span
             class="manager-inspector-icon manager-map-link-inspector-swatch"
@@ -157,9 +161,9 @@
             </h2>
           </div>
         </div>
-      </section>
+      </InspectorCard>
 
-      <section class="fabricate-card">
+      <InspectorCard>
         <h3 class="manager-card-title">
           <i class="fas fa-link" aria-hidden="true"></i>
           {text(
@@ -195,9 +199,9 @@
             )}
           </p>
         {/if}
-      </section>
+      </InspectorCard>
 
-      <section class="fabricate-card">
+      <InspectorCard>
         <h3 class="manager-card-title">
           <i class="fas fa-map-location-dot" aria-hidden="true"></i>
           {text(
@@ -225,9 +229,9 @@
             )}
           </p>
         {/if}
-      </section>
+      </InspectorCard>
 
-      <section class="fabricate-card">
+      <InspectorCard>
         <h3 class="manager-card-title">
           <i class="fas fa-people-group" aria-hidden="true"></i>
           {text(
@@ -262,7 +266,7 @@
             )}
           </p>
         {/if}
-      </section>
+      </InspectorCard>
     {:else}
       <EmptyState
         fill
@@ -276,10 +280,11 @@
       />
     {/if}
   {/if}
-</section>
+</InspectorCard>
 
 <style>
-  .manager-travel-inspector.is-empty {
+  /* `InspectorCard`'s element, so `:global`, chained to keep the scoped form's (0,3,0). */
+  :global(.fabricate-card.manager-travel-inspector.is-empty) {
     flex: 1 1 auto;
     min-height: 0;
     padding: 0;

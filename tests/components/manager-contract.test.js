@@ -206,6 +206,7 @@ const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svel
 // The world Tool entry, which took the linked-item card off the system editor (issue 1373).
 const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte';
 const CHANCE_SLIDER = 'src/ui/svelte/components/ChanceSlider.svelte';
+const INSPECTOR_CARD = 'src/ui/svelte/components/InspectorCard.svelte';
 const ENVIRONMENT_EDIT = 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte';
 // The reward and event limit counts are one shared component (issue 1050).
 const GATHERING_INSPECTOR_RAIL =
@@ -1794,13 +1795,17 @@ describe('CraftingSystemManager source contract', () => {
   // The per-system condition shortcut card moved with the systems inspector chain (issue 1721).
   defineStructureContract('draws the global condition shortcuts', SYSTEM_BROWSER_INSPECTOR, {
     names: ['selectedGatheringConditionShortcuts'],
-    // A hand-written card, so the recipe inspector's `spellsNo` card shell reads a token the
-    // reader can find. The real pair is the liveness test in
-    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
-    // `fabricate-card`.
-    spells: ['fabricate-card'],
+    // An `InspectorCard` since issue 1777, so the shell class is the primitive's to spell.
+    spells: ['manager-condition-shortcut-card'],
+    spellsNo: ['fabricate-card'],
     calls: ['buildSelectedGatheringConditionShortcuts'],
     writes: ['data-systems-gathering-conditions', 'data-systems-gathering-condition'],
+  });
+
+  // The positive control for every `spellsNo: ['fabricate-card']` row: the token the reader can find,
+  // in the one component that writes it since issue 1777.
+  defineStructureContract('spells the card shell class in the primitive', INSPECTOR_CARD, {
+    spells: ['fabricate-card'],
   });
 
   // The rules card moved into `environment/GatheringRulesInspector.svelte` (issue 1707 phase 2):
