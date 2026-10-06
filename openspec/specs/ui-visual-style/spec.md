@@ -16,7 +16,7 @@ Fabricate's Foundry-facing product UI must use a clean flat visual style.
 - Shared `--fab-*` tokens in `styles/fabricate.css` are the source of truth for reusable surface treatments, and they are ONE generation: a token name carries no version or generation marker, and no app-local layer of colour aliases forwards a shared token.
   See `The token namespace is one generation and names its purpose` in `openspec/specs/design-system/spec.md`.
 - Fabricate exposes a global module setting, `fabricate.theme`, for choosing the active product UI colour theme.
-- Fabricate exposes a global module setting, `fabricate.experimentalFeatures`, gating experimental surfaces still in development (currently the recipe-graph placeholder and the GM Manager's world `Downtime` surface).
+- Fabricate exposes a global module setting, `fabricate.experimentalFeatures`, gating experimental surfaces still in development (currently the recipe-graph placeholder, the GM Manager's world `Downtime` surface and the GM Manager's Premium crafting-icons advert, `ui-extension-points/spec.md` §Premium Crafting Icons Advert).
   It defaults to disabled.
 - Fabricate exposes a per-client module setting, `fabricate.interactionPromptPosition`, for the on-screen anchor of the region-entry interaction prompt toast.
   It offers the four screen corners and four edge-centers and defaults to `bottom-center` (the prompt's historical position).

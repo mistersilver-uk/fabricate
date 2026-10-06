@@ -7,6 +7,7 @@ import {
   BULK_DELETE_CARD_PATTERN,
   BULK_EDIT_CHROME_PATTERN,
   COMPONENT_EDITOR_MATCHES,
+  PREMIUM_ICONS_AD_PATTERN,
   REQUIREMENT_SUGGESTION,
   TYPEAHEAD_COMBOBOX_SOURCE,
   WORLD_SCOPE_MODEL_PATTERN,
@@ -70,7 +71,11 @@ const SALVAGE_ROW_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/recipe\/(pickerRowKinds|resultRows)\.js$/,
 ]);
 
+/** Component Rules' header group, led by the Premium advert until it is dismissed. */
+const COMPONENT_RULES_ACTIONS = '[data-manager-view="components"] .manager-header-actions';
+
 /** Open the editor on a component and bring its salvage results into view. */
+
 const salvageSteps = (componentId) => [
   { selector: '#manager-nav-component-rules' },
   { selector: `.manager-component-row[data-component-id="${componentId}"] [data-component-edit]` },
@@ -121,6 +126,10 @@ export const CASES = Object.freeze([
     query: {},
     steps: [{ selector: '#manager-nav-component-rules' }],
     expectView: 'components',
+    // The lab world opts into experimental features, so the Premium advert leads the header.
+    expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-premium-icons-ad]:first-child`,
+    // Only the full face draws the subline.
+    expectVisible: '[data-premium-icons-ad] .manager-premium-icons-ad-subline',
     // Issue 1371 r13-list — the list opens on its first drawn row (maintainer ruling M14).
     expectContained: [
       {
@@ -150,7 +159,42 @@ export const CASES = Object.freeze([
       WORLD_SCOPE_MODEL_PATTERN,
       // Builds the attribution note the inspector's Shared identity card draws (issue 2218).
       /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
+      PREMIUM_ICONS_AD_PATTERN,
     ],
+  }),
+  managerCase({
+    // Issue 2220: the header once a GM dismisses the advert, which only the × reaches.
+    id: 'manager-components-premium-ad-dismissed',
+    label: 'Manager — Components with the Premium advert dismissed',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-premium-icons-ad-dismiss]' },
+    ],
+    expectView: 'components',
+    expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-component-add-from-catalogue]:first-child`,
+    kinds: ['manager', 'components'],
+    sourceMatches: [PREMIUM_ICONS_AD_PATTERN],
+  }),
+  managerCase({
+    // Issue 2220: the advert's compact face, three icons and no subline, beside the action.
+    id: 'manager-components-premium-ad-compact',
+    label: 'Manager — Components with the compact Premium advert',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [{ selector: '#manager-nav-component-rules' }],
+    expectView: 'components',
+    expectSelector: `${COMPONENT_RULES_ACTIONS} > [data-premium-icons-ad]:first-child`,
+    // Drawn rather than withheld; the geometry test proves this face drops its subline.
+    expectVisible: '[data-premium-icons-ad]',
+    expectClick: '[data-premium-icons-ad-link]',
+    expectContained: [
+      { container: '.manager-header', target: '[data-component-add-from-catalogue]' },
+    ],
+    position: { width: 1100, height: 820 },
+    kinds: ['manager', 'components'],
+    sourceMatches: [PREMIUM_ICONS_AD_PATTERN],
   }),
   managerCase({
     // Issue 1371 r18-colour — the row badges in the essence's own colour (maintainer ruling M29).

@@ -1,16 +1,19 @@
 /*
- * The Manager page header's two geometry contracts, measured in a real engine.
+ * The Manager page header's three geometry contracts, measured in a real engine.
  *  1. The `Unsaved` chip takes the geometry of the buttons it sits beside in full: height,
  *     corner, type size and inline padding. A chip matching only one of the four reads as a
  *     further control drawn wrong.
  *  2. A long identity subtitle or title truncates on one line, so the action cluster never wraps.
+ *  3. The Premium advert gives way first: it compacts, then goes, so the heading keeps 320px and
+ *     `Add from catalogue` stays on screen and on one row at every manager width.
  */
-import test from 'node:test';
+import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { borrowBrowser } from '../helpers/layout-harness.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
@@ -99,20 +102,22 @@ function pageFor(subtitle, title) {
 
 /**
  * @param {string} markup the Manager's content, composed inside its real shell
+ * @param {{width?: number, extraCss?: string}} [shell] the manager's width and any further
+ *   component CSS the markup carries already scoped
  * @returns {string}
  */
-function pageAround(markup) {
+function pageAround(markup, { width = 1040, extraCss = '' } = {}) {
   const fixture = SCOPED_COMPONENTS.reduce(
     stampScopedClasses,
     `<div class="application theme-dark">
       <section class="window-content">
-        <div class="fabricate fabricate-manager" data-fabricate-theme="dark" style="width:1040px">
+        <div class="fabricate fabricate-manager" data-fabricate-theme="dark" style="width:${width}px">
           ${markup}
         </div>
       </section>
     </div>`
   );
-  const scopedCss = SCOPED_COMPONENTS.map((component) => component.css).join('\n');
+  const scopedCss = [...SCOPED_COMPONENTS.map((component) => component.css), extraCss].join('\n');
   return `<!doctype html><html><head><meta charset="utf-8">
     <style>${foundryCss}</style>
     <style>@layer modules {${fabricateCss}}</style>
@@ -312,3 +317,131 @@ test('a long identity TITLE does not wrap the action cluster either', () =>
       `the action cluster wrapped onto ${tops.size} rows: header ${measured.headerWidth}px = heading ${measured.headingWidth}px + actions ${measured.actionsWidth}px`
     );
   }));
+
+// ── The Premium crafting-icons advert (issue 2220) ─────────────────────────────────────────────
+
+const PREMIUM_AD = 'src/ui/svelte/apps/manager/ManagerPremiumIconsAd.svelte';
+const premiumAdCss = scopedComponentCss(resolve(repoRoot, PREMIUM_AD));
+const premiumAdHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-premium-ad-geometry-',
+  rawModules: ['src/ui/svelte/apps/manager/premiumIconsAdModel.js'],
+  compiledModules: [
+    'src/ui/svelte/components/Button.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
+    PREMIUM_AD,
+  ],
+  componentPath: PREMIUM_AD,
+});
+
+/** The advert's own markup, rendered by the component rather than copied into a fixture. */
+let premiumAdMarkup = '';
+before(async () => {
+  try {
+    await premiumAdHarness.setup();
+    const host = await premiumAdHarness.mount({ text: (key, fallback) => fallback });
+    premiumAdMarkup = host.innerHTML;
+  } finally {
+    premiumAdHarness.teardown();
+  }
+});
+
+/** Component Rules' header: the longest title a GM can give a system, the advert, the action. */
+const advertHeader = () => `
+<header class="manager-header">
+  <div class="manager-heading">
+    <nav class="manager-breadcrumbs"><span>Crafting Systems</span></nav>
+    <h1 class="manager-title">The Most Serene and Ancient Nimithernian Institute Component Rules</h1>
+    <p class="manager-subtitle">${LONG_SUBTITLE}</p>
+  </div>
+  <div class="manager-header-actions" aria-label="Component actions">
+    ${premiumAdMarkup}
+    <button type="button" class="fabricate-button fab-manager-button is-primary is-size-38" data-component-add-from-catalogue>
+      <i class="fas fa-plus"></i><span>Add from catalogue</span>
+    </button>
+  </div>
+</header>`;
+
+/** The header at one manager width: what the advert shows, and what it left the rest. */
+async function measureAdvert(width) {
+  const browser = await borrowBrowser();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 800 } });
+    await page.setContent(pageAround(advertHeader(), { width, extraCss: premiumAdCss.css }), {
+      waitUntil: 'load',
+    });
+    return await page.evaluate(() => {
+      const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+      const shown = (element) => element.getBoundingClientRect().width > 0;
+      const add = document.querySelector('[data-component-add-from-catalogue]');
+      const group = box('.manager-header-actions');
+      const header = document.querySelector('.manager-header');
+      const inner =
+        header.getBoundingClientRect().right -
+        Number.parseFloat(getComputedStyle(header).paddingRight);
+      return {
+        advert: shown(document.querySelector('[data-premium-icons-ad]')),
+        icons: [...document.querySelectorAll('.manager-premium-icons-ad-icon')].filter(shown)
+          .length,
+        subline: shown(document.querySelector('.manager-premium-icons-ad-subline')),
+        heading: Math.round(box('.manager-heading').width),
+        // One row: the group is no taller than its tallest child.
+        groupHeight: Math.round(group.height),
+        tallest: Math.round(
+          Math.max(
+            ...[...document.querySelector('.manager-header-actions').children].map(
+              (child) => child.getBoundingClientRect().height
+            )
+          )
+        ),
+        addHeight: Math.round(add.getBoundingClientRect().height),
+        addRight: Math.round(add.getBoundingClientRect().right),
+        headerRight: Math.round(inner),
+      };
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+/** The widths either side of each threshold, plus the window's declared width and the extremes. */
+const ADVERT_WIDTHS = Object.freeze([
+  { width: 1440, face: 'full' },
+  { width: 1280, face: 'full' },
+  { width: 1180, face: 'full' },
+  { width: 1179, face: 'compact' },
+  { width: 1100, face: 'compact' },
+  { width: 980, face: 'compact' },
+  { width: 979, face: 'hidden' },
+  { width: 900, face: 'hidden' },
+  { width: 680, face: 'hidden' },
+]);
+
+const FACES = Object.freeze({
+  full: { advert: true, icons: 6, subline: true },
+  compact: { advert: true, icons: 3, subline: false },
+  hidden: { advert: false, icons: 0, subline: false },
+});
+
+test('the markup the advert geometry is measured on is the component’s own', () => {
+  assert.ok(premiumAdMarkup.includes('data-premium-icons-ad'), 'the advert rendered nothing');
+  assert.ok(
+    premiumAdMarkup.includes(premiumAdCss.hashClass),
+    'the rendered advert and the measured CSS disagree on the scope hash'
+  );
+});
+
+for (const { width, face } of ADVERT_WIDTHS) {
+  test(`at ${width}px the Premium advert is ${face} and Add from catalogue keeps its row`, async () => {
+    const measured = await measureAdvert(width);
+    const { advert, icons, subline } = measured;
+    assert.deepEqual({ advert, icons, subline }, FACES[face], `the advert's face at ${width}px`);
+    assert.ok(measured.heading >= 320, `the heading kept ${measured.heading}px at ${width}px`);
+    assert.equal(measured.groupHeight, measured.tallest, `the action group wrapped at ${width}px`);
+    assert.equal(measured.addHeight, 38, `Add from catalogue wrapped its label at ${width}px`);
+    assert.ok(
+      measured.addRight <= measured.headerRight,
+      `Add from catalogue ran ${measured.addRight - measured.headerRight}px off the header`
+    );
+  });
+}

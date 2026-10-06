@@ -57,6 +57,8 @@ export const SETTING_KEYS = Object.freeze({
   LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem',
   THEME: 'theme',
   EXPERIMENTAL_FEATURES: 'experimentalFeatures',
+  // Issue 2220: whether a GM dismissed the Manager's Premium crafting-icons advert.
+  PREMIUM_ICONS_AD_DISMISSED: 'premiumIconsAdDismissed',
   INTERACTION_PROMPT_POSITION: 'interactionPromptPosition',
   // Version stamps for the one-shot identity passes (issues 555, 556, 561, 600, 1363, 1654).
   RECIPE_ITEM_FLAG_STAMP_VERSION: 'recipeItemFlagStampVersion',
@@ -210,6 +212,14 @@ const BASE_DEFINITIONS = Object.freeze({
     hint: 'FABRICATE.Settings.ExperimentalFeatures.Hint',
     scope: 'world',
     config: true,
+    type: Boolean,
+    default: false,
+  },
+  // Written `true` only by the advert's dismiss control; nothing clears it.
+  [SETTING_KEYS.PREMIUM_ICONS_AD_DISMISSED]: {
+    name: 'Premium Icons Advert Dismissed',
+    scope: 'world',
+    config: false,
     type: Boolean,
     default: false,
   },
