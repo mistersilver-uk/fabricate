@@ -178,6 +178,7 @@ describe('the membership record', () => {
       store: makeScopeStore('components', viaImport.value, viaImport),
       registrations: [{ systemId: SYSTEM, componentId: 'world-ash', added: true }],
       rowsOf: () => [record],
+      isPersisted: () => true,
     });
 
     assert.deepEqual(viaImport.value.membership, viaCatalogue.value.membership);
@@ -311,13 +312,15 @@ describe('the flush', () => {
   function world(initial, rows) {
     const settings = makeScopeSettings(initial);
     const store = makeScopeStore('components', settings.value, settings);
+    const unsaved = new Set();
     const flush = (registrations) =>
       flushWorldComponentRegistrations({
         store,
         registrations,
         rowsOf: (systemId) => rows[systemId] ?? [],
+        isPersisted: (systemId, componentId) => !unsaved.has(`${componentId}|${systemId}`),
       });
-    return { settings, store, flush, rows };
+    return { settings, store, flush, rows, unsaved };
   }
   const added = (componentId, systemId = SYSTEM) => ({ systemId, componentId, added: true });
 
@@ -361,6 +364,7 @@ describe('the flush', () => {
         store: null,
         registrations: [added('world-ash')],
         rowsOf: () => rows[SYSTEM],
+        isPersisted: () => true,
       }),
       { registered: 0, error: null }
     );
@@ -385,6 +389,21 @@ describe('the flush', () => {
 
     assert.deepEqual(await flush(registrations), { registered: 0, error: null });
     assert.equal(settings.writes.length, 0);
+  });
+
+  it('drops a registration whose row the persisted setting does not hold', async () => {
+    const rows = { [SYSTEM]: [row('comp-ash', 'Item.ash'), row('comp-salt', 'Item.salt')] };
+    const { settings, flush, unsaved } = world(undefined, rows);
+    unsaved.add(`comp-ash|${SYSTEM}`);
+
+    assert.deepEqual(await flush([added('comp-ash'), added('comp-salt')]), {
+      registered: 1,
+      error: null,
+    });
+    assert.deepEqual(Object.keys(settings.value.membership), [`comp-salt|${SYSTEM}`]);
+
+    unsaved.clear();
+    assert.deepEqual(await flush([added('comp-ash')]), { registered: 1, error: null });
   });
 
   it('keeps a scope edit that lands between recording and the flush', async () => {

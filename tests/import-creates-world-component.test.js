@@ -121,8 +121,9 @@ function scopeOf({ entities = [], defaults = {}, membership = [] } = {}) {
 
 /**
  * A manager over `systems` and a component scope store over `scope` (`undefined` is an unseeded
- * world, `store: false` a manager with no store). `events` names every setting write in order,
- * and `failNextCorpusWrite` rejects the next `craftingSystems` write.
+ * world, `store: false` a manager with no store). The manager's own `save` writes the
+ * `craftingSystems` setting through `game.settings`, which reads back what was written; `events`
+ * names every setting write in order, and `failNextCorpusWrite` rejects the next such write.
  */
 function world({ scope, systems = [{ id: FORGE }], store: withStore = true } = {}) {
   const events = [];
@@ -141,27 +142,44 @@ function world({ scope, systems = [{ id: FORGE }], store: withStore = true } = {
     manager.systems.set(system.id, manager._normalizeSystem({ name: system.id, ...system }));
   }
   manager.initialized = true;
-  const corpus = { rejection: null, componentIdsAtWrite: [] };
-  manager.save = async () => {
-    if (corpus.rejection) {
-      const error = corpus.rejection;
-      corpus.rejection = null;
-      throw error;
-    }
-    corpus.componentIdsAtWrite.push(componentIds(manager, FORGE));
-    events.push('craftingSystems');
-  };
+  const corpus = { rejection: null, persisted: asStored([...manager.systems.values()]) };
+  const persistedIds = (systemId) =>
+    (corpus.persisted.find((system) => system.id === systemId)?.components ?? []).map(
+      (component) => component.id
+    );
+  corpus.componentIdsAtWrite = [];
+  Object.assign(globalThis.game, {
+    settings: {
+      get: (_namespace, key) => {
+        if (corpus.unreadable) throw new Error('the setting cannot be read');
+        return key === 'craftingSystems' ? corpus.persisted : undefined;
+      },
+      set: async (_namespace, key, value) => {
+        if (corpus.rejection) {
+          const error = corpus.rejection;
+          corpus.rejection = null;
+          throw error;
+        }
+        corpus.persisted = asStored(value);
+        corpus.componentIdsAtWrite.push(persistedIds(FORGE));
+        events.push(key);
+      },
+    },
+  });
   return {
     manager,
     store,
     settings,
     events,
     corpus,
+    persistedIds,
     failNextCorpusWrite: (error) => (corpus.rejection = error),
     entityIds: () => (settings.value?.entities ?? []).map((entity) => entity.id),
     membershipKeys: () => Object.keys(settings.value?.membership ?? {}),
   };
 }
+
+const asStored = (value) => JSON.parse(JSON.stringify(value));
 
 const componentIds = (manager, systemId) =>
   manager.getSystem(systemId).components.map((component) => component.id);
@@ -495,6 +513,7 @@ describe('one run, one registration per component', () => {
       persist: false,
       registrations,
     });
+    await manager.save();
     const system = manager.getSystem(FORGE);
     system.components = system.components.filter((component) => component.id !== ash.item.id);
 
@@ -502,7 +521,7 @@ describe('one run, one registration per component', () => {
       registered: 0,
       error: null,
     });
-    assert.deepEqual(events, []);
+    assert.deepEqual(events, ['craftingSystems']);
   });
 
   it('a scope edit that lands between recording and the flush survives it', async () => {
@@ -518,9 +537,74 @@ describe('one run, one registration per component', () => {
     });
     await actions.createEntity({ id: 'world-late', name: 'Authored meanwhile' });
 
+    await manager.save();
     await manager.flushWorldComponentRegistrations(registrations);
 
     assert.deepEqual(entityIds(), ['world-late', ash.item.id]);
+  });
+});
+
+describe('a row the craftingSystems setting does not hold is never registered', () => {
+  /** The memberships naming a row the persisted `craftingSystems` setting lacks. */
+  function strandedMemberships({ settings, persistedIds }) {
+    return Object.values(settings.value?.membership ?? {})
+      .filter(({ entityId, systemId }) => !persistedIds(systemId).includes(entityId))
+      .map(({ entityId, systemId }) => `${entityId}|${systemId}`);
+  }
+
+  it('a retry after a rejected craftingSystems write issues no scope write and persists no membership', async () => {
+    const fixture = world();
+    const { manager, events, entityIds, persistedIds, failNextCorpusWrite } = fixture;
+    const ash = worldItem('ash');
+    failNextCorpusWrite(new Error('the server refused the corpus write'));
+    await assert.rejects(() => manager.addItemFromUuid(FORGE, ash.uuid));
+    const [unsaved] = componentIds(manager, FORGE);
+    assert.deepEqual(persistedIds(FORGE), [], 'the row exists in memory alone');
+
+    assert.equal((await manager.addItemFromUuid(FORGE, ash.uuid)).action, 'skipped');
+
+    assert.deepEqual(events, []);
+    assert.deepEqual(fixture.membershipKeys(), []);
+
+    // The next write of the system persists the row, and the import that then meets it registers it.
+    const salt = await manager.addItemFromUuid(FORGE, worldItem('salt').uuid);
+    assert.deepEqual(entityIds(), [salt.item.id]);
+    await manager.addItemFromUuid(FORGE, ash.uuid);
+    assert.deepEqual(entityIds(), [salt.item.id, unsaved]);
+    assert.deepEqual(strandedMemberships(fixture), []);
+  });
+
+  it('a setting that cannot be read vouches for no row, and the import still resolves', async () => {
+    const { manager, events, corpus, membershipKeys } = world();
+    corpus.unreadable = true;
+
+    const result = await manager.addItemFromUuid(FORGE, worldItem('ash').uuid);
+
+    assert.deepEqual(Object.keys(result), ['item', 'action', 'sourceFallbacks']);
+    assert.deepEqual(events, ['craftingSystems']);
+    assert.deepEqual(membershipKeys(), []);
+  });
+
+  it('two overlapping runs over one system leave no membership for a row not yet saved', async () => {
+    const fixture = world();
+    const { manager, events, entityIds } = fixture;
+    const ash = worldItem('ash');
+    const pending = [];
+    const added = await manager.addItemFromUuid(FORGE, ash.uuid, {
+      persist: false,
+      registrations: pending,
+    });
+
+    // A second run meets the first run's unsaved row and flushes before that run has saved.
+    assert.equal((await manager.addItemFromUuid(FORGE, ash.uuid)).action, 'skipped');
+    assert.deepEqual(events, []);
+    assert.deepEqual(strandedMemberships(fixture), []);
+    assert.deepEqual(fixture.membershipKeys(), []);
+
+    await manager.save();
+    await manager.flushWorldComponentRegistrations(pending);
+    assert.deepEqual(entityIds(), [added.item.id]);
+    assert.deepEqual(strandedMemberships(fixture), []);
   });
 });
 

@@ -47,6 +47,7 @@ export function itemSourcesCollaborators(manager) {
     scopeBasis: (system) => manager._scopeBasis(system),
     addItemFromUuid: (...args) => manager.addItemFromUuid(...args),
     componentScopeStore: () => manager._resolveComponentScopeStore(),
+    persistedSystems: () => manager._repository.readReplicatedSnapshot(),
     flushWorldComponentRegistrations: (registrations) =>
       manager.flushWorldComponentRegistrations(registrations),
     salvageNormalizationContext: (system) => manager._salvageNormalizationContext(system),
@@ -334,12 +335,38 @@ export async function resolveImportedComponentSourceData(itemUuid, source = null
 
 const componentRowsOf = (io) => (systemId) => io.getSystem(systemId)?.components ?? []; // ratchet-exempt(world-scope): writer
 
+/** Whether the persisted `craftingSystems` setting holds a component row, read once on first use.
+ * A row a rejected or pending write left only in memory is not held, nor is any row of a setting
+ * that cannot be read, so no membership is written for a row the setting lacks. */
+function persistedRowTest(io) {
+  let held = null;
+  return (systemId, componentId) => {
+    held ??= persistedComponentIds(io);
+    return held.get(systemId)?.has(componentId) === true;
+  };
+}
+
+function persistedComponentIds(io) {
+  let systems;
+  try {
+    systems = io.persistedSystems();
+  } catch {
+    systems = null;
+  }
+  const held = new Map();
+  for (const system of systems ?? []) {
+    held.set(system.id, new Set((system.components ?? []).map((component) => component.id))); // ratchet-exempt(world-scope): writer
+  }
+  return held;
+}
+
 /** A run's world-component registrations, written in one `fabricate.componentScope` save. */
 export function flushImportRegistrations(io, registrations) {
   return flushWorldComponentRegistrations({
     store: io.componentScopeStore(),
     registrations,
     rowsOf: componentRowsOf(io),
+    isPersisted: persistedRowTest(io),
   });
 }
 

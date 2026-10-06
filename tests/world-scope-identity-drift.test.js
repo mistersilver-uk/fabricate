@@ -171,6 +171,7 @@ test('a World Component a component import registers starts equal to its in-syst
     store: makeScopeStore('components', settings.value, settings),
     registrations: [{ systemId: 'sys-a', componentId: 'comp-salt', added: true }],
     rowsOf: () => systems[0].components,
+    isPersisted: () => true,
   });
 
   assert.deepEqual(reportWorldIdentityDrift(systems, { components: settings.value }), []);

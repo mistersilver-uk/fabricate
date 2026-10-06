@@ -83,12 +83,9 @@ function membershipFor(systemId, record, added, worldDefault) {
   return membership;
 }
 
-/**
- * What registering one in-system record writes to a persisted scope payload: `null`, a membership
- * for the entity under its id, or a new entity with its membership. An id match alone binds
- * nothing, and an entity under another id sharing its source leaves it unregistered, because an
- * import re-keys nothing. `added` says the run put the row in its system.
- */
+/** What registering one in-system record writes to a persisted scope payload: `null`, a membership
+ * for the entity under its id, or a new entity with its membership. An id match alone binds nothing,
+ * and an entity under another id sharing its source leaves it unregistered. */
 export function planWorldComponentRegistration(payload, { systemId, record, added = false }) {
   const entities = arrayOrEmpty(payload?.entities);
   const keys = sourceKeys(record);
@@ -105,21 +102,23 @@ export function planWorldComponentRegistration(payload, { systemId, record, adde
   };
 }
 
-/**
- * Write a run's registrations in one `fabricate.componentScope` save. Each is planned against the
- * payload as the store holds it now and its system's current rows, and nothing is awaited between
- * that read and the save, because the write replaces the whole setting. A rejected write is
- * caught and the store reloaded, since it publishes its cache before the write settles.
- * @returns {Promise<{registered: number, error: Error|null}>}
- */
-export async function flushWorldComponentRegistrations({ store, registrations, rowsOf }) {
+/** Write a run's registrations in one `fabricate.componentScope` save, each planned against the
+ * store's payload now and only for a row its system holds and `isPersisted` vouches for. Nothing is
+ * awaited between that read and the save; a rejected save is caught and the store reloaded. */
+export async function flushWorldComponentRegistrations({
+  store,
+  registrations,
+  rowsOf,
+  isPersisted,
+}) {
   const pending = arrayOrEmpty(registrations);
   if (!store || pending.length === 0) return { registered: 0, error: null };
   const payload = store.get();
   let registered = 0;
   for (const { systemId, componentId, added } of pending) {
     const record = rowById(rowsOf(systemId), componentId);
-    const planned = record && planWorldComponentRegistration(payload, { systemId, record, added });
+    if (!record || !isPersisted(systemId, componentId)) continue;
+    const planned = planWorldComponentRegistration(payload, { systemId, record, added });
     if (!planned) continue;
     if (planned.entity) payload.entities.push(planned.entity);
     payload.membership[membershipKey(componentId, systemId)] = planned.membership;
