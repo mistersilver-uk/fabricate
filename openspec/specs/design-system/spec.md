@@ -2227,6 +2227,8 @@ Crafting's essence pool MUST compose `EssencePool` through its adapter; its opt-
 Repeated thresholds for the same essence MUST sum their required amounts before comparing the shared contribution and render one keyed pool, so Fire 2 plus Fire 2 requires four Fire rather than counting the same two Fire twice.
 `ChoiceOptionList` MUST use each option's own `needed` amount when provided, falling back to the slot-level amount only for uniform-quantity callers.
 `SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.
+`SlotTile` has a `partial` face: a `--fab-warning-border` hairline, its pip on solid `--fab-warning` inked `--fab-bg-0`, and `--fab-warning-text` caption ink.
+`SlotRow` and `RequirementChooser` MUST paint a partly delivered essence with that face, never the `short` one, even while its group is still reported missing; an unchosen choice slot keeps the `open` face.
 Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
 `StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
 `YieldScale` MUST show one shared d100 cut against the item chances when shared-roll evidence is established.

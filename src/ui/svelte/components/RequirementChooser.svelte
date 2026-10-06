@@ -32,8 +32,8 @@
 
   Invariants:
   - A `partial` choice slot is one the player has not picked from, a to-do and never an error:
-    it paints the shared tile's `open` face. Any other `partial` slot paints as `short`, because
-    the tile has no partial face; `label` and `data-slot-state` carry the difference.
+    it paints the shared tile's `open` face. Any other `partial` slot, a partly delivered
+    essence, paints the tile's `partial` face.
   - A short alternative is dimmed and stays a pressable button; its `reading` is rendered as text
     its button names through `aria-describedby`.
   - `pip` is caller-formatted, so a face that states an amount rather than a held-against-needed
@@ -82,8 +82,8 @@
   const hasPanel = $derived(Boolean(opened) && (alternatives.length > 0 || Boolean(panel)));
 
   function tileState(slot) {
-    if (slot.state === 'met') return 'met';
-    return slot.kind === 'choice' && slot.state === 'partial' ? 'open' : 'short';
+    if (slot.kind === 'choice' && slot.state === 'partial') return 'open';
+    return ['met', 'partial'].includes(slot.state) ? slot.state : 'short';
   }
 
   function toggle(slot) {

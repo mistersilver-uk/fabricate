@@ -606,7 +606,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 implemented the specified tile for the Journal through `components/SlotRow`. Issue 1518 gave it its second importer, `components/RequirementChooser`, which draws every requirement slot and every alternative as this tile, so it clears the two-importer bar and becomes a member. Its `partial` face and its rendered acceptance stay with issue 1644, which is why the specimen and this row remain `target`."
+      "why": "Issue 1648 implemented the specified tile for the Journal through `components/SlotRow`. Issue 1518 gave it its second importer, `components/RequirementChooser`, which draws every requirement slot and every alternative as this tile, so it clears the two-importer bar and becomes a member. Issue 1644 gives it the `partial` face (a warning hairline, a pip on solid `--fab-warning` inked `--fab-bg-0`, warning caption ink), which both importers paint for a partly delivered essence, and measured it on its override frames: the hairline sits inside the tile rather than outside it, the pip is 12.8 high rather than 16.4, the short pip takes `--fab-on-danger` and a pressed tile adds a tick, so the specimen and this row stay `target` and the library's planned-migrations table carries them to issue 1523."
     },
     {
       "path": "src/ui/svelte/components/Meter.svelte",
@@ -788,7 +788,7 @@
       "callers": [
         "src/ui/svelte/apps/journal/StepDetails.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/StepDetails.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/StepDetails.svelte`, is below the two-importer membership bar, and crafting keeps `RequirementChooser` (issue 1518 ruling). Issue 1644 paints a partly delivered essence `partial` from the importer's `poolsStarted`, and measured the row: its kicker is 9/700 at 0.08em in subtle ink against the specimen's `k-kicker`, so the library entry stays `target`. `fabricate-journal-lifecycle-legacy` draws it locked."
     },
     {
       "path": "src/ui/svelte/components/ChoiceOptionList.svelte",
