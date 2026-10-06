@@ -48,6 +48,8 @@
       emptyTierText={localize('FABRICATE.App.Crafting.Detail.TierNoAward')}
       {reachedId}
       reachedLabel={localize('FABRICATE.App.Crafting.Detail.YourRoll')}
+      successLabel={localize('FABRICATE.Check.Evidence.Success')}
+      failureLabel={localize('FABRICATE.Check.Evidence.Failure')}
     />
   {:else}
     <EmptyState note hint={localize('FABRICATE.App.Crafting.Detail.NoOutcomes')} />

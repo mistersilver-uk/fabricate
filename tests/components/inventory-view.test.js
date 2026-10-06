@@ -1696,6 +1696,12 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       'each tier keeps its success hook'
     );
     assert.equal(
+      ladder.querySelector(':scope [data-inventory-salvage-outcome="o1"] [data-outcome-status]')
+        .textContent,
+      'FABRICATE.Check.Evidence.Failure',
+      "a tier's status glyph is named"
+    );
+    assert.equal(
       ladder.querySelector(':scope [data-inventory-salvage-outcome="o1"] [data-outcome-empty]')
         .textContent,
       'FABRICATE.App.Inventory.Salvage.OutcomeAwardsNothing',

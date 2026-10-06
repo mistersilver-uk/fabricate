@@ -550,6 +550,9 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(failureRow.matches('.fab-outcome-tier.is-failure'), 'failure tier reads as failed');
     assert.ok(successRow.querySelector('.fa-circle-check'), 'success tier states a check glyph');
     assert.ok(failureRow.querySelector('.fa-circle-xmark'), 'failure tier states a cross glyph');
+    const status = (row) => row.querySelector('.visually-hidden[data-outcome-status]')?.textContent;
+    assert.equal(status(successRow), 'FABRICATE.Check.Evidence.Success', 'the glyph is named');
+    assert.equal(status(failureRow), 'FABRICATE.Check.Evidence.Failure');
     assert.equal(
       failureRow.querySelector('[data-outcome-empty]').textContent.trim(),
       'FABRICATE.App.Crafting.Detail.TierNoAward',

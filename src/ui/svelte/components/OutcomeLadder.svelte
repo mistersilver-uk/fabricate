@@ -1,9 +1,10 @@
-<!-- ratchet-exempt(design-system): promoted on its third importer at issue 1644; its band chip and row yields disagree with the specimen, so the row arrives at target -->
+<!-- ratchet-exempt(design-system): promoted on its third importer at issue 1644; its head glyph, band chip, row yields and kicker disagree with the specimen, recorded in the migrations table, so the row arrives at target -->
 <!-- Authored outcome bands preview possible yields, never confirmed historical awards. -->
 <!--
-  `reachedId` marks the ONE tier whose `ids` (else its `id`) contain it, the first such tier only,
-  with a `reachedLabel` pill. A band is optional. Each tier, its band chip, its pill and each yield
-  take per-item `props`; the root takes `class` and a rest spread.
+  `reachedId` marks the first tier whose `ids` (else its `id`) contain it with a `reachedLabel` pill.
+  A band is optional. `successLabel`/`failureLabel` name each tier's status glyph for a screen reader.
+  Each tier, its band chip, its pill and each yield take per-item `props`; the root takes `class` and
+  a rest spread.
 -->
 <script>
   import Chip from './Chip.svelte';
@@ -16,6 +17,8 @@
     hint = '',
     reachedId = null,
     reachedLabel = '',
+    successLabel = '',
+    failureLabel = '',
     class: extraClass = '',
     ...rest
   } = $props();
@@ -36,6 +39,7 @@
   <div class="fab-outcome-tiers">
     {#each tiers as tier, index (tier.id || `${tier.name}-${index}`)}
       {@const isReached = index === reachedIndex}
+      {@const status = tier.fail ? failureLabel : successLabel}
       <article
         {...tier.props}
         class="fab-outcome-tier"
@@ -47,6 +51,7 @@
         <header class="fab-outcome-tier-heading">
           <i class={tier.fail ? 'fas fa-circle-xmark' : 'fas fa-circle-check'} aria-hidden="true"
           ></i>
+          {#if status}<span class="visually-hidden" data-outcome-status>{status}</span>{/if}
           <span class="fab-outcome-tier-name">{tier.name}</span>
           {#if isReached}
             <!-- ratchet-exempt(design-system): per-item props carry the caller's data-* hook onto the pill -->

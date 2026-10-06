@@ -131,6 +131,30 @@ describe('OutcomeLadder reached tier and pass-through (issue 1644)', () => {
     );
   });
 
+  it('falls back to its own id when a tier carries an empty ids list', async () => {
+    const tiers = [{ id: 'a', ids: [], name: 'A', yields: [] }];
+    const target = await ladder.mount({ tiers, reachedId: 'a', reachedLabel: 'Your roll' });
+    assert.deepEqual(tierIds(reached(target)), ['a']);
+  });
+
+  it("names each tier's status glyph for a screen reader, and draws no label when given none", async () => {
+    const labels = { successLabel: 'Success', failureLabel: 'Failure' };
+    const target = await ladder.mount({ tiers: TIERS, ...labels });
+    const status = (id) =>
+      target.querySelector(
+        `:scope [data-outcome-tier="${id}"] .visually-hidden[data-outcome-status]`
+      )?.textContent;
+    assert.equal(status('flawed'), 'Success');
+    assert.equal(status('ruined'), 'Failure');
+    assert.ok(
+      target.querySelector(':scope [data-outcome-status] + .fab-outcome-tier-name'),
+      'the status reads before the tier name'
+    );
+    ladder.remount();
+    const bare = await ladder.mount({ tiers: TIERS });
+    assert.equal(bare.querySelectorAll('[data-outcome-status]').length, 0);
+  });
+
   it('carries a root hook and class, and offers no control', async () => {
     const target = await ladder.mount({
       tiers: TIERS,

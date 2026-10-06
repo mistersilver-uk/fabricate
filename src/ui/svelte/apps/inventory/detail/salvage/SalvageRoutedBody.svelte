@@ -124,6 +124,8 @@
       emptyTierText={localize('FABRICATE.App.Inventory.Salvage.OutcomeAwardsNothing')}
       {reachedId}
       reachedLabel={localize('FABRICATE.App.Inventory.Salvage.YourRoll')}
+      successLabel={localize('FABRICATE.Check.Evidence.Success')}
+      failureLabel={localize('FABRICATE.Check.Evidence.Failure')}
       data-inventory-salvage-outcomes
     />
   {/if}

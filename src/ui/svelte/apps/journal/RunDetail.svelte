@@ -134,16 +134,12 @@
     Number(summaryGate?.requiredSeconds ?? viewedStage?.detail?.requiredSeconds) || 0
   );
   const availableAt = $derived(Number(summaryGate?.availableAt));
-  // A STAGE THAT HAS NOT BEGUN HAS NOT RUN OUT OF TIME (issue 1648, U3). Before a stage is
-  // started it holds no `timeGate`, so `availableAt` is NaN and this row fell through to
-  // `Summary.None` — the exact string a MATURED wait prints — while the button beside it
-  // offered to start the clock. D-025 governs the FORMAT of a duration shown, not which duration
-  // is shown, so no accepted ruling reaches this branch.
-  //
-  // It reads `run.stageStart`, the projection's STAGE fact. `actions.atStageStart` also requires
-  // that this viewer may act, so keying on it lost the row to a held claim, a non-owner viewer or
-  // a run awaiting recovery (UX2-2). Whether a stage has begun does not depend on a GM being
-  // online.
+  // A STAGE THAT HAS NOT BEGUN HAS NOT RUN OUT OF TIME (issue 1648, U3). An unstarted stage holds
+  // no `timeGate`, so `availableAt` is NaN and this row fell through to `Summary.None`, the string
+  // a MATURED wait prints, beside a button offering to start the clock (D-025 governs a duration's
+  // FORMAT, not which duration is shown). It reads `run.stageStart`, the projection's STAGE fact:
+  // `actions.atStageStart` also requires that this viewer may act, so keying on it lost the row to
+  // a held claim, a non-owner viewer or a run awaiting recovery (UX2-2); it needs no online GM.
   const notStarted = $derived(viewedIsCurrent && run?.stageStart?.required === true);
   const remainingTime = $derived.by(() => {
     const pausedRemaining = viewedIsCurrent
@@ -566,6 +562,8 @@
         emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
         label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
         hint={localize(ladderRuleKey(gatheringYield.ladderRule))}
+        successLabel={localize('FABRICATE.Check.Evidence.Success')}
+        failureLabel={localize('FABRICATE.Check.Evidence.Failure')}
       />
     {:else if gatheringYield && displayedYieldEntries.length > 0}
       {#if yieldPreviewLoading}
@@ -636,6 +634,8 @@
               tiers={previewTiers(craftingYield.tiers, localize)}
               emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
               label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
+              successLabel={localize('FABRICATE.Check.Evidence.Success')}
+              failureLabel={localize('FABRICATE.Check.Evidence.Failure')}
               hint={localize(
                 viewedIsCurrent
                   ? 'FABRICATE.App.Journal.Yields.CraftingPreviewHint'
