@@ -38,6 +38,7 @@ function downtimeStripPointerCase({ tabId, tooltip, attributes = [], ...entry })
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
     ...entry,
@@ -403,6 +404,7 @@ export const CASES = Object.freeze([
       sourceMatches: [
         /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
         /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
         /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       ],
     })
@@ -474,6 +476,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
   }),
@@ -523,6 +526,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
   }),
@@ -611,6 +615,7 @@ export const CASES = Object.freeze([
       // The one frame that draws the title bar's PREMIUM mark (issue 1777).
       /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/navTabBadgeStore\.js$/,
@@ -676,6 +681,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/svelte\/components\/Chip\.svelte$/,
@@ -715,6 +721,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/navTabBadgeStore\.js$/,
       /^styles\/fabricate\.css$/,
@@ -763,6 +770,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^styles\/fabricate\.css$/,

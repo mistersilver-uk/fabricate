@@ -218,9 +218,14 @@ function emittingSources() {
  * @param {string} template The id-building fragment, e.g. `manager-crafting-nav-${`.
  * @returns {Array<[string, string]>} `[path, text]` pairs to search.
  */
-/** The components that RENDER the manager rail. */
+/** The item model the rail's rows, ids and labels are built from (issue 1777). */
+const RAIL_ITEM_MODEL = 'src/ui/svelte/apps/manager/managerNavItems.js';
+
+/** The components that RENDER the manager rail, and the model that authors its rows. */
 function railRenderingFiles(sources) {
-  return [...sources].filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
+  return [...sources].filter(
+    ([file, text]) => text.includes(RAIL_BUTTON_CLASS) || file === RAIL_ITEM_MODEL
+  );
 }
 
 function relativeImportsOf(file, text) {
@@ -5420,6 +5425,7 @@ function buildExpectViewPredicate() {
     'src/ui/svelte/apps/manager/ManagerSystemNav.svelte',
     'src/ui/svelte/apps/manager/ManagerWorldNav.svelte',
     'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte',
+    'src/ui/svelte/apps/manager/managerNavItems.js',
     'src/ui/svelte/apps/manager/checks/checksRouteModel.svelte.js',
     'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js',
     'src/ui/svelte/apps/manager/gatheringDraftHandlers.svelte.js',

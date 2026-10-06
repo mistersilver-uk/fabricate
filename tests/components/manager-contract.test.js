@@ -163,12 +163,10 @@ const GATHERING_UNITS = [
   GATHERING_MODIFIER_HANDLERS,
 ];
 const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
-const MANAGER_WORLD_NAV = 'src/ui/svelte/apps/manager/ManagerWorldNav.svelte';
 const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
   'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte';
-// The rail's three entry units answer together for a claim over the entries they share; a claim
-// narrowed to one of them would drop most of its population (issue 1717).
-const MANAGER_NAV_UNITS = [MANAGER_SYSTEM_NAV, MANAGER_WORLD_NAV, MANAGER_WORLD_DOWNTIME_NAV_GROUP];
+// The rail's three entry units render the rows this one model builds (issue 1777).
+const MANAGER_NAV_ITEMS = 'src/ui/svelte/apps/manager/managerNavItems.js';
 // The page header's copy is spelled across two units since issue 1720 — the shell's markup and the
 // model it resolves from — so a key that must appear once appears once across the pair.
 const headerCopyLiterals = () => [
@@ -343,20 +341,22 @@ describe('CraftingSystemManager source contract', () => {
   );
 
   // What the `AC-11` to `AC-15` mounted cases cannot say is how many render sites exist: a third
-  // one added outside the provider-mode guard would satisfy every one of them (issue 1302).
+  // one added outside the provider-mode guard would satisfy every one of them (issue 1302). The
+  // badge is a model row's marker since issue 1777, so its hook is a model key, never an attribute.
   it('renders the Downtime badge at exactly two sites', () => {
-    const sites = templateNodes(componentAstOf(MANAGER_WORLD_DOWNTIME_NAV_GROUP))
-      .filter((node) =>
-        (node.attributes ?? []).some((attribute) =>
-          String(attribute.name ?? '').startsWith('data-world-downtime-badge')
-        )
-      )
-      .map((node) => node.name);
+    const isBadgeHook = (name) => String(name ?? '').startsWith('data-world-downtime-badge');
+    const sites = [...walkNodes(moduleAstOf(MANAGER_NAV_ITEMS).ast)]
+      .filter((node) => node.type === 'Property' && isBadgeHook(node.key?.value ?? node.key?.name))
+      .map((node) => node.key.value);
     assert.equal(
       sites.length,
       2,
       `the sub-item badge and the parent rollup, and nothing else (found ${sites.join(', ')})`
     );
+    const written = templateNodes(componentAstOf(MANAGER_WORLD_DOWNTIME_NAV_GROUP)).filter((node) =>
+      (node.attributes ?? []).some((attribute) => isBadgeHook(attribute.name))
+    );
+    assert.equal(written.length, 0, 'and the group writes no badge of its own beside the model');
   });
 
   // The companion is disposed before ApplicationV2 removes its Svelte target; that ordering is
@@ -807,7 +807,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'uses manager localization keys rather than hard-coded copy',
-    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, HEADER_MODEL, MANAGER_TITLE_BAR],
+    [MANAGER_ROOT, MANAGER_NAV_ITEMS, HEADER_MODEL, MANAGER_TITLE_BAR],
     {
       // In full: a substring claim is satisfied by `…Titlebar.Premium` next door. The mounted
       // cases render this copy, which `text(key, fallback)` still produces under a renamed key.
@@ -1113,7 +1113,7 @@ describe('CraftingSystemManager source contract', () => {
   // is selected, rather than rendering an empty heading (#429).
   defineStructureContract(
     'titles the page after the record it edits',
-    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, MANAGER_HEADER_BREADCRUMBS],
+    [MANAGER_ROOT, MANAGER_NAV_ITEMS, MANAGER_HEADER_BREADCRUMBS],
     {
       reads: ['selectedSystem.name'],
       spellsExactly: [
@@ -1121,7 +1121,9 @@ describe('CraftingSystemManager source contract', () => {
         'FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb',
       ],
       spellsNo: ['SystemEdit.Summary', 'SystemEdit.PageTitle'],
-      writes: ['data-nav-system-edit'],
+      // The rail row's hook is a model key (issue 1777); the rail census renders it.
+      keys: ['data-nav-system-edit'],
+      keysNo: ['data-nav-system-overview'],
       writesNo: ['data-nav-system-overview'],
       names: ['systemOverviewCount'],
       assignsNo: [['activeView', 'system-overview']],
@@ -1162,7 +1164,7 @@ describe('CraftingSystemManager source contract', () => {
   // real routes now, which is why neither may reappear in the placeholder list either.
   defineStructureContract(
     'derives the placeholder rail from selection and feature gates',
-    [MANAGER_ROOT, MANAGER_SYSTEM_NAV],
+    [MANAGER_ROOT, MANAGER_NAV_ITEMS],
     {
     names: ['visiblePlaceholderViews', 'selectSystemAndShowBrowser'],
     declares: ['experimentalFeaturesEnabled'],
@@ -1184,7 +1186,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'advertises the Graph placeholder as the only one, behind the experimental toggle',
-    { file: MANAGER_SYSTEM_NAV, constant: 'placeholderViews' },
+    { file: MANAGER_NAV_ITEMS, constant: 'placeholderViews' },
     {
       property: [
         ['id', 'graph'],
@@ -1202,7 +1204,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'and gates it on the experimental toggle rather than on a system feature',
-    { file: MANAGER_SYSTEM_NAV, fn: 'isViewAvailableForSystem' },
+    { file: MANAGER_NAV_ITEMS, fn: 'isViewAvailableForSystem' },
     { compares: ['graph'], names: ['experimentalFeaturesEnabled'] }
   );
 
@@ -1255,30 +1257,20 @@ describe('CraftingSystemManager source contract', () => {
 
   });
 
-  // A universal over every composition site, which is why it reads all three entry units: the
-  // sites are spread across them and narrowing it to one would drop most of its population.
-  it('never takes the selected pill class from the route a nav parent groups', () => {
-    const parentClasses = MANAGER_NAV_UNITS.flatMap((file) =>
-      [...walkNodes(componentAstOf(file).fragment)].filter(
-        (node) =>
-          node.type === 'TemplateLiteral' &&
-          literalStrings(node).some((literal) => literal.includes('manager-nav-parent'))
-      )
-    );
-    assert.ok(parentClasses.length > 0, 'the gathering parent still composes its class');
-    assert.ok(
-      parentClasses.every((node) => !identifierNames(node).has('isGatheringRoute')),
-      'and does not take the selected pill class from the route it groups'
-    );
-  });
+  // That a nav parent never takes the selected pill class from the route it groups is retired
+  // rather than re-pointed at `managerNavItems.js` (issue 1777): the class is composed in one place,
+  // `navRowClass`, so it is pinned by value instead. `tests/manager-nav-items.test.js` holds the
+  // Crafting and Gathering parents current without `active` on their own routes, and the rail
+  // census in `tests/components/manager-rail-mounted.js` pins both parents' classes there.
 
   // The gathering rail is one submenu group with its own expand/collapse control and a rollup
   // count summarising the three sections beneath it.
-  defineStructureContract('groups the gathering sections into a rail submenu', MANAGER_SYSTEM_NAV, {
+  defineStructureContract('groups the gathering sections into a rail submenu', [MANAGER_SYSTEM_NAV, MANAGER_NAV_ITEMS], {
     spells: ['manager-nav-group '],
-    // The member path the unit reads through its `navRail` prop, which is what replaced the
-    // root's own `railGroupExpanded` (issue 1717).
-    reads: ['navRail.expanded.gathering'],
+    // The member path the model reads through the unit's `navRail` prop, which is what replaced
+    // the root's own `railGroupExpanded` (issue 1717); it keys it by group id (issue 1777).
+    reads: ['navRail.expanded'],
+    property: [['id', 'gathering']],
     spellsExactly: [
       'manager-nav-submenu',
       'manager-nav-toggle',
@@ -2265,11 +2257,17 @@ describe('CraftingSystemManager source contract', () => {
 
   // A rail count is a bare mono numeral in its own span, not a chip (issue 643). The Tool Studio
   // entry is driven by `tests/components/manager-rail-mounted.js`, which presses it, reads the
-  // route and asserts the badge is absent at zero; which derivation each span renders is not.
+  // route and asserts the badge is absent at zero; which derivation each span renders is not. The
+  // derivation is a model count marker's value since issue 1777, and the span renders that value.
   it('renders each rail count as the derived number inside the shared count span', () => {
-    const rendered = classRenderedExpressions(
-      componentAstOf(MANAGER_SYSTEM_NAV),
-      'manager-nav-count'
+    const spans = classRenderedExpressions(componentAstOf(MANAGER_SYSTEM_NAV), 'manager-nav-count');
+    assert.deepEqual(
+      spans.flatMap((expression) => memberPaths(expression)),
+      ['marker.value'],
+      'the unit renders the count marker value, and nothing else, in the count span'
+    );
+    const rendered = [...walkNodes(moduleAstOf(MANAGER_NAV_ITEMS).ast)].flatMap((node) =>
+      node.type === 'CallExpression' && calledName(node) === 'countMarker' ? node.arguments : []
     );
     const read = rendered.flatMap((expression) => [
       ...memberPaths(expression),

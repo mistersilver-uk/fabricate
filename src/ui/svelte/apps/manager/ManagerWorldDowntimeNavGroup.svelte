@@ -1,7 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The world rail's Downtime group: the parent row with its premium chip and rollup badge, the
-  disclosure, and one sub-item per preview tab (issue 1717, extracted from the root).
+  disclosure, and one sub-item per preview tab (issue 1717, extracted from the root), rendered from
+  `managerDowntimeNavGroup` (issue 1777).
 
   Props:
   | prop | values | default | contract |
@@ -10,94 +11,35 @@
   | `downtimeTabText` | `(tab, field) => string` | — | localizes a tab field in Core mode and passes a companion's own copy through |
   | `downtimeNavLabelId` | `(tabId) => string` | — | the root's own id minter, because the Downtime host stamps the same id outside the rail |
 
+  Every prop is read by `managerDowntimeNavGroup` in `managerNavItems.js`, which holds the defaults.
+
   Invariants:
-  - The rollup renders only while the children are hidden — both disjuncts of
-    `downtimeNavRollupVisible` are load-bearing, pinned by `tests/components/manager-downtime-mounted.js`.
+  - The rollup renders only while the children are hidden — both disjuncts of its visibility are
+    load-bearing, pinned by `tests/components/manager-downtime-mounted.js`.
   - The reveal effect stays with the `bind:this` registry it reads; neither crosses a prop boundary.
 -->
 <script>
-  import { resolveNavTabBadge, navTabBadgeTotal } from '../../../navTabBadgeStore.js';
   import { localize } from '../../util/foundryBridge.js';
+  import { managerDowntimeNavGroup, navRowClass } from './managerNavItems.js';
 
-  let {
-    navRail,
-    worldDowntimeAvailable = false,
-    isWorldDowntimeRoute = false,
-    downtimeCoreFallback = true,
-    downtimeTabs = [],
-    downtimeNavTabBadges = null,
-    downtimeTabText = () => '',
-    downtimeNavLabelId = () => '',
-    worldDowntimeTabId = '',
-    openWorldDowntime = () => {},
-    openWorldDowntimePreview = () => {},
-  } = $props();
+  const props = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
 
-  // One sentence for all five groups, and deliberately generic: the Downtime group's children
-  // come from whichever provider holds the surface, so this cannot name a section.
-  const railGroupLockedTitle = $derived(
-    text(
-      'FABRICATE.Admin.Manager.Nav.LockedOpen',
-      'This section stays open while you are on one of its pages.'
-    )
-  );
-  // The rail's Downtime children render the active tab set.
-  const downtimeNavItems = $derived(downtimeTabs);
-  // The sub-item button's element id: the click target the mounted suite drives, and the anchor
-  // the group's markup is keyed on.
-  const downtimeNavItemId = (tabId) => `manager-downtime-nav-${tabId}`;
-  // The id of the sub-item's badge element (issue 1302) — the `aria-describedby` target, and
-  // never a descendant of `downtimeNavLabelId`'s span, which names the companion panel region.
-  const downtimeNavBadgeId = (tabId) => `manager-downtime-nav-badge-${tabId}`;
-  // The badge Core renders for one sub-item, in provider mode only: Core's own preview tabs never
-  // carry a `badge`.
-  function downtimeSubitemBadge(item) {
-    return downtimeCoreFallback ? null : resolveNavTabBadge(item, downtimeNavTabBadges);
-  }
-  // The Downtime parent rollup total (issue 1302) — Core's own summary of what is hidden behind a
-  // closed disclosure.
-  const downtimeNavRollupTotal = $derived(
-    downtimeCoreFallback ? 0 : navTabBadgeTotal(downtimeTabs, downtimeNavTabBadges)
-  );
-  // Renders only while the children are hidden; both disjuncts are load-bearing.
-  const downtimeNavRollupVisible = $derived(
-    !downtimeCoreFallback &&
-      downtimeNavRollupTotal > 0 &&
-      (!navRail.expanded.worldDowntime || navRail.collapsedDisplay)
-  );
-  // "{count} update" / "{count} updates" — Core's own generic word.
-  function downtimeRollupName(count) {
-    const key =
-      count === 1
-        ? 'FABRICATE.Admin.Manager.World.Downtime.BadgeTotalOne'
-        : 'FABRICATE.Admin.Manager.World.Downtime.BadgeTotalOther';
-    const fallback = count === 1 ? '{count} update' : '{count} updates';
-    return text(key, fallback).replace('{count}', String(count));
-  }
-  // The parent row's composed accessible name while the rollup shows.
-  function downtimeParentName(count) {
-    const key =
-      count === 1
-        ? 'FABRICATE.Admin.Manager.World.Downtime.NavWithBadgeOne'
-        : 'FABRICATE.Admin.Manager.World.Downtime.NavWithBadgeOther';
-    const fallback = count === 1 ? '{label}, {count} update' : '{label}, {count} updates';
-    const label = text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime');
-    return text(key, fallback).replace('{label}', label).replace('{count}', String(count));
-  }
+  const group = $derived(managerDowntimeNavGroup(props, text));
+
   // Reveal the switcher on route entry (issue 1213).
   const downtimeNavNodes = $state({});
   let revealedDowntimeNavId = null;
   $effect(() => {
-    if (!navRail.railLockedOpen || !navRail.expanded.worldDowntime) {
+    if (!props.navRail.railLockedOpen || !props.navRail.expanded.worldDowntime) {
       revealedDowntimeNavId = null;
       return;
     }
-    const tabId = worldDowntimeTabId;
+    const tabId = props.worldDowntimeTabId ?? '';
     if (revealedDowntimeNavId === tabId) return;
     const node = downtimeNavNodes[tabId];
     if (!node) return;
@@ -107,142 +49,109 @@
   });
 </script>
 
+{#snippet markers(item)}
+  {#each item.markers as marker (marker.kind)}
+    {#if marker.kind === 'premium'}
+      <!-- The chip is muted, never removed, once a companion holds the surface (issue 1185). -->
+      <span
+        class={`manager-nav-premium ${marker.installed ? 'is-installed' : ''}`}
+        {...marker.hooks}>{marker.text}</span
+      >
+    {:else if marker.kind === 'issues'}
+      <!-- The issue-summary vehicle, never the record count (issue 1515). -->
+      <span
+        class="manager-nav-issue-badge"
+        {...marker.hooks}
+        id={marker.domId}
+        role="img"
+        aria-label={marker.name}>{marker.count}</span
+      >
+    {:else if marker.kind === 'lock'}
+      <span class="manager-nav-lock" {...marker.hooks}
+        ><i class="fas fa-lock" aria-hidden="true"></i></span
+      >
+    {/if}
+  {/each}
+{/snippet}
+
 <!--
-  Downtime is a group, not a leaf: it nests the same four previews Core's own tab strip offers,
-  each carrying a premium padlock.
+  Downtime is a group, not a leaf: it nests the same previews Core's own tab strip offers, each
+  carrying a premium padlock.
 -->
-{#if worldDowntimeAvailable}
+{#if group}
   <div
-    class={`manager-nav-group manager-world-downtime-group ${navRail.expanded.worldDowntime ? 'is-expanded' : ''}`}
-    data-world-downtime-section
+    class={`manager-nav-group manager-world-downtime-group ${group.expanded ? 'is-expanded' : ''}`}
+    {...group.hooks}
   >
     <button
       type="button"
-      class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldDowntimeRoute ? 'is-active' : ''}`}
-      id="manager-world-nav-downtime"
-      data-world-nav-item="downtime"
-      title={downtimeCoreFallback
-        ? text(
-            'FABRICATE.Admin.Manager.World.Downtime.PremiumTooltip',
-            'Unlock Downtime Studio with Fabricate Premium'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.World.Downtime.InstalledTooltip',
-            'Downtime Studio is unlocked by Fabricate Premium'
-          )}
-      aria-label={downtimeNavRollupVisible
-        ? downtimeParentName(downtimeNavRollupTotal)
-        : text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
-      aria-current={isWorldDowntimeRoute ? 'page' : undefined}
-      aria-controls="manager-downtime-submenu"
-      aria-expanded={navRail.expanded.worldDowntime}
-      onclick={openWorldDowntime}
+      class={navRowClass(
+        'manager-nav-button manager-nav-parent manager-world-nav-item',
+        group.parent
+      )}
+      id={group.parent.domId}
+      {...group.parent.hooks}
+      title={group.parent.title}
+      aria-label={group.parent.ariaLabel}
+      aria-current={group.parent.current}
+      aria-controls={group.parent.controls}
+      aria-expanded={group.expanded}
+      onclick={group.parent.onSelect}
     >
-      <i class="fas fa-hourglass-half" aria-hidden="true"></i>
-      <span class="manager-nav-label">
-        {text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
-      </span>
-      <!-- The chip is muted, never removed, once a companion holds the surface (issue 1185). -->
-      {#if !downtimeNavRollupVisible}
-        <span
-          class={`manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
-          data-world-nav-premium
-          data-world-nav-premium-state={downtimeCoreFallback ? 'preview' : 'installed'}
-          >{text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'PREMIUM')}</span
-        >
-      {/if}
-      <!-- The rollup — Core's own summary of what the closed disclosure is hiding. -->
-      {#if !downtimeCoreFallback}
-        {#if downtimeNavRollupVisible}
-          <span
-            class="manager-nav-issue-badge"
-            data-world-downtime-badge-total
-            role="img"
-            aria-label={downtimeRollupName(downtimeNavRollupTotal)}>{downtimeNavRollupTotal}</span
-          >
-        {/if}
-      {/if}
+      <i class={group.parent.icon} aria-hidden="true"></i>
+      <span class="manager-nav-label">{group.parent.label}</span>
+      {@render markers(group.parent)}
     </button>
     <button
       type="button"
       class="manager-nav-toggle"
-      id="manager-downtime-toggle"
-      data-world-downtime-toggle
-      aria-label={navRail.expanded.worldDowntime
-        ? text('FABRICATE.Admin.Manager.World.Downtime.CollapseNav', 'Collapse Downtime')
-        : text('FABRICATE.Admin.Manager.World.Downtime.ExpandNav', 'Expand Downtime')}
-      aria-controls="manager-downtime-submenu"
-      aria-expanded={navRail.expanded.worldDowntime}
-      disabled={navRail.lockedOpen.worldDowntime}
-      aria-disabled={navRail.lockedOpen.worldDowntime}
-      title={navRail.lockedOpen.worldDowntime ? railGroupLockedTitle : undefined}
-      onclick={(event) => navRail.toggleGroup('worldDowntime', event)}
+      id={group.toggle.domId}
+      {...group.toggle.hooks}
+      aria-label={group.toggle.label}
+      aria-controls={group.submenu.domId}
+      aria-expanded={group.expanded}
+      disabled={group.locked}
+      aria-disabled={group.locked}
+      title={group.lockedReason}
+      onclick={group.toggle.onToggle}
     >
-      <i
-        class={navRail.expanded.worldDowntime ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
-        aria-hidden="true"
+      <i class={group.expanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"
       ></i>
     </button>
-    {#if navRail.expanded.worldDowntime}
+    {#if group.expanded}
       <div
         class="manager-nav-submenu"
-        id="manager-downtime-submenu"
-        data-world-downtime-submenu
-        aria-label={text('FABRICATE.Admin.Manager.World.Downtime.NavSections', 'Downtime previews')}
+        id={group.submenu.domId}
+        {...group.submenu.hooks}
+        aria-label={group.submenu.label}
       >
-        {#each downtimeNavItems as item (item.id)}
+        {#each group.children as item (item.id)}
           <!-- `accessibleName` and `tooltip` land here in provider mode (issue 1213). -->
           <button
             type="button"
-            class={`manager-nav-subitem manager-downtime-subitem ${isWorldDowntimeRoute && worldDowntimeTabId === item.id ? 'is-active' : ''}`}
-            id={downtimeNavItemId(item.id)}
+            class={navRowClass('manager-nav-subitem manager-downtime-subitem', item)}
+            id={item.domId}
             bind:this={downtimeNavNodes[item.id]}
-            data-world-downtime-item={item.id}
-            title={downtimeTabText(item, 'tooltip')}
-            aria-label={downtimeCoreFallback ? undefined : downtimeTabText(item, 'accessibleName')}
-            aria-current={isWorldDowntimeRoute && worldDowntimeTabId === item.id
-              ? 'true'
-              : undefined}
-            aria-describedby={downtimeSubitemBadge(item) ? downtimeNavBadgeId(item.id) : undefined}
-            onclick={() => openWorldDowntimePreview(item.id)}
+            {...item.hooks}
+            title={item.title}
+            aria-label={item.ariaLabel}
+            aria-current={item.current}
+            aria-describedby={item.ariaDescribedBy}
+            onclick={item.onSelect}
           >
             <i class={item.icon} aria-hidden="true"></i>
-            <span class="manager-nav-label" id={downtimeNavLabelId(item.id)}
-              >{downtimeTabText(item, 'label')}</span
-            >
-            <!-- The issue-summary vehicle, never the record count (issue 1515). -->
-            {#if !downtimeCoreFallback}
-              {@const badge = downtimeSubitemBadge(item)}
-              {#if badge}
-                <span
-                  class="manager-nav-issue-badge"
-                  data-world-downtime-badge={item.id}
-                  id={downtimeNavBadgeId(item.id)}
-                  role="img"
-                  aria-label={badge.accessibleName}>{badge.count}</span
-                >
-              {/if}
-            {/if}
-            <!-- The padlock and the note advertise Core's preview; a companion owning the
-                 surface has nothing locked, so neither renders. -->
-            {#if downtimeCoreFallback}
-              <span class="manager-nav-lock" data-world-downtime-lock
-                ><i class="fas fa-lock" aria-hidden="true"></i></span
-              >
-            {/if}
+            <span class="manager-nav-label" id={item.labelId}>{item.label}</span>
+            {@render markers(item)}
           </button>
         {/each}
       </div>
-      {#if downtimeCoreFallback}
+      {#if group.callout}
         <p class="manager-nav-callout" data-world-downtime-callout>
           <span class="manager-nav-callout-kicker">
             <i class="fas fa-lock" aria-hidden="true"></i>
-            {text('FABRICATE.Admin.Manager.World.Downtime.RailKicker', 'PREMIUM PREVIEW')}
+            {group.callout.kicker}
           </span>
-          {text(
-            'FABRICATE.Admin.Manager.World.Downtime.RailNote',
-            'Open any Downtime page to preview how Fabricate Premium can help you run downtime.'
-          )}
+          {group.callout.note}
         </p>
       {/if}
     {/if}
