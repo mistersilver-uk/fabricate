@@ -1032,7 +1032,7 @@ test('the history-data witnesses name their defining evidence on the selected re
   // The two families this one sits beside are unchanged by it.
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-lifecycle-')).length,
-    73
+    74
   );
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'))
@@ -1074,7 +1074,8 @@ test('all Journal lifecycle captures assert defining product state rather than a
   const cases = VIEW_LAB_CASES.filter((entry) =>
     entry.id.startsWith('fabricate-journal-lifecycle-')
   );
-  assert.equal(cases.length, 73);
+  // 74 since issue 1644 added the run-type panel open over two ticked kinds.
+  assert.equal(cases.length, 74);
   for (const entry of cases) {
     assert.equal(entry.expectTab, 'journal', entry.id);
     assert.ok(entry.expectSelector, `${entry.id} has an explicit assertion`);
@@ -5574,6 +5575,21 @@ test('a change confined to one rules-editor card selects every frame the editor 
   }
   for (const card of COMPONENT_EDITOR_CARDS) {
     assert.deepEqual(ids(card), editorFrames, `${card} selects the editor's frames`);
+  }
+});
+
+test('a change to the scoped component model selects the frames that draw its attribution note', () => {
+  // Issue 2218: the sentence is built in the model, so the rules editor callout and the list
+  // inspector's Shared identity card are photographed with the world catalogue.
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/apps/manager/scoped/componentScoped.js',
+  ]).map((viewCase) => viewCase.id);
+  for (const expected of [
+    'manager-component-edit-inheriting',
+    'manager-components-normal',
+    'world-component-catalogue',
+  ]) {
+    assert.ok(selected.includes(expected), `the model selects ${expected}`);
   }
 });
 

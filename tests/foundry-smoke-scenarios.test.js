@@ -299,7 +299,7 @@ test('the label-emission parse over every module covers the whole capture order'
     /captureRecipeResultsTab\(\s*ctx,\s*[^,]+,\s*'([^']+)'/g,
     /captureCurrentPlayerGathering\(\s*'([^']+)'/g,
     /captureSelectedGatheringTask\(\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g,
-    /handleRollPromptIfPresent\(\s*ctx\s*,\s*'([^']+)'/g,
+    /answerRollPrompt\(\s*ctx\s*,\s*'([^']+)'/g,
   ];
   const emitted = new Set();
   for (const segment of SMOKE_SOURCE_SEGMENTS) {

@@ -1,9 +1,6 @@
 /** Phase E's first half: the shared app, the inventory and salvage captures, the gathering states and the Crafting tab; it returns the app-shell locator the second half continues against. */
 
-import {
-  assertProgressiveStageListSound,
-  handleRollPromptIfPresent,
-} from '../pageOps/managerViews.mjs';
+import { assertProgressiveStageListSound, answerRollPrompt } from '../pageOps/managerViews.mjs';
 import {
   assertNoScreenshotOverlays,
   assertPointerTarget,
@@ -380,13 +377,14 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     await captureCurrentPlayerGathering(label);
   }
 
-  async function clickReadyGatheringAttempt() {
+  // `prompts` is by construction: an immediate (d100) gather opens the interactive roll prompt,
+  // and a timed one only starts its waiting run.
+  async function clickReadyGatheringAttempt({ prompts }) {
     await appShell
       .locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]')
       .first()
       .click();
-    // An immediate (d100) attempt opens the interactive roll prompt: capture it and click Roll.
-    await handleRollPromptIfPresent(ctx, 'player-gathering-roll-prompt');
+    if (prompts) await answerRollPrompt(ctx, 'player-gathering-roll-prompt');
     // The attempt keeps a ready button disabled until its listing reload lands, and that reload
     // re-keys the task rows; selecting a row before it settles races a detached element.
     await page.waitForFunction(
@@ -426,7 +424,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-task-ready',
     });
-    await clickReadyGatheringAttempt();
+    await clickReadyGatheringAttempt({ prompts: true });
     await captureSelectedGatheringTask({
       environment: 'Verdant Meadow',
       task: 'Gather Meadow Herbs',
@@ -444,7 +442,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-timed-ready',
     });
-    await clickReadyGatheringAttempt();
+    await clickReadyGatheringAttempt({ prompts: false });
     await captureSelectedGatheringTask({
       environment: 'Timed Orchard',
       task: 'Tend Slow Bloom',
@@ -584,11 +582,10 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         .locator('[data-crafting-craft][data-crafting-craft-disabled="false"]')
         .first();
       if ((await craftButton.count()) > 0) {
-        await craftButton.click().catch(() => {});
-        // A UI craft now opens the interactive roll prompt: capture it, then
-        // click Roll so the run summary resolves and the overlay clears. The prompt can open several
-        // seconds after the click once a full D0 walk has loaded the world.
-        await handleRollPromptIfPresent(ctx, 'player-crafting-roll-prompt', { timeout: 15_000 });
+        await craftButton.click();
+        // A UI craft of this checked recipe opens the interactive roll prompt: capture it, then
+        // click Roll so the run summary resolves and the overlay clears.
+        await answerRollPrompt(ctx, 'player-crafting-roll-prompt');
         await appShell
           .locator('[data-crafting-run-summary]')
           .first()

@@ -69,6 +69,8 @@ const harness = createMountedComponentHarness({
     'src/utils/scalars.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
+    // The run kinds the store filters by and the kind filter draws and counts (issue 1644).
+    'src/ui/svelte/util/journalRunKinds.js',
     // The store words an additional-dice refusal with the roll prompt's notice (issue 2008).
     'src/ui/presenters/additionalDicePrompt.js',
     'src/systems/additionalDiceReach.js',
@@ -120,6 +122,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/RunAwardChoice.svelte',
     'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte',
     'src/ui/svelte/apps/journal/ThisRun.svelte',
+    // The run-type multi-select and the box its rows draw (issue 1644).
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/apps/journal/JournalKindFilter.svelte',
     'src/ui/svelte/apps/journal/JournalView.svelte',
   ],
   rootClass: 'fabricate-app',
@@ -2354,10 +2359,12 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
     harness.remount();
     const salvage = await mountState('salvage');
-    for (const kind of ['crafting', 'gathering', 'alchemy']) {
-      salvage.target.querySelector(`[data-journal-kind-toggle="${kind}"]`).click();
-    }
+    salvage.target.querySelector(':scope [data-journal-kind-trigger]').click();
     flushSync();
+    for (const kind of ['crafting', 'gathering', 'alchemy']) {
+      salvage.target.querySelector(`:scope [data-journal-kind-option="${kind}"]`).click();
+      flushSync();
+    }
     assert.deepEqual(salvage.store.kindFilter, ['salvage']);
     assert.ok(salvage.target.querySelector('[data-history-run-id="lab-v1-salvage"]'));
   });

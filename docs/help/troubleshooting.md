@@ -458,6 +458,7 @@ It does two jobs, because both are projections of the same thing — the source 
 - It scans your world items, your unlocked compendiums, and every actor's inventory.
 - It tags each component and each recipe item (book or scroll) source with a durable identity link, so future copies always resolve to the right one.
 - It clears misleading duplicate-source metadata that a copied item inherited from the item it was copied from.
+- A copy renamed from a compendium entry that a component still claims is tagged as that component if it is not registered itself, because Repair Item Data does not tell a renamed copy from the entry; register it as its own component first if that is not what you want.
 - It re-points an owned copy that a duplicate mislabelled, but only when the copy's name clearly identifies a single book or scroll.
 - Locked (system and module) compendiums are skipped by **this** scan, because Fabricate cannot write to them.
 - It never teaches or removes a recipe.
@@ -507,6 +508,72 @@ It does not reach unlinked token copies that were never saved as world actors, o
 
 **See also:** [Visibility & Knowledge]({% link crafting/books-scrolls.md %}#duplicating-a-book-or-scroll) covers duplicating books and scrolls as an authoring workflow.
 [Crafting Systems]({% link components/index.md %}#adding-components) covers duplicating items to author components.
+
+---
+
+## Every Item I Import Updates the Same Component
+
+**Symptom:** You import several different items, such as spell scrolls of the same level, and each one updates the component the first one created.
+You end up with one component carrying the last item's name and image, and matching every one of those items.
+
+**Cause:** The items were built from the same compendium entry and then changed into something else.
+Older versions treated them all as copies of that entry.
+Fabricate now tells a copy of an entry from something built from it by name: a copy that keeps the entry's name is the same thing, and a differently named one is its own component, recipe item, or tool.
+
+**Fix for a component that is already merged:**
+
+1. Open the Crafting Admin panel and find the merged component.
+2. Remove the merged component from every crafting system that holds it.
+   Check what uses it first, because removing it rewrites the recipes that name it.
+   The **Systems using this component** card on its entry in the **Component catalogue** and the bulk remove both do this.
+3. Open the **Component catalogue** in the World section of the Crafting System Manager and delete the merged component's entry there too.
+   Removing the component from a system does not delete its entry, and the entry can only be deleted once no crafting system holds the component.
+   If you leave it, one of the items you import adopts it and the others are left without a catalogue entry.
+4. Import the items again, by dropping them or by using the bulk import.
+   Each one now registers its own component and its own catalogue entry.
+5. Re-add the component to any recipes that used the merged one.
+
+{: .note }
+> **Repair Item Data does not un-merge a component.**
+> A merged component keeps matching every item it absorbed until you delete it and import the items again.
+
+**Things to know:**
+
+- A renamed copy of a compendium entry is registered as its own component and does not claim the entry.
+  An item a player drags straight from the compendium does not match it, so hand out copies from the item you registered.
+- Components and recipe items whose shared compendium entry can no longer be found, because the pack is missing or disabled, still merge until the pack is restored; tools do not.
+- Editing an item's name, image, or description refreshes only the component linked to that item.
+
+**See also:** [Adding Components]({% link components/index.md %}#adding-components) covers importing items.
+[Repairing Item Data](#repairing-item-data) covers the maintenance action for copies players already hold.
+
+---
+
+## An Imported Component Has No Catalogue Entry
+
+**Symptom:** A component you imported into a crafting system does not appear in the world Component catalogue, or its rules editor says its name, image, and description are the system's own.
+<!-- markdownlint-disable-next-line markdownlint-sentences-per-line -->
+You may also have seen the warning "The items were imported, but the world Component catalogue could not be updated. Import them again to add them to it."
+
+**Cause:** Importing an item now also registers a world component that the system holds.
+A component imported before that was added has none.
+The same is true when the catalogue could not be written during an import, which is what the warning reports.
+
+**Fix:** Import the items again, by dropping them, importing the folder or pack, or using the Compendium Directory action.
+Each component without a catalogue entry gets one, and keeps all of its own values.
+
+**Things to know:**
+
+- If the world component for that item has a different id from this system's component, this system's component is left without one.
+  This is typically because another system imported the item first.
+  Linking it would mean renumbering a component that recipes already reference.
+  To recover, check what uses the other system's component for that item, because removing it rewrites the recipes that name it.
+  Then remove that component from every system that holds it, delete its entry in the catalogue, which is only possible once no system holds it, and import the item again.
+- In a world where several systems hold the same item, import it again first in the systems that already hold it.
+  Importing it into a new system first gives that system a world component that the older components cannot adopt.
+- An item that belongs to an actor is imported but never becomes a world component.
+
+**See also:** [Imports also register world components]({% link components/index.md %}#imports-also-register-world-components) and [Importing again and its limit]({% link components/index.md %}#importing-again-and-its-limit).
 
 ---
 

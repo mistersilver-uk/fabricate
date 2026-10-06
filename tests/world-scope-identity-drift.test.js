@@ -6,8 +6,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { flushWorldComponentRegistrations } from '../src/systems/manager/worldComponentRegistration.js';
 import { WORLD_IDENTITY_FIELDS } from '../src/systems/worldScopeEntityGrouping.js';
 import { reportWorldIdentityDrift } from '../src/systems/worldIdentityDrift.js';
+
+import { makeScopeSettings, makeScopeStore } from './helpers/worldScopeCorpus.js';
 
 const ENTITY_FIELDS = { components: 'components', essences: 'essenceDefinitions', tools: 'tools' };
 
@@ -145,6 +148,38 @@ test('(c) the detector is neither ALWAYS-EQUAL nor ALWAYS-UNEQUAL, on ONE corpus
     reported[0].worldValue,
     'Ash Salt',
     'and it reports BOTH sides, so PR 8 can re-derive rather than guess which one is fresh'
+  );
+});
+
+test('a World Component a component import creates starts equal to its in-system record', async () => {
+  // The import is a snapshot writer (issue 2218), so its output must report nothing, as the
+  // migration's does.
+  const record = {
+    id: 'comp-salt',
+    name: 'Ash Salt',
+    img: 'a.png',
+    description: 'A',
+    originItemUuid: 'Compendium.world.reagents.Item.salt',
+    registeredItemUuid: 'Item.salt',
+    aliasItemUuids: ['Item.old-salt'],
+    category: 'general',
+  };
+  const systems = [{ id: 'sys-a', components: [record] }];
+  const settings = makeScopeSettings(undefined);
+
+  await flushWorldComponentRegistrations({
+    store: makeScopeStore('components', settings.value, settings),
+    registrations: [{ systemId: 'sys-a', componentId: 'comp-salt', added: true }],
+    rowsOf: () => systems[0].components,
+    isPersisted: () => true,
+  });
+
+  assert.deepEqual(reportWorldIdentityDrift(systems, { components: settings.value }), []);
+  record.name = 'DRIFTED';
+  assert.equal(
+    reportWorldIdentityDrift(systems, { components: settings.value }).length,
+    1,
+    'and the registered pair is one the detector compares'
   );
 });
 

@@ -959,7 +959,8 @@ Option cards are the two-to-four-way choice above, used when each side needs its
 Neither is a mode of the other.
 Independent criteria that narrow a list are filter toggles, because any combination is valid.
 A one-of-N SCOPE the list is always in — rather than a filter that can be cleared — is a segmented control in the same bar; a segmented whose value could be "none" is a toggle in disguise.
-The journal's kind filter is therefore four independent toggles, because any combination of kinds is a valid view, while its active-status filter stays a segmented control, because its four values are mutually exclusive.
+Where those independent criteria are a FIXED SET of named values rather than properties of the record, the filter is the shared picker's multi-select mode, which states the combination in one trigger and is not a `Search`, because nothing is typed.
+The journal's kind filter is therefore that multi-select, because any combination of kinds is a valid view and the four kinds are a fixed set (maintainer ruling 2026-10-05), while its active-status filter stays a segmented control, because its four values are mutually exclusive.
 
 An inspector rail's verbs render through the button primitive at full width, each taking the role its verb names.
 
@@ -999,6 +1000,12 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **WHEN** the same record's enabled state appears in a browse list and in that record's own editor
 - **THEN** the list row renders a status button
 - **AND** the editor renders a toggle
+
+#### Scenario: A list is filtered by any combination of a fixed set of values
+
+- **WHEN** a filter narrows a list to any combination of a fixed, named set of values
+- **THEN** it renders the shared picker's multi-select, whose trigger summarises the combination
+- **AND** each choice applies as it is made, with no query field where the set is short
 
 #### Scenario: A rail item is an icon well
 

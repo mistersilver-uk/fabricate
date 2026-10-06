@@ -148,6 +148,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       /^src\/ui\/model\/(?:component|entity)BrowserModel\.js$/,
       WORLD_SCOPE_MODEL_PATTERN,
+      // Builds the attribution note the inspector's Shared identity card draws (issue 2218).
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
     ],
   }),
   managerCase({
@@ -244,7 +246,12 @@ export const CASES = Object.freeze([
     // The switch is a new control on this card (issue 1371), so it owns a real pointer hit rather than a DOM assertion.
     expectCenterHit: '[data-scoped-inherit-toggle="essences"]',
     kinds: ['manager', 'components'],
-    sourceMatches: [...COMPONENT_EDITOR_MATCHES, WORLD_SCOPE_MODEL_PATTERN],
+    sourceMatches: [
+      ...COMPONENT_EDITOR_MATCHES,
+      WORLD_SCOPE_MODEL_PATTERN,
+      // Builds the attribution note the identity callout draws (issue 2218).
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
+    ],
   }),
   // The first open-panel frame in the component studio (issue 1510): the option list exists only
   // while the panel is open, so a closed-state frame cannot double for it (the portal occludes
