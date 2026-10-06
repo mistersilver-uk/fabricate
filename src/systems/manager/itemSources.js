@@ -1,9 +1,9 @@
 /**
  * The item-source cluster (issue 1923): the legacy recipe-item reconciler, component and
  * recipe-item registration from an Item uuid, component source replacement and the GM metadata
- * refresh; collaborators arrive in `io`. Import de-duplication (`addItemFromUuid`) and
- * source-metadata propagation (`refreshComponentMetadataForUpdatedItem`) key on the narrower Item
- * Source Reference Chain, `getItemIdentityReferences`, which excludes `_stats.duplicateSource`.
+ * refresh; collaborators arrive in `io`. Import de-duplication (`addItemFromUuid`) keys on the
+ * source's own uuid plus its compendium source, the latter dropped for a clone or a derivative;
+ * the metadata refresh (`refreshComponentMetadataForUpdatedItem`) keys on the own uuid alone.
  */
 import { advanceDefinitionRevision } from '../../utils/definitionIndex.js';
 import {
@@ -11,6 +11,10 @@ import {
   getDuplicateSourceUuid,
   getItemIdentityReferences,
   getItemMatchUuids,
+  getOwnSourceUuids,
+  normalizeMatchName,
+  settleCompendiumClaim,
+  storedMatchName,
 } from '../../utils/sourceUuid.js';
 
 import { baseCollaborators, COMPONENT_FACTS, RECIPE_ITEM_FACTS } from './collaborators.js';
@@ -166,8 +170,9 @@ export async function addRecipeItemFromUuid(io, systemId, itemUuid) {
   // runs and the item resolves through the legacy scalar and raw references.
   const roleFlagKey = io.recipeItemRoleFlagKey(system.id);
 
-  const snapshot = await io.buildRecipeItemSourceSnapshot(itemUuid, source);
-  const existing = io.findRecipeItemDefinitionForSource(system, snapshot, source);
+  const resolved = await io.buildRecipeItemSourceSnapshot(itemUuid, source);
+  const existing = io.findRecipeItemDefinitionForSource(system, resolved, source);
+  const snapshot = settleCompendiumClaim(resolved, existing, source);
   if (existing) {
     const unchanged =
       existing.name === snapshot.name &&
@@ -188,6 +193,15 @@ export async function addRecipeItemFromUuid(io, systemId, itemUuid) {
     existing.img = snapshot.img;
     existing.description = snapshot.description;
     existing.originItemUuid = snapshot.originItemUuid;
+    // An origin move releases no claim the registration still lists, and no alias repeats the
+    // origin or the registered uuid (issue 2217).
+    const aliases = new Set(existing.aliasItemUuids || []);
+    if ((snapshot.aliasItemUuids || []).includes(previousSourceUuid)) {
+      aliases.add(previousSourceUuid);
+    }
+    aliases.delete(existing.originItemUuid);
+    aliases.delete(existing.registeredItemUuid);
+    existing.aliasItemUuids = [...aliases];
     // Indexed fields changed at constant length, invisible to the `definitionIndex` rule.
     advanceDefinitionRevision(system.recipeItemDefinitions);
 
@@ -225,8 +239,8 @@ function resolveImportedSourceData(itemUuid, source = null) {
   }
   // A world source with `_stats.duplicateSource` is a clone whose inherited `compendiumSource`
   // names the original's pack, so it keys on its own uuid or it would overwrite the original's
-  // definition (issue 555). Registration only: Foundry stamps `duplicateSource` on every
-  // non-compendium drag-drop, so `matchRecipeItemDefinition` has no clone gate.
+  // definition (issue 555). Registration only: an actor-owned copy may carry `duplicateSource`
+  // too, depending on the core build, so `matchRecipeItemDefinition` has no clone gate.
   const isClone = !!getDuplicateSourceUuid(source);
   const identityRefs = isClone
     ? [source?.uuid].filter((ref) => typeof ref === 'string' && ref.trim())
@@ -239,9 +253,22 @@ function resolveImportedSourceData(itemUuid, source = null) {
   return { currentUuid, canonicalUuid, references, isClone };
 }
 
+/** Whether a non-clone source is a derivative of its resolved compendium source (issue 2217): its
+ * stored name is neither the entry's stored name nor the original a translation module recorded
+ * on the entry. The source's own recorded original is not read, because `fromCompendium` copies
+ * the entry's flags into everything built from it. A side with no name is no evidence. */
+function isDerivativeOf(source, compendiumDocument) {
+  const name = storedMatchName(source);
+  const entryNames = [
+    storedMatchName(compendiumDocument),
+    normalizeMatchName(compendiumDocument?.flags?.babele?.originalName),
+  ].filter(Boolean);
+  return !!name && entryNames.length > 0 && !entryNames.includes(name);
+}
+
 /**
- * Component import source references, falling back when the recorded canonical source no
- * longer resolves.
+ * Import source references for every kind. A derivative keys on its own uuid as a clone does, with
+ * its `_stats` left alone; a recorded canonical source that no longer resolves falls back.
  * @returns {Promise<{currentUuid: string|null, canonicalUuid: string|null, references: string[],
  *   aliasItemUuids: string[],
  *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>}>}
@@ -268,7 +295,16 @@ export async function resolveImportedComponentSourceData(itemUuid, source = null
   }
 
   if (canonicalSource) {
-    return { ...sourceData, aliasItemUuids, sourceFallbacks };
+    if (!isDerivativeOf(source, canonicalSource)) {
+      return { ...sourceData, aliasItemUuids, sourceFallbacks };
+    }
+    return {
+      ...sourceData,
+      canonicalUuid: currentUuid,
+      references: sourceData.references.filter((ref) => ref !== recordedCanonicalUuid),
+      aliasItemUuids,
+      sourceFallbacks,
+    };
   }
 
   if (!sourceData.references.includes(recordedCanonicalUuid)) {
@@ -305,12 +341,15 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
   );
 
   const nextSourceData = await io.resolveImportedComponentSourceData(itemUuid, source);
-  const existing = io.findComponentBySourceReferences(system, nextSourceData.references);
-  const nextSnapshot = await io.buildComponentSourceSnapshot(
-    itemUuid,
-    source,
+  // The component claiming the source's own uuid wins over one claiming only its compendium
+  // source (issue 2217).
+  const existing =
+    io.findComponentBySourceReferences(system, getOwnSourceUuids(itemUuid, source)) ||
+    io.findComponentBySourceReferences(system, nextSourceData.references);
+  const nextSnapshot = settleCompendiumClaim(
+    await io.buildComponentSourceSnapshot(itemUuid, source, existing, nextSourceData),
     existing,
-    nextSourceData
+    source
   );
   if (existing) {
     const nextFallbacks = io.buildFallbackSourceReferences(
@@ -462,10 +501,10 @@ export async function refreshComponentMetadataForUpdatedItem(io, item, changes =
   const refreshDescription = hasUpdatedItemDescription(changes);
   if (!refreshName && !refreshImg && !refreshDescription) return { updated: 0 };
 
-  // Identity references only: a clone's duplicateSource names its original, which must not
-  // receive this edit.
-  const itemRefs = new Set(getItemIdentityReferences(item));
-  if (itemRefs.size === 0) return { updated: 0 };
+  // The edited Item's own uuid only: its compendium and duplicate sources name sibling Items,
+  // whose components must not receive this edit (issue 2217).
+  const ownUuids = getOwnSourceUuids(item?.uuid, item);
+  if (ownUuids.length === 0) return { updated: 0 };
 
   const nextName = refreshName ? item?.name || changes.name || 'Unnamed Item' : null;
   const nextImg = refreshImg ? item?.img || changes.img || 'icons/svg/item-bag.svg' : null;
@@ -480,8 +519,7 @@ export async function refreshComponentMetadataForUpdatedItem(io, item, changes =
   for (const system of io.systems().values()) {
     const components = Array.isArray(system.components) ? system.components : []; // ratchet-exempt(world-scope): writer
     for (const component of components) {
-      const matches = getItemMatchUuids(component).some((ref) => itemRefs.has(ref));
-      if (!matches) continue;
+      if (getItemMatchUuids(component).every((ref) => !ownUuids.includes(ref))) continue;
 
       let changed = false;
       if (refreshName && component.name !== nextName) {

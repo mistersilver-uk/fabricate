@@ -1073,6 +1073,13 @@ The set of UUIDs that identify an owned item and its canonical source for compon
 
 [Notes](docs/domain/terms.md#item-source-reference-chain)
 
+#### Derivative Source
+
+A registration source Item built from a compendium entry and then changed into a different thing: a non-clone whose compendium **Source UUID** resolves to a document none of whose names it shares.
+At registration and source replacement it keys on its own uuid alone, as a clone does, so each one becomes its own component, tool or recipe-item definition instead of overwriting the one registered before it.
+
+[Notes](docs/domain/terms.md#derivative-source)
+
 #### Recipe Item Match Tiers
 
 The four-tier precedence the one shared, **system-scoped** matcher (`matchRecipeItemDefinition(item, definitions, systemId)`) uses to resolve which recipe-item definition an owned item IS (issue 555, made per-system by issue 567): the list-aware durable identity tier is evaluated first, then among the source tiers the first match wins with no fall-through: (1) `identity` — the durable per-system `flags.fabricate.roles[systemId].recipeItemDefinitionId` leaf (the third `roles` sibling after `componentId`/`toolId`), then the legacy scalar `flags.fabricate.recipeItemDefinitionId` (a transitional read-only fallback), each naming a definition in the candidate set exclusively and otherwise falling through; (2) `uuid` — the item's own uuid in the definition's union refs; (3) `compendium` — the item's compendium **Source UUID** in the union; (4) `duplicate` — the item's `_stats.duplicateSource` in the union.
