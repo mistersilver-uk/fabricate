@@ -331,6 +331,26 @@ export function registerRailCases() {
     }
   });
 
+  // The shell derives the mode and the tier count; ManagerTitleBar only formats them (issue 1777).
+  it('summarises a routed-by-check selection with its outcome tiers in the titlebar', () => {
+    useShippedLocalization();
+    mountManager([], {
+      alchemyResolutionMode: 'routedByCheck',
+      craftingCheck: { routed: { type: 'fixed', fixedOutcomes: [{ id: 'great' }, { id: 'fair' }] } },
+    });
+    assert.equal(
+      target.querySelector('[data-manager-titlebar-status]').textContent.trim(),
+      'Routed by check · 2 outcome tiers'
+    );
+  });
+
+  it('draws no titlebar status line without a selected system', () => {
+    useShippedLocalization();
+    mountManager([], { selected: false });
+    assertHook(target, '.manager-titlebar[data-manager-titlebar]');
+    assertNoHook(target, '[data-manager-titlebar-status]', 'no selection, no resolution summary');
+  });
+
   it('labels the rail section, in shipped copy', () => {
     useShippedLocalization();
     mountManager();
