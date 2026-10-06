@@ -361,8 +361,11 @@ function persistedComponentIds(io) {
   return held;
 }
 
-/** A run's world-component registrations, written in one `fabricate.componentScope` save. */
-export function flushImportRegistrations(io, registrations) {
+/** A run's world-component registrations, written in one `fabricate.componentScope` save. A
+ * non-GM writes and registers nothing, and is answered rather than refused, because two callers
+ * flush inside `finally`. */
+export async function flushImportRegistrations(io, registrations) {
+  if (!globalThis.game?.user?.isGM) return { registered: 0, error: null };
   return flushWorldComponentRegistrations({
     store: io.componentScopeStore(),
     registrations,
