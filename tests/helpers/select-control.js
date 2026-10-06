@@ -226,7 +226,7 @@ export async function chooseSelectOptionByKeyboard(root, triggerSelector, value)
 
   await pressFocused('ArrowDown');
   const wanted = String(value);
-  const rows = root.querySelectorAll('.fabricate-select-popover [role="option"]').length;
+  const rows = root.querySelectorAll(':scope .fabricate-select-popover [role="option"]').length;
   const active = () =>
     root
       .querySelector(`[id="${trigger.getAttribute('aria-activedescendant')}"]`)

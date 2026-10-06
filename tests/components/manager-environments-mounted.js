@@ -2033,7 +2033,7 @@ export function registerEnvironmentsCases() {
     );
     assert.equal(
       target.querySelectorAll(
-        '.manager-inspector [data-gathering-inspector-rules] .fabricate-select-trigger'
+        ':scope .manager-inspector [data-gathering-inspector-rules] .fabricate-select-trigger'
       ).length,
       10
     );
@@ -3676,7 +3676,9 @@ export function registerEnvironmentsCases() {
       );
       assert.ok(
         Boolean(
-          ref.querySelector('.manager-character-modifier-operator-select .fabricate-select-trigger')
+          ref.querySelector(
+            ':scope .manager-character-modifier-operator-select .fabricate-select-trigger'
+          )
         ),
         'the reference row renders its operator select'
       );
@@ -3695,8 +3697,12 @@ export function registerEnvironmentsCases() {
         ],
         modifierPickerSelection: () => 'forest',
         rowCharacterModifiers: () => [{ id: 'ref-1', modifierId: 'mod-training', operator: '+' }],
-        onSelectModifierPickerOption: (kind, value) => writes.push(['condition', kind, value]),
-        onUpdateCharacterModifier: (id, patch) => writes.push(['operator', id, patch]),
+        onSelectModifierPickerOption: (kind, value) => {
+          writes.push(['condition', kind, value]);
+        },
+        onUpdateCharacterModifier: (id, patch) => {
+          writes.push(['operator', id, patch]);
+        },
       });
       const stem = shell.props.idPrefix;
       const picker = `[data-gathering-${subject}-condition-modifier-picker="biome"] .fabricate-select-trigger`;
@@ -3732,7 +3738,7 @@ export function registerEnvironmentsCases() {
       gatheringConditionAvailableOptions: () => [],
     });
     const trigger = root.querySelector(
-      '[data-gathering-drop-condition-modifier-picker="biome"] .fabricate-select-trigger'
+      ':scope [data-gathering-drop-condition-modifier-picker="biome"] .fabricate-select-trigger'
     );
     assert.equal(trigger.disabled, true, 'the trigger is off');
     assert.equal(trigger.getAttribute('data-tooltip'), 'All conditions already added.');

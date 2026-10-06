@@ -1151,8 +1151,7 @@ export const CASES = Object.freeze([
       { selector: '[data-gathering-task-drop-id="hb-slowbloom-drop"]' },
       { selector: '[data-gathering-drop-character-modifier-search] input', fill: 'Herb' },
       {
-        selector:
-          '[data-gathering-drop-character-modifier-suggestion="hb-mod-herbalism-training"]',
+        selector: '[data-gathering-drop-character-modifier-suggestion="hb-mod-herbalism-training"]',
       },
       { selector: '[data-gathering-drop-character-modifier-ref]', scroll: true },
     ],
