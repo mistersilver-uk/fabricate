@@ -1,0 +1,25 @@
+/*
+ * The Primitive Lab parent page's own rules: the two sizing states `mount.js` moves each specimen
+ * `<iframe>` through. Everything else on the page is `library.html`'s own stylesheet.
+ */
+
+/* Unsized: out of flow and off-screen at a generous width, so the document inside can shrink-wrap. */
+.pl-live {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0;
+  border: 0;
+  position: absolute;
+  visibility: hidden;
+  left: -99999px;
+  top: 0;
+  width: 2000px;
+  height: 10px;
+}
+
+/* Sized: back in flow at the size the specimen reported, where the drawing stood. */
+.pl-live.pl-specimen-sized {
+  position: static;
+  visibility: visible;
+  left: auto;
+}
