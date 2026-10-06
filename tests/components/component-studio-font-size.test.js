@@ -22,10 +22,10 @@ const FIXTURE = `
             </label>
             <!-- The toolbar controls are the shared Select, drawn as it renders: the picker ROOT
                  carrying the caller class, the trigger nested inside it. -->
-            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-essence-filter is-size-38"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="essence-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by essence"><span class="manager-travel-picker-value fabricate-select-value">All essences</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
+            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-essence-filter"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-form" data-m="essence-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by essence"><span class="manager-travel-picker-value fabricate-select-value">All essences</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
           </div>
           <div class="manager-component-filter-row is-secondary">
-            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-category-filter is-size-38"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="filter-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by category"><span class="manager-travel-picker-value fabricate-select-value">All categories</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
+            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-category-filter"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-form" data-m="filter-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by category"><span class="manager-travel-picker-value fabricate-select-value">All categories</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
             <span class="manager-component-filter-divider"></span>
             <div class="manager-component-filter-field">
               <span class="manager-component-filter-label" data-m="filter-label">Group by category</span>
@@ -370,22 +370,19 @@ const EXPECTED = {
   // the prototype — the map below is re-measured against the real markup, not carried
   // over. The old map pinned the drift and its own comments admitted it
   // ("filter-label: 12.48, // prototype toolbar micro-label 8.5px").
-  search: 11.52, // 0.72rem — prototype search input 12.5px sans
+  search: 12.5, // the library's `<Search>` at 500 12.5px, which is also the prototype's (issue 1782)
   // `proto:1062` — the toolbar micro-label at 8.5px, which is now the SHIPPED value rather than
   // the target this pin's own comment used to name (issue 1371 r11, UX finding F-K). The 0.08em
   // tracking is unchanged and resolves against this size, so the reference's 0.68px comes with
   // it. Route-scoped in the sheet, so the Recipe Studio's and the Essence library's labels are
   // untouched at 8.8 — which is why this fixture's root carries `data-manager-view="components"`.
   'filter-label': 8.5, // proto:1062 toolbar micro-label 8.5px @ .08em (was 8.8, and 12.48 before)
-  // 0.72rem, the shared `Select`'s `toolbar` rung, which states the literal on the trigger
-  // itself rather than leaving it to inherit Foundry's 14px app base.
-  // The two FILTER triggers take the reference's own 12px (issue 1371 r11, F-K); the SORT
-  // trigger does not, because the reference draws that one at 11.5px (`proto:1066`) against the
-  // shipped 11.52px and a fiftieth of a pixel is rounding rather than drift. Three selects in one
-  // bar with two pinned sizes is the reference's own arrangement, not an oversight.
-  'filter-select': 12, // proto:1054 — the category filter (was 11.52)
+  // The two FILTER triggers share the search's row and take `Select`'s `form` rung, the search's
+  // own 500 12.5px (issue 1782). The SORT trigger is the `toolbar` rung's 0.72rem literal, which
+  // the reference draws at 11.5px (`proto:1066`); a fiftieth of a pixel is rounding, not drift.
+  'filter-select': 12.5, // the `form` rung, beside the search
   'sort-select': 11.52, // proto:1066 draws 11.5; the residual is 0.02px
-  'essence-select': 12, // proto:1056 — the essence filter (was 11.52)
+  'essence-select': 12.5, // the `form` rung, beside the search
   'toolbar-button': 11, // proto:1067 — the sort-direction toggle at `600 11px` (was 11.52)
   // Every chip role below MOVED from 12 (0.75rem) to 9.92 (0.62rem) in issue 883. That is
   // the deliberate change, not drift: the compact Tool Studio scale is now the only chip

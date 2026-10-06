@@ -356,7 +356,7 @@
         >{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span
       >
       <Select
-        size="toolbar"
+        size="form"
         value={statusFilter}
         options={statusSelectOptions}
         showTick={false}
@@ -369,7 +369,7 @@
         >{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span
       >
       <Select
-        size="toolbar"
+        size="form"
         value={biomeFilter}
         options={biomeSelectOptions}
         ariaLabelledBy={`${instanceId}-biome-filter`}
@@ -381,7 +381,7 @@
         >{text('FABRICATE.Admin.Manager.Environment.Tasks.Availability', 'Availability')}</span
       >
       <Select
-        size="toolbar"
+        size="form"
         value={availabilityFilter}
         options={availabilitySelectOptions}
         ariaLabelledBy={`${instanceId}-availability-filter`}

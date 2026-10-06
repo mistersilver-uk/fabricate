@@ -366,7 +366,7 @@
         >{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span
       >
       <Select
-        size="toolbar"
+        size="form"
         value={statusFilter}
         options={statusSelectOptions}
         showTick={false}
@@ -379,7 +379,7 @@
         >{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span
       >
       <Select
-        size="toolbar"
+        size="form"
         value={biomeFilter}
         options={biomeSelectOptions}
         ariaLabelledBy={`${instanceId}-biome-filter`}
@@ -391,7 +391,7 @@
         >{text('FABRICATE.Admin.Manager.Environment.Events.DangerTag.Label', 'Danger')}</span
       >
       <Select
-        size="toolbar"
+        size="form"
         value={dangerFilter}
         options={dangerSelectOptions}
         ariaLabelledBy={`${instanceId}-danger-filter`}

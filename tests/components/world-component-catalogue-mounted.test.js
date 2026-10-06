@@ -2399,25 +2399,15 @@ describe('world Component Catalogue (issue 1371)', () => {
     }
 
     it('takes the 38px rung on the LEAD row’s two controls and nowhere else', async () => {
-      // `proto:577`-`578` draws the search field and the source select at 38.
+      // `proto:577`-`578` draws the search field and the source select at 38: the default search
+      // shell, and `Select`'s `form` rung beside it (issue 1782).
       const target = await mounted();
       const field = target.querySelector('[data-scoped-list-search]').closest('.fabricate-search');
       assert.ok(Boolean(field), 'the search field is the shared primitive');
-      assert.ok(
-        field.classList.contains('is-size-38'),
-        'and it carries the rung `SearchField` emits for size="38"'
-      );
+      assert.ok(!field.classList.contains('is-compact'), 'at its default 38px shell');
 
-      // ISSUE 1504 MOVED THE TOKEN OFF THE ELEMENT AND ONTO THE SELECT ROOT. These controls are
-      // shared `<Select>`s now: the hook rides the trigger through `triggerProps` and the caller's
-      // `class` lands on the picker root the trigger sits in, which is where the sheet's rung
-      // rule reaches it from.
-      const rootOf = (control) => control.closest('.fabricate-select');
       const source = target.querySelector('[data-scoped-list-filter="source-type"]');
-      assert.ok(
-        rootOf(source).classList.contains('is-size-38'),
-        'the lead row’s select carries the same rung'
-      );
+      assert.equal(source.getAttribute('data-select-size'), 'form', 'the lead row’s select is 38');
 
       for (const [what, selector] of [
         ['membership', '[data-scoped-list-filter="membership"]'],
@@ -2425,8 +2415,9 @@ describe('world Component Catalogue (issue 1371)', () => {
       ]) {
         const control = target.querySelector(selector);
         assert.ok(Boolean(control), `NON-VACUITY: the ${what} control is rendered`);
-        assert.ok(
-          !rootOf(control).classList.contains('is-size-38'),
+        assert.equal(
+          control.getAttribute('data-select-size'),
+          'toolbar',
           `and the filter row’s ${what} control keeps the ladder’s 34, because 32 is retired`
         );
       }
@@ -2457,9 +2448,10 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
     });
 
-    it('turns the inspector roster into a recess with its search field lifted out of it', async () => {
-      // Reviewer finding 7. Both were restyled IN PLACE for all three catalogues before the props
-      // existed; this screen is the one whose reference draws them.
+    it('turns the inspector roster into a recess around the shared search field', async () => {
+      // Reviewer finding 7. The recess was restyled IN PLACE for all three catalogues before the
+      // prop existed; this screen is the one whose reference draws it. The field's separate well
+      // went with issue 1782: the search draws its own box at every site.
       const target = await mounted();
       target.querySelector('[data-scoped-list-inspect="ingot"]').click();
       await drain();
@@ -2468,9 +2460,10 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.ok(card.classList.contains('is-recessed'), 'and the card takes the recess');
       const search = target.querySelector('.manager-scoped-roster-search');
       assert.ok(Boolean(search), 'the roster still draws its search field');
+      assert.ok(search.classList.contains('fabricate-search'), 'and it is the shared field’s own box');
       assert.ok(
-        search.classList.contains('manager-scoped-roster-search-well'),
-        'and the field is lifted into its own well rather than sitting flush in the recess'
+        !search.classList.contains('manager-scoped-roster-search-well'),
+        'with no second well class over it'
       );
     });
 
@@ -2874,8 +2867,9 @@ describe('world Component Catalogue (issue 1371)', () => {
         'essence',
         'the essence select is the source select’s next sibling — where the rules list puts its'
       );
-      assert.ok(
-        essence.classList.contains('is-size-38'),
+      assert.equal(
+        essence.querySelector('[data-scoped-list-filter]').getAttribute('data-select-size'),
+        'form',
         'and it takes the lead row’s rung, exactly as the source select beside it does'
       );
       assert.ok(

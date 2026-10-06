@@ -366,7 +366,7 @@ describe('InteractableBrowserRoot body', () => {
     // hand-rolled twins it declines to convert - so a bare `includes` reads the documentation and
     // stays green after the markup has been changed to a text input. Proved by mutation.
     assert.ok(
-      /<input\n\s+type="search"/.test(searchFieldSource),
+      /<input\n(?:(?!\/>)[\s\S])*?\n\s+type="search"/.test(searchFieldSource),
       'the shared field renders a search input'
     );
     assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.DropModifierHint'), 'Alt-override hint shown in the browser');
@@ -376,13 +376,14 @@ describe('InteractableBrowserRoot body', () => {
   it('puts its filter controls on one rung and gives the picker trigger the field width', () => {
     const searchTag = /<SearchField\b[\s\S]*?\/>/.exec(emittingHalfOf(rootSource));
     assert.ok(searchTag, 'the filter bar still renders the shared search field');
+    // The field is 38 by default (issue 1782), so the bar asks it for no rung.
     assert.ok(
-      searchTag[0].includes('size={38}'),
-      `the search field is asked for the 38px rung:\n${searchTag?.[0]}`
+      !/\bsize=/.test(searchTag[0]),
+      `the search field is handed no \`size\`, a prop it retired:\n${searchTag?.[0]}`
     );
     assert.ok(
-      /\.fabricate-search\.fabricate-search\.is-size-38 input\s*\{[^}]*height:\s*38px/.test(sheetSource),
-      'and that rung is 38px in the sheet'
+      /\.fabricate-search\.fabricate-search:not\(\.is-compact\)\s*\{[^}]*height:\s*38px/.test(sheetSource),
+      'and its default shell is 38px in the sheet'
     );
     assert.ok(
       /\.fabricate-select \.fabricate-select-trigger-form\s*\{[^}]*min-height:\s*38px/.test(sheetSource),

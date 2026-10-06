@@ -188,10 +188,19 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-component-catalogue',
     'manager-environments-browse-normal',
   ]),
-  // The manager's search field (issue 1039).
+  // The search field (issue 1039): the default 38px shell in each browse toolbar, the roster and the
+  // Tools library card, and the compact form in the task editor and the entry systems card.
   'src/ui/svelte/components/SearchField.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-knowledge-owned-copies',
+    'manager-recipes-normal',
+    'manager-recipes-narrow',
+    'manager-books-scrolls-normal',
+    'manager-gathering-tasks-browse-normal',
+    'manager-default-selection',
+    'manager-access-recipe-selected',
+    'manager-tool-parity-01-library-1280x720',
+    'world-component-entry-systems',
   ]),
   // The manager's card shell (issue 1427), extracted from 80 hand-written inspector-card sections.
   'src/ui/svelte/components/InspectorCard.svelte': Object.freeze([

@@ -344,8 +344,10 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   // The identity row every player detail pane leads with (issue 1518), and the primary it draws.
   'src/ui/svelte/apps/PlayerDetailHeader.svelte',
   'src/ui/svelte/components/Button.svelte',
-  // The search field, card box and switch the player controls converted onto (issue 1518).
+  // The search field, card box and switch the player controls converted onto (issue 1518), and
+  // the `Field` its labelled form renders (issue 1782).
   'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   // The requirement chooser the crafting rail renders (issue 1518), the tile it draws and its well.

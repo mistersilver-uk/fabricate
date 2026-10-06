@@ -64,6 +64,8 @@ export const RETIRED_BY_COMPONENT = Object.freeze({
   FillBar: Object.freeze(['size']),
   Pagination: Object.freeze(['label']),
   RowDisclosure: Object.freeze(['label']),
+  // Issue 1782: the field is 38 by default and `density` names its one exception.
+  SearchField: Object.freeze(['size']),
   SelectionCheckbox: Object.freeze(['size']),
 });
 

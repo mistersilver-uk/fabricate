@@ -276,10 +276,9 @@
 </script>
 
 <!--
-  THE FOUR PRIMITIVE SEAMS THIS SCREEN CONSUMES, each wired below rather than restyled in place
-  so the essence and tool catalogues do not move: `toolbarLeadSize="38"` (the LEAD ROW's own
-  published rung, which the three controls below deliberately do not take), `rowMedallion`
-  (`proto:600`'s borderless tile), `rosterRecessed` / `rosterSearchWell`, and `autoSelectFirst`.
+  THE THREE PRIMITIVE SEAMS THIS SCREEN CONSUMES, each wired below rather than restyled in place
+  so the essence and tool catalogues do not move: `rowMedallion` (`proto:600`'s borderless tile),
+  `rosterRecessed`, and `autoSelectFirst`.
 -->
 <main class="manager-main" data-scoped-page="world-components" aria-label={catalogueTitle}>
   <EntityCatalogueShell
@@ -339,11 +338,9 @@
     rowSecondLine="description"
     rowSourceBadge={false}
     splitToolbar
-    toolbarLeadSize="38"
     selectAllScope="shown"
     rowMedallion={COMPONENT_ROW_MEDALLION}
     rosterRecessed
-    rosterSearchWell
     systemRowAction="navigate"
     rosterEmptyNote={text(
       'FABRICATE.Admin.Manager.Scoped.Component.RosterEmpty',

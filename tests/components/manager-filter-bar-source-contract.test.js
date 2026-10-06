@@ -102,7 +102,7 @@ const field = definePrimitiveAdoptionContract({
   primitive: FIELD_PATH,
   contractClass: 'fabricate-search',
   allowlist: RAW_SEARCH_ALLOWLIST,
-  // 26 sites in 23 components at issue 2157; the floors below keep headroom under that count.
+  // 34 sites in 31 components at issue 1782; the floors below keep headroom under that count.
   callSiteFloor: 14,
   fileFloor: 12,
   detectorFixture: {
@@ -134,35 +134,56 @@ const NAMED = Object.freeze([
   Object.freeze({ tag: 'SearchField', sites: field.callSites }),
 ]);
 
-test('every filter bar and every search field passes an accessible name', () => {
-  // NON-VACUITY first: the two floors above are asserted by the factory.
-  const total = NAMED.reduce((sum, entry) => sum + entry.sites.length, 0);
-  assert.ok(total >= 22, `only ${total} call sites across both primitives, so this clause has ` +
-    'lost most of its domain');
+/**
+ * The naming props a call site passes, present AND non-empty. `ariaLabel=""` satisfies a presence
+ * check and names nothing, and an empty string is still an `aria-label` attribute, so some
+ * assistive technology reports an unnamed control rather than falling through to another route.
+ */
+function namingRoutesOf(site, routes) {
+  return routes.filter((name) => {
+    const declared = site.attribute(name);
+    return Boolean(declared) && !new RegExp(`^${name}=(""|''|\\{\\s*(""|''|\`\`)\\s*\\})$`).test(declared);
+  });
+}
 
-  const offenders = [];
-  for (const { tag, sites } of NAMED) {
-    for (const site of sites) {
-      const declared = site.attribute('ariaLabel');
-      // Present AND non-empty. `ariaLabel=""` satisfies a presence check and names nothing,
-      // and on a `<section>` it is worse than omitting the prop: an empty string is still an
-      // `aria-label` attribute, so some assistive technology reports an unnamed region rather
-      // than falling through to the element's other naming routes.
-      if (declared && !/^ariaLabel=(""|'')$/.test(declared)) continue;
-      offenders.push(`${site.file}: <${tag}> ${declared ?? 'passes no ariaLabel'}`);
-    }
-  }
-
+test('every filter bar passes an accessible name', () => {
+  // NON-VACUITY first: the floor above is asserted by the factory.
+  assert.ok(toolbar.callSites.length >= 8, 'the bar has lost most of its call sites');
+  const offenders = toolbar.callSites
+    .filter((site) => namingRoutesOf(site, ['ariaLabel']).length === 0)
+    .map((site) => `${site.file}: <FilterBar> ${site.attribute('ariaLabel') ?? 'passes no ariaLabel'}`);
   assert.deepEqual(
-    offenders.sort(),
+    offenders.sort((a, b) => a.localeCompare(b)),
     [],
-    'a `<FilterBar>` without `ariaLabel` renders a `<section>` with no accessible name, ' +
-      'which is not a `region` landmark at all — it disappears from the landmark list while ' +
-      'looking identical. A `<SearchField>` without one renders a `<label>` that wraps ' +
-      'an icon and an input and no text, so the control is announced as "search" and nothing ' +
-      'else. Neither is visible in a frame and neither is a compiler error, which is why it is ' +
-      `a source clause:\n  ${offenders.join('\n  ')}`
+    'a `<FilterBar>` without `ariaLabel` renders a `<section>` with no accessible name, which is ' +
+      'not a `region` landmark at all — it disappears from the landmark list while looking ' +
+      `identical, and no frame or compiler shows it:\n  ${offenders.join('\n  ')}`
   );
+});
+
+test('every search field takes exactly one naming route (issue 1782)', () => {
+  assert.ok(field.callSites.length >= 14, 'the field has lost most of its call sites');
+  const offenders = [];
+  for (const site of field.callSites) {
+    const routes = namingRoutesOf(site, ['label', 'ariaLabel', 'ariaLabelledBy']);
+    if (routes.length !== 1) offenders.push(`${site.file}: <SearchField> ${routes.join(' + ') || 'no route'}`);
+  }
+  assert.deepEqual(
+    offenders.sort((a, b) => a.localeCompare(b)),
+    [],
+    'a `<SearchField>` with no route renders a `<label>` wrapping a glyph and an input and no ' +
+      'text, so it is announced as "search" and nothing else; with two, one name is dead text ' +
+      'free to drift from the one that is read. Pass exactly one of `label`, `ariaLabel` and ' +
+      `\`ariaLabelledBy\`:\n  ${offenders.join('\n  ')}`
+  );
+});
+
+test('an empty literal is no naming route, quoted or as an expression', () => {
+  const siteWith = (declared) => ({ attribute: (name) => (name === 'ariaLabel' ? declared : null) });
+  for (const empty of ['ariaLabel=""', "ariaLabel=''", "ariaLabel={''}", 'ariaLabel={ "" }', 'ariaLabel={``}']) {
+    assert.deepEqual(namingRoutesOf(siteWith(empty), ['ariaLabel']), [], empty);
+  }
+  assert.deepEqual(namingRoutesOf(siteWith("ariaLabel={text('x')}"), ['ariaLabel']), ['ariaLabel']);
 });
 
 test('no call site restates the class the primitive emits itself', () => {

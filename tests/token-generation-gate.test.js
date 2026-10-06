@@ -391,11 +391,13 @@ test('an area-scoped property is declared and read only inside its area', () => 
   );
 
   // Non-vacuity, and it is the reason this gate is written against the requirement's own words
-  // rather than against a directory.
+  // rather than against a directory. Measured at issue 1782's search field: 29 rules, after the
+  // data table retired the drop grid's two properties and the search shell retired the two
+  // toolbar search rules that read `--fab-recipe-control-font`.
   assert.ok(
-    rules.length >= 30,
+    rules.length >= 25,
     `only ${rules.length} sheet rules mention one of the ${names.length} area-scoped properties, ` +
-      'against the ~90 this sheet holds. With none, the assertion below is vacuous.'
+      'against the 29 this sheet holds. With none, the assertion below is vacuous.'
   );
 
   // THE TOP-LEVEL SPLIT IS EXERCISED BY THE LIVE CORPUS, not only by the fixtures in

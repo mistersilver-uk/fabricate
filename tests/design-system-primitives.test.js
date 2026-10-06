@@ -503,6 +503,24 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
   }
 });
 
+test('(a) a search field change publishes every surface the 38px shell moved, and a compact one', () => {
+  const file = 'src/ui/svelte/components/SearchField.svelte';
+  const selected = new Set(mapChangedFilesToCases([file]).map((viewCase) => viewCase.id));
+  for (const caseId of [
+    'manager-recipes-normal',
+    'manager-recipes-narrow',
+    'manager-books-scrolls-normal',
+    'manager-gathering-tasks-browse-normal',
+    'manager-default-selection',
+    'manager-access-recipe-selected',
+    'manager-tool-parity-01-library-1280x720',
+    // The compact form, which the 38px shell must leave pixel-identical.
+    'world-component-entry-systems',
+  ]) {
+    assert.ok(selected.has(caseId), `a ${file} change does not select '${caseId}'`);
+  }
+});
+
 test('(a) the representative pair survives an override, additively', () => {
   // The override mechanism is ADDITIVE by contract (`viewLabCases.js`: "Broad signals still select
   // REPRESENTATIVE_CASE_IDS; these are additive, narrowly named exceptions") (issue 1116).

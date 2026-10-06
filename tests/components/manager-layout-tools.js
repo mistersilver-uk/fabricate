@@ -114,7 +114,8 @@ test('Tool Breakage keeps three shared radio cards wide and stacks them inside t
 });
 
 test('manager character modifier search suggestions keep icons in row flow', () => {
-  const searchIconBlock = blockFor('.fabricate-search.fabricate-search > i');
+  // The compact typeahead keeps the absolute glyph; the default shell draws it in flow (issue 1782).
+  const searchIconBlock = blockFor('.fabricate-search.fabricate-search:where(.is-compact) > i');
   const characterModifierSuggestionBlock = blockFor(
     '.fabricate-manager .manager-tag-suggestion.manager-character-modifier-add-suggestion'
   );
@@ -124,7 +125,7 @@ test('manager character modifier search suggestions keep icons in row flow', () 
 
   assert.ok(
     searchIconBlock.includes('position: absolute;') && searchIconBlock.includes('left: 11px;'),
-    'search field leading icon should remain positioned inside the input chrome'
+    'the compact search field leading icon should remain positioned inside the input chrome'
   );
   assert.equal(
     css.includes('.fabricate-search.fabricate-search i {\n  position: absolute;'),

@@ -540,17 +540,12 @@
   >
     <div class="manager-component-filter-row">
       <!--
-        THREE CONTROLS AT 38px, a published rung (26 / 28 / 30 / 34 / 38 / 44) and what the reference
-        draws: the field takes `size="38"` and each filter's `Select` root carries `is-size-38`. The
-        asymmetry is the primitives' shape — `SearchField` publishes a size prop, while
-        `Select` publishes three rungs and no 38, so the opt-in is this bar's rule: it lifts the
-        `toolbar` rung's 34px trigger to 38 beside the scoped catalogue's lead row, which takes the
-        same rule for the same reason.
+        ONE 38px SHELL ACROSS THE ROW (issue 1782): the search is 38 by default and each filter takes
+        `Select`'s `form` rung, the same box; the second row's sort keeps `toolbar`.
       -->
       <!-- The capture registry's narrowing hook: a case that has to reach a specific component types
            into this field rather than depending on where that component happens to sort. -->
       <SearchField
-        size="38"
         data-component-search=""
         value={itemSearchTerm || ''}
         onChange={(next) => onSearchChange(next)}
@@ -566,8 +561,8 @@
            names, so that list drops the tick; the essence list keeps it for the three
            near-identical predicates heading it. -->
       <Select
-        size="toolbar"
-        class="manager-component-category-filter is-size-38"
+        size="form"
+        class="manager-component-category-filter"
         value={ui.categoryFilter}
         options={categorySelectOptions}
         showTick={false}
@@ -581,8 +576,8 @@
 
       {#if showComponentEssences && componentEssenceOptions.length > 0}
         <Select
-          size="toolbar"
-          class="manager-component-essence-filter is-size-38"
+          size="form"
+          class="manager-component-essence-filter"
           value={ui.essenceFilter}
           options={essenceSelectOptions}
           minWidth={ESSENCE_FILTER_PANEL_MIN_WIDTH}

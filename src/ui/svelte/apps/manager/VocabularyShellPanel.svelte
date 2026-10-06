@@ -148,7 +148,6 @@
   /* EVERY CONTROL SITS ONE RAMP RUNG BELOW THE PANEL, which is a relationship rather than a
      colour: left alone they inherit the control rung, which is the PANEL's own fill. */
   :global(.manager-vocabulary-shell-panel .fabricate-select-trigger),
-  :global(.manager-vocabulary-shell-panel .fabricate-search input),
   :global(.manager-vocabulary-shell-panel .manager-vocabulary-form input) {
     background: var(--fab-bg-0);
   }

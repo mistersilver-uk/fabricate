@@ -94,12 +94,6 @@
     // ── THE TOOLBAR AS TWO ROWS (issue 1371 r8-cat) ──────────────────────────────────────────
     // `false` keeps the one row every caller renders today.
     splitToolbar = false,
-    // ── THE LEAD ROW'S CONTROL RUNG (issue 1371 r9-cat, maintainer ruling M12b) ──────────────
-    // The control HEIGHT the search field and the lead row's lane-filter selects take, named after
-    // the rung rather than after an adjective, exactly as `SearchField`'s own `size` is:
-    // `''` is the shipped 34px control and `'38'` is the ladder's next rung up
-    // (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44).
-    toolbarLeadSize = '',
     // ── THE ROW'S LEADING TILE (issue 1371 r9-cat, UX finding F12) ─────────────────────────── A
     // `Medallion` descriptor — `{variant, size, glyph}`, the primitive's OWN prop names — for the
     // tile at the head of every list row.
@@ -210,15 +204,6 @@
 
   const laneFilters = $derived(Array.isArray(filters) ? filters : []);
   const laneSorts = $derived(Array.isArray(sorts) ? sorts : []);
-
-  /**
-   * The class a LEAD-ROW select carries when the caller asked for the 38px rung, and `undefined`
-   * otherwise.
-   */
-  function leadSelectSizeClass(filter) {
-    const onLeadRow = (filter?.toolbarRow ?? 'lead') === 'lead';
-    return toolbarLeadSize === '38' && onLeadRow ? 'is-size-38' : undefined;
-  }
 
   /** The row medallion's three arguments, merged over the shipped tile. */
   const rowMedallionSpec = $derived({
@@ -607,8 +592,9 @@
             <span class="manager-scoped-list-sort-label" id="scoped-list-sort-label">
               {text('FABRICATE.Admin.Manager.Scoped.List.SortByLabel', 'Sort by')}
             </span>
+            <!-- The search's row is one 38px shell (issue 1782), so a one-row toolbar's sort takes `form`. -->
             <Select
-              size="toolbar"
+              size={splitToolbar ? 'toolbar' : 'form'}
               value={sortKey}
               options={sortSelectOptions}
               ariaLabelledBy="scoped-list-sort-label"
@@ -950,7 +936,6 @@
 {#snippet searchField()}
   <SearchField
     value={query}
-    size={toolbarLeadSize}
     onChange={(next) => changeQuery(next)}
     placeholder={searchPlaceholder ||
       text('FABRICATE.Admin.Manager.Scoped.List.SearchPlaceholder', 'Search…')}
@@ -976,11 +961,11 @@
         </span>
       {/if}
       <!--
-        THE APP'S OWN LIST, AT THIS ROW'S OWN RUNG (issue 1504).
+        THE APP'S OWN LIST, AT THIS ROW'S OWN RUNG (issue 1504): `form` on the search's row, so the
+        row is one 38px shell (issue 1782), and `toolbar` on the second.
       -->
       <Select
-        size="toolbar"
-        class={leadSelectSizeClass(filter)}
+        size={row === 'filters' ? 'toolbar' : 'form'}
         value={filterValues[filter.id] ?? 'all'}
         options={laneFilterOptions(filter)}
         ariaLabel={filter.microLabel ? undefined : filter.label}
