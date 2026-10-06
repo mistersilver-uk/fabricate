@@ -184,7 +184,7 @@ test('the gathering task editor keeps its inspector track only on a d100 task`s 
   );
   assert.match(
     rootSource,
-    /data-gathering-task-layout=\{fullWidthLayout\?\.id === 'gathering-task-edit'\s*\? 'results'/,
+    /data-gathering-task-layout=\{fullWidthLayout\?\.id === 'gathering-task-edit'\s*\? 'full'/,
     'the stylesheet selector should be driven by the same fullWidthLayout decision'
   );
 });

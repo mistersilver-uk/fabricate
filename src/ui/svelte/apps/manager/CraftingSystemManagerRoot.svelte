@@ -1332,7 +1332,7 @@
       id: 'gathering-task-edit',
       layoutClass: 'full-width-2-track',
       selector:
-        '.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"] .manager-body',
+        '.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"] .manager-body',
       predicate: isGatheringTaskFullWidth,
     },
     {
@@ -4275,7 +4275,7 @@
 <div
   class="fabricate-manager"
   data-manager-view={currentView}
-  data-gathering-task-layout={fullWidthLayout?.id === 'gathering-task-edit' ? 'results' : undefined}
+  data-gathering-task-layout={fullWidthLayout?.id === 'gathering-task-edit' ? 'full' : undefined}
   data-world-travel-tab={worldTravelTabAttribute}
   data-world-rules-tab={isWorldRulesRoute ? worldRulesTab : undefined}
 >
@@ -4945,7 +4945,7 @@
         checkConfig={selectedSystem?.gatheringCraftingCheck?.routed ?? null}
         previewActors={overridePreviewActors}
         {resolvePreviewCharacter}
-        resultValidationErrors={gathering.gatheringTaskValidation.resultErrors || []}
+        validation={gathering.gatheringTaskValidation}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={modifiers.gatheringConditionOptions('weather')}

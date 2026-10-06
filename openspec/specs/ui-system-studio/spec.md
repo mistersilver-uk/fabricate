@@ -1388,8 +1388,12 @@ Current GM editor behavior:
 - Expanded override panels contain per-environment override fields only; Gathering Task fields remain edited in their library surface.
 - Expanded override rows are keyboard reachable, preserve focus on save/error where practical, and stack without horizontal clipping in narrow Manager widths.
 - The scene link is authored on the Overview tab's Linked scene card: a Scene drop links or replaces it, a visible Unlink clears it, and a link whose scene no longer resolves reads as missing.
-- Gathering Task authoring is a tabbed editor — Overview (identity, task resolution mode, nodes), Requirements (availability, stamina, check modifiers, check override, required tools), Results — whose d100 Results tab alone keeps the selected-drop rail.
-  While the results validation has errors, the Results tab carries a `danger` issue mark (`EditorTabs` `badges`, vehicle `issue`), labelled with the error count and named by the notice's title, so a blocking issue is visible from every tab; each Results warning adds a `warning` mark named by its notice.
+- Gathering Task authoring is a tabbed editor — Overview (identity, task resolution mode, nodes), Requirements (availability, stamina, check modifiers, check override, required tools), Results, and Validation, which renders the shared surface over the task's readiness rows at full width; the blocking rows are the errors that disable Save.
+  Its d100 Results tab alone keeps the selected-drop rail.
+  Validation groups its rows in tab order: the name under Overview, read from the validation's own name errors and focusing the name input, and the drop-rule and result-set errors under Results, landing on its panel; Requirements runs no check and draws no group.
+  Its warnings are a routed task under a check with no outcome tiers, and a d100 task with one component on more than one drop row under a reward rule that may award only one.
+  The Validation tab carries a `danger` mark counting the blocking rows and a `warning` mark counting the warnings, so an issue is visible from every tab.
+  On Results, the blocking notice counts the Results rows that block Save and offers an action to Validation, and each warning notice is the Validation tab's own warning row, in the same words.
   The editor's tab bar is fixed, as the recipe and environment editors' are: the tab bar and the page notice position sit above the tab panel, and the tab panel is the scroller.
   At the manager's stacking width, a d100 task's Results tab stacks its drop rail beneath the editor without moving the nav, so a tab switch never moves the tab bar.
   A legacy Progressive task's Results tab renders `EmptyState`, saying its results are not authored here and pointing to Overview's resolution card.

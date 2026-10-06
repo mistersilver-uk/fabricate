@@ -130,6 +130,8 @@ They are authored once and composed into environments.
   These are (optionally) ordered rows, each pointing at a component with a **quantity** and a **drop rate** from 0 to 100.
   The drop row order is the rank used by the system's Gathering Rules when you choose "Highest ranked successful drop" in the gathering reward rules.
 4. Optionally, on the **Requirements** tab, set a **Stamina** cost, a gathering roll **modifier**, **Weather**/**time of day** gates, and any **Required tools** from the system's Tools library
+5. If **Save** is disabled, open the **Validation** tab.
+  It lists each blocking issue with a **View** action that takes you to the field to fix.
 
 {% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor on its Overview tab, with the task identity and Gathering resolution cards." %}
 

@@ -141,9 +141,9 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     );
   });
 
-  it('renders active result validation beside the result editor', () => {
-    assert.ok(editorSource.includes('resultValidationErrors = []'));
+  it('reads the header Save`s own validation for its readiness', () => {
+    assert.ok(editorSource.includes('validation = null'));
     assert.ok(editorSource.includes('data-gathering-task-results-validation'));
-    assert.ok(rootSource.includes('resultValidationErrors={gathering.gatheringTaskValidation.resultErrors'));
+    assert.ok(rootSource.includes('validation={gathering.gatheringTaskValidation}'));
   });
 });

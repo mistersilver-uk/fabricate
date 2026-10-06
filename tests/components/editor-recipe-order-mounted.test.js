@@ -302,7 +302,7 @@ const EDITORS = {
     open: () => openTaskEditor(),
     cards:
       '.manager-task-core-card, .manager-task-availability-card, .manager-task-results-card, ' +
-      '.manager-task-component-browser-card',
+      `.manager-task-component-browser-card, ${VALIDATION}`,
     raise: async () => {
       await openTaskEditor({
         taskResolutionMode: 'straight',
