@@ -47,3 +47,15 @@ test('a section reports its number and decoded title, and null where it draws no
     { id: 'ruledout', number: null, title: null },
   ]);
 });
+
+test('a nested .sec-head or .num cannot stand in for the section’s own', () => {
+  const { sections } = readLibrarySections(
+    [
+      '<body><section id="outer">',
+      '<div class="spec"><div class="sec-head"><span class="num">99</span><h2>Nested</h2></div></div>',
+      '<div class="sec-head"><span class="num">07</span><h2>Own</h2></div>',
+      '</section></body>',
+    ].join('')
+  );
+  assert.deepEqual(sections, [{ id: 'outer', number: '07', title: 'Own' }]);
+});

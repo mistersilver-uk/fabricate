@@ -14,6 +14,14 @@ import { catalogueEntries } from '../scripts/lib/primitiveLabSmoke.js';
 
 import { parseDesignLibrary, readDesignLibrary } from './helpers/designLibrary.js';
 import { resolveSlots } from './view-lab/primitives/inject.js';
+import {
+  BESIDE,
+  LIVE_LABEL_CLASS,
+  LIVE_LABEL_TEXT,
+  REPLACE,
+  livenessFor,
+  placeSpecimen,
+} from './view-lab/primitives/liveness.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -145,4 +153,101 @@ test('a row whose liveness no status decides is reported, never placed', () => {
   assert.equal(problems.length, 2, problems.join('\n'));
   assert.match(problems[0], /src\/Plain\.svelte: its component ships no library name/);
   assert.match(problems[1], /<Ghost> declares status null/);
+});
+
+/** Two names sharing one component path, one drawn under a heading that names only the other. */
+const SHARED_MANIFEST = Object.freeze([
+  { path: 'src/Shared.svelte', library: '<Done>' },
+  { path: 'src/Shared.svelte', library: '<Planned>' },
+]);
+
+test('a path shipping several names takes the one its own entry declares', () => {
+  const { slots, problems } = resolveIn(
+    FIXTURE,
+    [row('<Planned> <Kept>', '.p', 'Shared'), row('<Done>', '.d', 'Shared')],
+    SHARED_MANIFEST
+  );
+  assert.deepEqual(problems, []);
+  // <Planned> is the second name, and the only one this block declares.
+  assert.deepEqual(slots, [
+    { name: 'Planned', mode: BESIDE, path: 'src/Shared.svelte' },
+    { name: 'Done', mode: REPLACE, path: 'src/Shared.svelte' },
+  ]);
+});
+
+test('a path shipping several names that its entry names none of is reported, not guessed', () => {
+  const { slots, problems } = resolveIn(
+    FIXTURE,
+    [row('<Unbuilt>', '.u', 'Shared')],
+    SHARED_MANIFEST
+  );
+  assert.deepEqual(slots, []);
+  assert.equal(problems.length, 1, problems.join(', '));
+  assert.match(problems[0], /ships <Done> and <Planned>/);
+});
+
+test('a name never takes a mode from an inherited object property', () => {
+  assert.equal(livenessFor('toString'), null);
+  assert.equal(livenessFor('constructor'), null);
+  assert.equal(livenessFor(null), null);
+});
+
+/** The names that two blocks declare different statuses for. */
+function namesWithConflictingStatus(blocks) {
+  const seen = new Map();
+  const conflicts = new Set();
+  for (const block of blocks) {
+    for (const [name, status] of Object.entries(block.perNameStatus)) {
+      if (seen.has(name) && seen.get(name) !== status) conflicts.add(name);
+      seen.set(name, status);
+    }
+  }
+  return [...conflicts];
+}
+
+test('each name has one status across every block, so first-declared cannot differ from last', () => {
+  const { blocks } = parseDesignLibrary(readDesignLibrary());
+  assert.ok(blocks.length > 20, 'the library parsed to too few blocks for this rule');
+  assert.deepEqual(namesWithConflictingStatus(blocks), []);
+  assert.deepEqual(
+    namesWithConflictingStatus([
+      { perNameStatus: { Planned: 'target' } },
+      { perNameStatus: { Planned: 'shipped', Other: 'target' } },
+    ]),
+    ['Planned'],
+    'the guard must see a name declared with two statuses'
+  );
+});
+
+/** A slot over a drawing, in a happy-dom page; returns the page so the order can be read. */
+function placed(mode) {
+  const window = new Window();
+  const { document } = window;
+  document.write('<body><p id="before"></p><div id="drawing"></div><p id="after"></p></body>');
+  const host = document.querySelector('#drawing');
+  const iframe = document.createElement('iframe');
+  placeSpecimen({ host, mode }, iframe, document);
+  return { document, host, iframe };
+}
+
+test('a beside specimen keeps its drawing and follows it under a live label', () => {
+  const { document, host, iframe } = placed(BESIDE);
+  const [first, label, second] = [...document.body.children].slice(1, 4);
+  assert.equal(first, host, 'the drawing must stay in place');
+  assert.ok(document.body.contains(host));
+  assert.equal(label.textContent, LIVE_LABEL_TEXT);
+  assert.equal(label.className, LIVE_LABEL_CLASS);
+  assert.equal(LIVE_LABEL_TEXT, 'live');
+  assert.ok(!LIVE_LABEL_CLASS.includes('st-shipped'), 'a target entry must not read as shipped');
+  assert.equal(second, iframe);
+});
+
+test('a replace specimen takes its drawing’s place and the drawing leaves', () => {
+  const { document, host, iframe } = placed(REPLACE);
+  assert.ok(!document.body.contains(host));
+  assert.deepEqual(
+    [...document.body.children].map((node) => node.id || node.localName),
+    ['before', 'iframe', 'after']
+  );
+  assert.ok(document.body.contains(iframe));
 });

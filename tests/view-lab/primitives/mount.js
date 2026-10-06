@@ -17,7 +17,7 @@ import { CATALOGUE } from './catalogue.js';
 import { MAX_APPLIED_RESIZES, createSizeGovernor, describeHost } from './hostLayout.js';
 import { resolveSlots } from './inject.js';
 import { LIVE_CLASS, PAGE_CLASS, readLibrary } from './library.js';
-import { BESIDE } from './liveness.js';
+import { placeSpecimen } from './liveness.js';
 import { readSlotBox } from './slot.js';
 import {
   SPECIMEN_ASSIGN,
@@ -40,9 +40,6 @@ const SIZED_CLASS = 'pl-specimen-sized';
 
 /** Applied while a block specimen fills the replaced drawing's inline size. See `page.css`. */
 const FILL_CLASS = 'pl-specimen-fill';
-
-/** The label on a specimen standing beside its drawing, in the library's own status chip. */
-const SHIPPED_LABEL_CLASS = 'st st-shipped pl-shipped-label';
 
 /** The query parameter that says how much of the catalogue to mount. */
 const MOUNT_PARAMETER = 'mount';
@@ -196,18 +193,6 @@ function presizeBoxedSlot(iframe, row) {
   if (box?.height) iframe.style.height = `${box.height}px`;
 }
 
-/** Put the specimen where its drawing stood, or after the kept drawing under a `shipped` label. */
-function placeSpecimen(slot, iframe) {
-  if (slot.mode !== BESIDE) {
-    slot.host.replaceWith(iframe);
-    return;
-  }
-  const label = document.createElement('span');
-  label.className = SHIPPED_LABEL_CLASS;
-  label.textContent = 'shipped';
-  slot.host.after(label, iframe);
-}
-
 /**
  * Stand up one specimen: create its `<iframe>`, place it where the drawing stood, run the
  * `specimenProtocol.js` handshake, and resolve once it has settled. The listener stays after
@@ -290,7 +275,7 @@ function standUpSpecimen(slot, problems, results) {
   });
 
   iframe.src = SPECIMEN_URL;
-  placeSpecimen(slot, iframe);
+  placeSpecimen(slot, iframe, document);
   return settled;
 }
 

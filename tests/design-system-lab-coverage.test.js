@@ -640,6 +640,23 @@ test('the coverage rule requires every named row in every section, and only thos
   );
 });
 
+test('a name under two headings in different sections is reported under both', () => {
+  const library = {
+    headings: [...SYNTHETIC_LIBRARY.headings, '<Meter> <Chip>'],
+    headingSections: [...SYNTHETIC_LIBRARY.headingSections, 'surfaces'],
+  };
+  const { missing } = uncoveredManifestRows({
+    library,
+    catalogue: SYNTHETIC_CATALOGUE.filter((entry) => !entry.row.path.includes('Meter')),
+    manifestRows: SYNTHETIC_ROWS.filter((row) => !row.path.includes('MeterPanel')),
+  });
+  assert.deepEqual(missing, [
+    'surfaces <Chip> src/Chip.svelte',
+    'structures <Meter> src/Meter.svelte',
+    'surfaces <Meter> src/Meter.svelte',
+  ]);
+});
+
 test('the section rule refuses a manifest name no sectioned heading carries', () => {
   const rows = SYNTHETIC_ROWS.slice(0, 2);
   assert.deepEqual(unsectionedManifestRows({ library: SYNTHETIC_LIBRARY, manifestRows: rows }), []);
@@ -680,6 +697,36 @@ test('the catalogue directory holds nothing the lab cannot see', () => {
       `${CATALOGUE_DIRECTORY}/${entry.name} is neither a catalogue file nor the README`
     );
   }
+});
+
+/**
+ * The catalogue snippet nodes that are a native `select`, which draws unstyled here: the manager's
+ * native-select theme is gone, and a specimen entry specifies chrome, not the control.
+ *
+ * @param {object[]|undefined} nodes Snippet nodes, each `{tag, children?}`.
+ * @returns {string[]} One `<tag>` path per `select` found.
+ */
+function nativeSelectsIn(nodes = []) {
+  return nodes.flatMap((node) => [
+    ...(node.tag === 'select' ? [node.tag] : []),
+    ...nativeSelectsIn(node.children),
+  ]);
+}
+
+test('no catalogue snippet draws a native select', () => {
+  const snippetRows = CATALOGUE.filter((entry) => entry.row.snippets);
+  assert.ok(snippetRows.length > 0, 'no row carries snippets, so this rule has no domain');
+  for (const entry of snippetRows) {
+    for (const [name, nodes] of Object.entries(entry.row.snippets)) {
+      assert.deepEqual(
+        nativeSelectsIn(nodes),
+        [],
+        `${where(entry)} snippet "${name}" draws a native select, which renders unstyled`
+      );
+    }
+  }
+  const nested = [{ tag: 'div', children: [{ tag: 'span' }, { tag: 'select' }] }];
+  assert.deepEqual(nativeSelectsIn(nested), ['select'], 'the rule must find a nested select');
 });
 
 /** The smoke's half of the page contract: its attribute names decide the run. */
@@ -761,4 +808,14 @@ test('every attribute the smoke decides on is written by the page', () => {
       `the smoke navigates with \`?${MOUNT_ALL_QUERY}\` and \`mount.js\` declares no \`'${half}'\``
     );
   }
+});
+
+test('the page hands the manifest to the liveness decision, both tables', () => {
+  const source = withoutComments(PAGE_SOURCES.get(MOUNT_PATH));
+  assert.match(source, /import MANIFEST from '[^']*designSystemPrimitives\.json'/);
+  assert.match(
+    source,
+    /resolveSlots\(document\.body, CATALOGUE, \[\s*\.\.\.MANIFEST\.designSystemPrimitives,\s*\.\.\.MANIFEST\.notAPrimitive,?\s*\]\)/,
+    'the page must pass both manifest tables, or a row in one has no liveness'
+  );
 });

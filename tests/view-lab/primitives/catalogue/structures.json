@@ -85,9 +85,11 @@
               "text": "Karrun / Metals"
             },
             {
-              "tag": "select",
-              "attrs": { "aria-label": "Category for Karrun / Metals", "style": "width:160px" },
-              "children": [{ "tag": "option", "text": "Metals" }]
+              "tag": "span",
+              "attrs": {
+                "style": "width:160px;padding:4px 8px;border-radius:6px;font-size:12px;background:var(--fab-surface-soft);color:var(--fab-text)"
+              },
+              "text": "Metals"
             }
           ]
         },
@@ -101,9 +103,11 @@
               "text": "Karrun / Hafts"
             },
             {
-              "tag": "select",
-              "attrs": { "aria-label": "Category for Karrun / Hafts", "style": "width:160px" },
-              "children": [{ "tag": "option", "text": "Create new" }]
+              "tag": "span",
+              "attrs": {
+                "style": "width:160px;padding:4px 8px;border-radius:6px;font-size:12px;background:var(--fab-surface-soft);color:var(--fab-text)"
+              },
+              "text": "Create new"
             }
           ]
         }

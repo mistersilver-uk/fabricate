@@ -9,6 +9,13 @@ export const REPLACE = 'replace';
 export const BESIDE = 'beside';
 export const DRAWING = 'drawing';
 
+/**
+ * The label on a specimen standing beside its drawing: a neutral chip that says "live", not the
+ * green `st-shipped`, which would contradict the entry's own `target` status chip.
+ */
+export const LIVE_LABEL_CLASS = 'st st-prose pl-live-label';
+export const LIVE_LABEL_TEXT = 'live';
+
 const MODE_BY_STATUS = Object.freeze({ shipped: REPLACE, target: BESIDE, divergent: BESIDE });
 
 /**
@@ -51,6 +58,13 @@ export function decideLiveness(block, blocks, names) {
     return { problem: 'its component ships no library name, so no status decides its liveness' };
   }
   const own = names.find((name) => block.hasAttribute(statusAttribute(name)));
+  if (own === undefined && names.length > 1) {
+    return {
+      problem:
+        `its component ships ${names.map((name) => `<${name}>`).join(' and ')} and this entry ` +
+        'declares a status for none of them, so no one name decides its liveness',
+    };
+  }
   const name = own ?? names[0];
   const attribute = statusAttribute(name);
   const source = own ? block : [...blocks].find((candidate) => candidate.hasAttribute(attribute));
@@ -62,4 +76,22 @@ export function decideLiveness(block, blocks, names) {
     };
   }
   return { name, mode };
+}
+
+/**
+ * Put a specimen where its drawing stood, or, beside, after the kept drawing under a label.
+ *
+ * @param {{host: Element, mode: string}} slot One resolved slot.
+ * @param {Element} iframe The specimen's `<iframe>`.
+ * @param {Document} document The document that creates the label.
+ */
+export function placeSpecimen(slot, iframe, document) {
+  if (slot.mode !== BESIDE) {
+    slot.host.replaceWith(iframe);
+    return;
+  }
+  const label = document.createElement('span');
+  label.className = LIVE_LABEL_CLASS;
+  label.textContent = LIVE_LABEL_TEXT;
+  slot.host.after(label, iframe);
 }

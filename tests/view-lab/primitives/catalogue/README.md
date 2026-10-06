@@ -47,7 +47,7 @@ Whether the live component replaces the drawing or stands beside it is the
 library's per-name status, never the row's (`liveness.js`).
 A `shipped` name replaces its drawing.
 A `target` or `divergent` name keeps its drawing, because the drawing is the
-authority, and the live component follows it under a `shipped` chip.
+authority, and the live component follows it under a neutral `live` chip.
 The name is the library name the manifest records for the row's `path`, and its
 status is read off the entry naming it, so a row under a prose entry takes that
 name's own status.
