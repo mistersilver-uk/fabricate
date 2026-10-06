@@ -172,11 +172,11 @@ test('manager body starts as a three-region grid and stacks at narrow width', ()
 
 // The rail's crafting-system card SELECTS (issue 643). It used to be a fixed 64px box
 // holding the system's name and an icon-only button, with no way to switch system from
-// the rail at all — so the card is now a micro-label, a real `<select>` over every
-// system, and a text back link out to the system library.
+// the rail at all — so the card is now a micro-label, the shared `<Select>` over every
+// system (issue 1777), and a text back link out to the system library.
 test('the rail crafting-system card selects a system and links back to the library', () => {
   const scopeBlock = blockFor('.fabricate-manager .manager-scope-card');
-  const selectBlock = blockFor('.fabricate-manager .manager-scope-select');
+  const selectBlock = blockFor('.fabricate-manager .manager-scope-select .fabricate-select-trigger');
   const returnBlock = blockFor('.fabricate-manager .manager-scope-return');
   const returnFocusBlock = blockFor(
     '.fabricate-manager .manager-scope-return:hover,\n.fabricate-manager .manager-scope-return:focus-visible'
@@ -224,9 +224,9 @@ test('the rail crafting-system card selects a system and links back to the libra
     selectBlock.includes('font-family: var(--fab-font-serif);'),
     'the selected system name keeps the display face'
   );
-  assert.ok(selectBlock.includes('min-width: 0;'), 'the select may shrink inside the rail');
+  assert.ok(selectBlock.includes('width: 100%;'), 'the trigger takes the card width');
   assert.ok(
-    selectBlock.includes('text-overflow: ellipsis;'),
+    blockFor('.fabricate-select-value').includes('text-overflow: ellipsis;'),
     'a long system name ellipsises rather than reflowing the nav'
   );
   assert.equal(
@@ -262,9 +262,9 @@ test('the rail crafting-system card selects a system and links back to the libra
 });
 
 test('manager nav buttons clear host mouse focus and keep green keyboard focus', () => {
-  const navFocusBlock = blockFor('.fabricate-manager .manager-nav-button:focus');
-  const activeNavFocusBlock = blockFor('.fabricate-manager .manager-nav-button.is-active:focus');
-  const navFocusVisibleBlock = blockFor('.fabricate-manager .manager-nav-button:focus-visible');
+  const navFocusBlock = blockFor('.fabricate-nav .manager-nav-button:focus');
+  const activeNavFocusBlock = blockFor('.fabricate-nav .manager-nav-button.is-active:focus');
+  const navFocusVisibleBlock = blockFor('.fabricate-nav .manager-nav-button:focus-visible');
 
   assert.ok(
     navFocusBlock.includes('outline: none;'),
@@ -1046,7 +1046,7 @@ test('a short window scrolls the rail nav instead of clipping its bottom entries
 });
 
 test('the rail nav declares the scroller and the stacked breakpoint hands it back', () => {
-  const navBlock = blockFor('.fabricate-manager .manager-nav');
+  const navBlock = blockFor('.fabricate-nav.manager-nav');
   assert.ok(
     navBlock.includes('flex: 1 1 auto;') &&
       navBlock.includes('min-height:') &&
@@ -1066,7 +1066,7 @@ test('the rail nav declares the scroller and the stacked breakpoint hands it bac
 
   // Stacked, the rail is already a bounded 232px strip that scrolls itself.
   const query = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
-  const navStart = query.indexOf('.fabricate-manager .manager-nav {');
+  const navStart = query.indexOf('.fabricate-nav.manager-nav {');
   assert.ok(navStart > -1, 'the 1120px query must reset the nav scroller');
   const stackedNavRule = query.slice(navStart, query.indexOf('}', navStart) + 1);
   assert.ok(
@@ -1091,7 +1091,7 @@ test('collapsed manager rail hides scope content but keeps its expand control an
     '.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-collapse'
   );
   const railTitleBlock = blockFor('.fabricate-manager .manager-rail-title');
-  const navCountBlock = blockFor('.fabricate-manager .manager-nav-count');
+  const navCountBlock = blockFor('.fabricate-nav .manager-nav-count');
 
   assert.ok(
     collapsedRailTitleBlock.includes('display: none;'),
@@ -1140,7 +1140,7 @@ test('collapsed manager rail hides scope content but keeps its expand control an
     'a rail count must not change width between 9 and 10'
   );
   assert.equal(
-    css.includes('.fabricate-manager .manager-nav-count.manager-chip'),
+    css.includes('.fabricate-nav .manager-nav-count.manager-chip'),
     false,
     'the rail count should own its rule rather than borrowing (and undoing) the content chip'
   );

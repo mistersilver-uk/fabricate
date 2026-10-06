@@ -1146,15 +1146,15 @@ export function registerRecipesCases() {
     const target = await openRecipeEditor(calls);
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-edit');
 
-    const scopeSelect = target.querySelector('[data-manager-scope-select]');
-    const current = scopeSelect.value;
-    const other = Array.from(scopeSelect.options)
-      .map((option) => option.value)
-      .find((value) => value !== current);
+    const current = openSelectPanel(target, '[data-manager-scope-select]').querySelector(
+      '[role="option"][aria-selected="true"]'
+    )?.dataset.popoverOption;
+    const other = selectOptionValues(target, '[data-manager-scope-select]').find(
+      (value) => value !== current
+    );
     assert.ok(other, 'a second crafting system is available to switch to');
 
-    scopeSelect.value = other;
-    scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-manager-scope-select]', other);
     await tick();
     flushSync();
 
@@ -1176,13 +1176,14 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    const scopeSelect = target.querySelector('[data-manager-scope-select]');
-    const other = Array.from(scopeSelect.options)
-      .map((option) => option.value)
-      .find((value) => value !== scopeSelect.value);
+    const current = openSelectPanel(target, '[data-manager-scope-select]').querySelector(
+      '[role="option"][aria-selected="true"]'
+    )?.dataset.popoverOption;
+    const other = selectOptionValues(target, '[data-manager-scope-select]').find(
+      (value) => value !== current
+    );
 
-    scopeSelect.value = other;
-    scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-manager-scope-select]', other);
     await tick();
     flushSync();
 

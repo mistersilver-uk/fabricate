@@ -717,6 +717,36 @@ const PRIMITIVES = Object.freeze([
     // No pair: the root element carries no family class, so a fixture copying it has no anchor.
     mirrored: Object.freeze([]),
   }),
+  Object.freeze({
+    // `NavSidebar` (issue 1777): both variants write `fabricate-nav` on their root. The family is
+    // ENUMERATED so the Downtime group's own marks (`manager-nav-premium`, `-lock`, `-callout`),
+    // which `ManagerWorldDowntimeNavGroup` still draws, stay app-rooted outside it; it is
+    // `namespacedFamily` because the icon variant's `fabricate-app-nav*` classes name no app.
+    name: 'NavSidebar',
+    components: Object.freeze([
+      'src/ui/svelte/components/NavSidebar.svelte',
+      'src/ui/svelte/components/NavSidebarRows.svelte',
+    ]),
+    roots: Object.freeze(['fabricate-nav']),
+    family:
+      'manager-nav(?:-(?:group|button|parent|toggle|submenu|subitem|label|count|dirty-marker|' +
+      'issue-badge|planned))?|fabricate-app-nav(?:-(?:item|well|count|label|tooltip))?',
+    namespacedFamily: true,
+    anchors: Object.freeze([
+      'manager-nav',
+      'manager-nav-button',
+      'manager-nav-toggle',
+      'manager-nav-subitem',
+      'fabricate-app-nav',
+      'fabricate-app-nav-item',
+    ]),
+    // Measured at this commit: 18 written, 45 family selectors, 35 owned; the other ten are the
+    // collapsed rail's and the Downtime sub-item's caller rules.
+    writtenFloor: 16,
+    familyFloor: 40,
+    ownedFloor: 31,
+    mirrored: Object.freeze([Object.freeze({ anchor: 'manager-nav', root: 'fabricate-nav' })]),
+  }),
 ]);
 
 const read = (file) => readFileSync(join(repoRoot, file), 'utf8');

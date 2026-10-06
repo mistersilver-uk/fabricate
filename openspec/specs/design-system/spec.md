@@ -69,7 +69,8 @@ The library is where the vocabulary lives and this document is where its rules l
 A member that has SHIPPED MUST also carry a row in `scripts/lib/designSystemPrimitives.json` naming its implementation path, which is what lets a diff be attributed to a primitive.
 A member that has not shipped carries no row, because the manifest enumerates what ships and a row naming no file is a correspondence to nothing.
 `tests/design-system-coverage.test.js` reads both artifacts and fails when a name is in one and not the other, in either direction.
-`EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry; issue 1782 merged `<ValidationList>` into it, so the 40 naming headings declare 71 distinct names.
+`EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry, and issue 1782 merged `<ValidationList>` into it.
+`NavSidebar` is the shipped implementation of the library's `<NavSidebar>` entry, and issue 1777 merged `<AppRail>` into it as its `icon` variant (decision E2), so the 40 naming headings declare 70 distinct names.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
@@ -998,8 +999,12 @@ A `RuleRow` edits one condition→effect rule: a Check Breakage trigger, or a ga
 It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier or any other row of the World › Rules & Resources route.
 `SetPicker` is a bounded trigger opening a staged panel committed on Apply, and its `choose` form exists only for the session control "Set membership is edited through a bounded, staged picker" exempts; a control that commits one choice into a single slot, a filter or a short list its caller renders is not a set picker.
 The deciding test is the widget and when the write lands, never how the control looks.
-`Rail` is ONE SECTION of a right-hand inspector column, the library's inspector rail section: never the column itself, never the nav rail's `.manager-rail-block`, which carries the Rail Marker Family, and never `AppRail`.
+`Rail` is ONE SECTION of a right-hand inspector column, the library's inspector rail section: never the column itself, never the nav rail's `.manager-rail-block`, which carries the Rail Marker Family, and never `NavSidebar`'s `icon` variant.
 `DataTable` is for records compared down columns and `ListRow` for records scanned one at a time; a ladder of tiers is `OutcomeLadder`, never a table.
+`NavSidebar`'s variants are routed by shape, never by consumer, and its ARIA follows the variant.
+The `icon` variant MUST render a vertical tablist that keeps one tab stop, consistent with "A tab strip always keeps a tab stop", with `aria-selected` on the current tab, `aria-controls` naming the panel, each tooltip a sibling of the tablist referenced by `aria-describedby`, and Up, Down, Home and End moving the selection and focus.
+The `labelled` variant MUST render a `nav` with `aria-current` on the current row, a group parent's separate chevron carrying `aria-expanded` and `aria-controls`, and a disabled row or locked chevron carrying `disabled`, `aria-disabled` and its reason through `aria-describedby` to a visually hidden element, its `title` kept.
+Neither variant is the inspector `Rail`, the nav rail's `.manager-rail-block` or a Rail Marker Family vehicle.
 A GRIP is the pointer's drag handle and the keyboard's move control, one per ordered row; a ROCKER is the stacked up and down chevron PAIR that steps a row one position, and neither word names the other's affordance.
 
 #### Scenario: A list row and an editor both show the same record state
@@ -1019,6 +1024,18 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **WHEN** a navigation item's only visible content is a glyph
 - **THEN** its count is the filled pip on the well's outer corner
 - **AND** a labelled row's count renders as a bare numeral
+
+#### Scenario: The icon nav keeps one tab stop
+
+- **WHEN** `NavSidebar`'s `icon` variant renders
+- **THEN** exactly one item has `tabindex="0"`
+- **AND** the arrow keys move the selection and the focus
+
+#### Scenario: A locked chevron announces its reason
+
+- **WHEN** `NavSidebar`'s `labelled` variant renders a disabled chevron
+- **THEN** its reason is announced through `aria-describedby`
+- **AND** the chevron keeps its `title`
 
 #### Scenario: A tier-gated tab carries the premium padlock
 
@@ -2027,12 +2044,23 @@ The trail is a `nav` named "Breadcrumbs"; a crumb with `onSelect` is a button ca
 `PageHeader` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
 At issue 1777 its callers kept the manager's shipped header geometry, which disagreed with the specimen, and decision E4 escalated that disagreement to issue 1523 rather than settling it.
 
+The manager sidebar, except its Downtime group until that group converts, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
+Neither writes nav row, group or tab markup of its own, and the sidebar root carries `fabricate-nav`.
+`NavSidebar` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
+At issue 1777 both callers kept their shipped geometry, which disagreed with the specimen, and the convergence belongs to issue 1523.
+
 #### Scenario: A manager route draws its header
 
 - **WHEN** a manager route, the Tool editor and the Tool library included, renders its header
 - **THEN** it passes `breadcrumbs`, its title block and its actions, when it has any, to `PageHeader`
 - **AND** it writes no breadcrumb markup
 - **AND** the header root carries `fabricate-page-header`
+
+#### Scenario: NavSidebar's geometry disagrees with its specimen
+
+- **WHEN** `NavSidebar`'s geometry disagrees with its specimen
+- **THEN** the entry stays `target`
+- **AND** the geometry converges in issue 1523
 
 ### Requirement: A window is registered in the View Lab before a change re-skins it
 

@@ -123,7 +123,8 @@ test('a locator resolves against the live mount target, not the one it was creat
     const railWith = (label) => {
       const root = document.createElement('div');
       root.innerHTML =
-        `<button class="manager-nav-button"><span class="manager-nav-label">${label}</span></button>`;
+        `<nav class="fabricate-nav manager-nav"><button class="manager-nav-button">` +
+        `<span class="manager-nav-label">${label}</span></button></nav>`;
       return root;
     };
 

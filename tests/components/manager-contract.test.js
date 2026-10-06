@@ -164,11 +164,12 @@ const GATHERING_UNITS = [
   GATHERING_DRAFT_HANDLERS,
   GATHERING_MODIFIER_HANDLERS,
 ];
-const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
 const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
   'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte';
 // The rail's three entry units render the rows this one model builds (issue 1777).
 const MANAGER_NAV_ITEMS = 'src/ui/svelte/apps/manager/managerNavItems.js';
+// And `NavSidebar` draws them, through its labelled rows part (issue 1777).
+const NAV_SIDEBAR_ROWS = 'src/ui/svelte/components/NavSidebarRows.svelte';
 // The page header's copy is spelled across two units since issue 1720 — the shell's markup and the
 // model it resolves from — so a key that must appear once appears once across the pair.
 const headerCopyLiterals = () => [
@@ -1225,7 +1226,10 @@ describe('CraftingSystemManager source contract', () => {
     'renders the selected system in a rail card that selects',
     MANAGER_NAV_RAIL,
     {
-    writes: ['data-manager-scope-select', 'data-manager-rail-section'],
+    writes: ['data-manager-rail-section'],
+    // The scope select is the shared `Select`, its hook stamped on the trigger (issue 1777).
+    renders: ['Select'],
+    property: [['data-manager-scope-select', '']],
     spells: ['manager-scope-return'],
     spellsExactly: [
       'manager-scope-card',
@@ -1272,7 +1276,7 @@ describe('CraftingSystemManager source contract', () => {
 
   // The gathering rail is one submenu group with its own expand/collapse control and a rollup
   // count summarising the three sections beneath it.
-  defineStructureContract('groups the gathering sections into a rail submenu', [MANAGER_SYSTEM_NAV, MANAGER_NAV_ITEMS], {
+  defineStructureContract('groups the gathering sections into a rail submenu', [NAV_SIDEBAR_ROWS, MANAGER_NAV_ITEMS], {
     spells: ['manager-nav-group '],
     // The member path the model reads through the unit's `navRail` prop, which is what replaced
     // the root's own `railGroupExpanded` (issue 1717); it keys it by group id (issue 1777).
@@ -2267,7 +2271,7 @@ describe('CraftingSystemManager source contract', () => {
   // route and asserts the badge is absent at zero; which derivation each span renders is not. The
   // derivation is a model count marker's value since issue 1777, and the span renders that value.
   it('renders each rail count as the derived number inside the shared count span', () => {
-    const spans = classRenderedExpressions(componentAstOf(MANAGER_SYSTEM_NAV), 'manager-nav-count');
+    const spans = classRenderedExpressions(componentAstOf(NAV_SIDEBAR_ROWS), 'manager-nav-count');
     assert.deepEqual(
       spans.flatMap((expression) => memberPaths(expression)),
       ['marker.value'],

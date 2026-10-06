@@ -207,8 +207,7 @@ test('every manifest library name resolves to a library entry', () => {
  * entry leaves it when its primitive ships or is merged, and the check below fails until it does.
  */
 const SPECIFIED_ONLY = [
-  'AppRail', 'AppTitleBar', 'BrowseCard',
-  'NavSidebar',
+  'AppTitleBar', 'BrowseCard',
   'Search',
   'TierTrack', 'ViewToggle', 'XrefList',
 ];
@@ -460,6 +459,7 @@ const RE_ROOTED_ROWS = [
   'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/components/PageHeader.svelte',
+  'src/ui/svelte/components/NavSidebar.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
   'src/ui/svelte/components/RuleRow.svelte',
@@ -633,6 +633,9 @@ const BUILT_BY_1782 = [
 /** Names issue 1782 merged away, which must be no entry and must be on the ruled-out register. */
 const DELETED_BY_1782 = ['ValidationList'];
 
+/** Names issue 1777 merged away (decision E2), held to the same register as issue 1782's. */
+const MERGED_BY_1777 = ['AppRail'];
+
 test('every name issue 1782 built reads shipped in the library', () => {
   for (const name of BUILT_BY_1782) {
     assert.equal(
@@ -644,8 +647,8 @@ test('every name issue 1782 built reads shipped in the library', () => {
   }
 });
 
-test('every name issue 1782 merged away is no entry and is recorded as ruled out', () => {
-  for (const name of DELETED_BY_1782) {
+test('every name issue 1782 or issue 1777 merged away is no entry and is recorded as ruled out', () => {
+  for (const name of [...DELETED_BY_1782, ...MERGED_BY_1777]) {
     assert.ok(!library.names.includes(name), `${name} was merged and still heads an entry`);
     const entry = RULED_OUT.find((row) => primitiveNamesIn(row.name).includes(name));
     assert.ok(entry, `${name} was merged and the register omits it`);

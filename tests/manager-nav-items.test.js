@@ -216,7 +216,8 @@ describe('the crafting-system section', () => {
   it('draws Graph as a disabled placeholder that says why, with a word rather than a count', () => {
     const graph = byId(managerSystemNavItems(systemProps(), text), 'graph');
     assert.equal(graph.disabled, true);
-    assert.equal(graph.title, 'Graph is planned for a future release.');
+    assert.equal(graph.disabledReason, 'Graph is planned for a future release.');
+    assert.equal(graph.title, undefined, 'the reason is not a tooltip of its own');
     assert.deepEqual(graph.markers, [{ kind: 'planned', text: 'Soon' }]);
     assert.equal(graph.active, undefined, 'a placeholder never wears the selected pill');
     assert.equal(graph.onSelect, undefined, 'and has nowhere to go');

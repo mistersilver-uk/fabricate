@@ -3,7 +3,7 @@
  */
 
 import { BULK_EDIT_CHROME_PATTERN, COMPONENT_EDITOR_MATCHES } from './caseConstants.js';
-import { managerCase } from './caseFactories.js';
+import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
   managerCase({
@@ -127,7 +127,9 @@ export const CASES = Object.freeze([
     steps: [
       'Crafting',
       { selector: '#manager-crafting-nav-knowledge' },
-      { selector: '[data-manager-scope-select]', select: 'lab-alchemy' },
+      ...chooseSelectOption('[data-manager-scope-select]', 'lab-alchemy', '.fabricate-manager'),
+      // Parks the pointer on the rail's label, off the row the closed option list sat over.
+      { selector: '[data-manager-rail-section]' },
     ],
     expectView: 'knowledge',
     position: { width: 1280, height: 900 },

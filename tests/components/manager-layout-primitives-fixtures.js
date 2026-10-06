@@ -39,10 +39,6 @@ export function stackedBodyRule() {
 
 // The rail nav was unreachable in a SHORT window.
 function shortWindowRailMarkup(navItems) {
-  const items = Array.from({ length: navItems }, (item, index) => {
-    const last = index === navItems - 1 ? ' data-last-nav' : '';
-    return `<button class="manager-nav-button"${last}><span class="manager-nav-icon"><i class="fas fa-gem"></i></span><span class="manager-nav-label">Section ${index + 1}</span><span class="manager-nav-count">${index}</span></button>`;
-  }).join('');
   return `<div class="fabricate-manager" data-manager-view="systems">
       <div class="manager-titlebar" data-manager-titlebar><span>Fabricate</span></div>
       <header class="fabricate-page-header manager-header"><h1>Crafting systems</h1></header>
@@ -52,11 +48,14 @@ function shortWindowRailMarkup(navItems) {
           <section class="manager-rail-block">
             <div class="manager-scope-card" data-scope-card>
               <div class="manager-scope-card-head"><p class="manager-kicker">Crafting system</p><button class="manager-rail-toggle manager-scope-collapse" data-manager-rail-toggle>&lsaquo;</button></div>
-              <select class="manager-scope-select"><option>Lab Smithing</option></select>
+              <div class="fabricate-picker manager-travel-picker fabricate-select manager-scope-select"><button class="fabricate-select-trigger fabricate-select-trigger-inline"><span class="fabricate-select-value">Lab Smithing</span></button></div>
               <button class="manager-scope-return">All crafting systems</button>
             </div>
           </section>
-          <nav class="manager-nav">${items}</nav>
+          <nav class="fabricate-nav manager-nav">${Array.from({ length: navItems }, (item, index) => {
+            const last = index === navItems - 1 ? ' data-last-nav' : '';
+            return `<button class="manager-nav-button"${last}><span class="manager-nav-icon"><i class="fas fa-gem"></i></span><span class="manager-nav-label">Section ${index + 1}</span><span class="manager-nav-count">${index}</span></button>`;
+          }).join('')}</nav>
         </aside>
         <main class="manager-main"><div class="manager-table-scroll">Rows</div></main>
         <aside class="manager-inspector"><section class="fabricate-card">Inspector</section></aside>
