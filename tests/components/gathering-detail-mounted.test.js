@@ -663,7 +663,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(hints.textContent.includes('AwardModeAll'), 'award-mode hint shown');
     assert.ok(hints.textContent.includes('EventImpactSuccess'), 'event-impact hint shown');
 
-    const row = section.querySelector('[data-yield-scale] [data-yield-entry="d-ore"]');
+    const row = section.querySelector(':scope [data-yield-scale] [data-yield-entry="d-ore"]');
     assert.ok(Boolean(row), 'the drop is a scale row keyed by its drop id');
     assert.equal(row.querySelector('.fabricate-list-row-name').textContent, 'Raw Ore');
     assert.equal(
@@ -686,7 +686,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       await settle();
 
       const rows = [
-        ...target.querySelectorAll('[data-gathering-task-detail] [data-yield-entry]'),
+        ...target.querySelectorAll(':scope [data-gathering-task-detail] [data-yield-entry]'),
       ];
       assert.deepEqual(
         rows.map((row) => row.getAttribute('data-yield-entry')),
@@ -709,7 +709,9 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     await mountView(services);
     await settle();
 
-    const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
+    const section = target.querySelector(
+      ':scope [data-gathering-task-detail] [data-gathering-drops]'
+    );
     const scale = section.querySelector('[data-yield-scale]');
     assert.equal(scale.querySelectorAll('[data-yield-entry]').length, 3, 'every drop is drawn');
     assert.equal(
@@ -748,7 +750,9 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       'each breakdown is headed by its drop, in scale order'
     );
     assert.ok(Boolean(bodies[0].querySelector('[data-gathering-drop-no-modifiers]')));
-    assert.ok(bodies[2].textContent.includes('ModifierWeather') && bodies[2].textContent.includes('-5%'));
+    assert.ok(
+      bodies[2].textContent.includes('ModifierWeather') && bodies[2].textContent.includes('-5%')
+    );
 
     toggle.click();
     flushSync();
@@ -1128,8 +1132,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     flushSync();
     await settle();
 
-    const row = target.querySelector('[data-gathering-task-detail] [data-yield-entry="d1"]');
-    assert.ok(Boolean(row.querySelector('[data-list-row="dense"]')), 'the drop is a dense list row');
+    const row = target.querySelector(':scope [data-gathering-task-detail] [data-yield-entry="d1"]');
+    assert.ok(
+      Boolean(row.querySelector('[data-list-row="dense"]')),
+      'the drop is a dense list row'
+    );
     const tile = row.querySelector('.fab-medallion');
     assert.match(tile.getAttribute('style'), /width:\s*22px;\s*height:\s*22px/, 'at the row size');
     assert.equal(tile.getAttribute('data-medallion'), 'image', 'and it carries the drop artwork');
@@ -1187,7 +1194,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     await mountView(services);
     await settle();
 
-    assert.ok(calls.dropBreakdown.length >= 1, 'the breakdown was asked for');
+    assert.ok(calls.dropBreakdown.length > 0, 'the breakdown was asked for');
     assert.ok(
       Boolean(target.querySelector('[data-gathering-task-detail]')),
       'the inspector renders'

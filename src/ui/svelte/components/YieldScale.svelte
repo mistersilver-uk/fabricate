@@ -38,9 +38,7 @@
     rollModel === 'shared' && roll !== null && roll !== undefined && Number.isFinite(Number(roll))
   );
   const cutIndex = $derived(hasRoll ? sorted.findIndex((entry) => cleared(entry) === false) : -1);
-  const hasCut = $derived(
-    !authored && hasRoll && sorted.every((entry) => cleared(entry) !== null)
-  );
+  const hasCut = $derived(!authored && hasRoll && sorted.every((entry) => cleared(entry) !== null));
 
   function cleared(entry) {
     if (Object.hasOwn(entry, 'cleared'))
