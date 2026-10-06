@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { versionedTransitionResult } from '../../src/systems/versionedCommandResults.js';
 
 import {
   createMountedComponentHarness,
@@ -19,7 +20,6 @@ import {
   steppedEssenceRecipe,
 } from '../helpers/crafting-fixtures.js';
 import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
-import { versionedTransitionResult } from '../../src/systems/versionedCommandResults.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
