@@ -45,7 +45,7 @@ function shortWindowRailMarkup(navItems) {
   }).join('');
   return `<div class="fabricate-manager" data-manager-view="systems">
       <div class="manager-titlebar" data-manager-titlebar><span>Fabricate</span></div>
-      <header class="manager-header"><h1>Crafting systems</h1></header>
+      <header class="fabricate-page-header manager-header"><h1>Crafting systems</h1></header>
       <div class="manager-body">
         <aside class="manager-rail">
           <p class="manager-rail-title" data-manager-rail-section>GM management</p>
@@ -99,6 +99,41 @@ export async function readShortWindowRailGeometry({ width = 1280, height = 560, 
         scopeTopBefore,
         scopeTopAfter: scopeRect.top,
         scopeBottom: scopeRect.bottom,
+      };
+    });
+  } finally {
+    await context.close();
+  }
+}
+
+/** The title strip's computed box, read in a real browser against the shipped sheet (issue 1777). */
+export async function readTitleBarGeometry() {
+  const context = await openLayoutContext({
+    viewport: { width: 1280, height: 200 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style><style>html,body{margin:0}</style>` +
+        '<div class="fabricate fabricate-manager" data-manager-view="systems">' +
+        '<div class="manager-titlebar" data-manager-titlebar>' +
+        '<span class="manager-titlebar-badge">PREMIUM</span>' +
+        '<span class="manager-titlebar-status"><i class="manager-titlebar-status-icon"></i>' +
+        '<span class="manager-titlebar-status-text">Simple</span></span></div></div>'
+    );
+    return await page.evaluate(() => {
+      const style = getComputedStyle(document.querySelector('.manager-titlebar'));
+      return {
+        padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft],
+        columnGap: style.columnGap,
+        borders: [
+          style.borderTopWidth,
+          style.borderRightWidth,
+          style.borderBottomWidth,
+          style.borderLeftWidth,
+        ],
+        radius: style.borderTopLeftRadius,
       };
     });
   } finally {

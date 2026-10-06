@@ -91,8 +91,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-crafting-tier-step',
     'manager-checks-v3-count-triggers',
   ]),
-  // The bare leaf's one remaining caller: an opened gathering drop row's chance track.
-  'src/ui/svelte/components/FillBar.svelte': Object.freeze(['player-gathering-drop-open']),
+  // No app caller since issue 1644: one frame per instrument over the leaf (stage, meter, band).
+  'src/ui/svelte/components/FillBar.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-past-stage',
+    'player-crafting-essence-pool',
+    'player-gathering-task-ready',
+  ]),
   'src/ui/svelte/components/StageNav.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-future-stage',
@@ -111,11 +115,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-gathering-d100',
     'fabricate-journal-lifecycle-gathering-check',
   ]),
-  // The preview scale, plus the two historical branches no other frame draws.
+  // The preview scale, the two historical branches no other frame draws, and the gathering
+  // preview's authored-order scale, closed and with its breakdown open (issue 1644).
   'src/ui/svelte/components/YieldScale.svelte': Object.freeze([
     'fabricate-journal-lifecycle-gathering-d100',
     'fabricate-journal-history-data-legacy-row-rolls-1240',
     'fabricate-journal-history-data-unknown-material-resolution-1240',
+    'player-gathering-task-ready',
+    'player-gathering-drop-open',
   ]),
   // The Journal's gathering ladder, crafting's and salvage's routed tiers, before and after a roll.
   'src/ui/svelte/components/OutcomeLadder.svelte': Object.freeze([
@@ -200,6 +207,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The padlocked strip with its first tab's description, wide (`-tracking-described`) and wrapped with its last tab's (`-narrow-settings`) (issue 1779).
     'manager-world-downtime-tracking-described',
     'manager-world-downtime-narrow-settings',
+  ]),
+  // The page header (issue 1777): the Tool library's header, and the Tool editor's on a tab.
+  'src/ui/svelte/components/PageHeader.svelte': Object.freeze([
+    'manager-tool-parity-01-library-1280x720',
+    'manager-tool-parity-04-requirements-1280x720',
   ]),
   // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([

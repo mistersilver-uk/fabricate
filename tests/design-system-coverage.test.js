@@ -208,7 +208,7 @@ test('every manifest library name resolves to a library entry', () => {
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BrowseCard',
-  'NavSidebar', 'PageHeader',
+  'NavSidebar',
   'Search',
   'TierTrack', 'ViewToggle', 'XrefList',
 ];
@@ -459,6 +459,7 @@ const RE_ROOTED_ROWS = [
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  'src/ui/svelte/components/PageHeader.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
   'src/ui/svelte/components/RuleRow.svelte',

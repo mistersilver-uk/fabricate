@@ -59,7 +59,7 @@ export function managerShellPage({
       <div class="probe-host">
         <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="${view}">
           <div class="manager-titlebar"></div>
-          <header class="manager-header"></header>
+          <header class="fabricate-page-header manager-header"></header>
           <div class="manager-body">
             <nav class="manager-rail"></nav>
             ${productMarkup}

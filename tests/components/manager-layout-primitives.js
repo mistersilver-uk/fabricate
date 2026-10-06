@@ -35,6 +35,7 @@ import {
   emptyStateStyles,
   iconFactRowStyles,
   readShortWindowRailGeometry,
+  readTitleBarGeometry,
   stackedBodyRule,
 } from './manager-layout-primitives-fixtures.js';
 
@@ -1172,7 +1173,7 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
   const badgeBlock = blockFor('.fabricate-manager .manager-titlebar-badge');
   const statusBlock = blockFor('.fabricate-manager .manager-titlebar-status');
   const statusTextBlock = blockFor('.fabricate-manager .manager-titlebar-status-text');
-  const titleBlock = blockFor('.fabricate-manager .manager-title');
+  const titleBlock = blockFor('.fabricate-page-header .manager-title');
 
   assert.ok(
     rootBlock.includes('grid-template-rows: auto auto 1fr;'),
@@ -1230,6 +1231,17 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
     titleBlock.includes('font-family: var(--fab-font-serif);'),
     'the manager screen title should override the host h1 font with the studio serif'
   );
+});
+
+// The strip's shipped box, held until issue 1523 converges it on the AppTitleBar specimen: the
+// specimen's inline 12px block padding would push every manager frame, its 9px gap is off the
+// spacing scale, and its full border and radius cannot frame a band spanning the window edge.
+test('the manager titlebar keeps its shipped box until the specimen converges', async () => {
+  const strip = await readTitleBarGeometry();
+  assert.deepEqual(strip.padding, ['8px', '16px', '8px', '16px']);
+  assert.equal(strip.columnGap, '8px', 'the nearest spacing rung to the specimen 9px');
+  assert.deepEqual(strip.borders, ['0px', '0px', '1px', '0px'], 'a bottom rule only');
+  assert.equal(strip.radius, '0px');
 });
 
 test('every view-specific manager-body grid override narrows the rail column when collapsed', () => {

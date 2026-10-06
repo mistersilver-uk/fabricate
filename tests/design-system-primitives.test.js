@@ -146,6 +146,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1505: the surface that reports something that just happened.
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/OutcomeLadder.svelte',
+  // Issue 1777: the page header, on the Tool library and Tool editor frames.
+  'src/ui/svelte/components/PageHeader.svelte',
   // Issue 1518: the pager, on the player frames that draw its persistent and threshold forms.
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',

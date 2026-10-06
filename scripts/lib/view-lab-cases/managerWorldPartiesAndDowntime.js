@@ -36,8 +36,9 @@ function downtimeStripPointerCase({ tabId, tooltip, attributes = [], ...entry })
     expectCenterHit: tab,
     expectOverflowY: '.downtime-preview-scroll',
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
     ...entry,
@@ -57,7 +58,7 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
@@ -75,7 +76,7 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
@@ -92,7 +93,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(MapLinksTab|PartiesTab|RealmsTab)/,
       /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
@@ -112,7 +113,7 @@ export const CASES = Object.freeze([
     position: { width: 1100, height: 900 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(MapLinksTab|PartiesTab|RealmsTab)/,
       /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
@@ -135,7 +136,7 @@ export const CASES = Object.freeze([
     position: { width: 680, height: 900 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringPartiesTab)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/Party/,
       /^styles\/fabricate\.css$/,
     ],
@@ -154,7 +155,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte|headerBreadcrumbs\.js)$/,
       // The gate lock this case is named for is drawn by `PartyExpandedBody`, in the card's right column.
       /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],
@@ -173,7 +174,7 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte|headerBreadcrumbs\.js)$/,
     ],
   }),
   managerCase({
@@ -401,8 +402,9 @@ export const CASES = Object.freeze([
       position: { width: 1330, height: 900 },
       kinds: ['manager', 'world', 'downtime'],
       sourceMatches: [
-        /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
         /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
         /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       ],
     })
@@ -472,8 +474,9 @@ export const CASES = Object.freeze([
     position: { width: 960, height: 900 },
     kinds: ['manager', 'world', 'downtime', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
   }),
@@ -521,8 +524,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world', 'downtime', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
   }),
@@ -607,8 +611,11 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
+      // The one frame that draws the title bar's PREMIUM mark (issue 1777).
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/navTabBadgeStore\.js$/,
@@ -672,8 +679,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/svelte\/components\/Chip\.svelte$/,
@@ -711,8 +719,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 1000 },
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/navTabBadgeStore\.js$/,
       /^styles\/fabricate\.css$/,
@@ -759,8 +768,9 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^styles\/fabricate\.css$/,

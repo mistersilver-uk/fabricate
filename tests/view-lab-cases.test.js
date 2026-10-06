@@ -52,6 +52,7 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
 import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
@@ -217,9 +218,14 @@ function emittingSources() {
  * @param {string} template The id-building fragment, e.g. `manager-crafting-nav-${`.
  * @returns {Array<[string, string]>} `[path, text]` pairs to search.
  */
-/** The components that RENDER the manager rail. */
+/** The item model the rail's rows, ids and labels are built from (issue 1777). */
+const RAIL_ITEM_MODEL = 'src/ui/svelte/apps/manager/managerNavItems.js';
+
+/** The components that RENDER the manager rail, and the model that authors its rows. */
 function railRenderingFiles(sources) {
-  return [...sources].filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
+  return [...sources].filter(
+    ([file, text]) => text.includes(RAIL_BUTTON_CLASS) || file === RAIL_ITEM_MODEL
+  );
 }
 
 function relativeImportsOf(file, text) {
@@ -5414,13 +5420,14 @@ function buildExpectViewPredicate() {
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'src/ui/svelte/apps/manager/headerModel.svelte.js',
     'src/ui/svelte/apps/manager/ManagerPageHeader.svelte',
-    'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte',
+    'src/ui/svelte/apps/manager/headerBreadcrumbs.js',
     'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte',
     'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
     'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
     'src/ui/svelte/apps/manager/ManagerSystemNav.svelte',
     'src/ui/svelte/apps/manager/ManagerWorldNav.svelte',
     'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte',
+    'src/ui/svelte/apps/manager/managerNavItems.js',
     'src/ui/svelte/apps/manager/checks/checksRouteModel.svelte.js',
     'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js',
     'src/ui/svelte/apps/manager/gatheringDraftHandlers.svelte.js',
@@ -6389,12 +6396,15 @@ test('every unit the shell extracted selects the shell\u2019s own case set', () 
   const MANAGER = 'src/ui/svelte/apps/manager';
   const shell = [`${MANAGER}/CraftingSystemManagerRoot.svelte`];
   const extracted = [
-    'ManagerPageHeader',
-    'ManagerHeaderBreadcrumbs',
-    'ManagerHeaderActions',
-    'ManagerHeaderCraftingActions',
-    'ManagerHeaderGatheringActions',
-  ].map((unit) => `${MANAGER}/${unit}.svelte`);
+    ...[
+      'ManagerPageHeader',
+      'ManagerHeaderActions',
+      'ManagerHeaderCraftingActions',
+      'ManagerHeaderGatheringActions',
+    ].map((unit) => `${MANAGER}/${unit}.svelte`),
+    // The trail model `ManagerPageHeader` renders through `PageHeader` (issue 1777).
+    `${MANAGER}/headerBreadcrumbs.js`,
+  ];
   const ids = (paths) =>
     [...new Set(mapChangedFilesToCases(paths).map((entry) => entry.id ?? entry))].sort();
   const expected = ids(shell);
@@ -6408,4 +6418,27 @@ test('every unit the shell extracted selects the shell\u2019s own case set', () 
   for (const path of extracted) {
     assert.deepEqual(ids([path]), expected, `${path} alone selects a different set`);
   }
+});
+
+/**
+ * The title bar renders on every manager screen, so a change to it alone publishes a
+ * representative subset of the shell's set rather than all of it (issue 1777): the six system
+ * frames and the one frame that draws its PREMIUM mark.
+ */
+test('the title bar selects the system frames and the premium-installed frame', () => {
+  const MANAGER = 'src/ui/svelte/apps/manager';
+  const ids = (paths) =>
+    [...new Set(mapChangedFilesToCases(paths).map((entry) => entry.id))].sort(byCodePoint);
+  const titleBar = ids([`${MANAGER}/ManagerTitleBar.svelte`]);
+  assert.deepEqual(titleBar, [
+    'manager-default-selection',
+    'manager-rail-collapsed',
+    'manager-rail-expanded',
+    'manager-selected-normal',
+    'manager-selected-stacked',
+    'manager-systems-empty',
+    'manager-world-downtime-test-companion-installed',
+  ]);
+  const shell = new Set(ids([`${MANAGER}/CraftingSystemManagerRoot.svelte`]));
+  for (const id of titleBar) assert.ok(shell.has(id), `${id} is not a frame the shell draws`);
 });

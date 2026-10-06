@@ -171,6 +171,8 @@ const SHARED_PRIMITIVES = [
   // body draw them, and the recipe-item preview carries that salvage body into the manager tree.
   'src/ui/svelte/components/OutcomeLadder.svelte',
   'src/ui/svelte/components/ListRow.svelte',
+  // The yield scale (issue 1644): the gathering find section draws it over the same dense row.
+  'src/ui/svelte/components/YieldScale.svelte',
 ];
 
 /** Components adjudicated AGAINST membership, and why a non-entry is worth recording. */

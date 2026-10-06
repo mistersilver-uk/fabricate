@@ -81,6 +81,8 @@ A candidate with fewer is recorded as ruled out WITH ITS CALLERS NAMED — or wi
 That bar is measured over EVERY `.svelte` under `src/ui/svelte/` and not only over `src/ui/svelte/components/`, because nothing in this requirement turns on which directory a candidate sits in and a component under `apps/` can acquire twenty callers without anyone asking whether it belongs in the vocabulary — one has.
 `tests/design-system-primitives.test.js` holds a register of every path outside `components/` that clears the bar and carries no manifest row, and a path leaves that register only by GAINING a row in one of the two manifest tables, so a component crossing the bar is a decision somebody has to record rather than a threshold nothing watches.
 `environment/GatheringModifierEditor.svelte` is the worked example of that register doing its job: a composition reaching two independent callers is owed a manifest row and cannot be recorded as a non-member instead, so when issue 1707 wrote the twice-authored gathering modifier panel once and the gathering task and gathering event inspector leaves became its two callers, it left the register by entering the member table as a manager-only row naming no library entry, because no specimen specifies a condition-and-character modifier editor.
+`apps/manager/ManagerTitleBar.svelte` is a one-caller component and not a member: its caller is `CraftingSystemManagerRoot.svelte`, it has no manifest row, and `<AppTitleBar>` stays `target` until a second host exists (#1777 decision E1).
+The title bar (`AppTitleBar`) and the page header (`PageHeader`) are distinct entries.
 
 Those recorded callers MUST be a structured field on the row rather than a sentence, and `tests/design-system-primitives.test.js` MUST assert the field EQUALS what the import graph measures.
 "Re-test the count" is what the clause above asks for and what nothing did: the register's caller claims were prose for as long as it existed, and prose is not resolved by anything.
@@ -257,6 +259,8 @@ Issue 1518 turned `EditorTabs` into a fact in the player application: `gathering
 `EditorValidationSurface`, `ToggleCard` and `ItemDropZone` remain capabilities, every importer of each still lying under `src/ui/svelte/apps/manager/`, and `ChanceSlider` remains a capability whose every importer lies there too; none has a player-application site to convert.
 `SortableList` satisfies it as of issue 1512, emitting `fabricate-sortable-list`; it portals nothing and needs one root, and it is the first entry here whose family was never application-rooted at all, so the gate is told by name that a class matching the family pattern is a namespace class.
 It declares NO `mirrored` fixture pair, and that is measured rather than omitted: the only class a hand-written fixture of a converted list carries is `manager-checks-tier-row`, which `checks/CraftingCheckEditor.svelte` writes too, so a mirror keyed on it would demand that row class on rows this list does not render.
+`PageHeader` satisfies it as of issue 1777, emitting `fabricate-page-header` on its `<header>`: the box, the heading block, the eyebrow and the trail are rooted there, the box rule doubled to `.fabricate-page-header.fabricate-page-header` so it keeps the (0,2,0) it had under `.fabricate-manager`.
+`manager-title` and `manager-subtitle` are outside its gated family, because the manager's rail and scoped cards spell them too, so their rules carry `.fabricate-page-header` beside `.fabricate-manager` rather than instead of it; it declares NO `mirrored` pair, because its root element carries no family class.
 `tests/components/searchable-popover-area-scope.test.js` derives each class set from the components' own markup and fails when a rule a primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
 It reads a class another entry's namespace owns as that primitive's caller container — `.fabricate-pagination .fabricate-icon-button` is the pager's rule over the button it composes, not `IconButton`'s — unless the selector also names an application root no entry owns, such as `.fabricate-manager`, in which case the rule is the primitive's own and that root fails it.
 For every other clause the other entry's class stays an application root by name.
@@ -2014,6 +2018,22 @@ A player never authors a choice group, and MAY pick from a result-side choice gr
 - **THEN** its identity header carries no primary, unless the screen's spec requires a disabled start action that names its blocker
 - **AND** no second-choice verb takes its place
 
+### Requirement: The application shell renders through the shell primitives
+
+Every manager page header MUST render through `PageHeader` (`src/ui/svelte/components/PageHeader.svelte`): the Tool editor's, the Tool library's and the header every other manager route draws.
+Each passes its trail as `breadcrumbs`, its title block as `title` and `subtitle` or as an `identity` snippet, and its action group as an `actions` snippet, and writes no breadcrumb markup of its own.
+The manager's route trail is derived by `src/ui/svelte/apps/manager/headerBreadcrumbs.js`, one chain per route under the world root or the crafting-system root, and a crumb is a control only where pressing it leaves the screen.
+The trail is a `nav` named "Breadcrumbs"; a crumb with `onSelect` is a button called with no argument and declared focused to Foundry, and the last crumb carries `aria-current="page"`.
+`PageHeader` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
+At issue 1777 its callers kept the manager's shipped header geometry, which disagreed with the specimen, and decision E4 escalated that disagreement to issue 1523 rather than settling it.
+
+#### Scenario: A manager route draws its header
+
+- **WHEN** a manager route, the Tool editor and the Tool library included, renders its header
+- **THEN** it passes `breadcrumbs`, its title block and its actions, when it has any, to `PageHeader`
+- **AND** it writes no breadcrumb markup
+- **AND** the header root carries `fabricate-page-header`
+
 ### Requirement: A window is registered in the View Lab before a change re-skins it
 
 Screenshot evidence for a change to a window OUTSIDE the case registry is not merely absent; it is FALSELY POSITIVE, and that is why registration is a requirement rather than a courtesy.
@@ -2216,6 +2236,8 @@ The optional `labels.evidence(entry)` callback MUST support each row's independe
 A missing field MUST NOT hide other known fields or rows, and unknown outcomes MUST remain neutral.
 A known shared roll whose unknown outcomes prevent locating a cut MUST remain visible as a standalone roll reading without inventing a cut position.
 Default preview callers MUST retain the existing shared comparison and ordering.
+`YieldScale` MAY keep authored order: with `order` `authored` it MUST keep entry order and MUST NOT draw a cut, and a known shared roll stays a standalone reading.
+Gathering's drop preview MUST compose `YieldScale` in authored order, because its reward selection is by authored order.
 An explicitly recorded `cleared` boolean MUST govern historical row outcomes, preserving native high-roll semantics; an explicit unknown outcome MUST remain unknown, while callers omitting that field retain the default low-roll comparison.
 `OutcomeLadder` MUST display the complete noninteractive routed outcome ladder for authored previews; ordinary routed history MUST instead use its recorded outcome log as specified by `ui-journal-app`.
 `OutcomeLadder` MAY mark the one reached tier: `reachedId` matches a tier's merged `ids`, else its `id`, and only the first matching tier carries the `reachedLabel` pill and the accent edge.
