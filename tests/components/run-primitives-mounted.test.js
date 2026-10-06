@@ -787,6 +787,16 @@ describe('run primitives mounted behavior', () => {
     yieldHarness.remount();
     const bottom = await yieldHarness.mount({ entries, roll: 1, labels });
     assert.match(bottom.querySelector('[data-yield-cut]').textContent, /every find on the scale cleared it/u);
+    yieldHarness.remount();
+
+    // Issue 1644: an authored-rank caller keeps entry order and never cuts, even given a roll.
+    const authored = await yieldHarness.mount({ entries, roll: 41, labels, order: 'authored' });
+    const ids = [...authored.querySelectorAll('[data-yield-entry]')].map((row) => row.getAttribute('data-yield-entry'));
+    assert.deepEqual(ids, ['rare', 'sure', 'mid'], 'entry order, not chance order');
+    assert.ok(!authored.querySelector('[data-yield-cut]'), 'no cut through an unsorted scale');
+    assert.equal(authored.querySelector('[data-yield-shared-roll]').textContent.trim(), 'Rolled 41');
+    assert.ok(authored.querySelector('[data-yield-entry="rare"]').classList.contains('is-missed'));
+    assert.ok(authored.querySelector('[data-yield-entry="mid"]').classList.contains('is-cleared'));
   });
 
   it('states the complete routed outcome ladder including failure without controls', async () => {
