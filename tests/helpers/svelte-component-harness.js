@@ -360,6 +360,8 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   // The rail's icon variant (issue 1777), and the labelled rows part it imports.
   'src/ui/svelte/components/NavSidebar.svelte',
   'src/ui/svelte/components/NavSidebarRows.svelte',
+  // The row the Journal's Active list draws each run through (issue 1778).
+  'src/ui/svelte/components/ListRow.svelte',
 ]);
 
 // The gathering find section (issue 1644): the shared scale, its rows, the one disclosure beneath

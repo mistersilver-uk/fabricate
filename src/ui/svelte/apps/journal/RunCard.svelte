@@ -1,22 +1,20 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  RunCard renders one active run in the left column. It mirrors the gathering
-  record-card idiom (30px icon, ellipsised name) with a status pill, a
-  world-time countdown, and a progress bar.
+  RunCard renders one active run in the left column as a selectable ListRow (issue 1778): a 30px
+  mark, the ellipsised name with its bolt and status chips as badges, the subtitle and step as
+  meta, and the world-time countdown and progress as the aside beneath the row's one button.
 
   Countdown + progress are world-time driven (no wall-clock interval): `now` is
   the store's reactive world time, recomputed on the `updateWorldTime` tick, so
   `formatDurationHMS(availableAt - now)` and the progress fraction update when
-  game time advances. Selection is an accent border on the record's normal surface
-  (NOT a box-shadow, which the .fabricate-app focus rule would clear on click) and
-  aria-pressed. The card is a role=button with Enter/Space keyboard activation.
+  game time advances. Selection is the button's own aria-pressed, which ListRow draws.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
   import RunProgress from '../../components/RunProgress.svelte';
-  import Medallion from '../../components/Medallion.svelte';
+  import ListRow from '../../components/ListRow.svelte';
   import { runAttentionPresentation, runStatusPresentation } from './journalRunStatus.js';
   import { formatDurationHMS } from '../../util/formatDuration.js';
 
@@ -98,151 +96,123 @@
   // the Active surface). What it is waiting for is the attention chip's job.
   const showsTiming = $derived(hasGate || showsStageRail);
 
+  // The control's name is the visible name, then every state the row only draws (issue 1778).
+  const accessibleName = $derived(
+    [
+      title,
+      completesAsTimePasses && boltLabel,
+      localize(runStatus.labelKey),
+      attention && localize(attention.labelKey),
+      blindSecretPreview && localize('FABRICATE.App.Journal.BlindSecret.Badge'),
+    ]
+      .filter(Boolean)
+      .join(', ')
+  );
+
   function activate() {
     if (id) onSelect?.(run);
   }
-  function onKey(event) {
-    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
-      event.preventDefault();
-      activate();
-    }
-  }
 </script>
 
-<div
-  class="journal-run-card"
-  class:is-selected={selected}
-  role="button"
-  tabindex="0"
-  data-run-id={id}
-  data-run-type={run?.runType ?? ''}
-  data-run-status={status}
-  data-selected={selected ? 'true' : 'false'}
-  aria-pressed={selected}
-  onclick={activate}
-  onkeydown={onKey}
->
-  <div class="journal-run-card-main">
-    <Medallion art={img} alt="" size={30} />
-    <div class="journal-run-card-copy">
-      <div class="journal-run-card-heading">
-        <span class="journal-run-card-name" {title}>{title}</span>
-        {#if completesAsTimePasses}
+{#snippet heading()}
+  <span class="journal-run-card-heading">
+    {#if completesAsTimePasses}
+      <span
+        class="journal-run-card-bolt"
+        role="img"
+        aria-label={boltLabel}
+        data-tooltip={boltLabel}
+        data-run-completes-as-time-passes><i class="fas fa-bolt" aria-hidden="true"></i></span
+      >
+    {/if}
+    <Chip
+      class="journal-run-status"
+      density="list"
+      tone={statusChipTone(runStatus.tone)}
+      icon={`fas ${runStatus.icon}`}
+      data-run-status={status}>{localize(runStatus.labelKey)}</Chip
+    >
+    {#if attention}
+      <Chip
+        class="journal-run-attention"
+        density="list"
+        tone={statusChipTone(attention.tone)}
+        icon={`fas ${attention.icon}`}
+        data-run-attention={attention.kind}>{localize(attention.labelKey)}</Chip
+      >
+    {/if}
+    {#if blindSecretPreview}
+      <span
+        class="journal-run-card-secret"
+        data-run-secret-preview="true"
+        title={localize('FABRICATE.App.Journal.BlindSecret.Title')}
+      >
+        <i class="fas fa-eye-slash" aria-hidden="true"></i>
+        {localize('FABRICATE.App.Journal.BlindSecret.Badge')}
+      </span>
+    {/if}
+  </span>
+{/snippet}
+
+{#snippet context()}
+  <span class="journal-run-card-context">
+    {#if subtitle !== ''}<span class="journal-run-card-subtitle">{subtitle}</span>{/if}
+    {#if stepLabel !== ''}<span class="journal-run-card-step">{stepLabel}</span>{/if}
+  </span>
+{/snippet}
+
+{#snippet timing()}
+  <div class="journal-run-card-timing">
+    {#if progress !== null || showsStageRail}
+      <div class="journal-run-card-progress" data-run-progress={accessiblePercent}>
+        <RunProgress
+          stages={stages.length > 0 ? stages : [{}]}
+          current={currentStageIndex}
+          progress={progressPercent}
+          ariaLabel={localize('FABRICATE.App.Journal.Progress.Label')}
+        />
+      </div>
+    {/if}
+    {#if hasGate}
+      <div class="journal-run-card-countdown" data-run-countdown>
+        <i class="fas fa-clock" aria-hidden="true"></i>
+        {#if isReady}
           <span
-            class="journal-run-card-bolt"
-            role="img"
-            aria-label={boltLabel}
-            data-tooltip={boltLabel}
-            data-run-completes-as-time-passes><i class="fas fa-bolt" aria-hidden="true"></i></span
+            >{localize(
+              isFinalStep
+                ? 'FABRICATE.App.Journal.Countdown.ReadyToFinish'
+                : 'FABRICATE.App.Journal.Countdown.ReadyToContinue'
+            )}</span
           >
-        {/if}
-        <Chip
-          class="journal-run-status"
-          density="list"
-          tone={statusChipTone(runStatus.tone)}
-          icon={`fas ${runStatus.icon}`}
-          data-run-status={status}>{localize(runStatus.labelKey)}</Chip
-        >
-        {#if attention}
-          <Chip
-            class="journal-run-attention"
-            density="list"
-            tone={statusChipTone(attention.tone)}
-            icon={`fas ${attention.icon}`}
-            data-run-attention={attention.kind}>{localize(attention.labelKey)}</Chip
-          >
-        {/if}
-        {#if blindSecretPreview}
-          <span
-            class="journal-run-card-secret"
-            data-run-secret-preview="true"
-            title={localize('FABRICATE.App.Journal.BlindSecret.Title')}
-          >
-            <i class="fas fa-eye-slash" aria-hidden="true"></i>
-            {localize('FABRICATE.App.Journal.BlindSecret.Badge')}
-          </span>
+        {:else}
+          <span>{localize('FABRICATE.App.Journal.Countdown.Remaining', { time: remaining })}</span>
         {/if}
       </div>
-      {#if subtitle !== '' || stepLabel !== ''}
-        <div class="journal-run-card-context">
-          {#if subtitle !== ''}<span class="journal-run-card-subtitle">{subtitle}</span>{/if}
-          {#if stepLabel !== ''}<span class="journal-run-card-step">{stepLabel}</span>{/if}
-        </div>
-      {/if}
-    </div>
+    {/if}
   </div>
-  {#if showsTiming}
-    <div class="journal-run-card-timing">
-      {#if progress !== null || showsStageRail}
-        <div class="journal-run-card-progress" data-run-progress={accessiblePercent}>
-          <RunProgress
-            stages={stages.length > 0 ? stages : [{}]}
-            current={currentStageIndex}
-            progress={progressPercent}
-            ariaLabel={localize('FABRICATE.App.Journal.Progress.Label')}
-          />
-        </div>
-      {/if}
-      {#if hasGate}
-        <div class="journal-run-card-countdown" data-run-countdown>
-          <i class="fas fa-clock" aria-hidden="true"></i>
-          {#if isReady}
-            <span
-              >{localize(
-                isFinalStep
-                  ? 'FABRICATE.App.Journal.Countdown.ReadyToFinish'
-                  : 'FABRICATE.App.Journal.Countdown.ReadyToContinue'
-              )}</span
-            >
-          {:else}
-            <span>{localize('FABRICATE.App.Journal.Countdown.Remaining', { time: remaining })}</span
-            >
-          {/if}
-        </div>
-      {/if}
-    </div>
-  {/if}
-</div>
+{/snippet}
+
+<ListRow
+  name={title}
+  art={img}
+  markSize={30}
+  truncateName
+  {selected}
+  onOpen={activate}
+  openProps={{
+    class: ['journal-run-card', { 'is-selected': selected }],
+    'data-run-id': id,
+    'data-run-type': run?.runType ?? '',
+    'data-run-status': status,
+    'data-selected': selected ? 'true' : 'false',
+    'aria-label': accessibleName,
+  }}
+  badges={heading}
+  meta={subtitle !== '' || stepLabel !== '' ? context : undefined}
+  aside={showsTiming ? timing : undefined}
+/>
 
 <style>
-  .journal-run-card {
-    box-sizing: border-box;
-    display: block;
-    width: 100%;
-    padding: var(--fab-space-1) var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-bg-2);
-    color: var(--fab-text);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .journal-run-card:not(.is-selected):hover {
-    background: var(--fab-surface-raised);
-  }
-
-  /* Selection is an accent border outline (not a box-shadow,
-     which the global .fabricate-app focus rule clears on mouse-click focus). */
-  .journal-run-card.is-selected {
-    border-color: var(--fab-accent-border);
-  }
-
-  .journal-run-card-main {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    min-width: 0;
-  }
-
-  .journal-run-card-copy {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
-  }
-
   .journal-run-card-heading,
   .journal-run-card-context,
   .journal-run-card-timing {
@@ -250,16 +220,6 @@
     align-items: center;
     min-width: 0;
     gap: var(--fab-space-2);
-  }
-
-  .journal-run-card-name {
-    flex: 1 1 auto;
-    font-size: 12px;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
   }
 
   .journal-run-card-subtitle,
@@ -333,8 +293,5 @@
   .journal-run-card-progress {
     min-width: 56px;
     flex: 1 1 auto;
-  }
-  .journal-run-card-timing {
-    margin-top: var(--fab-space-1);
   }
 </style>

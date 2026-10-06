@@ -116,11 +116,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-claim-retained',
     'fabricate-journal-lifecycle-history-multi-success',
   ]),
+  // The dense result rows, then one frame per selectable site (issue 1778): the Journal's Active runs.
   'src/ui/svelte/components/ListRow.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-finished-success',
     'fabricate-journal-lifecycle-gathering-d100',
     'fabricate-journal-lifecycle-gathering-check',
+    'fabricate-journal',
   ]),
   // The preview scale, the two historical branches no other frame draws, and the gathering
   // preview's authored-order scale, closed and with its breakdown open (issue 1644).

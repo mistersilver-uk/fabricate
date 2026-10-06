@@ -30,6 +30,7 @@ import {
   checkGate,
   manifestRows,
 } from './helpers/designSystemRatchet.js';
+import { LIST_ROW_ADOPTERS } from './helpers/listRowContract.js';
 import {
   assertMovedByDiff,
   headManifest,
@@ -518,6 +519,17 @@ test('(a) a search field change publishes every surface the 38px shell moved, an
     'world-component-entry-systems',
   ]) {
     assert.ok(selected.has(caseId), `a ${file} change does not select '${caseId}'`);
+  }
+});
+
+test('(a) a ListRow change publishes a frame for every converted selectable site', () => {
+  // Issue 1778: each converted site names the frame that draws it, and the frame must be selected.
+  const selected = mapChangedFilesToCases(['src/ui/svelte/components/ListRow.svelte']).map(
+    (viewCase) => viewCase.id
+  );
+  for (const { file, frame } of LIST_ROW_ADOPTERS) {
+    assert.ok(existsSync(path.join(REPO_ROOT, file)), `${file} does not exist`);
+    assert.ok(selected.includes(frame), `a ListRow change does not select '${frame}' for ${file}`);
   }
 });
 

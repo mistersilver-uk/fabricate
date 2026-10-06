@@ -23,11 +23,12 @@ const ART_RESOLVER = 'resolveCraftingArt(';
 // pool's carrier tile -1, now the shared EssencePool's source tile; the routed salvage result
 // pill -1, now the shared ladder's `ListRow`; the gathering drop row's tile -1, its drops now the
 // shared YieldScale's rows; the held-stack picker's tile -1, its stacks now the shared
-// ChoiceOptionList's one site.
-const MEDALLION_SITES = 72;
+// ChoiceOptionList's one site. Issue 1778: ListRow's mark +3, one literal tag per art rung (22,
+// 26, 30, 38); RunCard's tile -1, now that row's 30px mark.
+const MEDALLION_SITES = 74;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 55;
+const ART_BEARING_SITES = 57;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>
