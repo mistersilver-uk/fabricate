@@ -1130,6 +1130,34 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
   // ─── THE THREE ERRORS THAT USED TO BE SWALLOWED (issue 1514) ────────────────────────────
 
+  it('says it is still calculating while the breakdown loads, and draws no find rows yet', async () => {
+    const { services } = makeServices(listing([environment()]));
+    services.getGatheringDropBreakdown = () => new Promise(() => {});
+    await mountView(services);
+    await settle();
+
+    const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
+    assert.equal(section.getAttribute('data-gathering-drops-state'), 'loading');
+    assert.ok(section.textContent.includes('DropsLoading'), 'with the loading sentence');
+    assert.equal(section.querySelectorAll('button').length, 0, 'and no control yet');
+  });
+
+  it('draws no find section for a task with no drops', async () => {
+    const { services, calls } = makeServices(listing([environment()]));
+    await mountView(services);
+    await settle();
+
+    assert.ok(calls.dropBreakdown.length >= 1, 'the breakdown was asked for');
+    assert.ok(
+      Boolean(target.querySelector('[data-gathering-task-detail]')),
+      'the inspector renders'
+    );
+    assert.ok(
+      !target.querySelector('[data-gathering-task-detail] [data-gathering-drops]'),
+      'with no find section'
+    );
+  });
+
   it('says so when the drop-breakdown fetch fails, instead of drawing an empty find list', async () => {
     const { services } = makeServices(listing([environment()]));
     services.getGatheringDropBreakdown = () => Promise.reject(new Error('boom'));
