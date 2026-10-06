@@ -4451,6 +4451,136 @@
   color: var(--fab-text-subtle);
 }
 
+/* ListRow's selectable form (issue 1778), on selectors the dense row never carries. `onOpen` makes the content one native button whose `::after` covers the row, so the whole row opens it; `trailing` stacks above that overlay and `aside` wraps beneath it. Selection is the button's own `aria-pressed`. */
+.fabricate-list-row.is-form {
+  position: relative;
+  flex-wrap: wrap;
+}
+
+.fabricate-list-row.is-default {
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3) var(--fab-space-4);
+  border-radius: 11px;
+}
+
+.fabricate-list-row.is-card {
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--fab-space-3);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-list-row > .fabricate-list-row-open {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: inherit;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: normal;
+  text-align: left;
+  box-shadow: none;
+}
+
+.fabricate-list-row.is-card > .fabricate-list-row-open {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.fabricate-list-row > .fabricate-list-row-open:enabled {
+  cursor: pointer;
+}
+
+.fabricate-list-row > button.fabricate-list-row-open::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 9px;
+}
+
+.fabricate-list-row.is-default > button.fabricate-list-row-open::after,
+.fabricate-list-row.is-card > button.fabricate-list-row-open::after {
+  border-radius: 11px;
+}
+
+.fabricate-list-row.is-form > :not(.fabricate-list-row-open, .fabricate-list-row-aside) {
+  position: relative;
+  z-index: 1;
+}
+
+.fabricate-list-row > .fabricate-list-row-open:focus-visible {
+  outline: none;
+}
+
+.fabricate-list-row > .fabricate-list-row-open:focus-visible::after {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+.fabricate-list-row .fabricate-list-row-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-list-row .fabricate-list-row-head,
+.fabricate-list-row .fabricate-list-row-badges,
+.fabricate-list-row .fabricate-list-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-list-row .fabricate-list-row-children {
+  display: block;
+  min-width: 0;
+}
+
+.fabricate-list-row > .fabricate-list-row-aside {
+  flex: 1 0 100%;
+  min-width: 0;
+}
+
+.fabricate-list-row.is-card .fabricate-list-row-name {
+  font-size: 14px;
+}
+
+.fabricate-list-row.is-danger {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true']) {
+  border-color: var(--fab-accent-border);
+}
+
+.fabricate-list-row.is-danger:has(> .fabricate-list-row-open[aria-pressed='true']) {
+  box-shadow: inset 0 0 0 1px var(--fab-accent-border);
+}
+
+.fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true'])) {
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-list-row:has(> .fabricate-list-row-open:disabled) {
+  opacity: 0.62;
+}
+
 /* THE DATA TABLE (issue 1782): records compared down columns, under a caption that states the heading and the count. Rooted at the class `DataTable.svelte` writes, so it paints in the manager and the player window alike; the drop rules card restates its frame through its own card class. */
 .fabricate-data-table {
   display: flex;
