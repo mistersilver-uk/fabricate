@@ -140,6 +140,8 @@ function readParams() {
     systemBlocked: params.get('systemBlocked') === '1',
     // Give Prospect the Seam a depleted-marker image, for the art picker's filled frame (issue 1522).
     depletedImage: params.get('depletedImage') === '1',
+    // Bend Horseshoe asks for any ore, for the held-stack picker's frame (issue 1644).
+    tagStacks: params.get('tagStacks') === '1',
     // Build a world with NO Tools at all, for the world Tools Catalogue's empty state.
     noTools: params.get('noTools') === '1',
     // Withhold the world essence scope from the manager, so an essence editor renders unscoped,
@@ -976,6 +978,7 @@ async function boot() {
         learnableBook: params.learnableBook,
         systemBlocked: params.systemBlocked,
         depletedImage: params.depletedImage,
+        tagStacks: params.tagStacks,
       });
   await seedRollPromptFixture(world, params.rollPromptState);
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);

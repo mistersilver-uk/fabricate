@@ -15,8 +15,8 @@
     through the resolver the engine consumes, so the selection is never computed here.
 
   Invariants:
-  - Each group is one shared `ChoiceOptionList` radiogroup. Crafting claims no stack elsewhere, so
-    a short stack is dimmed, still offered and described by its reading; none is disabled.
+  - Each group is one shared `ChoiceOptionList` radiogroup. A stack choice carries no claim from
+    elsewhere in the set, so a short stack is dimmed, offered and described; none is disabled.
 -->
 <script>
   import ChoiceOptionList from '../../../components/ChoiceOptionList.svelte';

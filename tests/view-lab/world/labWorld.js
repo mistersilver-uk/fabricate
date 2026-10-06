@@ -399,6 +399,17 @@ function blockHerbalism(content) {
   system.craftingCheck = { ...check, progressive: { ...check.progressive, rollFormula: '' } };
 }
 
+/** Bend Horseshoe asks for five of any ingot, which Brenna alone holds as two stacks — five iron,
+ *  four steel — so its slot opens the held-stack picker with one stack short (issue 1644). Not ore:
+ *  Vosk's iron ore shares Brenna's lab item uuid, and a stack's id must be unique. */
+function seedTagStacks(content) {
+  const { recipe } = recipeAndSystem(content, 'sm-r-horseshoe', 'tagStacks');
+  const anyIngot = { match: { type: 'tags', tags: ['ingot'], tagMatch: 'any' }, quantity: 5 };
+  recipe.ingredientSets = [
+    { id: 's1', ingredientGroups: [{ id: 's1-g1', name: 'Ingot', options: [anyIngot] }] },
+  ];
+}
+
 /** Prospect the Seam's depleted-marker art, for the art picker's filled frame (issue 1522). */
 function seedDepletedImage(content) {
   const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.SMITHING];
@@ -707,6 +718,7 @@ export async function buildLabWorld({
   learnableBook = false,
   systemBlocked = false,
   depletedImage = false,
+  tagStacks = false,
 } = {}) {
   const content = buildLabContent({ journalCaseState });
   if (
@@ -722,6 +734,7 @@ export async function buildLabWorld({
   seedCheckOverride(content, checkOverride);
   if (systemBlocked) blockHerbalism(content);
   if (depletedImage) seedDepletedImage(content);
+  if (tagStacks) seedTagStacks(content);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.

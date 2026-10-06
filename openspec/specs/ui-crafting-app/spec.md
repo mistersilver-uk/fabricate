@@ -992,6 +992,8 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   A choice slot's caption states its alternative count whichever kind of option is chosen.
 - An essence alternative reports the essence the held stacks carry against its authored amount, and reads satisfied exactly when the resolver would consider that alternative fundable.
   Fundable is not funded: the slot's own ratio still reports what the pool allocation delivers.
+- A tag option matching several held stacks opens its held-stack picker in the slot's panel: the shared `ChoiceOptionList` radiogroup, one candidate per stack, each reading held against the slot's need.
+  A stack held short of the need is dimmed, still offered and described by its reading; a stack choice carries no claim from elsewhere in the set, so none is disabled.
 - Focus auto-advances to the first unsatisfied slot until the player opens a slot themselves, after which the player's choice sticks.
   The remembered slot is re-validated on every read against the live slot list, falling back to the first unsatisfied slot and then to the first slot, so changing set, step or recipe can never leave a stale or absent chooser open.
   Clicking the open slot's tile again closes the chooser instead of reopening it, and the closed choice is remembered the same scoped way: it stays closed until the player opens a slot again (including re-clicking the same tile), while changing set, step or recipe re-derives the default open slot as before.

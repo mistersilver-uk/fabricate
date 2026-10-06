@@ -1318,6 +1318,22 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
+  // Issue 1644: a tag slot matching two held stacks, one short, opens the held-stack picker.
+  playerCase({
+    id: 'player-crafting-stack-picker',
+    label: 'Player app — Crafting held-stack picker on a tag slot',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', tagStacks: '1' },
+    // Selecting the recipe opens its one choice slot, so pressing the tile would shut it.
+    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' }],
+    expectSelector:
+      '[data-recipe-section="stacks"][data-alt-kind="stack"] [role="radiogroup"]' +
+      ':has([role="radio"][aria-checked="true"]:not(.is-short))' +
+      ':has([role="radio"].is-short[aria-describedby]:not(:disabled))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
+  }),
   playerCase({
     id: 'player-crafting-tag-unmatched',
     label: 'Player app — Crafting tag unmatched',
