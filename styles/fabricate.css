@@ -4451,10 +4451,13 @@
   color: var(--fab-text-subtle);
 }
 
-/* ListRow's selectable form (issue 1778), on selectors the dense row never carries. `onOpen` makes the content one native button whose `::after` covers the row, so the whole row opens it; `trailing` stacks above that overlay and `aside` wraps beneath it. Selection is the button's own `aria-pressed`. */
+/* ListRow's selectable form (issue 1778), on selectors the dense row never carries. `onOpen` makes the content one native button whose `::after` covers the row, so the whole row opens it; `trailing` stacks above that overlay and `aside` wraps beneath it. Selection is the button's own `aria-pressed`. At the dense density the form keeps the Journal Active row's space-1/space-2 inset and a space-1 line gap: at the dense specimen's space-2/space-3 a run row measures 75.9px against 64px, and four Active rows no longer share the window with four Finished ones (the "List row geometry" migrations row). */
 .fabricate-list-row.is-form {
   position: relative;
+  isolation: isolate;
   flex-wrap: wrap;
+  row-gap: var(--fab-space-1);
+  padding: var(--fab-space-1) var(--fab-space-2);
 }
 
 .fabricate-list-row.is-default {
@@ -4466,6 +4469,7 @@
 .fabricate-list-row.is-card {
   flex-direction: column;
   align-items: stretch;
+  gap: var(--fab-space-2);
   padding: var(--fab-space-3);
   border-radius: 11px;
   background: var(--fab-bg-2);
@@ -4506,6 +4510,7 @@
   content: '';
   position: absolute;
   inset: -1px;
+  z-index: 1;
   border-radius: 9px;
 }
 
@@ -4514,9 +4519,12 @@
   border-radius: 11px;
 }
 
-.fabricate-list-row.is-form > :not(.fabricate-list-row-open, .fabricate-list-row-aside) {
+/* The control's own content and the trailing controls sit above the overlay, so a name's title, a glyph's tooltip and a trailing click reach their own element; Foundry core makes a button's children pointer-transparent, and that is undone here. The aside is its own stacking context beneath the overlay, so a click on it opens the row. */
+.fabricate-list-row.is-form > :not(.fabricate-list-row-open):not(.fabricate-list-row-aside),
+.fabricate-list-row > .fabricate-list-row-open > * {
   position: relative;
-  z-index: 1;
+  z-index: 2;
+  pointer-events: auto;
 }
 
 .fabricate-list-row > .fabricate-list-row-open:focus-visible {
@@ -4552,8 +4560,20 @@
 }
 
 .fabricate-list-row > .fabricate-list-row-aside {
+  position: relative;
+  z-index: 0;
   flex: 1 0 100%;
   min-width: 0;
+}
+
+/* A truncated row keeps its name and badges on one line, the name ellipsizing first. */
+.fabricate-list-row.is-truncated .fabricate-list-row-head {
+  flex-wrap: nowrap;
+}
+
+.fabricate-list-row.is-truncated .fabricate-list-row-badges {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
 }
 
 .fabricate-list-row.is-card .fabricate-list-row-name {

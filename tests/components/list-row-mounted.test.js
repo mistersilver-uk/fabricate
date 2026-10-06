@@ -253,6 +253,46 @@ function fullRow(overrides = {}) {
 
 const controlOf = (target) => target.querySelector('.fabricate-list-row-open');
 
+/** The declarations of the one sheet rule whose selector list names `selector`, as a map. */
+function declarationsFor(selector) {
+  const blocks = SHEET.replaceAll(/\/\*[\s\S]*?\*\//g, '').split('}');
+  const matching = blocks.filter((block) =>
+    block
+      .slice(0, block.indexOf('{'))
+      .split(',')
+      .some((part) => part.trim() === selector)
+  );
+  assert.equal(matching.length, 1, `one rule names ${selector}`);
+  const body = matching[0].slice(matching[0].indexOf('{') + 1);
+  return new Map(
+    body
+      .split(';')
+      .map((line) => line.split(':').map((part) => part.trim()))
+      .filter(([property]) => property)
+  );
+}
+
+describe('ListRow selectable form stacking, as the sheet declares it (issue 1778)', () => {
+  it('stacks the overlay above the aside and below the content and trailing controls', () => {
+    const overlay = declarationsFor('.fabricate-list-row > button.fabricate-list-row-open::after');
+    const content = declarationsFor('.fabricate-list-row > .fabricate-list-row-open > *');
+    const trailing = declarationsFor(
+      '.fabricate-list-row.is-form > :not(.fabricate-list-row-open):not(.fabricate-list-row-aside)'
+    );
+    const aside = declarationsFor('.fabricate-list-row > .fabricate-list-row-aside');
+    const root = declarationsFor('.fabricate-list-row.is-form');
+    assert.equal(root.get('position'), 'relative', 'the overlay is placed against the root');
+    assert.equal(root.get('isolation'), 'isolate', 'and its layers stay inside the row');
+    assert.equal(overlay.get('position'), 'absolute');
+    const layer = (rule) => Number(rule.get('z-index'));
+    assert.ok(layer(aside) < layer(overlay), 'a click on the aside lands on the control');
+    for (const above of [content, trailing]) {
+      assert.ok(layer(above) > layer(overlay), 'content and trailing controls sit above it');
+      assert.equal(above.get('pointer-events'), 'auto', "undoing core's `button > *` rule");
+    }
+  });
+});
+
 describe('ListRow selectable form (issue 1778)', () => {
   before(() => harness.setup());
   afterEach(() => harness.remount());
