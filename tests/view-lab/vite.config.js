@@ -6,6 +6,8 @@ import { defineConfig } from 'vite';
 
 import { missingChromeMessage, resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 
+import { worktreeWatchIgnores } from './watchIgnore.js';
+
 const repoRoot = resolve(import.meta.dirname, '../..');
 const chromeCache = resolveChromeCache(repoRoot);
 const dnd5eRoot = join(repoRoot, '.foundry-e2e', 'systems', 'dnd5e');
@@ -143,8 +145,9 @@ export default defineConfig({
     // art alone, and the dnd5e tree is the same shape.
     watch: {
       ignored: [
-        // Agent lane worktrees live INSIDE the repo, each a full checkout.
-        '**/.worktrees/**',
+        // Agent lane worktrees live INSIDE the primary repo, each a full checkout. Anchored at the
+        // served root, so a lab served FROM a worktree still watches its own tree.
+        ...worktreeWatchIgnores(repoRoot),
         ...(chromeCache ? [join(chromeCache.dir, '**')] : []),
         ...(existsSync(dnd5eRoot) ? [join(dnd5eRoot, '**')] : []),
       ],

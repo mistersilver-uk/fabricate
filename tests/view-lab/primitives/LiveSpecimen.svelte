@@ -8,9 +8,10 @@
   | `component` | Svelte component | required | The component the row names. |
   | `props` | plain object | `{}` | Spread verbatim; specimens are not stateful. |
   | `content` | node array | `null` | The children snippet: a string, or `{tag, attrs, text, children}`; neither `text` nor `children` is a void element. |
+  | `snippets` | `{body?, footer?}` of node arrays | `{}` | Named snippets, same node shape; `specimenMount.js` refuses a name outside `SPECIMEN_SNIPPET_NAMES`. |
 -->
 <script>
-  let { path = '', component: Specimen, props = {}, content = null } = $props();
+  let { path = '', component: Specimen, props = {}, content = null, snippets = {} } = $props();
 </script>
 
 {#snippet nodes(list)}
@@ -28,10 +29,19 @@
   {/each}
 {/snippet}
 
+{#snippet body()}{@render nodes(snippets.body)}{/snippet}
+{#snippet footer()}{@render nodes(snippets.footer)}{/snippet}
+
 <div class="pl-specimen" data-primitive-lab-specimen={path}>
   {#if content}
-    <Specimen {...props}>{@render nodes(content)}</Specimen>
+    <Specimen {...props} {...snippets.body ? { body } : {}} {...snippets.footer ? { footer } : {}}
+      >{@render nodes(content)}</Specimen
+    >
   {:else}
-    <Specimen {...props} />
+    <Specimen
+      {...props}
+      {...snippets.body ? { body } : {}}
+      {...snippets.footer ? { footer } : {}}
+    />
   {/if}
 </div>

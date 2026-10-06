@@ -25,6 +25,8 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-journal-view-',
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
+    // Issue 1644: a candidate and its slot tile keep focus across a pending command.
+    'src/ui/svelte/util/focusWhenEnabled.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,

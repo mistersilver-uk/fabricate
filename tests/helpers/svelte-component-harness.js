@@ -421,6 +421,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // The art decision the retired `CraftingThumb` owned (issue 1506), now a pure leaf every
   // converted tile reads.
   'src/ui/svelte/util/craftingArtResolution.js',
+  // Issue 1644: the stack picker's candidates keep focus across a pending command.
+  'src/ui/svelte/util/focusWhenEnabled.js',
   'src/ui/svelte/util/essenceIcons.js',
   // The essence colour fold (issue 1036).
   'src/ui/svelte/util/essenceTint.js',
@@ -561,6 +563,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
+  // Issue 1644: the stack picker adapts the shared candidate radiogroup.
+  'src/ui/svelte/components/ChoiceOptionList.svelte',
   'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
   // The check card is a strip of current values (issue 1521).
   'src/ui/svelte/components/InfoStrip.svelte',

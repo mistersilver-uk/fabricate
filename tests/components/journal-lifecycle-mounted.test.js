@@ -47,6 +47,8 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-journal-lifecycle-',
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
+    // Issue 1644: a candidate and its slot tile keep focus across a pending command.
+    'src/ui/svelte/util/focusWhenEnabled.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
@@ -1468,7 +1470,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     const options = [...mounted.target.querySelectorAll('[data-choice-id]')];
     const large = options.find((option) => option.textContent.includes('iron stock'));
     const small = options.find((option) => option.textContent.includes('copper stock'));
-    assert.match(large.textContent, /3 held · needs 3/);
+    assert.match(large.textContent, /3 held · needs 3 · 2 spare/, 'the fixed group claims one');
     assert.equal(large.disabled, true, 'the candidate would leave the fixed iron group short');
     assert.match(small.textContent, /2 held · needs 1/);
     assert.equal(small.disabled, false, 'the smaller alternate uses its own required amount');
@@ -1539,6 +1541,134 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(paint('fire'), 'partial', 'two of four delivered is partial, never short');
     assert.equal(paint('earth'), 'short', 'none delivered stays short');
     assert.equal(paint('water'), 'partial', 'a single delivered unit already starts the pool');
+  });
+
+  it('offers a short candidate, selects it without readying the run, and locks claimed stock', async () => {
+    const set = ingredientSet('short', [
+      {
+        id: 'choice',
+        options: [
+          componentOption('lots', 'iron', 5),
+          componentOption('spare', 'copper', 1),
+          componentOption('one', 'iron', 1),
+        ],
+      },
+      { id: 'fixed', options: [componentOption('reserved', 'copper', 2)] },
+    ]);
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture([set], {
+        selectedIngredientSetId: set.id,
+        ingredientOptionOverrides: { choice: { optionIndex: 2 } },
+      })
+    );
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
+    const begin = () => mounted.target.querySelector('[data-run-action="begin"]');
+    assert.equal(begin().disabled, false, 'the met selection can begin');
+    mounted.target.querySelector(':scope [data-slot-id="choice"] button').click();
+    await settleAction();
+    const options = [...mounted.target.querySelectorAll('[data-choice-id][role="radio"]')];
+    const short = options.find((option) => /needs 5/.test(option.textContent));
+    const claimed = options.find((option) => option.textContent.includes('copper stock'));
+    assert.equal(claimed.disabled, true, 'the fixed group claims both copper');
+    assert.equal(short.disabled, false, 'three iron against five is offered, not locked');
+    const reading = mounted.target.querySelector(`[id="${short.getAttribute('aria-describedby')}"]`);
+    assert.match(reading.textContent, /3 held · needs 5/);
+    short.click();
+    await settleAction();
+    const overrides =
+      mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan
+        .ingredientOptionOverrides;
+    assert.equal(overrides.choice.optionIndex, 0, 'pressing the short candidate selects it');
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
+    assert.equal(begin().disabled, true, 'a short stack never readies the run');
+  });
+
+  it('measures each candidate against what the stage can fund, so a short fixed group locks none', async () => {
+    const set = ingredientSet('remainder', [
+      {
+        id: 'choice',
+        options: [componentOption('iron', 'iron', 1), componentOption('steel', 'steel', 1)],
+      },
+      { id: 'fuel', options: [componentOption('coal', 'coal', 2)] },
+    ]);
+    const fixture = selectionFixture([set], {
+      selectedIngredientSetId: set.id,
+      ingredientOptionOverrides: { choice: { optionIndex: 0 } },
+    });
+    fixture.builderOptions.actor = { ...ACTOR, items: [item('iron-a', 'iron', 5)] };
+    const mounted = await mountState('ready-single', fixture);
+    const begin = () => mounted.target.querySelector('[data-run-action="begin"]');
+    assert.equal(begin().disabled, true, 'no coal is held, so the stage cannot begin');
+    mounted.target.querySelector(':scope [data-slot-id="choice"] button').click();
+    await settleAction();
+    const options = [...mounted.target.querySelectorAll('[data-choice-id][role="radio"]')];
+    const iron = options.find((option) => option.textContent.includes('iron stock'));
+    const steel = options.find((option) => option.textContent.includes('steel'));
+    const unavailable = localizedLabel('FABRICATE.App.Journal.Stage.CandidateUnavailable');
+    assert.equal(iron.disabled, false, 'held in full and claimed by nothing the stage can fund');
+    assert.match(iron.textContent, /5 held · needs 1 · 5 spare/);
+    assert.ok(!iron.textContent.includes(unavailable) && !iron.hasAttribute('title'));
+    assert.ok(!iron.hasAttribute('aria-describedby'), 'a met candidate is not described as refused');
+    assert.equal(steel.disabled, false, 'an unheld option is short, never locked');
+    assert.ok(steel.classList.contains('is-short'));
+    const reading = mounted.target.querySelector(`[id="${steel.getAttribute('aria-describedby')}"]`);
+    assert.equal(reading.textContent, `0 held · needs 1 · 0 spare · ${unavailable}`);
+    assert.equal(steel.getAttribute('title'), unavailable);
+    steel.click();
+    await settleAction();
+    const overrides =
+      mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan
+        .ingredientOptionOverrides;
+    assert.deepEqual(overrides.choice, { optionIndex: 1 }, 'the unheld option is chosen by index');
+    assert.equal(begin().disabled, true);
+  });
+
+  it('keeps the list open on an arrow choice and closes it onto the slot tile on activation', async () => {
+    const mounted = await mountState('waiting-open-choice');
+    // Chromium drops focus to the body the moment a focused control is disabled, as each one is
+    // while the choice's command is pending. happy-dom does not, so the drop is played here;
+    // focus-when-enabled-rendered.test.js proves the browser half.
+    const chromiumBlur = new globalThis.window.MutationObserver((records) => {
+      for (const { target } of records) {
+        if (target.disabled && globalThis.document.activeElement === target) {
+          globalThis.document.body.focus();
+        }
+      }
+    });
+    chromiumBlur.observe(mounted.target, { attributes: true, attributeFilter: ['disabled'], subtree: true });
+    const press = (element, key) =>
+      element.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key, bubbles: true }));
+    const pending = async () => {
+      flushSync();
+      await Promise.resolve();
+      return [Boolean(mounted.store.busyRunKey), globalThis.document.activeElement?.tagName];
+    };
+    const tile = () => mounted.target.querySelector(':scope [data-slot-id="metal"] button');
+    const list = () =>
+      mounted.target.querySelector(':scope [data-slot-row] [data-choice-options="metal"]');
+    try {
+      tile().click();
+      flushSync();
+      const radios = [...list().querySelectorAll('[role="radio"]:not(:disabled)')];
+      assert.ok(radios.length > 1, 'the open slot offers more than one candidate');
+      const start = radios.find((radio) => radio.tabIndex === 0);
+      start.focus();
+      press(start, 'ArrowRight');
+      assert.deepEqual(await pending(), [true, 'BODY'], 'the pending command drops focus');
+      await settleAction();
+      assert.ok(list(), 'an arrow choice leaves the list open');
+      const focused = globalThis.document.activeElement;
+      assert.ok(focused !== start && list().contains(focused), 'focus returns to the next candidate');
+      assert.equal(focused.getAttribute('aria-checked'), 'true', 'and that candidate is checked');
+      press(focused, 'Enter');
+      assert.deepEqual(await pending(), [true, 'BODY']);
+      await settleAction();
+      assert.ok(!list(), 'activation closes the list');
+      assert.ok(globalThis.document.activeElement === tile(), 'focus returns to the slot tile');
+    } finally {
+      chromiumBlur.disconnect();
+    }
   });
 
   it('states confirmed receipt rows, uncertainty and unstarted effects with strict redaction', async () => {
@@ -2129,7 +2259,10 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.doesNotMatch(slot.textContent, /iron stock/);
     slot.querySelector('button').click();
     flushSync();
-    assert.ok(!mounted.target.querySelector('[data-choice-id][aria-pressed="true"]'));
+    const checked = () =>
+      [...mounted.target.querySelectorAll('[data-choice-id][role="radio"][aria-checked="true"]')];
+    assert.ok(mounted.target.querySelectorAll('[data-choice-id][role="radio"]').length > 0);
+    assert.equal(checked().length, 0, 'the missing held item checks no candidate');
     const iron = [...mounted.target.querySelectorAll('[data-choice-id]')].find((entry) =>
       entry.textContent.includes('iron stock')
     );
@@ -2139,6 +2272,13 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(
       mounted.commands.at(-1).payload.selectionPlan.ingredientOptionOverrides.metal.heldItemId,
       'Item.iron-a'
+    );
+    mounted.target.querySelector(':scope [data-slot-id="metal"] button').click();
+    flushSync();
+    assert.deepEqual(
+      checked().map((radio) => radio.textContent.includes('iron stock')),
+      [true],
+      'the explicit replacement is the one checked candidate'
     );
   });
 

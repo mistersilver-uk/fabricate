@@ -998,7 +998,7 @@
           "AlternativesTitle": "Alternatives",
           "ChooseStackTitle": "Which {name} to use",
           "ChooseOption": "Choose {name}",
-          "ChooseShortOption": "Choose {name}: you have {have}, and this needs {need}.",
+          "StackReading": "{have} held · needs {need}",
           "OptionSelected": "Selected",
           "CurrencyCost": "{amount} {unit}",
           "CurrencyUnaffordable": "Not enough {unit}",

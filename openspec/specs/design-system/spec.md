@@ -2050,7 +2050,7 @@ The trail is a `nav` named "Breadcrumbs"; a crumb with `onSelect` is a button ca
 `PageHeader` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
 At issue 1777 its callers kept the manager's shipped header geometry, which disagreed with the specimen, and decision E4 escalated that disagreement to issue 1523 rather than settling it.
 
-The manager sidebar, except its Downtime group until that group converts, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
+The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
 Neither writes nav row, group or tab markup of its own, and the sidebar root carries `fabricate-nav`.
 `NavSidebar` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
 At issue 1777 both callers kept their shipped geometry, which disagreed with the specimen, and the convergence belongs to issue 1523.
@@ -2260,6 +2260,8 @@ Past and future `StageCard` presentations MUST be inert; browsing them MUST NOT 
 Crafting's essence pool MUST compose `EssencePool` through its adapter; its opt-in `capAtHeld` caps each carrier at its held count instead of freezing increments once every threshold is met, and per-item `props` and `inputProps` carry a caller's hooks onto the threshold, the carrier row and its input.
 Repeated thresholds for the same essence MUST sum their required amounts before comparing the shared contribution and render one keyed pool, so Fire 2 plus Fire 2 requires four Fire rather than counting the same two Fire twice.
 `ChoiceOptionList` MUST use each option's own `needed` amount when provided, falling back to the slot-level amount only for uniform-quantity callers.
+`ChoiceOptionList` MUST be one single-select `radiogroup` of `radio` candidates with one tab stop, whose arrow, Home and End keys move focus and the choice together past any disabled candidate.
+It MUST disable a candidate only when it is held but the stage claims it elsewhere, or while its caller refuses it, such as a pending selection command; a candidate held short of the need MUST stay pressable, dimmed and described by its reading.
 `SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.
 `SlotTile` has a `partial` face: a `--fab-warning-border` hairline, its pip on solid `--fab-warning` inked `--fab-bg-0`, and `--fab-warning-text` caption ink.
 `SlotRow` and `RequirementChooser` MUST paint a partly delivered essence with that face, never the `short` one, even while its group is still reported missing; an unchosen choice slot keeps the `open` face.
@@ -2280,6 +2282,12 @@ An explicitly recorded `cleared` boolean MUST govern historical row outcomes, pr
 Its band is optional, and a tier with no band MUST draw no chip.
 Each tier, its band chip, its pill and each yield MUST pass a caller's per-item `props` through as hooks.
 Crafting's routed-by-check tiers and salvage's routed body compose `OutcomeLadder`.
+
+#### Scenario: A player chooses a candidate from the keyboard
+
+- **WHEN** a slot's candidates include one the stage claims elsewhere and one held short of the need
+- **THEN** the claimed one is disabled and the short one is offered, dimmed and described by its reading
+- **AND** the arrow keys move focus and the choice together, passing over the disabled candidate
 
 #### Scenario: A player views another stage while allocating materials
 

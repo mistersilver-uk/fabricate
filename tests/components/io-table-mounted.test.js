@@ -445,7 +445,8 @@ describe('IoTable mounted behavior', () => {
     const [oak, bog] = target.querySelectorAll(':scope [data-alt-kind="stack"] [role="radio"]');
     assert.ok(!oak.classList.contains('is-short'), 'twelve held against a need of two');
     assert.ok(bog.classList.contains('is-short'), 'one held against a need of two');
-    assert.match(bog.getAttribute('aria-label'), /"have":1.*"need":2/);
+    const reading = target.querySelector(`[id="${bog.getAttribute('aria-describedby')}"]`);
+    assert.match(reading.textContent, /"have":1.*"need":2/);
   });
 
   it('opens the pool for an essence slot only, never beside a plain choice', async () => {

@@ -157,10 +157,10 @@
             art: option?.img ?? '',
             icon: option?.icon ?? 'fas fa-circle',
             tint: tintOf(option?.colorToken),
-            disabled: option?.available !== true,
+            unavailable: option?.available !== true,
             needed: Number(option?.need) || 1,
             claimed: 0,
-            held: option?.available === true ? Number(option?.need) || 1 : 0,
+            held: Math.max(0, Number(option?.held) || 0),
             optionIndex: Number(option?.index) || 0,
             heldItemId: null,
           },
@@ -172,7 +172,7 @@
         art: item?.img ?? option?.img ?? '',
         icon: option?.icon ?? 'fas fa-circle',
         tint: tintOf(option?.colorToken),
-        disabled: option?.available !== true || item?.available !== true,
+        unavailable: option?.available !== true || item?.available !== true,
         needed: Number(option?.need) || 1,
         claimed: Math.max(0, Number(item?.claimed) || 0),
         held: Math.max(0, Number(item?.held) || 0),
@@ -209,13 +209,13 @@
     requirements.map((requirement, requirementIndex) => {
       const groupId = String(requirement?.groupId ?? `requirement-${requirementIndex}`);
       const options = choiceOptions(groupId, requirement?.option);
+      // ChoiceOptionList locks stock held in full yet claimed elsewhere; a pending command, all.
       const candidates = candidateRows(groupId, options).map((candidate) => ({
         ...candidate,
-        unavailable: candidate.disabled,
-        reason: candidate.disabled
+        reason: candidate.unavailable
           ? localize('FABRICATE.App.Journal.Stage.CandidateUnavailable')
           : '',
-        disabled: busy || candidate.disabled,
+        disabled: busy,
       }));
       const selected = selectedCandidate(requirement, candidates);
       const needed = Math.max(1, Number(requirement?.option?.need) || 1);

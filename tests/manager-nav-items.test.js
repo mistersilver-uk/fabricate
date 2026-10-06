@@ -15,7 +15,6 @@ import {
   managerDowntimeNavGroup,
   managerSystemNavItems,
   managerWorldNavItems,
-  navRowClass,
 } from '../src/ui/svelte/apps/manager/managerNavItems.js';
 
 import { shippedString } from './helpers/manager/managerLocalization.js';
@@ -285,16 +284,10 @@ describe('the crafting-system section', () => {
     for (const id of ['crafting', 'gathering']) {
       const { parent } = byId(onRoute, id);
       assert.equal(parent.current, 'page', `${id} is the current page`);
-      assert.equal(parent.active, undefined, `${id} never wears the selected pill`);
-      assert.equal(
-        navRowClass('manager-nav-button manager-nav-parent', parent),
-        'manager-nav-button manager-nav-parent'
-      );
+      assert.ok(!('active' in parent), `${id} never wears the selected pill`);
     }
     const checks = byId(onRoute, 'checks').parent;
     assert.equal(checks.active, true, 'Checks wears it, being a route of its own');
-    assert.equal(navRowClass('base', checks), 'base is-active');
-    assert.equal(navRowClass('base', { active: false }), 'base ');
   });
 
   it('marks exactly the row the GM stands on as current', () => {
@@ -557,13 +550,14 @@ describe('the Downtime group', () => {
     assert.equal(group.parent.title, 'Unlock Downtime Studio with Fabricate Premium');
     assert.equal(group.parent.ariaLabel, 'Downtime');
     for (const child of group.children) {
-      assert.deepEqual(child.markers, [
-        { kind: 'lock', hooks: { 'data-world-downtime-lock': '' } },
-      ]);
+      assert.deepEqual(child.markers, [], 'the padlock is not a mark');
+      assert.equal(child.tierGated, true, 'it is the tier gate, drawn by the row');
+      assert.deepEqual(child.lockHooks, { 'data-world-downtime-lock': '' });
       assert.equal(child.ariaLabel, undefined, 'Core’s own tab is named by its label');
       assert.equal(child.ariaDescribedBy, undefined);
     }
     assert.equal(group.callout.kicker, 'PREMIUM PREVIEW');
+    assert.deepEqual(group.callout.hooks, { 'data-world-downtime-callout': '' });
   });
 
   it('mutes the chip for a companion, and hangs each badge on its tab as a description', () => {
@@ -580,6 +574,10 @@ describe('the Downtime group', () => {
     });
     assert.equal(group.parent.title, 'Downtime Studio is unlocked by Fabricate Premium');
     assert.equal(group.callout, null, 'nothing is locked, so there is nothing to sell');
+    assert.ok(
+      group.children.every((child) => child.tierGated === false),
+      'and no padlock'
+    );
     const [tracking] = group.children;
     assert.deepEqual(tracking.markers, [
       {
@@ -680,6 +678,18 @@ describe('the Downtime group', () => {
       ['openWorldDowntime', 'click'],
       ['openWorldDowntimePreview', 'tracking'],
     ]);
+  });
+
+  it('reveals the tab on screen only while the rail is locked open with the group expanded', () => {
+    const revealed = (rail) =>
+      managerDowntimeNavGroup(
+        downtimeProps({ ...PROVIDER, navRail: rail, worldDowntimeTabId: 'factions' }),
+        text
+      ).children.map((child) => child.reveal);
+    const expanded = { worldDowntime: true };
+    assert.deepEqual(revealed({ ...navRail({ expanded }), railLockedOpen: true }), [false, true]);
+    assert.deepEqual(revealed({ ...navRail({ expanded }), railLockedOpen: false }), [false, false]);
+    assert.deepEqual(revealed({ ...navRail(), railLockedOpen: true }), [false, false]);
   });
 });
 

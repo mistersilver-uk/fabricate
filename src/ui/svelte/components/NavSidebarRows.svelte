@@ -9,26 +9,36 @@
   | `entries` | model rows and `kind: 'group'` groups | `[]` | rendered in order |
   | `itemClass` | class string | `''` | appended to every top-level row and group parent |
   | `groupClasses` | `{[groupId]: class}` | `{}` | one group's own class beside `manager-nav-group` |
+  | `childClasses` | `{[groupId]: class}` | `{}` | appended to every child row of that group |
 
   Invariants:
   - A row with no `active` carries exactly its base class; a disabled row or locked chevron is
     described by a visually hidden reason — pinned by `tests/components/nav-sidebar-mounted.test.js`.
+  - A `tierGated` row draws the premium padlock after its marks, hidden from assistive technology;
+    a `reveal` row scrolls itself into view, once each time it starts revealing (issue 1213).
 -->
 <script>
-  let { entries = [], itemClass = '', groupClasses = {} } = $props();
+  let { entries = [], itemClass = '', groupClasses = {}, childClasses = {} } = $props();
 
-  function rowClass(base, item) {
-    return item.active === undefined ? base : `${base} ${item.active ? 'is-active' : ''}`;
+  // `base`, the caller's `extra` class, then the pill slot a row with no `active` does not carry.
+  function rowClass(base, extra, item) {
+    const classes = extra ? `${base} ${extra}` : base;
+    return item.active === undefined ? classes : `${classes} ${item.active ? 'is-active' : ''}`;
   }
 
   const reasonId = (domId) => `${domId}-reason`;
-  const leafClass = $derived(itemClass ? ` ${itemClass}` : '');
+
+  // A stable function, so a row that stays revealed across re-renders is not scrolled again.
+  function revealRow(node) {
+    // happy-dom does not implement it, hence the optional call.
+    node.scrollIntoView?.({ block: 'nearest' });
+  }
 </script>
 
-{#snippet row(item, base, expanded)}
+{#snippet row(item, base, extra, expanded)}
   <button
     type="button"
-    class={rowClass(base, item)}
+    class={rowClass(base, extra, item)}
     data-keyboard-focus="true"
     id={item.domId}
     {...item.hooks}
@@ -38,12 +48,13 @@
     aria-controls={item.controls}
     aria-expanded={expanded}
     aria-disabled={item.disabled ? 'true' : undefined}
-    aria-describedby={item.disabledReason ? reasonId(item.domId) : undefined}
+    aria-describedby={item.disabledReason ? reasonId(item.domId) : item.ariaDescribedBy}
     disabled={item.disabled}
     onclick={item.onSelect}
+    {@attach item.reveal && revealRow}
   >
     <i class={item.icon} aria-hidden="true"></i>
-    <span class="manager-nav-label">{item.label}</span>
+    <span class="manager-nav-label" id={item.labelId}>{item.label}</span>
     <!-- A record count, an issue badge naming its unit and an unsaved marker of its own shape stay
          distinguishable; "Soon" is a word, not a count (issue 1515). -->
     {#each item.markers as marker (marker.kind)}
@@ -53,13 +64,28 @@
         <span class="manager-nav-dirty-marker" {...marker.hooks} role="img" aria-label={marker.name}
         ></span>
       {:else if marker.kind === 'issues'}
-        <span class="manager-nav-issue-badge" {...marker.hooks} role="img" aria-label={marker.name}
-          >{marker.count}</span
+        <span
+          class="manager-nav-issue-badge"
+          {...marker.hooks}
+          id={marker.domId}
+          role="img"
+          aria-label={marker.name}>{marker.count}</span
         >
       {:else if marker.kind === 'planned'}
         <span class="manager-nav-planned">{marker.text}</span>
+      {:else if marker.kind === 'premium'}
+        <!-- The chip is muted, never removed, once a companion holds the surface (issue 1185). -->
+        <span
+          class={`manager-nav-premium ${marker.installed ? 'is-installed' : ''}`}
+          {...marker.hooks}>{marker.text}</span
+        >
       {/if}
     {/each}
+    {#if item.tierGated}
+      <span class="manager-nav-lock" {...item.lockHooks}
+        ><i class="fas fa-lock" aria-hidden="true"></i></span
+      >
+    {/if}
   </button>
   {#if item.disabledReason}
     <span class="visually-hidden" id={reasonId(item.domId)}>{item.disabledReason}</span>
@@ -75,7 +101,8 @@
     >
       {@render row(
         entry.parent,
-        `manager-nav-button manager-nav-parent${leafClass}`,
+        'manager-nav-button manager-nav-parent',
+        itemClass,
         entry.expanded
       )}
       <button
@@ -107,12 +134,21 @@
           aria-label={entry.submenu.label}
         >
           {#each entry.children as child (child.id)}
-            {@render row(child, 'manager-nav-subitem')}
+            {@render row(child, 'manager-nav-subitem', childClasses[entry.id])}
           {/each}
         </div>
+        {#if entry.callout}
+          <p class="manager-nav-callout" {...entry.callout.hooks}>
+            <span class="manager-nav-callout-kicker">
+              <i class="fas fa-lock" aria-hidden="true"></i>
+              {entry.callout.kicker}
+            </span>
+            {entry.callout.note}
+          </p>
+        {/if}
       {/if}
     </div>
   {:else}
-    {@render row(entry, `manager-nav-button${leafClass}`)}
+    {@render row(entry, 'manager-nav-button', itemClass)}
   {/if}
 {/each}

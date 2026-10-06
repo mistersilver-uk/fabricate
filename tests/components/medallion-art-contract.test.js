@@ -22,11 +22,12 @@ const ART_RESOLVER = 'resolveCraftingArt(';
 // contents tab's linked-recipe row -1, its members now `SetPicker` tokens. Issue 1644: the crafting
 // pool's carrier tile -1, now the shared EssencePool's source tile; the routed salvage result
 // pill -1, now the shared ladder's `ListRow`; the gathering drop row's tile -1, its drops now the
-// shared YieldScale's rows.
-const MEDALLION_SITES = 73;
+// shared YieldScale's rows; the held-stack picker's tile -1, its stacks now the shared
+// ChoiceOptionList's one site.
+const MEDALLION_SITES = 72;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 56;
+const ART_BEARING_SITES = 55;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>
