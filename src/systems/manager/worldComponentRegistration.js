@@ -4,25 +4,17 @@
  * § Component scope requirement 6. */
 import { isGeneralComponentCategory } from '../../utils/componentCategories.js';
 import { arrayOrEmpty, trimString } from '../../utils/scalars.js';
-import { getItemMatchUuids } from '../../utils/sourceReferenceUnion.js';
+import { getItemMatchUuids, sourceReferenceKey } from '../../utils/sourceReferenceUnion.js';
 import { componentEssenceMapsEqual, normalizeComponentEssenceMap } from '../componentScope.js';
 import { membershipKey } from '../scopedDefinitions.js';
 import { identityOf } from '../worldScopeEntityGrouping.js';
 
-/** A source reference's match key: a pack Item's uuid without its document-type segment, so the
- * type-less spelling earlier bulk imports stored matches the document's own. */
-function sourceKey(reference) {
-  const parts = reference.split('.');
-  const packItem = parts.length === 5 && parts[0] === 'Compendium' && parts[3] === 'Item';
-  return packItem ? `Compendium.${parts[1]}.${parts[2]}.${parts[4]}` : reference;
-}
-
 function sourceKeys(record) {
-  return new Set(getItemMatchUuids(record).map(sourceKey));
+  return new Set(getItemMatchUuids(record).map(sourceReferenceKey));
 }
 
 function sharesSource(record, keys) {
-  return getItemMatchUuids(record).some((reference) => keys.has(sourceKey(reference)));
+  return getItemMatchUuids(record).some((reference) => keys.has(sourceReferenceKey(reference)));
 }
 
 function rowById(rows, id) {

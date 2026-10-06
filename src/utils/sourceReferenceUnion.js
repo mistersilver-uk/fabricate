@@ -12,6 +12,14 @@ export function pushUniqueReference(target, value) {
   target.push(trimmed);
 }
 
+/** A source reference's match key: a pack Item's uuid without its document-type segment, so the
+ * type-less spelling an older import or a legacy drop payload stored matches the document's own. */
+export function sourceReferenceKey(reference) {
+  const parts = reference.split('.');
+  const packItem = parts.length === 5 && parts[0] === 'Compendium' && parts[3] === 'Item';
+  return packItem ? `Compendium.${parts[1]}.${parts[2]}.${parts[4]}` : reference;
+}
+
 /** Collect every UUID reference a registered ENTRY can use for runtime matching. */
 export function getItemMatchUuids(entry) {
   const refs = [];
