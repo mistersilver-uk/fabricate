@@ -357,6 +357,16 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
 ]);
 
+// The gathering find section (issue 1644): the shared scale, its rows, the one disclosure beneath
+// them and the per-drop breakdown it opens.
+export const GATHERING_DROPS_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/ListRow.svelte',
+  'src/ui/svelte/components/YieldScale.svelte',
+  'src/ui/svelte/components/RowDisclosure.svelte',
+  'src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte',
+  'src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte',
+]);
+
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
 /** `src/systems/checkTarget.js` and its import closure. */
 export const CHECK_TARGET_RAW_MODULES = Object.freeze([

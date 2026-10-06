@@ -692,6 +692,8 @@ export const CASES = Object.freeze([
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-ridgemoss"] .gathering-task-summary' },
     ],
+    // Issue 1644: the find section states its one drop on the shared yield scale.
+    expectSelector: '[data-gathering-drops-state="ready"] [data-yield-scale] [data-yield-entry]',
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
   }),
@@ -731,21 +733,23 @@ export const CASES = Object.freeze([
   playerCase({
     id: 'player-gathering-drop-open',
     label: 'Player app — Gathering drop modifiers open',
-    // The only state that draws the repaired drop disclosure (issue 1512), on the world's five-row
-    // drop table, so one open row's breakdown shows against four collapsed siblings.
+    // The only state that draws the opened breakdown (issue 1644): the world's five-row drop table,
+    // authored with coal last although its chance is second, so the scale shows authored order.
     reaches: 'beyond',
     smokeLabels: [],
     query: { tab: 'gathering' },
     steps: [
       { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
       { selector: '.gathering-task-row[data-task-id="sm-task-prospect"] .gathering-task-summary' },
-      { selector: ':nth-match(.gathering-task-drop-summary, 1)', scroll: true },
+      { selector: '[data-gathering-drops-disclosure]', scroll: true },
       // A scroll step short-circuits before the driver's activation branch, so opening is its own.
-      { selector: ':nth-match(.gathering-task-drop-summary, 1)', press: 'Enter' },
+      { selector: '[data-gathering-drops-disclosure]', press: 'Enter' },
+      { selector: ':nth-match([data-gathering-drop-modifiers], 1)', scroll: true },
     ],
-    // The open row and the region it names, so a header that only flipped its attribute fails.
+    // The open disclosure and the breakdowns it names, so a toggle that only flipped its state fails.
     expectSelector:
-      '.gathering-task-drop:has(.gathering-task-drop-summary[aria-expanded="true"][aria-controls])' +
+      '[data-gathering-drops]' +
+      ':has([data-gathering-drops-disclosure][aria-expanded="true"][aria-controls])' +
       ' [data-gathering-drop-modifiers]',
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],

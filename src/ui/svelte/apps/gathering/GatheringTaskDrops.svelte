@@ -1,11 +1,12 @@
 <!-- Svelte 5 runes mode -->
 <!--
   GatheringTaskDrops renders the right-column "What you might find" section for
-  the selected task. It lists each possible drop with its (modifier-adjusted)
-  chance as a mini bar with the percent in-line at the end, hint text explaining
-  how finds are awarded and how events impact results, and an expandable
-  "Modifiers" body per drop that breaks the chance down into base + weather +
-  time-of-day + biome + per-character-ability contributions.
+  the selected task: the award-mode and event hints, the drops as one shared
+  `YieldScale` in AUTHORED row order (issue 1644), and one `RowDisclosure` beneath
+  the scale that opens every drop's modifier breakdown, each headed by its drop.
+
+  Authored order, never chance order: every award mode selects by authored rank, so a
+  re-sort would misstate which find a single award goes to. Each chance is the row's figure.
 
   Data comes from `services.getGatheringDropBreakdown` (resolved lazily by the
   parent for the selected task); `breakdown` is
@@ -19,11 +20,10 @@
   parent now passes `error` and this section says so, at `data-gathering-drops-state="error"`.
 -->
 <script>
-  import FillBar from '../../components/FillBar.svelte';
   import Kicker from '../../components/Kicker.svelte';
-  import Medallion from '../../components/Medallion.svelte';
   import Notice from '../../components/Notice.svelte';
-  import { disclosurePhraseKey } from '../../util/disclosurePhrase.js';
+  import RowDisclosure from '../../components/RowDisclosure.svelte';
+  import YieldScale from '../../components/YieldScale.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { toPercent as pct } from '../../util/gatheringFormat.js';
   import GatheringDropModifiers from './GatheringDropModifiers.svelte';
@@ -32,9 +32,26 @@
 
   /** The drop tile's stand-in when a drop record carries no artwork of its own. */
   const DEFAULT_DROP_IMG = 'icons/svg/item-bag.svg';
+  /** A drop the world left nameless still has to be named, so the row names the kind. */
+  const NAMELESS_DROP = 'FABRICATE.Labels.UnknownComponent';
 
   const drops = $derived(Array.isArray(breakdown?.drops) ? breakdown.drops : []);
   const hasDrops = $derived(drops.length > 0);
+  const entries = $derived(
+    drops.map((drop, index) => ({
+      id: String(drop.id ?? index),
+      name: drop.name || localize(NAMELESS_DROP),
+      art: drop.img || DEFAULT_DROP_IMG,
+      qty: Number(drop.quantity) || 1,
+      chance: pct(drop.finalChance),
+      drop,
+    }))
+  );
+  // No threshold sentence: the dense row draws it inline, which in this column wraps every name.
+  const scaleLabels = {
+    quantity: (entry) => localize('FABRICATE.App.Gathering.Detail.DropQuantity', { x: entry.qty }),
+    chance: (entry) => `${entry.chance}%`,
+  };
 
   const awardHint = $derived.by(() => {
     switch (breakdown?.awardMode) {
@@ -58,19 +75,10 @@
         : ''
   );
 
-  let expandedIds = $state(new Set());
-  function toggle(id) {
-    // Copy-then-reassign: the reactive unit is `expandedIds`, not the Set. A plain Set
-    // that is never mutated after assignment is correct here; SvelteSet is not needed.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const next = new Set(expandedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    expandedIds = next;
-  }
-
-  /** A drop the world left nameless still has to be announced, so the phrase names the kind. */
-  const NAMELESS_DROP = 'FABRICATE.Labels.UnknownComponent';
+  const breakdownLabel = localize('FABRICATE.App.Gathering.Detail.ChanceBreakdown');
+  const instanceId = $props.id();
+  const regionId = `fab-drop-breakdown-${instanceId}`;
+  let breakdownOpen = $state(false);
 </script>
 
 {#if loading}
@@ -112,64 +120,28 @@
       </ul>
     {/if}
 
-    <ul class="gathering-task-drops-list">
-      {#each drops as drop, index (drop.id ?? index)}
-        {@const key = drop.id ?? index}
-        {@const isOpen = expandedIds.has(key)}
-        {@const bodyId = `fab-drop-modifiers-${key}`}
-        {@const phraseName = drop.name || localize(NAMELESS_DROP)}
-        <li class="gathering-task-drop" data-gathering-drop data-drop-id={drop.id ?? ''}>
-          <!-- The whole summary is the disclosure and therefore the button, not a focusable
-               `div role="button"` Foundry's `KeyboardManager#hasFocus` cannot see (issue 1512).
-               The name is this header's own copy plus the hidden phrase; `aria-controls` is emitted
-               only while the body it names is mounted. -->
-          <button
-            type="button"
-            data-keyboard-focus="true"
-            class="gathering-task-drop-summary"
-            aria-expanded={isOpen}
-            aria-controls={isOpen ? bodyId : undefined}
-            onclick={() => toggle(key)}
-          >
-            <Medallion art={drop.img || DEFAULT_DROP_IMG} alt="" size={36} />
-            <span class="gathering-task-drop-copy">
-              <span class="gathering-task-drop-name" title={drop.name}>
-                {drop.name}
-                {#if Number(drop.quantity) > 1}
-                  <span class="gathering-task-drop-qty"
-                    >{localize('FABRICATE.App.Gathering.Detail.DropQuantity', {
-                      x: Number(drop.quantity),
-                    })}</span
-                  >
-                {/if}
-              </span>
-              <!-- No `role="meter"` in here: ARIA makes a button's children presentational, so the
-                   role is stripped and the figure and the phrase carry the chance (issue 1512). -->
-              <span
-                class="gathering-task-drop-chance"
-                data-gathering-drop-value={pct(drop.finalChance)}
-              >
-                <FillBar value={pct(drop.finalChance)} density="compact" />
-                <span class="gathering-task-drop-percent">{pct(drop.finalChance)}%</span>
-              </span>
-            </span>
-            <span class="gathering-task-drop-chevron" aria-hidden="true">
-              <i class={`fas ${isOpen ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
-            </span>
-            <span class="visually-hidden"
-              >{localize(disclosurePhraseKey(isOpen), { name: phraseName })}
-              {localize('FABRICATE.App.Gathering.Detail.FindChance', {
-                x: pct(drop.finalChance),
-              })}</span
-            >
-          </button>
+    <YieldScale {entries} order="authored" labels={scaleLabels} />
 
-          {#if isOpen}
-            <GatheringDropModifiers {drop} {bodyId} />
-          {/if}
-        </li>
-      {/each}
-    </ul>
+    <!-- ONE labelled row whose chevron sits BESIDE the label, never inside a button (issue 1644). -->
+    <div class="gathering-task-drops-breakdown" data-gathering-drops-breakdown>
+      <span class="gathering-task-drops-breakdown-label" data-gathering-drops-breakdown-label
+        >{breakdownLabel}</span
+      >
+      <RowDisclosure
+        expanded={breakdownOpen}
+        controls={breakdownOpen ? regionId : ''}
+        ariaLabel={breakdownLabel}
+        data-gathering-drops-disclosure
+        onToggle={(next) => (breakdownOpen = next)}
+      />
+    </div>
+    {#if breakdownOpen}
+      <div class="gathering-task-drops-breakdown-region" id={regionId}>
+        {#each entries as entry (entry.id)}
+          <GatheringDropModifiers drop={entry.drop} name={entry.name} />
+        {/each}
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -214,88 +186,21 @@
     font-size: 10px;
   }
 
-  .gathering-task-drops-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-  }
-
-  .gathering-task-drop {
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface-soft);
-    overflow: hidden;
-  }
-
-  /* A `<button>` since issue 1512, so core's `button` reset is neutralised: it pins a height, a
-     border, a fill and a centred content box. `height: auto` keeps the medallion's own box. */
-  .gathering-task-drop-summary {
-    appearance: none;
-    -webkit-appearance: none;
+  .gathering-task-drops-breakdown {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: space-between;
     gap: var(--fab-space-2);
-    width: 100%;
-    min-width: 0;
-    height: auto;
-    padding: var(--fab-space-2);
-    border: 0;
-    text-align: left;
-    cursor: pointer;
-    color: inherit;
-    background: transparent;
-    font: inherit;
-    text-rendering: inherit;
   }
 
-  .gathering-task-drop-summary:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: -2px;
-  }
-
-  .gathering-task-drop-copy {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .gathering-task-drop-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
-    font-size: 13px;
-  }
-
-  .gathering-task-drop-qty {
+  .gathering-task-drops-breakdown-label {
     color: var(--fab-text-muted);
-    font-weight: 500;
-  }
-
-  .gathering-task-drop-chance {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .gathering-task-drop-percent {
-    flex: 0 0 auto;
     font-size: 12px;
     font-weight: 600;
-    color: var(--fab-text);
   }
 
-  .gathering-task-drop-chevron {
-    flex: 0 0 auto;
-    width: 18px;
-    text-align: center;
-    color: var(--fab-text-muted);
+  .gathering-task-drops-breakdown-region {
+    display: flex;
+    flex-direction: column;
   }
 </style>

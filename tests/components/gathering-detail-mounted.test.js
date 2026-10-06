@@ -12,6 +12,7 @@ import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 import {
   ADDITIONAL_DICE_NOTICE_RAW_MODULES,
   CHECK_TARGET_RAW_MODULES,
+  GATHERING_DROPS_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
@@ -21,7 +22,6 @@ import {
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
 import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
-import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -102,6 +102,29 @@ function dropBreakdown() {
           character: [{ label: 'Dexterity', icon: 'fas fa-user', contribution: 8 }],
         },
       },
+    ],
+  };
+}
+
+/** Authored rarest-first, so authored order and chance order disagree on every row. */
+function scrambledBreakdown(awardMode) {
+  const drop = (id, name, quantity, chance, modifiers = {}) => ({
+    id,
+    name,
+    quantity,
+    baseChance: chance,
+    finalChance: chance,
+    modifiers,
+  });
+  return {
+    successChance: 0.95,
+    awardMode,
+    awardLimit: 2,
+    eventPolicy: null,
+    drops: [
+      drop('d-rare', 'Starsilver', 1, 0.1),
+      drop('d-common', 'Slag', 3, 0.9),
+      drop('d-mid', 'Iron', 2, 0.45, { weather: { value: -5 } }),
     ],
   };
 }
@@ -386,8 +409,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
+    for (const dropsModule of GATHERING_DROPS_COMPILED_MODULES) writeCompiledSvelte(dropsModule);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     for (const primitive of PLAYER_APP_COMPILED_MODULES) writeCompiledSvelte(primitive);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
@@ -616,7 +638,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(!row.querySelector('[data-gathering-success-value]'), 'beneath the row, not in it');
   });
 
-  it('renders "What you might find" with per-drop mini bars, award/event hints, and expandable modifiers', async () => {
+  it('renders "What you might find" as one yield scale with its award and event hints', async () => {
     const { services, calls } = makeServices(listing([environment()]), dropBreakdown());
     await mountView(services);
     await settle();
@@ -641,98 +663,131 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(hints.textContent.includes('AwardModeAll'), 'award-mode hint shown');
     assert.ok(hints.textContent.includes('EventImpactSuccess'), 'event-impact hint shown');
 
-    const drop = section.querySelector('[data-gathering-drop]');
-    assert.ok(drop, 'a drop row renders');
+    const row = section.querySelector('[data-yield-scale] [data-yield-entry="d-ore"]');
+    assert.ok(Boolean(row), 'the drop is a scale row keyed by its drop id');
+    assert.equal(row.querySelector('.fabricate-list-row-name').textContent, 'Raw Ore');
     assert.equal(
-      drop.querySelector('[data-gathering-drop-value]').getAttribute('data-gathering-drop-value'),
-      '53'
+      row.querySelector('.fabricate-list-row-quantity').textContent,
+      'FABRICATE.App.Gathering.Detail.DropQuantity:{"x":2}'
     );
+    assert.equal(row.querySelector('.manager-chip').textContent.trim(), '53%', 'its chance figure');
+    assert.ok(!row.querySelector('.fabricate-list-row-detail'), 'and no inline sentence');
+    assert.ok(
+      !section.querySelector('[data-gathering-drop-modifiers]'),
+      'the breakdown stays closed until opened'
+    );
+  });
+
+  // Issue 1644: award modes select by AUTHORED rank, so the preview never re-sorts by chance.
+  for (const awardMode of ['allDrops', 'highestRankedDrop', 'limitedDrops']) {
+    it(`keeps the drops in authored row order under ${awardMode}, each chance its own figure`, async () => {
+      const { services } = makeServices(listing([environment()]), scrambledBreakdown(awardMode));
+      await mountView(services);
+      await settle();
+
+      const rows = [
+        ...target.querySelectorAll('[data-gathering-task-detail] [data-yield-entry]'),
+      ];
+      assert.deepEqual(
+        rows.map((row) => row.getAttribute('data-yield-entry')),
+        ['d-rare', 'd-common', 'd-mid'],
+        'authored order, which this fixture makes differ from chance order'
+      );
+      assert.deepEqual(
+        rows.map((row) => row.querySelector('.manager-chip').textContent.trim()),
+        ['10%', '90%', '45%']
+      );
+      assert.ok(!target.querySelector('[data-yield-cut]'), 'a preview draws no cut');
+    });
+  }
+
+  it('draws no control in the scale and one labelled disclosure beneath it for the breakdown', async () => {
+    const { services } = makeServices(
+      listing([environment()]),
+      scrambledBreakdown('highestRankedDrop')
+    );
+    await mountView(services);
+    await settle();
+
+    const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
+    const scale = section.querySelector('[data-yield-scale]');
+    assert.equal(scale.querySelectorAll('[data-yield-entry]').length, 3, 'every drop is drawn');
     assert.equal(
-      drop.querySelector('[data-gathering-drop-modifiers]'),
-      null,
-      'modifiers hidden until expanded'
+      scale.querySelectorAll('button, input, select, a, [role="button"], [tabindex]').length,
+      0,
+      'the scale is a record, with no control in it'
     );
 
-    drop.querySelector('.gathering-task-drop-summary').click();
+    const toggles = section.querySelectorAll('.fab-row-disclosure');
+    assert.equal(toggles.length, 1, 'one disclosure for the whole breakdown');
+    const toggle = toggles[0];
+    assert.equal(toggle.tagName, 'BUTTON');
+    assert.equal(toggle.getAttribute('data-keyboard-focus'), 'true');
+    assert.ok(toggle.hasAttribute('data-gathering-drops-disclosure'), 'its rest hook lands');
+    assert.ok(!toggle.parentElement.closest('button'), 'it is never inside another button');
+    const order = [...section.querySelectorAll('[data-yield-scale], .fab-row-disclosure')];
+    assert.ok(order[0] === scale && order[1] === toggle, 'it sits beneath the scale');
+    const label = toggle
+      .closest('[data-gathering-drops-breakdown]')
+      .querySelector('[data-gathering-drops-breakdown-label]');
+    assert.equal(label.textContent.trim(), 'FABRICATE.App.Gathering.Detail.ChanceBreakdown');
+    assert.equal(toggle.getAttribute('aria-label'), label.textContent.trim(), 'named for its row');
+    assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+    assert.ok(!toggle.hasAttribute('aria-controls'), 'a closed breakdown names no region');
+
+    toggle.click();
     flushSync();
-    const modifiers = drop.querySelector('[data-gathering-drop-modifiers]');
+    assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+    const region = target.querySelector(`[id="${toggle.getAttribute('aria-controls')}"]`);
+    assert.ok(Boolean(region), 'aria-controls resolves to the region it opened');
+    assert.ok(!scale.contains(region) && !toggle.contains(region), 'beside them, not inside');
+    const bodies = [...region.querySelectorAll('[data-gathering-drop-modifiers]')];
+    assert.deepEqual(
+      bodies.map((body) => body.querySelector('[data-gathering-drop-modifiers-name]').textContent),
+      ['Starsilver', 'Slag', 'Iron'],
+      'each breakdown is headed by its drop, in scale order'
+    );
+    assert.ok(Boolean(bodies[0].querySelector('[data-gathering-drop-no-modifiers]')));
+    assert.ok(bodies[2].textContent.includes('ModifierWeather') && bodies[2].textContent.includes('-5%'));
+
+    toggle.click();
+    flushSync();
+    assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+    assert.ok(!section.querySelector('[data-gathering-drop-modifiers]'), 'and it closes again');
+  });
+
+  it('lists each modifier of an opened breakdown, signed', async () => {
+    const { services } = makeServices(listing([environment()]), dropBreakdown());
+    await mountView(services);
+    await settle();
+
+    target.querySelector('[data-gathering-drops-disclosure]').click();
+    flushSync();
+    const modifiers = target.querySelector('[data-gathering-drop-modifiers]');
     assert.ok(modifiers, 'modifiers reveal on expand');
     assert.ok(modifiers.textContent.includes('Dexterity'), 'character ability contribution listed');
     assert.ok(modifiers.textContent.includes('ModifierWeather'), 'weather contribution listed');
     assert.ok(modifiers.textContent.includes('+10%'), 'weather delta shown signed');
   });
 
-  it('opens the drop row from its own header button, which names itself and resolves its region', async () => {
-    const { services } = makeServices(listing([environment()]), dropBreakdown());
-    await mountView(services);
-    await settle();
-
-    const row = target.querySelector('[data-gathering-task-detail] [data-gathering-drop]');
-    const header = row.querySelector('.gathering-task-drop-summary');
-    assertWholeHeaderDisclosure({
-      root: target,
-      header,
-      recordName: 'Raw Ore',
-      expanded: false,
-      chevronSelector: '.gathering-task-drop-chevron i',
-      site: 'the gathering drop row, collapsed',
-    });
-    // ARIA makes a button's children presentational, so the chance cannot be a meter in here: the
-    // figure is the header's own content and the phrase states what the figure is.
-    assert.ok(!header.querySelector('[role="meter"]'), 'no meter role survives inside the header');
-    assert.equal(
-      header.querySelector('[data-gathering-drop-value]').getAttribute('data-gathering-drop-value'),
-      '53',
-      'the chance value hook stays on the bar'
-    );
-    const dropPhrase = header.querySelector('.visually-hidden').textContent;
-    assert.ok(
-      dropPhrase.includes('FABRICATE.App.Gathering.Detail.FindChance') && dropPhrase.includes('53'),
-      'and the phrase carries the chance the stripped meter used to announce'
-    );
-
-    header.click();
-    flushSync();
-
-    const body = assertWholeHeaderDisclosure({
-      root: target,
-      header: row.querySelector('.gathering-task-drop-summary'),
-      recordName: 'Raw Ore',
-      expanded: true,
-      chevronSelector: '.gathering-task-drop-chevron i',
-      site: 'the gathering drop row, open',
-    });
-    assert.ok(
-      body.matches('[data-gathering-drop-modifiers]'),
-      'the region the header controls IS the modifiers body, not a wrapper around it'
-    );
-
-    row.querySelector('.gathering-task-drop-summary').click();
-    flushSync();
-    assertWholeHeaderDisclosure({
-      root: target,
-      header: row.querySelector('.gathering-task-drop-summary'),
-      recordName: 'Raw Ore',
-      expanded: false,
-      chevronSelector: '.gathering-task-drop-chevron i',
-      site: 'the gathering drop row, collapsed again',
-    });
-  });
-
-  it('names a nameless drop from the shared component fallback', async () => {
-    // The lab world holds drops with no name, and "Show details for " names nothing at all.
+  it('names a nameless drop from the shared component fallback, on its row and its breakdown', async () => {
+    // The lab world holds drops with no name, and a blank row names nothing at all.
     const breakdown = dropBreakdown();
     breakdown.drops[0].name = '';
     const { services } = makeServices(listing([environment()]), breakdown);
     await mountView(services);
     await settle();
 
-    const header = target.querySelector('[data-gathering-drop] .gathering-task-drop-summary');
-    assert.ok(
-      header
-        .querySelector('.visually-hidden')
-        .textContent.includes('FABRICATE.Labels.UnknownComponent'),
-      'the phrase falls back to the shared unknown-component name'
+    const row = target.querySelector('[data-yield-entry="d-ore"]');
+    assert.equal(
+      row.querySelector('.fabricate-list-row-name').textContent,
+      'FABRICATE.Labels.UnknownComponent'
+    );
+    target.querySelector('[data-gathering-drops-disclosure]').click();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-gathering-drop-modifiers-name]').textContent,
+      'FABRICATE.Labels.UnknownComponent'
     );
   });
 
@@ -1059,7 +1114,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(toolRows[0].textContent.includes('Stone Pickaxe'));
   });
 
-  it('draws the drop row on the shared art tile and the shared fill bar, at the size each rendered', async () => {
+  it('draws each drop on the shared list row, its artwork on the 22px art tile', async () => {
     const { services } = makeServices(listing([environment()]), {
       drops: [
         { id: 'd1', name: 'Moss', img: 'icons/svg/mystery-man.svg', finalChance: 0.5, quantity: 1 },
@@ -1073,28 +1128,12 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     flushSync();
     await settle();
 
-    const row = target.querySelector('[data-gathering-task-detail] [data-gathering-drop]');
+    const row = target.querySelector('[data-gathering-task-detail] [data-yield-entry="d1"]');
+    assert.ok(Boolean(row.querySelector('[data-list-row="dense"]')), 'the drop is a dense list row');
     const tile = row.querySelector('.fab-medallion');
-    assert.ok(Boolean(tile), 'the drop thumbnail is the shared art tile');
-    // The CONVERSION RULE the geometry requirement states.
-    assert.match(
-      tile.getAttribute('style'),
-      /width:\s*36px;\s*height:\s*36px/,
-      'at the 36px it already rendered'
-    );
+    assert.match(tile.getAttribute('style'), /width:\s*22px;\s*height:\s*22px/, 'at the row size');
     assert.equal(tile.getAttribute('data-medallion'), 'image', 'and it carries the drop artwork');
-
-    const bar = row.querySelector('.fab-fill-bar');
-    assert.ok(Boolean(bar), 'the chance track is the shared fill bar');
-    assert.ok(
-      bar.classList.contains('is-sm'),
-      'at the `sm` rung, which is the height the hand-rolled track drew'
-    );
-    assert.match(
-      bar.querySelector('.fab-fill-bar-fill').getAttribute('style'),
-      /width: 50%/,
-      'and the fill carries the chance'
-    );
+    assert.ok(!row.querySelector('.fab-fill-bar'), 'the chance is a figure, not a fill track');
   });
 
   it('draws the required-tool tile on the shared art tile at the size it rendered', async () => {
@@ -1196,7 +1235,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       'which is what `detail` is for: the second line says what to do next'
     );
     // The DISTINCTION that was missing: this is not the "nothing to find" picture.
-    assert.ok(!section.querySelector('[data-gathering-drop]'), 'no drop rows are drawn');
+    assert.ok(!section.querySelector('[data-yield-entry]'), 'no drop rows are drawn');
   });
 
   it('draws the ordinary ready state when the drop-breakdown fetch succeeds (control)', async () => {
@@ -1221,6 +1260,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       !section.querySelector('[data-gathering-drops-error]'),
       'and carries no failure notice'
     );
+    assert.equal(section.querySelectorAll('[data-yield-entry]').length, 1, 'and draws its drop');
   });
 
   it('says the linked scene could not be loaded when its uuid does not resolve', async () => {
