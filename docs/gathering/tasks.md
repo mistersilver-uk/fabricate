@@ -99,6 +99,12 @@ The Results tab no longer carries issue marks.
 Instead, when Results holds rows that block saving, a notice on the Results tab shows how many there are, with a **Review in Validation** action that opens the Validation tab.
 The Results tab still shows the notices for the two warnings above.
 
+A d100 task's Drop rules card is a table.
+Its caption carries the heading, a count of rules and a search field.
+The columns are the rank (ranked mode only), the drop component, the drop chance (a slider and a number), the count and the modifiers.
+The page scrolls rather than the card, and the pager appears only when there are more rules than the smallest page size.
+Click a row, or tab into any control in it, to select that drop rule for the inspector rail.
+
 A legacy Progressive task keeps its own results, so its Results tab shows an empty state titled "Results are not authored here".
 It points you to the **Gathering resolution** card on Overview, where you can choose another mode to author results.
 

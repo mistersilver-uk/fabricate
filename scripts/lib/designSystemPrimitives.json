@@ -655,6 +655,14 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "Issue 1782 builds the specified inspector rail SECTION: a bare column at `--fab-space-2`, opened by the manager's eyebrow when it takes a `label`, which then names it as a `group`; unlabelled it is an unnamed `<section>`, never a `region`. It is one section of a right-hand inspector column, never the column itself, `ManagerNavRail`'s `.manager-rail-block` or `AppRail`. Three importers: `apps/manager/essences/EssenceBrowserInspector.svelte` (seven sections, three of them labelled, each a hand-written column at that gap), `apps/manager/tools/ToolBrowserInspector.svelte` (its Effective rules and Inheritance groups, kicker-and-body pairs that sat bare in the tool card and keep its 14px rhythm and flush kicker through a caller rule) and `apps/manager/RecipeItemEditor.svelte` (its two preview-rail sections, a column at that gap whose kickers keep their own size and tracking through a caller rule). `shipped`: the specimen was re-derived to the essence inspector, the exemplar, so no converted frame moves. Scoped `shared`: its family is rooted at `fab-rail`, the class it writes, in its own scoped block, so it paints wherever it is mounted. Its broad-signal override names a frame of each inspector."
+    },
+    {
+      "path": "src/ui/svelte/components/DataTable.svelte",
+      "library": "<DataTable>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1782 builds the specified table for records compared down columns, under ruling 3 (2026-09-19): a `<table>` whose visible `<caption>` is the `heading` and the `count` and names it, a caller `search` snippet at the caption's end, a `cell` snippet, a `<th scope=\"row\">` column, selection as `is-selected` on the `<tr>` by a pointer click with the row never focusable, `rowData(row)` and a `rowAction` on each row, and the shipped `Pagination` when it pages. Two importers: `apps/manager/gathering-task/GatheringTaskDropsCard.svelte` (the drop rules, paged, searchable, selectable and ranked, each row a drop target) and `apps/crafting/detail/IoTable.svelte` (its essence, tool and output groups, bounded and unpaged; its ingredient rail is not a table). The outcome-tier table is not a caller: it is a ladder, routed to `<OutcomeLadder>`. Scoped `shared`: its family is rooted at `fabricate-data-table`, the class it writes, in the module sheet, and it re-roots the drop table's retired `manager-gathering-task-drop-*` grid. Its broad-signal override names the drop rules with a row selected, the ranked table at the intermediate width, and the crafting outputs holding a choice group."
     }
   ],
   "notAPrimitive": [

@@ -191,6 +191,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/IngredientRoutedBody.svelte',
     'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
     'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
+    'src/ui/svelte/components/DataTable.svelte',
     'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
     'src/ui/svelte/apps/crafting/detail/AwardPill.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
