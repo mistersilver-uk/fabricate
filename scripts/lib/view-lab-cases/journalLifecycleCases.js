@@ -80,7 +80,16 @@ export function journalLifecycleCases() {
     'past-routed-stage',
     'future-routed-stage',
     'kind-toggles',
+    'kind-filter-open',
     'history-settling',
+  ];
+  // A state with no fixture of its own walks another state's world.
+  const fixtureStates = { 'kind-filter-open': 'kind-toggles' };
+  const fixtureOf = (state) => fixtureStates[state] ?? state.replace(/-finished$/, '');
+  // The run-type filter's closed and open faces claim it, rather than every lifecycle frame.
+  const kindFilterSources = [
+    /^src\/ui\/svelte\/apps\/journal\/JournalKindFilter\.svelte$/,
+    /^src\/ui\/svelte\/util\/journalRunKinds\.js$/,
   ];
   const selectRivets = [
     { selector: '[data-journal-search] input', fill: 'Forge Iron Rivets' },
@@ -132,7 +141,7 @@ export function journalLifecycleCases() {
     narrow: 'lab-v1-wide',
   };
   const selectCaseRun = (state) => {
-    const fixtureState = state.replace(/-finished$/, '');
+    const fixtureState = fixtureOf(state);
     const name = selectionNames[fixtureState];
     if (!name) return [];
     const id = selectedIds[fixtureState] ?? `lab-v1-${fixtureState}`;
@@ -142,11 +151,17 @@ export function journalLifecycleCases() {
       { selector: '[data-journal-search] input', fill: '' },
     ];
   };
-  const kindToggle = (kind) => `[data-journal-kind-toggle="${kind}"]`;
-  const showOnlyKind = (kind) =>
-    ['crafting', 'gathering', 'salvage', 'alchemy']
-      .filter((other) => other !== kind)
-      .map((other) => ({ selector: kindToggle(other) }));
+  // The run-type multi-select: its trigger opens and shuts the panel, and each row flips one kind.
+  const kindTrigger = { selector: '[data-journal-kind-trigger]' };
+  const kindOption = (kind) => `[data-journal-kind-option="${kind}"]`;
+  const untickKinds = (...kinds) => kinds.map((kind) => ({ selector: kindOption(kind) }));
+  const showOnlyKind = (kind) => [
+    kindTrigger,
+    ...untickKinds(
+      ...['crafting', 'gathering', 'salvage', 'alchemy'].filter((other) => other !== kind)
+    ),
+    kindTrigger,
+  ];
   const steps = {
     // A paused run holds the choices it made (D-028), so its rail is inert and the walk stops at the pause.
     paused: [{ selector: '[data-run-action="pause"]' }],
@@ -197,7 +212,8 @@ export function journalLifecycleCases() {
     salvage: showOnlyKind('salvage'),
     'past-routed-stage': [{ selector: '[data-stage-nav-index="0"]' }],
     'future-routed-stage': [{ selector: '[data-stage-nav-index="3"]' }],
-    'kind-toggles': [{ selector: kindToggle('gathering') }],
+    'kind-toggles': [kindTrigger, ...untickKinds('gathering'), kindTrigger],
+    'kind-filter-open': [kindTrigger, ...untickKinds('gathering', 'alchemy')],
     'essence-overshoot': [
       { selector: '[data-essence-source$=".Item.jp-duskglass"] [data-stepper-increment]' },
       { selector: '[data-essence-source$=".Item.jp-duskglass"] [data-stepper-increment]' },
@@ -562,9 +578,18 @@ export function journalLifecycleCases() {
     'kind-toggles':
       '.journal-view-container' +
       has(
-        `${kindToggle('gathering')}[aria-pressed="false"]`,
-        `${kindToggle('crafting')}[aria-pressed="true"]`,
+        '[data-journal-kind-filter][data-journal-kind-shown="crafting salvage alchemy"]',
+        '[data-journal-kind-trigger][aria-expanded="false"]',
         '[data-run-id]'
+      ),
+    'kind-filter-open':
+      '.journal-kind-popover' +
+      has(
+        `${kindOption('crafting')}[aria-selected="true"]`,
+        `${kindOption('gathering')}[aria-selected="false"]`,
+        `${kindOption('salvage')}[aria-selected="true"]`,
+        `${kindOption('alchemy')}[aria-selected="false"]`,
+        '[data-journal-kind-show-all]'
       ),
     'history-checked-choice': terminal(
       'succeeded',
@@ -667,7 +692,7 @@ export function journalLifecycleCases() {
       reaches: 'beyond',
       query: {
         tab: 'journal',
-        journalCaseState: state.replace(/-finished$/, ''),
+        journalCaseState: fixtureOf(state),
         ...(['history-gm-deleted-recipe', 'claim-retained'].includes(state) && { viewer: 'gm' }),
         ...(state.startsWith('gathering-straight') && { gatheringTaskMode: 'straight' }),
         ...(state.startsWith('gathering-check') && { gatheringTaskMode: 'routed' }),
@@ -685,7 +710,8 @@ export function journalLifecycleCases() {
       expectSelector: expected[state],
       ...(pointerTargets[state] && { expectCenterHit: pointerTargets[state] }),
       ...(state === 'filter-paused' && { expectCenterHit: steps[state].at(-1).selector }),
-      ...(state === 'kind-toggles' && { expectCenterHit: kindToggle('gathering') }),
+      ...(state === 'kind-toggles' && { expectCenterHit: kindTrigger.selector }),
+      ...(state === 'kind-filter-open' && { expectCenterHit: kindOption('salvage') }),
       ...(state === 'current-choice-closed' && {
         expectCenterHit: '[data-slot-row] button.fab-slot-tile',
       }),
@@ -702,6 +728,7 @@ export function journalLifecycleCases() {
         JOURNAL_SOURCES,
         /^src\/ui\/svelte\/stores\/journalStore/,
         /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
+        ...(['kind-toggles', 'kind-filter-open'].includes(state) ? kindFilterSources : []),
       ],
     })
   );

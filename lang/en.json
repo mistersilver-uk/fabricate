@@ -1316,7 +1316,11 @@
           "SearchPlaceholder": "Search runs…",
           "SearchLabel": "Search runs",
           "Kind": {
-            "Label": "Kind",
+            "Label": "Run types",
+            "Name": "{label}: {summary}",
+            "All": "All run types",
+            "None": "No run types",
+            "ShowAll": "Show all run types",
             "Crafting": "Crafting",
             "Gathering": "Gathering",
             "Salvage": "Salvage",

@@ -96,6 +96,7 @@ fabricate-journal-lifecycle-essence-overshoot
 fabricate-journal-lifecycle-past-routed-stage
 fabricate-journal-lifecycle-future-routed-stage
 fabricate-journal-lifecycle-kind-toggles
+fabricate-journal-lifecycle-kind-filter-open
 fabricate-journal-lifecycle-history-settling
 fabricate-journal-history-batch-full-1240
 fabricate-journal-history-batch-partial-1240

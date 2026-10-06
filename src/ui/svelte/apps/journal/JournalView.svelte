@@ -5,10 +5,11 @@
   import Notice from '../../components/Notice.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import StatusToggle from '../../components/StatusToggle.svelte';
+  import { RUN_KINDS } from '../../util/journalRunKinds.js';
   import PlayerViewState from '../PlayerViewState.svelte';
   import ActiveRunsList from './ActiveRunsList.svelte';
   import HistoryList from './HistoryList.svelte';
+  import JournalKindFilter from './JournalKindFilter.svelte';
   import RunDetail from './RunDetail.svelte';
 
   let { services = null } = $props();
@@ -42,20 +43,13 @@
     }
   );
 
-  // One independent toggle per run kind; the store holds the shown set and owns the union.
-  const KIND_TOGGLES = Object.freeze([
-    { kind: 'crafting', labelKey: 'FABRICATE.App.Journal.Filters.Kind.Crafting' },
-    { kind: 'gathering', labelKey: 'FABRICATE.App.Journal.Filters.Kind.Gathering' },
-    { kind: 'salvage', labelKey: 'FABRICATE.App.Journal.Filters.Kind.Salvage' },
-    { kind: 'alchemy', labelKey: 'FABRICATE.App.Journal.Filters.Kind.Alchemy' },
+  // The store holds the shown kind set and owns the union; the filter only flips one kind.
+  const shownKinds = $derived(Array.isArray(journal?.kindFilter) ? journal.kindFilter : RUN_KINDS);
+  const kindFiltered = $derived(RUN_KINDS.some((kind) => !shownKinds.includes(kind)));
+  const listedRuns = $derived([
+    ...(journal?.listing?.activeRuns ?? []),
+    ...(journal?.listing?.history ?? []),
   ]);
-  const shownKinds = $derived(
-    Array.isArray(journal?.kindFilter)
-      ? journal.kindFilter
-      : KIND_TOGGLES.map((toggle) => toggle.kind)
-  );
-  const kindFiltered = $derived(KIND_TOGGLES.some((toggle) => !shownKinds.includes(toggle.kind)));
-  const instanceId = $props.id();
   const statusOptions = $derived([
     {
       value: 'all',
@@ -136,27 +130,11 @@
                 data-journal-search="true"
               />
             </div>
-            <div
-              class="journal-kind-field"
-              role="group"
-              aria-label={localize('FABRICATE.App.Journal.Filters.Kind.Label')}
-              data-journal-kind-filter=""
-            >
-              {#each KIND_TOGGLES as toggle (toggle.kind)}
-                {@const toggleId = `${instanceId}-kind-${toggle.kind}`}
-                <span class="journal-kind-toggle">
-                  <StatusToggle
-                    id={toggleId}
-                    on={shownKinds.includes(toggle.kind)}
-                    data-journal-kind-toggle={toggle.kind}
-                    onclick={() => journal?.toggleKind?.(toggle.kind)}
-                  />
-                  <label for={toggleId} class="journal-kind-label"
-                    >{localize(toggle.labelKey)}</label
-                  >
-                </span>
-              {/each}
-            </div>
+            <JournalKindFilter
+              {shownKinds}
+              runs={listedRuns}
+              onToggle={(kind) => journal?.toggleKind?.(kind)}
+            />
           </div>
           <SegmentedControl
             options={statusOptions}
@@ -264,27 +242,6 @@
   }
   .journal-search-field > :global(.journal-search-control) {
     min-width: 0;
-  }
-  .journal-kind-field {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
-    gap: var(--fab-space-2) var(--fab-space-3);
-    min-width: 0;
-  }
-  .journal-kind-toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    min-width: 0;
-  }
-  .journal-kind-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 12px;
-    color: var(--fab-text-muted);
-    cursor: pointer;
   }
   .journal-browse-lists {
     display: grid;

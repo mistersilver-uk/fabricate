@@ -1032,7 +1032,7 @@ test('the history-data witnesses name their defining evidence on the selected re
   // The two families this one sits beside are unchanged by it.
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-lifecycle-')).length,
-    73
+    74
   );
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'))
@@ -1074,7 +1074,8 @@ test('all Journal lifecycle captures assert defining product state rather than a
   const cases = VIEW_LAB_CASES.filter((entry) =>
     entry.id.startsWith('fabricate-journal-lifecycle-')
   );
-  assert.equal(cases.length, 73);
+  // 74 since issue 1644 added the run-type panel open over two ticked kinds.
+  assert.equal(cases.length, 74);
   for (const entry of cases) {
     assert.equal(entry.expectTab, 'journal', entry.id);
     assert.ok(entry.expectSelector, `${entry.id} has an explicit assertion`);
