@@ -1206,7 +1206,7 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
   // The badge carries the localized PREMIUM mark (issue 1185; it used to carry the selected
   // system's name, which the rail's crafting-system card already shows).
   const goldChipBlock =
-    /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-manager \.manager-nav-premium,\s*\.fabricate-manager \.manager-premium-icons-ad-badge \{[\s\S]*?\}/.exec(
+    /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-nav \.manager-nav-premium,\s*\.fabricate-manager \.manager-premium-icons-ad-badge \{[\s\S]*?\}/.exec(
       withoutComments(css)
     )?.[0] ?? '';
   assert.ok(

@@ -10350,7 +10350,7 @@
 }
 
 /* The padlock does NOT dim with its row. It is the premium marker on a working control, not a disabled state, so it holds the accent whether or not the row is the current one — the one place in this rail where a trailing mark deliberately outranks the label beside it. */
-.fabricate-manager .manager-nav-lock {
+.fabricate-nav .manager-nav-lock {
   flex: 0 0 auto;
   margin-left: auto;
   color: var(--fab-accent);
@@ -10359,7 +10359,7 @@
 }
 
 /* The premium badge on the Downtime parent row — A VEHICLE OF ITS OWN (issue 1515). */
-.fabricate-manager .manager-nav-premium {
+.fabricate-nav .manager-nav-premium {
   min-width: 0;
 
   /* `2px 5px`, one pixel tighter each side than the design's `2px 6px`. The design's rail row ends in an inert chevron; this one ends in a real 28px expand/collapse BUTTON, so the same chip on the same 175px row leaves the label a pixel short and it breaks mid-word. */
@@ -10374,7 +10374,7 @@
 }
 
 /* The rail's premium-preview note: what the padlocks above it mean. It sits at the foot of the group and, like the design's own, is below the fold at the rail's resting scroll — the rail scrolls, and this is real copy a default screenshot will not show. */
-.fabricate-manager .manager-nav-callout {
+.fabricate-nav .manager-nav-callout {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
@@ -10389,7 +10389,7 @@
   line-height: 1.4;
 }
 
-.fabricate-manager .manager-nav-callout-kicker {
+.fabricate-nav .manager-nav-callout-kicker {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-chip);
@@ -10438,7 +10438,7 @@
 
 /* THE GOLD BADGE CHIP, stated once (issues 1185, 1304, 1515). */
 .fabricate-manager .manager-titlebar-badge,
-.fabricate-manager .manager-nav-premium,
+.fabricate-nav .manager-nav-premium,
 .fabricate-manager .manager-premium-icons-ad-badge {
   color: var(--fab-on-badge-gold);
   background: var(--fab-badge-gold);
@@ -10471,7 +10471,7 @@
 }
 
 /* THE SAME CHIP, MUTED — the rail's Downtime marker once a companion holds the surface (issue 1185). */
-.fabricate-manager .manager-nav-premium.is-installed {
+.fabricate-nav .manager-nav-premium.is-installed {
   color: var(--fab-accent);
   background: var(--fab-accent-soft);
   font-weight: 600;

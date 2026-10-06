@@ -43,12 +43,6 @@ function pageRow(current, fields) {
 
 const countMarker = (value) => ({ kind: 'count', value });
 
-/** A row's class: `base`, then its pill slot, which a row with no `active` does not carry; the
- * Downtime group's, which `NavSidebar` does not draw yet. */
-export function navRowClass(base, item) {
-  return item.active === undefined ? base : `${base} ${item.active ? 'is-active' : ''}`;
-}
-
 /** `props` over `defaults`, where a prop passed as `undefined` takes its default as Svelte's do. */
 function withDefaults(defaults, props) {
   const input = { ...defaults };
@@ -676,7 +670,8 @@ function downtimeParent(input, rollup, text) {
 
 /**
  * One tab's row. Its badge (issue 1302) describes it and never names it, and only a provider's tab
- * resolves one; the padlock advertises Core's preview, where nothing is unlocked.
+ * resolves one; `tierGated` draws the padlock that advertises Core's preview, where nothing is
+ * unlocked.
  */
 function downtimeChild(input, tab) {
   const { downtimeCoreFallback: coreFallback, downtimeTabText: tabText } = input;
@@ -693,7 +688,6 @@ function downtimeChild(input, tab) {
       hooks: { 'data-world-downtime-badge': tab.id },
     });
   }
-  if (coreFallback) markers.push({ kind: 'lock', hooks: { 'data-world-downtime-lock': '' } });
   return navItem({
     id: tab.id,
     domId: `manager-downtime-nav-${tab.id}`,
@@ -707,6 +701,14 @@ function downtimeChild(input, tab) {
     current: current ? 'true' : undefined,
     ariaDescribedBy: badge ? badgeId : undefined,
     markers,
+    tierGated: coreFallback,
+    lockHooks: { 'data-world-downtime-lock': '' },
+    // The companion route's rail scrolls its screen's row into view (issue 1213).
+    reveal: Boolean(
+      input.navRail.railLockedOpen &&
+      input.navRail.expanded.worldDowntime &&
+      tab.id === input.worldDowntimeTabId
+    ),
     onSelect: () => input.openWorldDowntimePreview(tab.id),
   });
 }
@@ -726,6 +728,7 @@ const DOWNTIME_DEFAULTS = Object.freeze({
 
 function downtimeCallout(text) {
   return {
+    hooks: { 'data-world-downtime-callout': '' },
     kicker: text('FABRICATE.Admin.Manager.World.Downtime.RailKicker', 'PREMIUM PREVIEW'),
     note: text(
       'FABRICATE.Admin.Manager.World.Downtime.RailNote',

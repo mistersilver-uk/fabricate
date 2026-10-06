@@ -13,8 +13,8 @@
   | `panelId` | id | `''` | the panel every `icon` tab controls |
 
   Snippets:
-  - `content(rows)` — the `labelled` nav's body; `rows(entries, {itemClass, groupClasses})` draws
-    `managerNavItems.js` rows and groups.
+  - `content(rows)` — the `labelled` nav's body; `rows(entries, {itemClass, groupClasses,
+    childClasses})` draws `managerNavItems.js` rows and groups.
 
   Callbacks:
   - `onSelect(id)` — an `icon` tab was clicked or reached by Up/Down/Home/End; focus follows.
@@ -52,8 +52,8 @@
   }
 </script>
 
-{#snippet rows(entries, { itemClass = '', groupClasses = {} } = {})}
-  <NavSidebarRows {entries} {itemClass} {groupClasses} />
+{#snippet rows(entries, { itemClass = '', groupClasses = {}, childClasses = {} } = {})}
+  <NavSidebarRows {entries} {itemClass} {groupClasses} {childClasses} />
 {/snippet}
 
 {#if variant === 'icon'}

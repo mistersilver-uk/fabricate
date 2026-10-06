@@ -344,3 +344,127 @@ describe('NavSidebar, labelled variant', () => {
     assert.ok(!root.querySelector('#probe-overview').hasAttribute('aria-disabled'));
   });
 });
+
+/** A tier-gated group in the shape the Downtime model builds: the chip, the padlocks, the note. */
+function gatedSection({ installed = false, reveal = null } = {}) {
+  const premium = { kind: 'premium', text: 'PREMIUM', installed, hooks: { 'data-probe-chip': '' } };
+  const child = (id, fields = {}) =>
+    leaf(id, id, {
+      labelId: `probe-label-${id}`,
+      active: false,
+      tierGated: !installed,
+      lockHooks: { 'data-probe-lock': id },
+      reveal: id === reveal,
+      ...fields,
+    });
+  const badge = { kind: 'issues', count: 2, name: '2 waiting', domId: 'probe-badge-ledger' };
+  return {
+    entries: [
+      {
+        ...group('gated', {
+          expanded: true,
+          locked: false,
+          toggle: { label: 'Collapse gated' },
+          submenuLabel: 'Gated previews',
+          parent: leaf('gated', 'Gated', { markers: [premium], active: false }),
+          children: [
+            child('ledger', installed ? { markers: [badge], ariaDescribedBy: badge.domId } : {}),
+            child('crew'),
+          ],
+        }),
+        callout: installed
+          ? null
+          : {
+              kicker: 'PREVIEW',
+              note: 'Open a page to preview it.',
+              hooks: { 'data-probe-note': '' },
+            },
+      },
+    ],
+    options: {
+      groupClasses: { gated: 'probe-gated-group' },
+      childClasses: { gated: 'probe-child' },
+    },
+  };
+}
+
+describe('NavSidebar, labelled variant, a tier-gated group', () => {
+  before(() => labelledHarness.setup());
+  after(() => labelledHarness.teardown());
+  afterEach(() => labelledHarness.remount());
+
+  const mountGated = (options = {}) => labelledHarness.mount({ sections: [gatedSection(options)] });
+
+  it('draws a padlock in each tier-gated row, after its marks and hidden from AT', async () => {
+    const root = await mountGated();
+    const rows = [...root.querySelectorAll('.manager-nav-subitem')];
+    assert.deepEqual(
+      rows.map((row) => row.getAttribute('class')),
+      ['manager-nav-subitem probe-child ', 'manager-nav-subitem probe-child '],
+      'each child carries its group’s child class beside the pill slot'
+    );
+    for (const row of rows) {
+      const lock = row.lastElementChild;
+      assert.equal(lock.getAttribute('class'), 'manager-nav-lock', 'the padlock closes the row');
+      assert.equal(lock.dataset.probeLock, row.id.replace('probe-', ''), 'with its row’s hooks');
+      assert.equal(lock.querySelector('i.fas.fa-lock')?.getAttribute('aria-hidden'), 'true');
+      assert.ok(!row.disabled && !row.hasAttribute('aria-disabled'), 'and the row stays usable');
+    }
+    assert.equal(
+      root.querySelector('#probe-label-crew')?.textContent,
+      'crew',
+      'a row’s label carries the id it is named by elsewhere'
+    );
+  });
+
+  it('draws no padlock once nothing is gated, and describes a row by its badge', async () => {
+    const root = await mountGated({ installed: true });
+    assert.ok(!root.querySelector('.manager-nav-lock'), 'no padlock');
+    const ledger = root.querySelector('#probe-ledger');
+    assert.equal(ledger.getAttribute('aria-describedby'), 'probe-badge-ledger');
+    assert.equal(root.querySelector('#probe-badge-ledger')?.textContent, '2');
+  });
+
+  it('draws the PREMIUM chip on the parent, muted once the surface is unlocked', async () => {
+    let root = await mountGated();
+    const chip = () => root.querySelector('[data-probe-chip]');
+    assert.equal(chip()?.getAttribute('class'), 'manager-nav-premium ');
+    assert.equal(chip().textContent, 'PREMIUM');
+    assert.equal(chip().parentElement.id, 'probe-gated', 'on the parent row');
+    labelledHarness.remount();
+    root = await mountGated({ installed: true });
+    assert.equal(chip()?.getAttribute('class'), 'manager-nav-premium is-installed');
+  });
+
+  it('closes an open group with its note, and drops the note with the gate', async () => {
+    let root = await mountGated();
+    const groupNode = root.querySelector('.probe-gated-group');
+    const note = groupNode.lastElementChild;
+    assert.ok(note.matches('p.manager-nav-callout[data-probe-note]'), 'the note closes the group');
+    assert.equal(note.querySelector('.manager-nav-callout-kicker')?.textContent.trim(), 'PREVIEW');
+    assert.ok(note.textContent.includes('Open a page to preview it.'));
+    labelledHarness.remount();
+    root = await mountGated({ installed: true });
+    assert.ok(!root.querySelector('.manager-nav-callout'), 'no note once nothing is gated');
+  });
+
+  it('scrolls a revealed row into view once, and again only when the reveal moves', async () => {
+    const scrolled = [];
+    const proto = globalThis.Element.prototype;
+    const original = proto.scrollIntoView;
+    proto.scrollIntoView = function record(options) {
+      scrolled.push([this.id, options]);
+    };
+    try {
+      await mountGated({ reveal: 'ledger' });
+      assert.deepEqual(scrolled, [['probe-ledger', { block: 'nearest' }]]);
+      await labelledHarness.setProps({ sections: [gatedSection({ reveal: 'ledger' })] });
+      assert.equal(scrolled.length, 1, 'a re-render of the same reveal does not scroll again');
+      await labelledHarness.setProps({ sections: [gatedSection({ reveal: 'crew' })] });
+      assert.deepEqual(scrolled.at(-1), ['probe-crew', { block: 'nearest' }]);
+      assert.equal(scrolled.length, 2);
+    } finally {
+      proto.scrollIntoView = original;
+    }
+  });
+});

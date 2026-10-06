@@ -7,7 +7,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `rows` | `NavSidebar`'s `rows` snippet | — | draws the entries below the heading row |
+  | `rows` | `NavSidebar`'s `rows` snippet | — | draws the entries below the heading row, and the Downtime group |
   | `navRail` | the `navRailModel` instance | — | supplies group expansion, the locks and `toggleGroup` |
   | `worldScopedCounts` | `{components, vocabulary, essences, tools}` | `{}` | one count per catalogue leaf, keyed by `WORLD_CATALOGUE_LEAVES[].countKey` |
   | `downtimeNavLabelId` | `(tabId) => string` | — | forwarded to the Downtime group; the root mints it because the Downtime host stamps it too |
@@ -49,6 +49,7 @@
   </div>
   {@render rows(entries, { itemClass: 'manager-world-nav-item', groupClasses: GROUP_CLASS })}
   <ManagerWorldDowntimeNavGroup
+    {rows}
     navRail={props.navRail}
     worldDowntimeAvailable={props.worldDowntimeAvailable}
     isWorldDowntimeRoute={props.isWorldDowntimeRoute}
