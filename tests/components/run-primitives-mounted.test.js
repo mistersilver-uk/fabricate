@@ -511,7 +511,7 @@ describe('run primitives mounted behavior', () => {
     const short = target.querySelector('[data-choice-id="ash"]');
     assert.equal(short.disabled, false, 'a candidate held short of the need is still offered');
     assert.equal(
-      target.querySelectorAll('[data-choice-options="binder"] [role="radiogroup"] [role="radio"]').length,
+      target.querySelectorAll(':scope [data-choice-options="binder"] [role="radiogroup"] [role="radio"]').length,
       3
     );
     target.querySelector('[data-choice-id="resin"]').click();
@@ -575,7 +575,9 @@ describe('run primitives mounted behavior', () => {
       selectedId,
       held: (id) => binderStock[id] ?? 0,
       claimed: (id) => (id === 'dusk' ? 2 : 0),
-      onChoose: (slotId, id) => chosen.push([slotId, id]),
+      onChoose: (slotId, id) => {
+        chosen.push([slotId, id]);
+      },
       label: 'Choose a component',
       candidateReading: ({ held, needed }) => `${held} held · needs ${needed}`,
     });
@@ -584,7 +586,7 @@ describe('run primitives mounted behavior', () => {
   it('is one single-select radiogroup that disables only a candidate claimed elsewhere', async () => {
     const chosen = [];
     const target = await mountBinderChoices(chosen);
-    const group = target.querySelector('[data-choice-options="binder"] [role="radiogroup"]');
+    const group = target.querySelector(':scope [data-choice-options="binder"] [role="radiogroup"]');
     assert.equal(group.getAttribute('aria-label'), 'Choose a component');
     const [stylus, chalk, dusk, ash] = group.querySelectorAll('[role="radio"]');
     assert.deepEqual(

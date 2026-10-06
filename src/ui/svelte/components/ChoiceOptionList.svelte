@@ -123,7 +123,8 @@
         />
         <span class="fab-choice-option-copy">
           <span class="fab-choice-option-name" id={`${uid}-name-${index}`}>{row.option.label}</span>
-          <span class="fab-choice-option-reading" id={`${uid}-reading-${index}`}>{row.reading}</span>
+          <span class="fab-choice-option-reading" id={`${uid}-reading-${index}`}>{row.reading}</span
+          >
         </span>
         <i class={selected ? 'fas fa-circle-check' : 'far fa-circle'} aria-hidden="true"></i>
       </button>

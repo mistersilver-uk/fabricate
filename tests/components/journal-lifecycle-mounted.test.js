@@ -2143,7 +2143,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       mounted.commands.at(-1).payload.selectionPlan.ingredientOptionOverrides.metal.heldItemId,
       'Item.iron-a'
     );
-    mounted.target.querySelector('[data-slot-id="metal"] button').click();
+    mounted.target.querySelector(':scope [data-slot-id="metal"] button').click();
     flushSync();
     assert.deepEqual(
       checked().map((radio) => radio.textContent.includes('iron stock')),
