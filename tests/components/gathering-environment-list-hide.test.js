@@ -34,6 +34,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
+    // The list row each card draws through, and the mark it imports (issue 1778).
+    'src/ui/svelte/components/Medallion.svelte',
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'
   ],

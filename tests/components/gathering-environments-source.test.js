@@ -25,6 +25,14 @@ const journalSource = read('../../src/ui/svelte/apps/journal/JournalView.svelte'
 const listSource = read('../../src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
 const cardSource = read('../../src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
 const cssSource = read('../../styles/fabricate.css');
+const cardCss = compile(cardSource, { filename: 'EnvironmentCard.svelte', css: 'external' }).css.code;
+
+/** The compiled declarations of the card rule whose selector starts with `selector`. */
+function cardRule(selector) {
+  const start = cardCss.indexOf(`${selector}`);
+  assert.ok(start >= 0, `no compiled rule for ${selector}`);
+  return cardCss.slice(cardCss.indexOf('{', start) + 1, cardCss.indexOf('}', start));
+}
 
 describe('Fabricate app wiring for the gathering tab', () => {
   it('exposes listGatheringForActor and passes services down', () => {
@@ -262,7 +270,7 @@ describe('EnvironmentCard markup contracts', () => {
     assert.ok(cardSource.includes('data-environment-id={id}'), 'environment id hook');
     assert.ok(cardSource.includes('data-locked='), 'locked hook');
     assert.ok(cardSource.includes('data-selection-mode={selectionMode}'), 'selection-mode hook');
-    assert.ok(cardSource.includes('data-selected='), 'selection marker hook');
+    assert.ok(cardSource.includes("'data-selected':"), 'selection marker hook, on the row’s button');
   });
 
   it('guards the (x/y) discovered suffix behind blind && revealPolicy !== never', () => {
@@ -299,48 +307,20 @@ describe('EnvironmentCard markup contracts', () => {
     assert.ok(cardSource.includes('FABRICATE.App.Gathering.Environments.LockedAria'), 'locked accessible label');
   });
 
-  it('renders locked cards as non-focusable listitems and available cards as buttons', () => {
-    assert.ok(cardSource.includes('role="listitem"'), 'locked card is a listitem');
-    assert.ok(cardSource.includes('<button'), 'available card is a button');
-    assert.ok(cardSource.includes('filter: saturate(0.65) brightness(0.85)'), 'image-only desaturation on locked');
-    assert.ok(cardSource.includes('background: var(--fab-success-soft)'), 'selected look uses success-soft');
+  // Issue 1778: the card is the selectable list row; a locked teaser is that row with no control.
+  it('draws both shapes as list-row listitems, only the available one opening through its button', () => {
+    assert.ok(cardSource.includes("import ListRow from '../../components/ListRow.svelte'"));
+    assert.equal(cardSource.match(/role="listitem"/gu)?.length, 2, 'the locked and the available row');
+    assert.equal(cardSource.match(/onOpen=/gu)?.length, 1, 'only the available row opens');
+    assert.ok(!cardSource.includes('<button'), 'the only button is the list row’s own');
   });
 
-  it('gives the selected card a full accent border outline (not a focus-killed box-shadow)', () => {
-    assert.ok(
-      cardSource.includes('.gathering-env-card.is-selected {'),
-      'selected rule exists'
-    );
-    assert.ok(
-      cardSource.includes('border-color: var(--fab-accent)'),
-      'selected card gets an accent-coloured border outline'
-    );
-    // The host rule `.fabricate button:focus` clears box-shadow on mouse-click
-    // focus, so selection must not rely on one. (Rooted at `.fabricate-app`
-    // until issue 1501 collapsed it onto the module root.)
-    assert.equal(
-      cardSource.includes('box-shadow: inset 3px 0 0 var(--fab-accent)'),
-      false,
-      'selection no longer uses a box-shadow bar (it would vanish on click focus)'
-    );
-  });
-
-  it('resets the available <button> so Foundry button chrome cannot crop content or padding', () => {
-    assert.ok(cardSource.includes('.gathering-env-card.is-available {'), 'available button rule exists');
-    assert.ok(cardSource.includes('height: auto'), 'button height is reset to auto so the description is not cropped');
-    assert.ok(cardSource.includes('overflow: visible'), 'button overflow is reset so the description is not clipped');
-    assert.ok(cardSource.includes('justify-content: flex-start'), 'button content is top-anchored like the locked div');
-  });
-
-  it('scopes the hover background so it does not wipe the selection look', () => {
-    assert.ok(
-      cardSource.includes('.gathering-env-card.is-available:not(.is-selected):hover'),
-      'hover background is scoped to :not(.is-selected)'
-    );
-    assert.equal(
-      cardSource.includes('.gathering-env-card.is-available:hover {'),
-      false,
-      'the unscoped hover rule (which would override selection) is gone'
+  it('leaves the selected look to the list row’s accent edge, and keeps the locked desaturation', () => {
+    assert.doesNotMatch(cardCss, /success-soft|is-selected|:hover|--fab-accent/u, 'no selection paint of its own');
+    assert.match(
+      cardRule('.gathering-env-card.is-locked .gathering-env-card-thumb'),
+      /filter: saturate\(0\.65\) brightness\(0\.85\);/u,
+      'image-only desaturation on locked'
     );
   });
 
@@ -363,34 +343,24 @@ describe('EnvironmentCard markup contracts', () => {
     );
   });
 
-  it('stacks the card vertically with a main row and a clamped description', () => {
-    assert.ok(cardSource.includes('gathering-env-card-main'), 'main row container present');
-    assert.ok(cardSource.includes('flex-direction: column'), 'card stacks vertically');
-    assert.ok(cardSource.includes('gathering-env-card-description'), 'description element present');
+  it('clamps the description, a span, to two lines', () => {
+    assert.ok(cardSource.includes('<span class="gathering-env-card-description">'), 'phrasing content');
     assert.ok(cardSource.includes("description !== ''"), 'description omitted when empty');
-    assert.ok(cardSource.includes('-webkit-line-clamp: 2'), 'description clamps to ~2 lines');
-    assert.ok(cardSource.includes('min-height: 76px'), 'min-height kept as a growth floor');
+    assert.match(cardRule('.gathering-env-card-description'), /-webkit-line-clamp: 2;/u);
   });
 
-  it('puts the blind/event pills in a header bar above the main row, divided by a soft line', () => {
-    // Scope ordering to the markup (the top doc-comment also names these classes).
-    const markup = cardSource.slice(cardSource.indexOf('{#snippet identity()}'), cardSource.indexOf('<style>'));
-    const headerIdx = markup.indexOf('gathering-env-card-header');
-    const mainIdx = markup.indexOf('gathering-env-card-main');
-    const blindIdx = markup.indexOf('gathering-env-card-blind"');
-    const eventIdx = markup.indexOf('gathering-env-card-event');
-    assert.ok(headerIdx > -1, 'header bar present');
-    // The header is the FIRST child of the card, before the main row.
-    assert.ok(headerIdx < mainIdx, 'header markup precedes the main row');
-    assert.ok(blindIdx > headerIdx && blindIdx < mainIdx, 'blind chip lives in the header');
-    assert.ok(eventIdx > headerIdx && eventIdx < mainIdx, 'event chip lives in the header');
-    assert.ok(blindIdx < eventIdx, 'event chip is to the right of the blind chip');
-    // The header is a short, full-bleed bar separated from the body by a divider.
-    const headerBlock = cardSource.slice(cardSource.indexOf('.gathering-env-card-header {'));
-    assert.ok(/border-bottom:\s*1px solid var\(--fab-border\)/.test(headerBlock), 'header has the soft divider line');
-    assert.ok(/margin:\s*-10px -10px 0/.test(headerBlock), 'header is full-bleed (negative margins reach the card edges)');
-    // The event chip now shows its level name, not just the icon.
-    assert.ok(cardSource.includes('gathering-env-card-event-label'), 'event chip renders a level-name label');
+  it('puts the discovered count, the selection-mode summary, the realm alert and the danger pill in that order among the badges', () => {
+    const start = cardSource.indexOf('{#snippet badges()}');
+    const badges = cardSource.slice(start, cardSource.indexOf('{/snippet}', start));
+    const order = [
+      'gathering-env-card-discovered',
+      'gathering-env-card-blind"',
+      'gathering-env-card-realm-alert',
+      'gathering-env-card-event ',
+    ].map((name) => badges.indexOf(name));
+    assert.ok(order.every((index) => index >= 0), 'each is a badge');
+    assert.deepEqual([...order].sort((a, b) => a - b), order, 'in reading order');
+    assert.ok(cardSource.includes('gathering-env-card-event-label'), 'the danger pill names its level');
   });
 
   it('uses base tokens only (no area-scoped --fab-manager-* properties)', () => {
@@ -400,25 +370,15 @@ describe('EnvironmentCard markup contracts', () => {
     assert.equal(viewSource.includes('--fab-manager-'), false, 'no area-scoped properties in the view');
   });
 
-  it('pins each card slot so the bottom card is not squashed by flex-shrink', () => {
-    assert.ok(cardSource.includes('gathering-env-card-slot'), 'shared card-slot class present');
-    assert.ok(
-      cardSource.includes('.gathering-env-card-slot {\n    flex: 0 0 auto;'),
-      'card slot pins flex: 0 0 auto so it keeps its natural height'
-    );
-    // Both the available wrapper and the locked root carry the slot class.
-    assert.ok(
-      cardSource.includes('<div class="gathering-env-card-slot" role="listitem">'),
-      'available card wrapper carries the slot class'
-    );
-    assert.ok(
-      cardSource.includes('class="gathering-env-card is-locked gathering-env-card-slot"'),
-      'locked card root carries the slot class'
-    );
+  it('pins each row so the bottom card is not squashed by flex-shrink, and keeps its 76px floor', () => {
+    const slot = cardRule('.gathering-env-card-slot');
+    assert.match(slot, /flex: 0 0 auto;/u, 'the row keeps its natural height');
+    assert.match(slot, /min-height: 76px;/u, 'never under the card’s floor');
+    assert.equal(cardSource.match(/gathering-env-card-slot"/gu)?.length, 2, 'on both rows');
   });
 
-  it('uses a decorative empty alt on the thumbnail', () => {
+  it('uses a decorative empty alt on the thumbnail, and the row draws the titled name', () => {
     assert.ok(cardSource.includes('alt=""'), 'thumbnail is decorative');
-    assert.ok(cardSource.includes('title={name}'), 'name carries a title for the ellipsis');
+    assert.ok(cardSource.includes('nameClass="gathering-env-card-name"'), 'the list row’s name keeps the card’s class');
   });
 });

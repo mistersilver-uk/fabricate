@@ -20,6 +20,7 @@ import {
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -359,7 +360,70 @@ describe('GatheringView mounted behavior', () => {
     );
   });
 
-  it('renders a "Not in current realm" header alert on a realm-locked card', async () => {
+  // Issue 1778: an available environment is the selectable list row's one button.
+  it('draws an available environment as one list-row button named by its name and drawn states', async () => {
+    await mountView(makeServices(listing([
+      environment({
+        id: 'env-blind',
+        name: 'Hidden Grove',
+        selectionMode: 'blind',
+        revealPolicy: 'onAttempt',
+        discoveredTaskCount: 1,
+        composedTaskCount: 3,
+        risk: 'deadly'
+      })
+    ])));
+
+    const card = target.querySelector('[data-environment-id="env-blind"]');
+    const row = card.parentElement;
+    assert.ok(row.matches('.gathering-env-card-slot[role="listitem"][data-list-row="default"]'), 'the listitem is the row');
+    assert.equal(row.querySelectorAll('button').length, 1, 'with one control');
+    assert.equal(card.tagName, 'BUTTON', 'a native button');
+    assert.ok(card.matches('.fabricate-list-row-open.gathering-env-card.is-available'), 'keeping its hooks');
+    assert.equal(card.getAttribute('data-keyboard-focus'), 'true');
+    assert.equal(card.getAttribute('data-locked'), 'false');
+    assert.equal(card.getAttribute('data-selection-mode'), 'blind');
+    assert.ok(card.querySelector(':scope > .fabricate-list-row-leading .gathering-env-card-thumb'), 'the thumb leads');
+    assert.deepEqual(
+      [...card.querySelectorAll(NON_PHRASING_CONTENT)].map((node) => node.tagName.toLowerCase()),
+      [],
+      'the button holds phrasing content only'
+    );
+    assert.deepEqual(card.getAttribute('aria-label').split(', '), [
+      'Hidden Grove',
+      'FABRICATE.App.Gathering.Environments.Discovered:{"x":1,"y":3}',
+      'FABRICATE.App.Gathering.Environments.BlindChip',
+      'FABRICATE.App.Gathering.Detail.Pips.Danger:{"value":"FABRICATE.App.Gathering.Detail.Risk.deadly"}'
+    ]);
+    const described = card
+      .getAttribute('aria-describedby')
+      .split(' ')
+      .map((id) => target.querySelector(`[id="${id}"]`));
+    assert.equal(described.length, 2, 'the biomes and the description');
+    assert.ok(described[0].querySelector('.gathering-env-card-chips'), 'the biomes describe it first');
+    assert.ok(described[1].querySelector('.gathering-env-card-description'), 'then the description');
+  });
+
+  it('keeps a locked environment an inert listitem with no control', async () => {
+    await mountView(makeServices(listing([
+      environment({ id: 'env-open', name: 'Open' }),
+      environment({ id: 'env-locked', name: 'Sealed', locked: true })
+    ])));
+
+    const locked = target.querySelector('[data-environment-id="env-locked"]');
+    assert.ok(
+      locked.matches('.gathering-env-card.is-locked.gathering-env-card-slot[role="listitem"][data-list-row]'),
+      'the list row root carries every locked hook'
+    );
+    assert.equal(locked.getAttribute('aria-label'), 'FABRICATE.App.Gathering.Environments.LockedAria:{"name":"Sealed"}');
+    assert.equal(locked.getAttribute('title'), locked.getAttribute('aria-label'), 'its label is its tooltip');
+    assert.ok(!locked.querySelector('button, [role="button"], [tabindex]'), 'nothing in it is a control');
+    const inert = locked.querySelector(':scope > .fabricate-list-row-open');
+    assert.equal(inert?.tagName, 'DIV', 'its content sits in the row’s inert form, laid out as the button is');
+    assert.ok(inert.querySelector('.gathering-env-card-name'), 'and still names the environment');
+  });
+
+  it('renders a "Not in current realm" alert badge on a realm-locked card', async () => {
     await mountView(makeServices(listing([
       environment({ id: 'env-open', name: 'Open' }),
       environment({
@@ -381,10 +445,10 @@ describe('GatheringView mounted behavior', () => {
     assert.ok(alert.querySelector('.fa-location-dot'), 'chip carries the location icon');
     assert.equal(alert.getAttribute('title'), 'No party realm set.', 'tooltip is the full reason message');
 
-    // The alert sits in the header alongside the danger pip.
-    const header = realmCard.querySelector('.gathering-env-card-header');
-    assert.ok(header.contains(alert), 'alert is in the card header');
-    assert.ok(header.querySelector('.gathering-env-card-event'), 'danger pip is in the same header');
+    // The alert is one of the row's badges, beside the danger pip (issue 1778).
+    const badges = realmCard.querySelector('.fabricate-list-row-badges');
+    assert.ok(badges.contains(alert), 'alert is a badge after the name');
+    assert.equal(alert.nextElementSibling, badges.querySelector('.gathering-env-card-event'), 'before the danger pip');
 
     // A normal (in-realm/open) environment shows no realm alert.
     const openCard = target.querySelector('[data-environment-id="env-open"]');
@@ -533,29 +597,24 @@ describe('GatheringView mounted behavior', () => {
     assert.equal(openCard.getAttribute('data-selected'), 'true', 'first selectable env is auto-selected');
   });
 
-  it('selected card gets a border outline and keeps its selection look (hover rule is :not(.is-selected)-scoped)', async () => {
+  // Issue 1778: selection is the row's pressed state, which ListRow draws; the card paints none.
+  it('marks the selected card pressed and leaves its selection look to the list row', async () => {
     await mountView(makeServices(listing([environment({ id: 'env-a', name: 'Alpha' })])));
 
     const card = target.querySelector('[data-environment-id="env-a"]');
     assert.equal(card.getAttribute('data-selected'), 'true', 'single env auto-selected');
     assert.ok(card.classList.contains('is-selected'), 'selected card carries the selection class');
+    assert.equal(card.getAttribute('aria-pressed'), 'true', 'and is the pressed control');
+    assert.ok(card.matches('[data-list-row] > button.fabricate-list-row-open'), 'of the list row');
 
-    // The hover background is scoped so a hovered selected card keeps success-soft + outline.
-    const cardSource = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/gathering/EnvironmentCard.svelte'),
-      'utf8'
+    const { css } = compile(
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/EnvironmentCard.svelte'), 'utf8'),
+      { filename: 'EnvironmentCard.svelte', css: 'external' }
     );
-    assert.ok(
-      cardSource.includes('.gathering-env-card.is-available:not(.is-selected):hover'),
-      'hover background is :not(.is-selected)-scoped so selection survives hover'
-    );
-    assert.ok(
-      cardSource.includes('border-color: var(--fab-accent)'),
-      'selected card gets a full accent-coloured border outline'
-    );
+    assert.doesNotMatch(css.code, /is-selected|success-soft|:hover/u, 'the card draws no selection or hover of its own');
   });
 
-  it('renders the description under the main row and omits it entirely when empty', async () => {
+  it('renders the description as the row’s content and omits it entirely when empty', async () => {
     await mountView(makeServices(listing([
       environment({ id: 'env-desc', name: 'Described', description: 'A lush riverbank teeming with reeds.' }),
       environment({ id: 'env-no-desc', name: 'Bare', description: '' })
@@ -566,11 +625,11 @@ describe('GatheringView mounted behavior', () => {
     assert.ok(desc, 'description element renders when description is present');
     assert.ok(desc.textContent.includes('A lush riverbank teeming with reeds.'), 'description text rendered');
 
-    // The description is a sibling of the main row, beneath it.
-    const main = describedCard.querySelector('.gathering-env-card-main');
-    assert.ok(main, 'main row container present');
-    assert.equal(main.contains(desc), false, 'description is not nested inside the main row');
-    assert.equal(main.nextElementSibling, desc, 'description follows the main row');
+    // The description is a phrasing span beneath the name, inside the row's one button.
+    assert.equal(desc.tagName, 'SPAN', 'a span, so the button holds phrasing content only');
+    assert.ok(desc.parentElement.matches('.fabricate-list-row-children'), 'the row’s content region');
+    const head = describedCard.querySelector('.fabricate-list-row-head');
+    assert.ok(head.compareDocumentPosition(desc) & 4, 'beneath the name');
 
     const bareCard = target.querySelector('[data-environment-id="env-no-desc"]');
     assert.equal(
@@ -639,7 +698,7 @@ describe('GatheringView mounted behavior', () => {
     );
   });
 
-  it('places the blind badge in the card header bar, not inline with the name or main row', async () => {
+  it('places the selection-mode summary among the badges after the name, apart from the biomes', async () => {
     await mountView(makeServices(listing([
       environment({
         id: 'env-blind',
@@ -652,25 +711,30 @@ describe('GatheringView mounted behavior', () => {
       })
     ])));
 
+    // Issue 1778: the header strip became the row's badges, which wrap after the name.
     const card = target.querySelector('[data-environment-id="env-blind"]');
-    const header = card.querySelector('.gathering-env-card-header');
-    const main = card.querySelector('.gathering-env-card-main');
-    const nameRow = card.querySelector('.gathering-env-card-name-row');
+    const badges = card.querySelector('.fabricate-list-row-badges');
     const blind = card.querySelector('.gathering-env-card-blind');
     const chips = card.querySelector('.gathering-env-card-chips');
 
     assert.ok(blind, 'blind badge renders');
-    assert.ok(header, 'card header bar renders');
-    assert.ok(header.contains(blind), 'blind badge lives in the header bar');
-    assert.equal(main.contains(blind), false, 'blind badge is not in the main row');
-    assert.equal(nameRow.contains(blind), false, 'blind badge is not inline with the name');
+    assert.ok(badges?.contains(blind), 'blind badge is one of the row’s badges');
+    assert.equal(
+      badges.previousElementSibling,
+      card.querySelector('.gathering-env-card-name'),
+      'and the badges follow the name'
+    );
+    assert.equal(
+      badges.firstElementChild,
+      card.querySelector('.gathering-env-card-discovered'),
+      'the discovered count leads them, beside the name it qualifies'
+    );
     assert.ok(chips, 'chips row still renders');
-    // The header is the card's first child, above the main row.
-    const kids = Array.from(card.children);
-    assert.ok(kids.indexOf(header) < kids.indexOf(main), 'header precedes the main row');
+    assert.ok(chips.closest('.fabricate-list-row-meta'), 'the biomes are the row’s meta');
+    assert.equal(chips.contains(blind), false, 'and hold no badge');
   });
 
-  it('always shows a danger pill in the header bar, with its level name, coloured by risk tier and to the right of the blind chip', async () => {
+  it('always shows a danger pill among the badges, with its level name, coloured by risk tier and to the right of the blind chip', async () => {
     await mountView(makeServices(listing([
       environment({ id: 'env-safe', name: 'Safe Meadow', risk: 'safe' }),
       environment({
@@ -684,10 +748,10 @@ describe('GatheringView mounted behavior', () => {
 
     // Always shown, even on a non-blind card.
     const safeCard = target.querySelector('[data-environment-id="env-safe"]');
-    const safeHeader = safeCard.querySelector('.gathering-env-card-header');
+    const safeBadges = safeCard.querySelector('.fabricate-list-row-badges');
     const safeEvent = safeCard.querySelector('.gathering-env-card-event');
     assert.ok(safeEvent, 'danger pill renders on a non-blind card');
-    assert.ok(safeHeader.contains(safeEvent), 'danger pill lives in the header bar');
+    assert.ok(safeBadges.contains(safeEvent), 'danger pill is one of the badges');
     assert.ok(safeEvent.classList.contains('risk-safe'), 'pill carries the risk tier class');
     assert.ok(safeEvent.querySelector('.fa-skull'), 'pill shows the danger icon');
     // The chip now shows the level name, not just the icon.
@@ -695,11 +759,11 @@ describe('GatheringView mounted behavior', () => {
     assert.ok(safeLabel, 'danger pill renders a level-name label');
     assert.ok((safeLabel.textContent || '').includes('Risk.safe'), 'label shows the localized danger level');
 
-    // On a blind card the pill sits to the RIGHT of the blind chip in the header.
+    // On a blind card the pill sits to the RIGHT of the blind chip among the badges.
     const blindCard = target.querySelector('[data-environment-id="env-blind-deadly"]');
-    const header = blindCard.querySelector('.gathering-env-card-header');
-    const blind = header.querySelector('.gathering-env-card-blind');
-    const event = header.querySelector('.gathering-env-card-event');
+    const badges = blindCard.querySelector('.fabricate-list-row-badges');
+    const blind = badges.querySelector('.gathering-env-card-blind');
+    const event = badges.querySelector('.gathering-env-card-event');
     assert.ok(blind && event, 'both the blind chip and the danger pill render');
     assert.equal(blind.nextElementSibling, event, 'danger pill is to the right of the blind chip');
     assert.ok(event.classList.contains('risk-deadly'), 'deadly tier class applied');

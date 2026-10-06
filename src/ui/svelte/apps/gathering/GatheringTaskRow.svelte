@@ -1,24 +1,18 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  GatheringTaskRow renders one gathering task in the center column — used for both
-  a targeted environment's task list and a blind environment's "Discovered Tasks"
-  list. It is a compact, selectable row: clicking it selects the task, which
-  drives the right-column inspector (the canonical place for the full task detail
-  and the Attempt action) and highlights the row.
-
-  Layout: a top HEADER bar (only when the task is blocked) surfaces each blocking
-  issue as a callout chip ("Missing tool(s)", wrong conditions, …). Below it the
-  main row shows the task image (with a lock overlay + desaturation when blocked),
-  the name, and a ChanceBar (success scale). A short, always-visible description sits
-  underneath. The row has no Attempt button and no expand toggle — those live in
-  the right-column inspector.
+  GatheringTaskRow draws one task of the center column as a selectable ListRow (issue 1778);
+  selecting it drives the right-column inspector, which holds the detail and the Attempt. The 56px
+  thumb leads, each blocking issue is a callout badge, the economy is meta, the description is the
+  row's content and the success ChanceBar sits in the aside. A blocked row stays enabled, because
+  it opens the inspector that explains it, and its name says it is blocked.
 -->
 <script>
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
-  import { descriptionOrDefault } from '../../util/gatheringFormat.js';
+  import { descriptionOrDefault, toPercent } from '../../util/gatheringFormat.js';
   import { calloutFor } from './gatheringBlockedReasons.js';
   import ChanceBar from './ChanceBar.svelte';
+  import ListRow from '../../components/ListRow.svelte';
 
   let { task = null, selected = false, onSelect = null } = $props();
 
@@ -48,7 +42,7 @@
   );
   const staminaCost = $derived(task?.rich?.stamina?.cost ?? null);
 
-  // Each blocking issue becomes a header callout chip. Icon/tone/label come from
+  // Each blocking issue becomes a callout badge. Icon/tone/label come from
   // calloutFor in the shared gatheringBlockedReasons vocabulary. The linked-scene
   // gate is an environment-level restriction, surfaced once above the task list
   // by GatheringDetail — never as a per-task callout here, so it is skipped.
@@ -67,154 +61,117 @@
     return out;
   });
 
+  // The control's name is the visible name, then every state the row only draws (issue 1778):
+  // the callouts, the chance, and the lock, whose generic sentence closes it.
+  const accessibleName = $derived(
+    [
+      name,
+      ...callouts.map((callout) => callout.label),
+      successChance != null &&
+        localize('FABRICATE.App.Gathering.Detail.SuccessChance', { x: toPercent(successChance) }),
+      blocked && localize('FABRICATE.App.Gathering.Detail.Blocked'),
+    ]
+      .filter(Boolean)
+      .join(', ')
+  );
+
   function select() {
     onSelect?.(id);
   }
-  function onSummaryKey(event) {
-    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
-      event.preventDefault();
-      select();
-    }
-  }
 </script>
 
-<div
-  class="gathering-task-row"
-  class:is-blocked={blocked}
-  class:is-selected={selected}
+{#snippet thumb()}
+  <span class="gathering-task-thumb-wrap">
+    <img
+      class="gathering-task-thumb"
+      class:is-fallback={!img}
+      src={img || DEFAULT_GATHERING_TASK_IMG}
+      alt=""
+    />
+    {#if blocked}
+      <span class="gathering-task-lock-overlay" aria-hidden="true">
+        <i class="fas fa-lock"></i>
+      </span>
+    {/if}
+  </span>
+{/snippet}
+
+{#snippet badges()}
+  <span class="gathering-task-callouts" data-gathering-callouts>
+    {#each callouts as callout (callout.code)}
+      <span class={`gathering-task-callout tone-${callout.tone}`}>
+        <i class={`fas ${callout.icon}`} aria-hidden="true"></i>
+        <span>{callout.label}</span>
+      </span>
+    {/each}
+  </span>
+{/snippet}
+
+{#snippet economy()}
+  <span class="gathering-task-economy" data-gathering-economy>
+    {#if nodeCount != null}
+      <span
+        class="gathering-economy-chip"
+        data-gathering-node-count
+        title={localize('FABRICATE.App.Gathering.Detail.NodesRemaining')}
+      >
+        <i class="fas fa-mountain" aria-hidden="true"></i>
+        <span>{nodeCount}</span>
+      </span>
+    {/if}
+    {#if staminaCost != null}
+      <span
+        class="gathering-economy-chip"
+        data-gathering-stamina-cost
+        title={localize('FABRICATE.App.Gathering.Detail.StaminaCost')}
+      >
+        <i class="fas fa-bolt" aria-hidden="true"></i>
+        <span>{staminaCost}</span>
+      </span>
+    {/if}
+  </span>
+{/snippet}
+
+{#snippet copy()}
+  <span
+    class="gathering-task-description"
+    class:is-fallback={!hasDescription}
+    data-gathering-task-description>{descriptionText}</span
+  >
+{/snippet}
+
+{#snippet chance()}
+  <div class="gathering-task-chance" data-gathering-success>
+    <ChanceBar value={successChance} scale="success" />
+  </div>
+{/snippet}
+
+<ListRow
+  {name}
+  density="default"
+  class={['gathering-task-row', { 'is-blocked': blocked, 'is-selected': selected }]}
   role="listitem"
   data-task-id={id}
   data-attemptable={attemptable ? 'true' : 'false'}
   data-blocked={blocked ? 'true' : 'false'}
   data-selected={selected ? 'true' : 'false'}
->
-  <div
-    class="gathering-task-summary is-toggle"
-    role="button"
-    tabindex="0"
-    onclick={select}
-    onkeydown={onSummaryKey}
-  >
-    {#if callouts.length > 0}
-      <div class="gathering-task-header" data-gathering-callouts>
-        {#each callouts as callout (callout.code)}
-          <span class={`gathering-task-callout tone-${callout.tone}`}>
-            <i class={`fas ${callout.icon}`} aria-hidden="true"></i>
-            <span>{callout.label}</span>
-          </span>
-        {/each}
-      </div>
-    {/if}
-
-    <div class="gathering-task-main">
-      <span class="gathering-task-thumb-wrap">
-        <img
-          class="gathering-task-thumb"
-          class:is-fallback={!img}
-          src={img || DEFAULT_GATHERING_TASK_IMG}
-          alt=""
-        />
-        {#if blocked}
-          <span class="gathering-task-lock-overlay" aria-hidden="true">
-            <i class="fas fa-lock"></i>
-          </span>
-        {/if}
-      </span>
-
-      <span class="gathering-task-copy">
-        <span class="gathering-task-name" title={name}>{name}</span>
-        {#if nodeCount != null || staminaCost != null}
-          <span class="gathering-task-economy" data-gathering-economy>
-            {#if nodeCount != null}
-              <span
-                class="gathering-economy-chip"
-                data-gathering-node-count
-                title={localize('FABRICATE.App.Gathering.Detail.NodesRemaining')}
-              >
-                <i class="fas fa-mountain" aria-hidden="true"></i>
-                <span>{nodeCount}</span>
-              </span>
-            {/if}
-            {#if staminaCost != null}
-              <span
-                class="gathering-economy-chip"
-                data-gathering-stamina-cost
-                title={localize('FABRICATE.App.Gathering.Detail.StaminaCost')}
-              >
-                <i class="fas fa-bolt" aria-hidden="true"></i>
-                <span>{staminaCost}</span>
-              </span>
-            {/if}
-          </span>
-        {/if}
-      </span>
-
-      {#if successChance != null}
-        <span class="gathering-task-chance" data-gathering-success>
-          <ChanceBar value={successChance} scale="success" />
-        </span>
-      {/if}
-    </div>
-
-    <p
-      class="gathering-task-description"
-      class:is-fallback={!hasDescription}
-      data-gathering-task-description
-    >
-      {descriptionText}
-    </p>
-  </div>
-</div>
+  {selected}
+  onOpen={select}
+  openProps={{ class: 'gathering-task-summary is-toggle', 'aria-label': accessibleName }}
+  leading={thumb}
+  badges={callouts.length > 0 ? badges : undefined}
+  meta={nodeCount != null || staminaCost != null ? economy : undefined}
+  children={copy}
+  aside={successChance != null ? chance : undefined}
+/>
 
 <style>
-  .gathering-task-row {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text);
-    overflow: hidden;
-  }
-
-  /* Selection highlight mirrors the environment card's selected state. */
-  .gathering-task-row.is-selected {
-    border-color: var(--fab-accent);
-    background: var(--fab-success-soft);
-  }
-
-  .gathering-task-summary {
-    display: flex;
-    flex-direction: column;
-    /* Bottom whitespace for the row lives here, NOT as a padding-bottom on the
-       clamped description below: a padding-bottom on a -webkit-line-clamp box
-       makes Chromium paint a sliver of the clamped-away third line into that
-       padding band, which then bleeds under the row border (most visible with
-       Foundry's tall Signika metrics). Keeping the gap on the summary wrapper
-       preserves the whitespace without the sliver. */
-    padding-bottom: var(--fab-space-2);
-  }
-
-  .gathering-task-summary.is-toggle {
-    cursor: pointer;
-  }
-
-  .gathering-task-summary.is-toggle:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: -2px;
-  }
-
-  /* Header bar: a short full-width strip of blocking-issue callouts, divided
-     from the body by a soft line (mirrors the environment-card header). */
-  .gathering-task-header {
+  .gathering-task-callouts {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--fab-border);
+    min-width: 0;
   }
 
   .gathering-task-callout {
@@ -246,14 +203,6 @@
     font-size: 10px;
   }
 
-  .gathering-task-main {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-3);
-    min-height: 72px;
-    padding: var(--fab-space-2);
-  }
-
   .gathering-task-thumb-wrap {
     position: relative;
     flex: 0 0 auto;
@@ -276,7 +225,7 @@
     box-sizing: border-box;
   }
 
-  .gathering-task-row.is-blocked .gathering-task-thumb {
+  :global(.gathering-task-row.is-blocked) .gathering-task-thumb {
     filter: saturate(0.65) brightness(0.85);
   }
 
@@ -293,26 +242,6 @@
 
   .gathering-task-lock-overlay i {
     font-size: 18px;
-  }
-
-  .gathering-task-copy {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  .gathering-task-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
-  }
-
-  .gathering-task-chance {
-    flex: 0 0 auto;
   }
 
   /* Economy badges (node count / stamina cost) under the task name. */
@@ -339,21 +268,17 @@
     font-size: 10px;
   }
 
-  /* Short, always-visible description beneath the main row — occupies the slot
-     the requirements drop-down used, but compact and never toggled. */
+  /* Clamped to two lines. The 1.5 line-height keeps the second line's descenders inside the clamp
+     box (issue 401), and the row's own padding supplies the whitespace below: a padding-bottom
+     here makes Chromium paint a sliver of the clamped-away third line. */
   .gathering-task-description {
-    margin: 0;
-    /* No padding-bottom here — it would reintroduce the line-clamp sliver (see
-       .gathering-task-summary). The bottom gap is owned by the summary. */
-    padding: 0 var(--fab-space-2);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    /* 1.5 line-height keeps the second line's descenders inside the clamp box
-       so overflow: hidden no longer shaves g/y/p (issue 401). */
     font-size: 12px;
     line-height: 1.5;
+    white-space: normal;
     color: var(--fab-text-muted);
   }
 

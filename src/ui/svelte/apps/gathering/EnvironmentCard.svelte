@@ -1,30 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  EnvironmentCard renders a single gathering environment in the player
-  Environments column. It mirrors the GM environment-row look (64px thumb,
-  ellipsised name, biome chips) using only base --fab-* tokens, since the GM
-  rules are .fabricate-manager-scoped and lean on manager-only mv2 tokens.
-
-  The card is a vertical stack: a `.gathering-env-card-main` row (thumb + copy)
-  on top, then a full-width `.gathering-env-card-description` clamped to ~2
-  lines beneath it (omitted entirely when the environment has no description).
-
-  Two shapes:
-   - Available: an interactive <button> inside the listitem. Clicking selects
-     the card (highlight only — no center-column wiring yet).
-   - Locked: a non-interactive, non-focusable <div role="listitem"> for
-     disabled environments (shown to every viewer, GMs included), with a lock
-     overlay rendered over the desaturated thumbnail and an accessible label.
-
-  Blind environments (selectionMode === 'blind') show a mask badge in the
-  name-row and — only when the effective revealPolicy !== 'never' — a
-  "(discovered/total)" suffix with an accessible label.
+  EnvironmentCard draws one gathering environment in the player Environments column as a
+  selectable ListRow (issue 1778): the 64px thumb leads, the selection-mode summary, the realm
+  alert and the danger (risk) level are badges after the name, the biomes are meta and the
+  description is the row's content. An available environment is the row's one button; a locked
+  teaser is the row's inert form, a listitem with no control, named by its own label.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { watchSceneImage } from './linkedSceneImage.js';
   import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
+  import ListRow from '../../components/ListRow.svelte';
 
   let { environment = null, selectionMode = 'list', selectedId = null, onSelect = null } = $props();
 
@@ -55,6 +42,7 @@
       y: composedTaskCount,
     })
   );
+  const blindLabel = localize('FABRICATE.App.Gathering.Environments.BlindChip');
   const lockedLabel = $derived(
     localize('FABRICATE.App.Gathering.Environments.LockedAria', { name })
   );
@@ -82,88 +70,83 @@
     localize('FABRICATE.App.Gathering.Detail.Pips.Danger', { value: dangerLabel })
   );
 
+  // The control's name is the visible name, then every state the row only draws (issue 1778).
+  const accessibleName = $derived(
+    [name, showDiscovered && discoveredLabel, blind && blindLabel, dangerAria]
+      .filter(Boolean)
+      .join(', ')
+  );
+
   function handleSelect() {
     if (locked) return;
     onSelect?.(id);
   }
 </script>
 
-{#snippet identity()}
-  <span class="gathering-env-card-header">
-    {#if blind}
-      <span
-        class="gathering-env-card-blind"
-        title={localize('FABRICATE.App.Gathering.Environments.BlindChip')}
-      >
-        <i class="fas fa-mask" aria-hidden="true"></i>
-        <span class="gathering-env-card-blind-label"
-          >{localize('FABRICATE.App.Gathering.Environments.BlindChip')}</span
-        >
+{#snippet thumb()}
+  <span class="gathering-env-card-thumb-wrap">
+    <img
+      class="gathering-env-card-thumb"
+      class:is-fallback={!displayImg}
+      src={displayImg || DEFAULT_GATHERING_ENVIRONMENT_IMG}
+      alt=""
+    />
+    {#if locked}
+      <span class="gathering-env-card-lock-overlay" aria-hidden="true">
+        <i class="fas fa-lock"></i>
       </span>
     {/if}
-    {#if notInRealm}
-      <span class="gathering-env-card-realm-alert" title={realmAlertTitle}>
-        <i class="fas fa-location-dot" aria-hidden="true"></i>
-        <span class="gathering-env-card-realm-label"
-          >{localize('FABRICATE.App.Gathering.Environments.RealmLockedChip')}</span
-        >
-      </span>
-    {/if}
-    <span class={`gathering-env-card-event ${dangerRiskClass}`} aria-label={dangerAria}>
-      <i class="fas fa-skull" aria-hidden="true"></i>
-      <span class="gathering-env-card-event-label">{dangerLabel}</span>
-    </span>
   </span>
-  <span class="gathering-env-card-main">
-    <span class="gathering-env-card-thumb-wrap">
-      <img
-        class="gathering-env-card-thumb"
-        class:is-fallback={!displayImg}
-        src={displayImg || DEFAULT_GATHERING_ENVIRONMENT_IMG}
-        alt=""
-      />
-      {#if locked}
-        <span class="gathering-env-card-lock-overlay" aria-hidden="true">
-          <i class="fas fa-lock"></i>
-        </span>
-      {/if}
-    </span>
-    <span class="gathering-env-card-copy">
-      <span class="gathering-env-card-name-row">
-        <span class="gathering-env-card-name" title={name}>{name}</span>
-        {#if showDiscovered}
-          <span
-            class="gathering-env-card-discovered"
-            aria-label={discoveredLabel}
-            title={discoveredLabel}>({discoveredTaskCount}/{composedTaskCount})</span
-          >
-        {/if}
-      </span>
-      {#if biomeTags.length > 0}
-        <span class="gathering-env-card-chips" aria-hidden="false">
-          {#each biomeTags as tag (tag.id)}
-            <span class="gathering-env-card-chip" style={biomeChipStyle(tag)}>
-              <i class={tag.icon} aria-hidden="true"></i>
-              <span class="gathering-env-card-chip-label">{tag.label}</span>
-            </span>
-          {/each}
-        </span>
-      {/if}
-    </span>
-  </span>
-  <!--
-    The description renders on locked teasers too, by design: like the name,
-    image, and biome chips it is identity-level info a player may see for a
-    sealed environment. Only tasks/weights/counts are redacted from a locked
-    listing; the description is not.
-  -->
-  {#if description !== ''}
-    <span class="gathering-env-card-description">{description}</span>
+{/snippet}
+
+{#snippet badges()}
+  {#if showDiscovered}
+    <span class="gathering-env-card-discovered" aria-label={discoveredLabel} title={discoveredLabel}
+      >({discoveredTaskCount}/{composedTaskCount})</span
+    >
   {/if}
+  {#if blind}
+    <span class="gathering-env-card-blind" title={blindLabel}>
+      <i class="fas fa-mask" aria-hidden="true"></i>
+      <span class="gathering-env-card-blind-label">{blindLabel}</span>
+    </span>
+  {/if}
+  {#if notInRealm}
+    <span class="gathering-env-card-realm-alert" title={realmAlertTitle}>
+      <i class="fas fa-location-dot" aria-hidden="true"></i>
+      <span class="gathering-env-card-realm-label"
+        >{localize('FABRICATE.App.Gathering.Environments.RealmLockedChip')}</span
+      >
+    </span>
+  {/if}
+  <span class={`gathering-env-card-event ${dangerRiskClass}`} aria-label={dangerAria}>
+    <i class="fas fa-skull" aria-hidden="true"></i>
+    <span class="gathering-env-card-event-label">{dangerLabel}</span>
+  </span>
+{/snippet}
+
+{#snippet biomes()}
+  <span class="gathering-env-card-chips">
+    {#each biomeTags as tag (tag.id)}
+      <span class="gathering-env-card-chip" style={biomeChipStyle(tag)}>
+        <i class={tag.icon} aria-hidden="true"></i>
+        <span class="gathering-env-card-chip-label">{tag.label}</span>
+      </span>
+    {/each}
+  </span>
+{/snippet}
+
+<!-- The description renders on locked teasers too, by design: like the name, image and biome
+     chips it is identity-level info a player may see for a sealed environment. -->
+{#snippet copy()}
+  <span class="gathering-env-card-description">{description}</span>
 {/snippet}
 
 {#if locked}
-  <div
+  <ListRow
+    {name}
+    density="default"
+    nameClass="gathering-env-card-name"
     class="gathering-env-card is-locked gathering-env-card-slot"
     role="listitem"
     data-environment-id={id}
@@ -171,105 +154,42 @@
     data-selection-mode={selectionMode}
     aria-label={lockedLabel}
     title={lockedLabel}
-  >
-    {@render identity()}
-  </div>
+    openProps={{}}
+    leading={thumb}
+    {badges}
+    meta={biomeTags.length > 0 ? biomes : undefined}
+    children={description !== '' ? copy : undefined}
+  />
 {:else}
-  <div class="gathering-env-card-slot" role="listitem">
-    <button
-      type="button"
-      class="gathering-env-card is-available"
-      class:is-selected={isSelected}
-      data-environment-id={id}
-      data-locked="false"
-      data-selection-mode={selectionMode}
-      data-selected={isSelected ? 'true' : 'false'}
-      aria-pressed={isSelected}
-      onclick={handleSelect}
-    >
-      {@render identity()}
-    </button>
-  </div>
+  <ListRow
+    {name}
+    density="default"
+    nameClass="gathering-env-card-name"
+    class="gathering-env-card-slot"
+    role="listitem"
+    selected={isSelected}
+    onOpen={handleSelect}
+    openProps={{
+      class: ['gathering-env-card', 'is-available', { 'is-selected': isSelected }],
+      'data-environment-id': id,
+      'data-locked': 'false',
+      'data-selection-mode': selectionMode,
+      'data-selected': isSelected ? 'true' : 'false',
+      'aria-label': accessibleName,
+    }}
+    leading={thumb}
+    {badges}
+    meta={biomeTags.length > 0 ? biomes : undefined}
+    children={description !== '' ? copy : undefined}
+  />
 {/if}
 
 <style>
-  /*
-    Cards are direct flex children of the column scroll container
-    (flex-direction: column) and default to flex-shrink: 1, which squashes the
-    last card. Pin every card slot to its natural height so none collapse.
-  */
-  .gathering-env-card-slot {
+  /* The row is a flex child of the column's scroller, whose default shrink squashes the last
+     card, so each keeps its natural height, never under the card's 76px floor. */
+  :global(.gathering-env-card-slot) {
     flex: 0 0 auto;
-  }
-
-  .gathering-env-card {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: 100%;
     min-height: 76px;
-    padding: 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text);
-    text-align: left;
-  }
-
-  /*
-    The available card is a <button>; Foundry's core .application button rules
-    leak a fixed height, overflow clipping, and centred alignment that would
-    crop the description and squash the top padding. Reset the button to lay
-    out exactly like the locked <div>: a left-aligned, top-anchored, auto-height
-    flex column.
-  */
-  .gathering-env-card.is-available {
-    cursor: pointer;
-    appearance: none;
-    -webkit-appearance: none;
-    margin: 0;
-    font: inherit;
-    line-height: normal;
-    height: auto;
-    overflow: visible;
-    align-items: stretch;
-    justify-content: flex-start;
-  }
-
-  .gathering-env-card.is-available:not(.is-selected):hover {
-    background: var(--fab-surface-raised);
-  }
-
-  .gathering-env-card.is-available:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  /*
-    Selection is an accent-coloured border outline, NOT a box-shadow: the host
-    rule `.fabricate button:focus` clears box-shadow on mouse-click focus, which
-    would hide a shadow-based indicator until focus leaves the card. A
-    border-color outline is immune to that reset. (That reset was rooted at
-    `.fabricate-app` until issue 1501 collapsed it onto the module root; the rank
-    and the declarations are unchanged, so this argument is too.)
-  */
-  .gathering-env-card.is-selected {
-    border-color: var(--fab-accent);
-    background: var(--fab-success-soft);
-  }
-
-  .gathering-env-card.is-locked {
-    /* Keep text contrast-safe; only the image is desaturated. */
-    color: var(--fab-text-muted);
-  }
-
-  .gathering-env-card-main {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    min-width: 0;
   }
 
   .gathering-env-card-thumb-wrap {
@@ -294,7 +214,8 @@
     box-sizing: border-box;
   }
 
-  .gathering-env-card.is-locked .gathering-env-card-thumb {
+  /* Keep text contrast-safe; only the image is desaturated. */
+  :global(.gathering-env-card.is-locked) .gathering-env-card-thumb {
     filter: saturate(0.65) brightness(0.85);
   }
 
@@ -312,34 +233,6 @@
 
   .gathering-env-card-lock-overlay i {
     font-size: 20px;
-  }
-
-  .gathering-env-card-copy {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .gathering-env-card-name-row {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    min-width: 0;
-  }
-
-  .gathering-env-card-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
-  }
-
-  .gathering-env-card.is-locked .gathering-env-card-name {
-    /* Floor opacity so muted locked copy stays legible. */
-    opacity: 0.85;
   }
 
   .gathering-env-card-discovered {
@@ -377,53 +270,33 @@
     color: var(--fab-text);
   }
 
-  .gathering-env-card.is-locked .gathering-env-card-chip-label {
+  /* Floor the opacity so muted locked copy stays legible. */
+  :global(.gathering-env-card.is-locked .gathering-env-card-name) {
+    color: var(--fab-text-muted);
+    opacity: 0.85;
+  }
+
+  :global(.gathering-env-card.is-locked) .gathering-env-card-chip-label {
     color: var(--fab-text-muted);
     opacity: 0.85;
   }
 
   .gathering-env-card-description {
-    /* Full-width copy beneath the main row, clamped to ~2 lines. The 1.5
-       line-height's bottom half-leading already contains the second line's
-       descenders (g, y, p) within the clamp box, and the card's own 10px
-       bottom padding supplies the whitespace below.
-
-       Deliberately NO padding-bottom here: on Chromium (Foundry's renderer)
-       a padding-bottom on a -webkit-line-clamp box makes the browser paint a
-       sliver of the clamped-away third line into that padding band, which
-       then bleeds under the card border — most visibly with Foundry's tall
-       Signika metrics. Dropping the padding removes the sliver without
-       shaving descenders (verified against Signika). */
+    /* Clamped to two lines. The 1.5 line-height's bottom half-leading keeps the second line's
+       descenders inside the clamp box, and the row's own padding supplies the whitespace below:
+       a padding-bottom here makes Chromium paint a sliver of the clamped-away third line. */
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-size: 12px;
     line-height: 1.5;
+    white-space: normal;
     color: var(--fab-text-muted);
   }
 
-  .gathering-env-card.is-locked .gathering-env-card-description {
+  :global(.gathering-env-card.is-locked) .gathering-env-card-description {
     opacity: 0.85;
-  }
-
-  /*
-    A short header bar at the top of the card holding the blind + danger chips,
-    separated from the body by a soft divider. The negative margins make it
-    full-bleed (cancelling the card's 10px top/side padding) so the divider spans
-    the full card width; its own 6px vertical padding gives the chips a little
-    breathing room above and below. Right-aligned so the chips stay top-right.
-    Being in flow (not an overlay), it no longer steals width from the biome-chip
-    row below.
-  */
-  .gathering-env-card-header {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
-    margin: -10px -10px 0;
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--fab-border);
   }
 
   .gathering-env-card-blind {
@@ -443,11 +316,8 @@
     font-size: 11px;
   }
 
-  /*
-    Realm-lock alert: shown only when the environment is locked because the party
-    isn't in its realm. Mirrors the warning-tone task callout pill so it reads as
-    the same "not in current realm" indicator, just promoted to the env header.
-  */
+  /* Realm-lock alert: shown only when the environment is locked because the party isn't in its
+     realm. Mirrors the warning-tone task callout pill, so it reads as the same indicator. */
   .gathering-env-card-realm-alert {
     flex: 0 0 auto;
     display: inline-flex;
@@ -466,13 +336,9 @@
     font-size: 11px;
   }
 
-  /*
-    Danger pill: an icon + level-name chip (mirrors the blind chip metrics). The
-    skull icon escalates in colour with the environment's risk tier
-    (success -> warning -> danger) via the risk-* rules below; the label keeps
-    readable text colour. The base icon rule is the fallback for any unmapped
-    risk value.
-  */
+  /* Danger pill: an icon + level-name chip. The skull escalates in colour with the risk tier
+     (success -> warning -> danger) via the risk-* rules below; the base icon rule is the
+     fallback for any unmapped risk value. */
   .gathering-env-card-event {
     flex: 0 0 auto;
     display: inline-flex;
@@ -489,7 +355,7 @@
     color: var(--fab-text);
   }
 
-  .gathering-env-card.is-locked .gathering-env-card-event-label {
+  :global(.gathering-env-card.is-locked) .gathering-env-card-event-label {
     color: var(--fab-text-muted);
     opacity: 0.85;
   }

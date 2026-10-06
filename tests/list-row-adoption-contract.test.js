@@ -18,8 +18,6 @@ const LIST_ROW = 'src/ui/svelte/components/ListRow.svelte';
 const ROLE_BUTTON_SITES = Object.freeze([
   'src/ui/svelte/apps/alchemy/Workbench.svelte',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
-  'src/ui/svelte/apps/gathering/GatheringEventRow.svelte',
-  'src/ui/svelte/apps/gathering/GatheringTaskRow.svelte',
   'src/ui/svelte/components/LogList.svelte',
 ]);
 
@@ -29,7 +27,6 @@ const OWN_PRESSED_SITES = Object.freeze([
   'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
-  'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
   'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
 ]);
 
