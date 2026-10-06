@@ -556,6 +556,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
+  // Issue 1644: the stack picker adapts the shared candidate radiogroup.
+  'src/ui/svelte/components/ChoiceOptionList.svelte',
   'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
   // The check card is a strip of current values (issue 1521).
   'src/ui/svelte/components/InfoStrip.svelte',

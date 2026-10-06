@@ -10,8 +10,3 @@ export function countText(value) {
 export function haveOfNeedText(have, need) {
   return `${countText(have)}/${countText(need)}`;
 }
-
-// U+00D7, not the letter x: a player reads it as a quantity rather than as part of a name.
-export function stackCountText(have) {
-  return `×${countText(have)}`;
-}
