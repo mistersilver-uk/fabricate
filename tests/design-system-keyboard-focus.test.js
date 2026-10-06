@@ -217,10 +217,11 @@ describe('design system: a programmatic focus target declares itself focused to 
     const { formlessButtons } = focusPopulations();
     const undeclared = undeclaredIn(formlessButtons);
 
-    // 198 at issue 1777, which moved the manager trail's 22 crumb buttons into `PageHeader`.
+    // 198 at issue 1777, which moved the manager trail's 22 crumb buttons into `PageHeader`, then
+    // 173 once the manager rail's hand-authored rows became loops over `managerNavItems.js`.
     assert.ok(
-      formlessButtons.length >= 190,
-      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 198 ` +
+      formlessButtons.length >= 165,
+      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 173 ` +
         'this tree holds'
     );
     assert.ok(

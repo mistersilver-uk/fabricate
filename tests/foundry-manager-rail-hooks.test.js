@@ -17,10 +17,13 @@ const harness = SMOKE_SOURCE;
 const RAIL_BUTTON_CLASS = 'manager-nav-button';
 const RAIL_ENTRIES = [...MANAGER_SYSTEM_RAIL_ENTRIES, ...MANAGER_WORLD_SCOPED_RAIL_ENTRIES];
 
-/** The components that RENDER the manager rail. */
+/** The item model the rail's rows are built from, ids and labels included (issue 1777). */
+const RAIL_ITEM_MODEL = 'src/ui/svelte/apps/manager/managerNavItems.js';
+
+/** The components that RENDER the manager rail, and the model that authors its rows. */
 const railSources = Object.entries(
   collectWorkingTreeSources(['src'], ['.js', '.svelte'])
-).filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
+).filter(([file, text]) => text.includes(RAIL_BUTTON_CLASS) || file === RAIL_ITEM_MODEL);
 
 test('the rail entry table is non-trivial and internally consistent', () => {
   // NON-VACUITY FIRST. Every assertion below iterates this table, so an empty or truncated one
@@ -29,6 +32,10 @@ test('the rail entry table is non-trivial and internally consistent', () => {
   const ids = RAIL_ENTRIES.map((entry) => entry.id);
   assert.equal(new Set(ids).size, ids.length, 'a rail entry id is declared twice');
   assert.ok(railSources.length > 0, `nothing in src renders "${RAIL_BUTTON_CLASS}" any more`);
+  assert.ok(
+    railSources.some(([file]) => file === RAIL_ITEM_MODEL),
+    `${RAIL_ITEM_MODEL} is missing, so the ids it authors would be read nowhere`
+  );
 
   // AND THE DUPLICATE LABEL IS EXPECTED, not an accident.
   const labels = RAIL_ENTRIES.map((entry) => entry.label);
