@@ -242,7 +242,7 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 - **The GM Manager shows one Premium advert, the crafting-icons advert, in the page header's action group of exactly two screens: the world Component catalogue (`world-components`) and the system Component Rules list (`components`).**
   It is not rendered on the world Component entry, the Component Rules editor, or any other route.
   On Component Rules it leads the group, before `Add from catalogue`; on the world Component catalogue, whose group is otherwise not rendered, it is the group's only content.
-- It shows six Premium crafting icons, a `PREMIUM` badge in the Manager title bar badge's gold treatment, one line of copy, an external `See Premium` link and a dismiss control.
+- It shows six Premium crafting icons, a `PREMIUM` badge in the Manager title bar badge's gold treatment, one line of copy, an external `Get Premium` link and a dismiss control.
   The link is §Downtime Preview and Premium Extension's Patreon call to action — the same URL, `_blank`, `rel="noopener noreferrer"` — and, unlike that call to action, the advert carries raster imagery, because the icons are the product it advertises.
 - It renders only while all three hold: `fabricate.experimentalFeatures` is enabled; no provider is registered in either extension registry, which is the predicate the Manager title bar's `PREMIUM` badge reads; and the world setting `fabricate.premiumIconsAdDismissed` is not `true`.
   A provider registered while the Manager is open hides it at once.

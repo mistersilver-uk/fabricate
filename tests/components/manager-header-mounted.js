@@ -1845,7 +1845,7 @@ const HEADER_CENSUS = Object.freeze({
       "+ 5 span class=\"manager-premium-icons-ad-badge svelte-1h1bhxu\" | PREMIUM",
       "+ 4 span class=\"manager-premium-icons-ad-subline svelte-1h1bhxu\" | For components and essences, with Downtime",
       "+ 3 a class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" data-premium-icons-ad-link=\"true\" href=\"https://www.patreon.com/c/mistersilver\" rel=\"noopener noreferrer\" target=\"_blank\" title=\"Opens Fabricate Premium on Patreon in a new tab\"",
-      "+ 4 span | See Premium",
+      "+ 4 span | Get Premium",
       "+ 4 i aria-hidden=\"true\" class=\"fas fa-arrow-up-right-from-square\"",
       "+ 3 button aria-label=\"Hide Premium suggestion\" class=\"fabricate-icon-button is-size-24 is-ghost\" data-keyboard-focus=\"true\" data-premium-icons-ad-dismiss=\"\" title=\"Hide Premium suggestion\" type=\"button\"",
       "+ 4 i aria-hidden=\"true\" class=\"fas fa-xmark\"",
@@ -1889,7 +1889,7 @@ const HEADER_CENSUS = Object.freeze({
       "+ 5 span class=\"manager-premium-icons-ad-badge svelte-1h1bhxu\" | PREMIUM",
       "+ 4 span class=\"manager-premium-icons-ad-subline svelte-1h1bhxu\" | For components and essences, with Downtime",
       "+ 3 a class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" data-premium-icons-ad-link=\"true\" href=\"https://www.patreon.com/c/mistersilver\" rel=\"noopener noreferrer\" target=\"_blank\" title=\"Opens Fabricate Premium on Patreon in a new tab\"",
-      "+ 4 span | See Premium",
+      "+ 4 span | Get Premium",
       "+ 4 i aria-hidden=\"true\" class=\"fas fa-arrow-up-right-from-square\"",
       "+ 3 button aria-label=\"Hide Premium suggestion\" class=\"fabricate-icon-button is-size-24 is-ghost\" data-keyboard-focus=\"true\" data-premium-icons-ad-dismiss=\"\" title=\"Hide Premium suggestion\" type=\"button\"",
       "+ 4 i aria-hidden=\"true\" class=\"fas fa-xmark\"",
@@ -2028,7 +2028,7 @@ function registerPremiumIconsAdCases() {
     );
   });
 
-  it('links See Premium to the Patreon page in a new tab', async () => {
+  it('links Get Premium to the Patreon page in a new tab', async () => {
     await mountComponentRulesAdvert();
     const link = advert().querySelector('[data-premium-icons-ad-link]');
     assert.equal(link.tagName, 'A');
@@ -2036,9 +2036,9 @@ function registerPremiumIconsAdCases() {
     assert.equal(link.getAttribute('target'), '_blank');
     assert.equal(link.getAttribute('rel'), 'noopener noreferrer');
     assert.equal(link.getAttribute('title'), 'Opens Fabricate Premium on Patreon in a new tab');
-    assert.equal(link.textContent.trim(), 'See Premium');
+    assert.equal(link.textContent.trim(), 'Get Premium');
     assert.equal(link.querySelector('i').getAttribute('aria-hidden'), 'true');
-    assert.ok(!link.hasAttribute('data-action'), 'See Premium is a link, not an action');
+    assert.ok(!link.hasAttribute('data-action'), 'Get Premium is a link, not an action');
   });
 
   it('holds the world Component catalogue group alone, without the systems actions', async () => {

@@ -356,7 +356,7 @@ const REVIEWED = [
         file: 'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
         buttons: 12,
       },
-      // The Premium advert's `See Premium` link, counted whole-file for the same reason: the
+      // The Premium advert's `Get Premium` link, counted whole-file for the same reason: the
       // component renders only inside this container (issue 2220).
       {
         file: 'src/ui/svelte/apps/manager/ManagerPremiumIconsAd.svelte',

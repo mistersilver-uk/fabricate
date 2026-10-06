@@ -88,12 +88,12 @@
     target="_blank"
     rel="noopener noreferrer"
     title={text(
-      'FABRICATE.Admin.Manager.PremiumIconsAd.SeePremiumHint',
+      'FABRICATE.Admin.Manager.PremiumIconsAd.GetPremiumHint',
       'Opens Fabricate Premium on Patreon in a new tab'
     )}
     data-premium-icons-ad-link
   >
-    <span>{text('FABRICATE.Admin.Manager.PremiumIconsAd.SeePremium', 'See Premium')}</span>
+    <span>{text('FABRICATE.Admin.Manager.PremiumIconsAd.GetPremium', 'Get Premium')}</span>
     <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
   </Button>
   <IconButton

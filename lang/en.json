@@ -2750,8 +2750,8 @@
           "Title": "Crafting icons",
           "Badge": "PREMIUM",
           "Subline": "For components and essences, with Downtime",
-          "SeePremium": "See Premium",
-          "SeePremiumHint": "Opens Fabricate Premium on Patreon in a new tab",
+          "GetPremium": "Get Premium",
+          "GetPremiumHint": "Opens Fabricate Premium on Patreon in a new tab",
           "Hide": "Hide Premium suggestion"
         },
         "Crafting": {
