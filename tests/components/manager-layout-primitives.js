@@ -62,10 +62,10 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
   // pair's earlier position. Both areas are covered by this one block because `.fabricate` is
   // the player app's own root and the manager `<div>`'s ancestor.
   const moduleFocusBlock = blockFor(
-    '.fabricate a:focus,\n.fabricate button:focus,\n.fabricate input:focus,\n.fabricate select:focus,\n.fabricate textarea:focus,\n.fabricate [tabindex]:focus'
+    '.fabricate a:focus,\n.fabricate button:focus,\n.fabricate input:focus,\n.fabricate textarea:focus,\n.fabricate [tabindex]:focus'
   );
   const moduleFocusVisibleBlock = blockFor(
-    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate select:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
+    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
   );
 
   assert.ok(
@@ -108,9 +108,10 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
     // NON-EMPTY, asserted rather than assumed, for the reason the note above gives.
     assert.deepEqual(
       suppressed,
-      ['[tabindex]', 'a', 'button', 'input', 'select', 'textarea'],
-      `the ${area}'s :focus list must name the six element targets the pair is written for, ` +
-        'or the comparison below is between two empty lists'
+      ['[tabindex]', 'a', 'button', 'input', 'textarea'],
+      `the ${area}'s :focus list must name the five element targets the pair is written for — ` +
+        '`select` left with the last native select a template rendered (issue 1777) — or the ' +
+        'comparison below is between two empty lists'
     );
     assert.deepEqual(
       elementsIn(supplying).sort(compareStrings),
@@ -172,18 +173,18 @@ test('manager body starts as a three-region grid and stacks at narrow width', ()
 
 // The rail's crafting-system card SELECTS (issue 643). It used to be a fixed 64px box
 // holding the system's name and an icon-only button, with no way to switch system from
-// the rail at all — so the card is now a micro-label, a real `<select>` over every
-// system, and a text back link out to the system library.
+// the rail at all — so the card is now a micro-label, the shared `<Select>` over every
+// system (issue 1777), and a text back link out to the system library.
 test('the rail crafting-system card selects a system and links back to the library', () => {
   const scopeBlock = blockFor('.fabricate-manager .manager-scope-card');
-  const selectBlock = blockFor('.fabricate-manager .manager-scope-select');
+  const selectBlock = blockFor('.fabricate-manager .manager-scope-select .fabricate-select-trigger');
   const returnBlock = blockFor('.fabricate-manager .manager-scope-return');
   const returnFocusBlock = blockFor(
     '.fabricate-manager .manager-scope-return:hover,\n.fabricate-manager .manager-scope-return:focus-visible'
   );
   // The manager's keyboard ring is the module-rooted pair's supplying half (issue 1501).
   const focusBlock = blockFor(
-    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate select:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
+    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
   );
 
   assert.ok(
@@ -224,9 +225,14 @@ test('the rail crafting-system card selects a system and links back to the libra
     selectBlock.includes('font-family: var(--fab-font-serif);'),
     'the selected system name keeps the display face'
   );
-  assert.ok(selectBlock.includes('min-width: 0;'), 'the select may shrink inside the rail');
+  assert.ok(selectBlock.includes('width: 100%;'), 'the trigger takes the card width');
+  // 32px is off the ladder: 30 lifts the rail 2px and 34 drops it 2px; issue 1523 snaps it.
   assert.ok(
-    selectBlock.includes('text-overflow: ellipsis;'),
+    selectBlock.includes('min-height: 32px;'),
+    'the trigger keeps the native select’s 32px, so the nav below it does not move'
+  );
+  assert.ok(
+    blockFor('.fabricate-select-value').includes('text-overflow: ellipsis;'),
     'a long system name ellipsises rather than reflowing the nav'
   );
   assert.equal(
@@ -262,9 +268,9 @@ test('the rail crafting-system card selects a system and links back to the libra
 });
 
 test('manager nav buttons clear host mouse focus and keep green keyboard focus', () => {
-  const navFocusBlock = blockFor('.fabricate-manager .manager-nav-button:focus');
-  const activeNavFocusBlock = blockFor('.fabricate-manager .manager-nav-button.is-active:focus');
-  const navFocusVisibleBlock = blockFor('.fabricate-manager .manager-nav-button:focus-visible');
+  const navFocusBlock = blockFor('.fabricate-nav .manager-nav-button:focus');
+  const activeNavFocusBlock = blockFor('.fabricate-nav .manager-nav-button.is-active:focus');
+  const navFocusVisibleBlock = blockFor('.fabricate-nav .manager-nav-button:focus-visible');
 
   assert.ok(
     navFocusBlock.includes('outline: none;'),
@@ -997,6 +1003,16 @@ test('the stacked manager body sizes its regions to content instead of sharing i
   );
 });
 
+test('the scope trigger is 32px and ellipsises a long system name inside the 220px rail', async () => {
+  const report = await readShortWindowRailGeometry({
+    systemName: 'The Grand Consolidated Guild of Artificers and Alchemists',
+  });
+  assert.equal(report.triggerHeight, 32, 'the trigger is the native select’s 32px');
+  assert.ok(report.valueClipped, 'the long name overflows its value span');
+  assert.equal(report.valueTextOverflow, 'ellipsis', 'and the overflow is an ellipsis');
+  assert.ok(report.triggerRight <= report.scopeRight, 'the trigger stays inside the card');
+});
+
 test('a short window scrolls the rail nav instead of clipping its bottom entries', async () => {
   const report = await readShortWindowRailGeometry();
 
@@ -1046,7 +1062,7 @@ test('a short window scrolls the rail nav instead of clipping its bottom entries
 });
 
 test('the rail nav declares the scroller and the stacked breakpoint hands it back', () => {
-  const navBlock = blockFor('.fabricate-manager .manager-nav');
+  const navBlock = blockFor('.fabricate-nav.manager-nav');
   assert.ok(
     navBlock.includes('flex: 1 1 auto;') &&
       navBlock.includes('min-height:') &&
@@ -1066,7 +1082,7 @@ test('the rail nav declares the scroller and the stacked breakpoint hands it bac
 
   // Stacked, the rail is already a bounded 232px strip that scrolls itself.
   const query = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
-  const navStart = query.indexOf('.fabricate-manager .manager-nav {');
+  const navStart = query.indexOf('.fabricate-nav.manager-nav {');
   assert.ok(navStart > -1, 'the 1120px query must reset the nav scroller');
   const stackedNavRule = query.slice(navStart, query.indexOf('}', navStart) + 1);
   assert.ok(
@@ -1091,7 +1107,7 @@ test('collapsed manager rail hides scope content but keeps its expand control an
     '.fabricate-manager .manager-body.is-rail-collapsed .manager-scope-collapse'
   );
   const railTitleBlock = blockFor('.fabricate-manager .manager-rail-title');
-  const navCountBlock = blockFor('.fabricate-manager .manager-nav-count');
+  const navCountBlock = blockFor('.fabricate-nav .manager-nav-count');
 
   assert.ok(
     collapsedRailTitleBlock.includes('display: none;'),
@@ -1140,7 +1156,7 @@ test('collapsed manager rail hides scope content but keeps its expand control an
     'a rail count must not change width between 9 and 10'
   );
   assert.equal(
-    css.includes('.fabricate-manager .manager-nav-count.manager-chip'),
+    css.includes('.fabricate-nav .manager-nav-count.manager-chip'),
     false,
     'the rail count should own its rule rather than borrowing (and undoing) the content chip'
   );
@@ -1190,7 +1206,7 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
   // The badge carries the localized PREMIUM mark (issue 1185; it used to carry the selected
   // system's name, which the rail's crafting-system card already shows).
   const goldChipBlock =
-    /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-manager \.manager-nav-premium,\s*\.fabricate-manager \.manager-premium-icons-ad-badge \{[\s\S]*?\}/.exec(
+    /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-nav \.manager-nav-premium,\s*\.fabricate-manager \.manager-premium-icons-ad-badge \{[\s\S]*?\}/.exec(
       withoutComments(css)
     )?.[0] ?? '';
   assert.ok(

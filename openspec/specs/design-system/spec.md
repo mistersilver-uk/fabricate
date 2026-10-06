@@ -69,7 +69,8 @@ The library is where the vocabulary lives and this document is where its rules l
 A member that has SHIPPED MUST also carry a row in `scripts/lib/designSystemPrimitives.json` naming its implementation path, which is what lets a diff be attributed to a primitive.
 A member that has not shipped carries no row, because the manifest enumerates what ships and a row naming no file is a correspondence to nothing.
 `tests/design-system-coverage.test.js` reads both artifacts and fails when a name is in one and not the other, in either direction.
-`EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry; issue 1782 merged `<ValidationList>` into it, so the 40 naming headings declare 71 distinct names.
+`EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry, and issue 1782 merged `<ValidationList>` into it.
+`NavSidebar` is the shipped implementation of the library's `<NavSidebar>` entry, and issue 1777 merged `<AppRail>` into it as its `icon` variant (decision E2), so the 40 naming headings declare 70 distinct names.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
@@ -319,7 +320,7 @@ The rule governs SELECTOR ROOTING and does not reach a bare-element baseline an 
 A shared primitive nonetheless MUST NOT depend on one, for the same reason it must not read an area-scoped property: `.fabricate-manager input:not([type])` themes every free-text control in the manager, and a primitive relying on it renders Foundry's default chrome everywhere else.
 Such a primitive declares that chrome on its own rule instead.
 
-The two re-rooted button families do exactly that. `.fabricate-manager button, .fabricate-manager input, .fabricate-manager select, .fabricate-manager textarea { font: inherit }` has no player-app counterpart, so a button rooted at its own class and rendered outside the manager would fall to Foundry's default button font; the families therefore declare `font: inherit` on a rule of their own.
+The two re-rooted button families do exactly that. `.fabricate-manager button, .fabricate-manager input, .fabricate-manager textarea { font: inherit }` has no player-app counterpart, so a button rooted at its own class and rendered outside the manager would fall to Foundry's default button font; the families therefore declare `font: inherit` on a rule of their own.
 WHERE that rule is ROOTED is part of the requirement rather than a formatting choice, because a bare-element baseline is a FLOOR and not an override.
 It is declared at the FAMILY ROOT ALONE — high enough to beat the user agent's own button font in a host that declares nothing, and deliberately too low to beat a caller's per-site rule on a class the primitive merely passes through.
 Written at the family's own compound specificity it instead TIES every such rule and wins on source order against each one declared earlier in the sheet: that is how issue 1502's first attempt silently deleted the recipe row's `manager-recipe-lock` and `manager-recipe-edit` 0.68rem and rendered both glyphs 28.7% larger.
@@ -334,7 +335,7 @@ Chrome an area declares over an element-TYPED predicate is a SEPARATE rule that 
 Written over `:is(input, select, textarea)`, `appearance` and `min-height` reach the radios, ranges, steppers and selects the area's own predicate deliberately excludes, and neither can be undone by a higher-specificity `height` or `appearance` rule further down.
 POSITION is the third axis, and at (0,1,1) it is load-bearing in a way it is not at (0,1,0).
 A floor that TIES every LATER same-rank rule in its area also beats each of them on source order, and `font` is a shorthand that resets `line-height` with the rest.
-So the floor is declared at the first position from which no rule it did not previously beat now loses to it, which on this sheet is immediately below the area baseline: `.fabricate-manager textarea { line-height: 1.4 }` and the `@supports (appearance: base-select)` form of `.fabricate-manager select { line-height: 1 }` each restate a `font` longhand at that same rank, further down.
+So the floor is declared at the first position from which no rule it did not previously beat now loses to it, which on this sheet is immediately below the area baseline: `.fabricate-manager textarea { line-height: 1.4 }` restates a `font` longhand at that same rank, further down, and its `@supports (appearance: base-select)` select twin went with the manager's last native select at issue 1777.
 The `line-height` is not left to the shorthand either. `font` is a shorthand, so it resets line-height along with the rest — to the inherited value in the `inherit` form, to `normal` otherwise — and the block that declares `line-height: 1` is the MORE SPECIFIC of the two, so that block is what resolves in any engine and the ordering of the two is corroboration rather than the mechanism.
 That is the (0,1,0) case, where the two ranks differ and specificity settles it.
 Where the ranks TIE, position carries the same duty on its own, and the floor must be declared where no same-rank restatement of a `font` longhand is left below it.
@@ -706,7 +707,7 @@ An interactive primitive MUST declare rest, hover, focus-visible and disabled, a
 Any surface rendered from an asynchronous store — a browse list, a table, a rail section — declares LOADING and ERROR, because a store-fed surface reaches both states in ordinary use and a component that renders neither shows an empty list for a failure.
 Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer activation does not ring.
 `tests/components/design-system-debt-ratchets.test.js` holds that rule across both stylesheet corpora, judging each compound of a selector list separately.
-Its one exemption is SUPPRESSING Foundry core's own focus ring, which the global sheet does for ONE root — `.fabricate` itself, the shared module root every Fabricate window emits — and it is recognised by the SHAPE of that block — one root class crossed with a published list of element targets — rather than by naming lines, so appending a seventh selector to an exempt block breaks the shape instead of inheriting the exemption.
+Its one exemption is SUPPRESSING Foundry core's own focus ring, which the global sheet does for ONE root — `.fabricate` itself, the shared module root every Fabricate window emits — and it is recognised by the SHAPE of that block — one root class crossed with a published list of element targets — rather than by naming lines, so appending a sixth selector to an exempt block breaks the shape instead of inheriting the exemption.
 It named five roots until the three interactables windows and the roll-prompt dialog had their copies deleted, and the rule that reduction establishes is general: a per-area copy of a suppression the module root already writes reaches the same elements at the same rank, so which one paints is decided by source order rather than by anything a reader of either block can see, and the copy is deleted by the change that proves the module rule reaches it.
 The licence extends to COPIES and not to VARIANTS.
 Where an area rule declares a DIFFERENT treatment it is not a copy and it survives while it has a carrier: the roll-prompt dialog kept a `:focus-visible` ring of its own on `select`, painting an inset `box-shadow` where the module ring paints an outset `outline`, because an outset ring on a `<select>` flush to that dialog's overflow-clipped edge is clipped and reads as a one-sided flash; it went with the dialog when issue 2021 moved the prompt into the shared `Modal`.
@@ -998,8 +999,12 @@ A `RuleRow` edits one condition→effect rule: a Check Breakage trigger, or a ga
 It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier or any other row of the World › Rules & Resources route.
 `SetPicker` is a bounded trigger opening a staged panel committed on Apply, and its `choose` form exists only for the session control "Set membership is edited through a bounded, staged picker" exempts; a control that commits one choice into a single slot, a filter or a short list its caller renders is not a set picker.
 The deciding test is the widget and when the write lands, never how the control looks.
-`Rail` is ONE SECTION of a right-hand inspector column, the library's inspector rail section: never the column itself, never the nav rail's `.manager-rail-block`, which carries the Rail Marker Family, and never `AppRail`.
+`Rail` is ONE SECTION of a right-hand inspector column, the library's inspector rail section: never the column itself, never the nav rail's `.manager-rail-block`, which carries the Rail Marker Family, and never `NavSidebar`'s `icon` variant.
 `DataTable` is for records compared down columns and `ListRow` for records scanned one at a time; a ladder of tiers is `OutcomeLadder`, never a table.
+`NavSidebar`'s variants are routed by shape, never by consumer, and its ARIA follows the variant.
+The `icon` variant MUST render a vertical tablist that keeps one tab stop, consistent with "A tab strip always keeps a tab stop", with `aria-selected` on the current tab, `aria-controls` naming the panel, each tooltip a sibling of the tablist referenced by `aria-describedby`, and Up, Down, Home and End moving the selection and focus.
+The `labelled` variant MUST render a `nav` with `aria-current` on the current row, a group parent's separate chevron carrying `aria-expanded` and `aria-controls`, and a disabled row or locked chevron carrying `disabled`, `aria-disabled` and its reason through `aria-describedby` to a visually hidden element, its `title` kept.
+Neither variant is the inspector `Rail`, the nav rail's `.manager-rail-block` or a Rail Marker Family vehicle.
 A GRIP is the pointer's drag handle and the keyboard's move control, one per ordered row; a ROCKER is the stacked up and down chevron PAIR that steps a row one position, and neither word names the other's affordance.
 
 #### Scenario: A list row and an editor both show the same record state
@@ -1019,6 +1024,18 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **WHEN** a navigation item's only visible content is a glyph
 - **THEN** its count is the filled pip on the well's outer corner
 - **AND** a labelled row's count renders as a bare numeral
+
+#### Scenario: The icon nav keeps one tab stop
+
+- **WHEN** `NavSidebar`'s `icon` variant renders
+- **THEN** exactly one item has `tabindex="0"`
+- **AND** the arrow keys move the selection and the focus
+
+#### Scenario: A locked chevron announces its reason
+
+- **WHEN** `NavSidebar`'s `labelled` variant renders a disabled chevron
+- **THEN** its reason is announced through `aria-describedby`
+- **AND** the chevron keeps its `title`
 
 #### Scenario: A tier-gated tab carries the premium padlock
 
@@ -1735,6 +1752,7 @@ Deleting it early drops a still-shipping control to the platform's own treatment
 The player app's shared select skin is the first one to reach the end of that rule rather than to be narrowed by it.
 Three rules under `.fabricate-app` themed the closed control, its option list and its focus ring, and all three are DELETED with the app's last native select, because no select is rendered under `.fabricate-app` any more — the shared play-surface class the player window and the three interactables windows all emit.
 That is the rule's reach and therefore the right test: the manager's remaining selects and the three `DialogV2` bodies carry their own skins, and neither ever inherited this one.
+The manager's skin reached the same end at issue 1777, when the nav rail's scope select converted and no template rendered a native select any more: its element-level baseline, option list and `base-select` picker, the `.form-group` and gathering event editor `select` legs, and the `select` leg of the module focus pair are DELETED, because none of the three `DialogV2` bodies carries a Fabricate root for any of them to reach.
 The carriers a root's skin answers for are this repository's own markup under that root; a companion module renders its own DOM inside the player host and styles it itself.
 Deletion is right exactly when no carrier is left, and the check is the carrier rather than the calendar.
 
@@ -2027,12 +2045,23 @@ The trail is a `nav` named "Breadcrumbs"; a crumb with `onSelect` is a button ca
 `PageHeader` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
 At issue 1777 its callers kept the manager's shipped header geometry, which disagreed with the specimen, and decision E4 escalated that disagreement to issue 1523 rather than settling it.
 
+The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
+Neither writes nav row, group or tab markup of its own, and the sidebar root carries `fabricate-nav`.
+`NavSidebar` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
+At issue 1777 both callers kept their shipped geometry, which disagreed with the specimen, and the convergence belongs to issue 1523.
+
 #### Scenario: A manager route draws its header
 
 - **WHEN** a manager route, the Tool editor and the Tool library included, renders its header
 - **THEN** it passes `breadcrumbs`, its title block and its actions, when it has any, to `PageHeader`
 - **AND** it writes no breadcrumb markup
 - **AND** the header root carries `fabricate-page-header`
+
+#### Scenario: NavSidebar's geometry disagrees with its specimen
+
+- **WHEN** `NavSidebar`'s geometry disagrees with its specimen
+- **THEN** the entry stays `target`
+- **AND** the geometry converges in issue 1523
 
 ### Requirement: A window is registered in the View Lab before a change re-skins it
 
@@ -2227,6 +2256,8 @@ Crafting's essence pool MUST compose `EssencePool` through its adapter; its opt-
 Repeated thresholds for the same essence MUST sum their required amounts before comparing the shared contribution and render one keyed pool, so Fire 2 plus Fire 2 requires four Fire rather than counting the same two Fire twice.
 `ChoiceOptionList` MUST use each option's own `needed` amount when provided, falling back to the slot-level amount only for uniform-quantity callers.
 `SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.
+`SlotTile` has a `partial` face: a `--fab-warning-border` hairline, its pip on solid `--fab-warning` inked `--fab-bg-0`, and `--fab-warning-text` caption ink.
+`SlotRow` and `RequirementChooser` MUST paint a partly delivered essence with that face, never the `short` one, even while its group is still reported missing; an unchosen choice slot keeps the `open` face.
 Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
 `StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
 `YieldScale` MUST show one shared d100 cut against the item chances when shared-roll evidence is established.

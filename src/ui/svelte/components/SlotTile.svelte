@@ -1,4 +1,3 @@
-<!-- ratchet-exempt(design-system): promoted on its second importer, RequirementChooser (issue 1518); its partial face and rendered acceptance stay with issue 1644 -->
 <!-- Material-choice tiles retain the library's 56px image and overlaid quantity pip. -->
 <script>
   import Medallion from './Medallion.svelte';
@@ -19,7 +18,7 @@
     onActivate = () => {},
   } = $props();
 
-  const states = new Set(['met', 'short', 'open']);
+  const states = new Set(['met', 'partial', 'short', 'open']);
   const resolvedState = $derived(states.has(state) ? state : 'met');
   const host = $derived(interactive ? 'button' : 'div');
   const attributes = $derived(
@@ -89,6 +88,10 @@
     border-color: var(--fab-danger-border);
   }
 
+  .fab-slot-tile.is-partial {
+    border-color: var(--fab-warning-border);
+  }
+
   .fab-slot-tile.is-open {
     border-style: dashed;
     border-color: var(--fab-accent-border);
@@ -138,6 +141,12 @@
     color: var(--fab-on-danger);
   }
 
+  /* No on-warning ink exists, so the warning fill takes the page ground as every solid chip does. */
+  .is-partial .fab-slot-pip {
+    background: var(--fab-warning);
+    color: var(--fab-bg-0);
+  }
+
   .fab-slot-pip.is-candidate {
     background: var(--fab-accent);
     color: var(--fab-on-accent);
@@ -159,6 +168,10 @@
 
   [data-slot-state='short'] .fab-slot-caption {
     color: var(--fab-danger-text);
+  }
+
+  [data-slot-state='partial'] .fab-slot-caption {
+    color: var(--fab-warning-text);
   }
 
   [data-slot-state='open'] .fab-slot-caption {

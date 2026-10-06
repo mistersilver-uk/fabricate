@@ -35,10 +35,10 @@ const FIXTURE = `
             <span class="manager-chip is-neutral manager-editor-tab-badge" data-m="tab-badge">4</span>
           </button>
         </div>
-        <div class="manager-nav-button">
+        <div class="fabricate-nav"><div class="manager-nav-button">
           <span class="manager-nav-label" data-m="nav-label">Recipes</span>
           <span class="manager-nav-count" data-m="nav-count">105</span>
-        </div>
+        </div></div>
         <div class="manager-recipe-ingredient-set-add">
           <!-- Carries fab-manager-button because the shipped control does (issue 1118), and
                see the expected value below: this is the one row in this file that changed

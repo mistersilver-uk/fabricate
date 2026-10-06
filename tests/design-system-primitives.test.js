@@ -143,6 +143,9 @@ const EXPECTED_OVERRIDE_KEYS = [
   // component exactly one painted rule of its own — the at-cap trigger treatment — and that rule
   // had to be re-anchored through `:global()` because the button is the primitive's element now.
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  // Issue 1777: the app navigation and its labelled rows, on both rail states and the player shell.
+  'src/ui/svelte/components/NavSidebar.svelte',
+  'src/ui/svelte/components/NavSidebarRows.svelte',
   // Issue 1505: the surface that reports something that just happened.
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/OutcomeLadder.svelte',

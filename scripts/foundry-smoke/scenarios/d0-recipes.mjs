@@ -143,7 +143,7 @@ export default {
     // system whatever a recipe is authored to do.
     const scopeSelect = page.locator('.fabricate-manager [data-manager-scope-select]').first();
     try {
-      await scopeSelect.selectOption({ label: 'Smoke Simple Forge' });
+      await chooseSelectOption(page, scopeSelect, { value: executionFixtures?.simple?.systemId });
       await settleManagerNav(page);
       await page
         .locator('.fabricate-manager .manager-recipe-row [data-recipe-check="none"]')
@@ -155,7 +155,9 @@ export default {
         label: 'manager-recipes-no-check',
       });
     } finally {
-      await scopeSelect.selectOption(craftingSetup.systemId).catch(() => {});
+      await chooseSelectOption(page, scopeSelect, { value: craftingSetup.systemId }).catch(
+        () => {}
+      );
       await settleManagerNav(page);
       await openManagerCraftingSection(page, 'recipes', 'recipes');
     }

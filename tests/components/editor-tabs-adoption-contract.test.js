@@ -116,10 +116,11 @@ function rawTablists() {
 
 /** The files that may still write a raw `role="tablist"`, in code-point order, and why. */
 const TABLIST_HOSTS = Object.freeze([
-  // The player app's vertical nav rail: the library's `<AppRail>`, not a tab strip (issue 1779, E2).
-  'src/ui/svelte/apps/FabricateAppRoot.svelte',
   // THE primitive. It is the one file that is supposed to write this.
   PRIMITIVE,
+  // The player app's vertical nav rail: `<NavSidebar>`'s icon variant, not a tab strip (issue
+  // 1777 decision E2, which merged `<AppRail>` into it).
+  'src/ui/svelte/components/NavSidebar.svelte',
 ]);
 
 test('the tablist walk is alive, so the clause below is not vacuous', () => {

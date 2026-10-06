@@ -31,13 +31,18 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/WorldClockChip.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
   ]),
+  // Issue 1644: the read-only row, and every frame that paints a partly delivered essence.
   'src/ui/svelte/components/SlotRow.svelte': Object.freeze([
     'fabricate-journal-lifecycle-waiting-open-choice',
     'fabricate-journal-lifecycle-material-shortage',
+    'fabricate-journal-lifecycle-legacy',
   ]),
   'src/ui/svelte/components/SlotTile.svelte': Object.freeze([
     'fabricate-journal-lifecycle-waiting-open-choice',
     'fabricate-journal-lifecycle-material-shortage',
+    'player-crafting-essence-pool-shared',
+    'player-crafting-essence-shopping',
+    'player-crafting-pick-for-me',
   ]),
   'src/ui/svelte/components/ChoiceOptionList.svelte': Object.freeze([
     'fabricate-journal-lifecycle-waiting-open-choice',
@@ -212,6 +217,20 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/PageHeader.svelte': Object.freeze([
     'manager-tool-parity-01-library-1280x720',
     'manager-tool-parity-04-requirements-1280x720',
+  ]),
+  // The app navigation (issue 1777): the manager sidebar expanded and collapsed, the collapsed
+  // Downtime rail, and the player rail, its icon variant.
+  'src/ui/svelte/components/NavSidebar.svelte': Object.freeze([
+    'manager-rail-expanded',
+    'manager-rail-collapsed',
+    'manager-world-downtime-collapsed',
+    'fabricate-app-shell',
+  ]),
+  // Its labelled rows and groups (issue 1777), which only the manager sidebar draws.
+  'src/ui/svelte/components/NavSidebarRows.svelte': Object.freeze([
+    'manager-rail-expanded',
+    'manager-rail-collapsed',
+    'manager-world-downtime-collapsed',
   ]),
   // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
@@ -401,11 +420,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-simple',
   ]),
   // The requirement chooser (issue 1518): open on a choice slot, and the rail's three slot states;
-  // and its award face at the ceiling (issue 1773).
+  // its award face at the ceiling (issue 1773); and the partly delivered essences (issue 1644).
   'src/ui/svelte/components/RequirementChooser.svelte': Object.freeze([
     'player-crafting-chooser-open',
     'player-crafting-slot-rail',
     'player-journal-award-choice-ceiling',
+    'player-crafting-essence-pool-shared',
+    'player-crafting-essence-shopping',
+    'player-crafting-pick-for-me',
   ]),
   // The track (issue 1516): its 30px inline rung is drawn only by the requirement row's amount toggle.
   'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([

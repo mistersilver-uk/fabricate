@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { flushSync, tick } from 'svelte';
 
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../../src/ui/svelte/util/announceAfterFocus.js';
+import { chooseSelectOption } from '../select-control.js';
 import { shippedString } from './managerLocalization.js';
 
 /**
@@ -301,13 +302,10 @@ export function createManagerQueries(getTarget) {
       .map((button) => button.id.replace('manager-crafting-nav-', ''));
   }
 
-  // The ONE scope-switch driver for the route-reconciliation cases (issue 1151): set the select,
-  // dispatch a real bubbling `change`, settle, and report the rendered route.
+  // The ONE scope-switch driver for the route-reconciliation cases (issue 1151): choose the system
+  // on the scope Select, settle, and report the rendered route.
   async function switchScopeSystemTo(systemId) {
-    const scopeSelect = getTarget().querySelector('[data-manager-scope-select]');
-    assert.ok(scopeSelect, 'the rail card exposes a system scope select');
-    scopeSelect.value = systemId;
-    scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    chooseSelectOption(getTarget(), '[data-manager-scope-select]', systemId);
     await tick();
     flushSync();
     return getTarget().querySelector('.fabricate-manager').dataset.managerView;

@@ -107,7 +107,7 @@ const BARE_FOCUS = /:focus(?!-(?:visible|within))(?![\w-])/u;
 const RESET_SHAPES = Object.freeze(
   [
     'button input select textarea [tabindex]',
-    'a button input select textarea [tabindex]',
+    'a button input textarea [tabindex]',
     'button input select',
   ].map((shape) => shape.split(' ').sort(byCodePoint).join(' '))
 );
@@ -222,11 +222,12 @@ test('the five Foundry-core focus resets are recognised, and a look-alike is not
   );
   assert.equal(
     exempt.length,
-    6,
-    'the one surviving block names 6 selectors. It was 24 across five blocks before issue 1520: ' +
-      'the module reset names six, the config, browser and manager copies named five each, and ' +
+    5,
+    'the one surviving block names 5 selectors. It was 24 across five blocks before issue 1520: ' +
+      'the module reset named six, the config, browser and manager copies named five each, and ' +
       'the roll-prompt copy named three — 6 + 5 + 5 + 5 + 3 — of which 18 went with the four ' +
-      'deleted blocks.'
+      'deleted blocks, and issue 1777 took the module reset`s `select` leg with the last native ' +
+      'select a template rendered.'
   );
 
   // A rule that merely CONTAINS a reset compound is not a reset. This is the cheapest way to
@@ -1197,8 +1198,10 @@ const WITHDRAWN_UTILITIES = Object.freeze([
   {
     name: 'fab-field-skin',
     why:
-      'measured at thirteen carriers of the target tuple: three are PINNED by a test or a script ' +
-      'that reads their selectors, six are recorded non-adopters and four are unpinned. Issue ' +
+      'measured at twelve carriers of the target tuple: three are PINNED by a test or a script ' +
+      'that reads their selectors, five are recorded non-adopters and four are unpinned. Issue ' +
+      "1777 deleted the sixth non-adopter, the manager's element-level `select` baseline, with " +
+      'the last native select a template rendered. Issue ' +
       "2005's Studio parity pass added the outcome tier row, pinned by the Checks mounted suite, " +
       "and took the config option card's glyph tile off the tuple, its border now transparent " +
       "as the library's icon chip draws it. The " +
@@ -1471,9 +1474,9 @@ test('every carrier of the withdrawn skin tuple carries its census marker', () =
 
   assert.equal(
     carriers.length,
-    13,
-    'the census is thirteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
-      'its three-pinned / six-non-adopter / four-unpinned split as prose, so a carrier arriving ' +
+    12,
+    'the census is twelve carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
+      'its three-pinned / five-non-adopter / four-unpinned split as prose, so a carrier arriving ' +
       'or ' +
       'leaving means re-deriving that `why` text with it rather than moving this number alone.'
   );

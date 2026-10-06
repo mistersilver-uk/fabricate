@@ -32,8 +32,15 @@
     return componentId ? Math.max(0, Number(held(componentId)) || 0) : 0;
   }
 
+  // A partly delivered essence is partial even though the solver still reports its group missing.
+  function partlyDelivered(requirement) {
+    const met = Number(requirement.poolsMet) || 0;
+    return met < Number(requirement.poolsRequired) && (met > 0 || requirement.poolsStarted > 0);
+  }
+
   function tileState(requirement) {
     if (requirement.kind === 'choice' && !componentFor(requirement)) return 'open';
+    if (requirement.kind === 'essence' && partlyDelivered(requirement)) return 'partial';
     if (requirement.available === false) return 'short';
     if (requirement.kind === 'essence') {
       return Number(requirement.poolsMet) >= Number(requirement.poolsRequired) ? 'met' : 'short';

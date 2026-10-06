@@ -151,17 +151,18 @@ describe('RequirementChooser mounted behavior', () => {
     );
   });
 
-  it('paints short for a chosen short choice and for a partly met essence', async () => {
+  it('paints a chosen short choice short and a partly delivered essence partial', async () => {
     const target = await harness.mount({
       slots: [
         { ...CHOICE, state: 'short' },
         { ...ESSENCE, state: 'partial', pip: '2/4' },
       ],
     });
-    assert.deepEqual(
-      slotsIn(target).map((slot) => paintOf(slot)),
-      ['short', 'short']
-    );
+    const [choice, essence] = slotsIn(target);
+    assert.equal(paintOf(choice), 'short');
+    assert.equal(paintOf(essence), 'partial', 'a partly delivered essence is never painted short');
+    const tile = essence.querySelector('.fab-slot-tile');
+    assert.ok(tile.classList.contains('is-partial') && !tile.classList.contains('is-short'));
     for (const slot of slotsIn(target)) {
       assert.ok(slot.querySelector('.fab-slot-pip').classList.contains('is-ratio'));
     }
@@ -179,11 +180,33 @@ describe('RequirementChooser mounted behavior', () => {
       [String.raw`\.fab-slot-pip`, '--fab-on-success'],
       [String.raw`\.is-short\S* \.fab-slot-pip`, '--fab-on-danger'],
       [String.raw`\.fab-slot-pip\S*\.is-candidate`, '--fab-on-accent'],
+      [String.raw`\.is-partial\S* \.fab-slot-pip`, '--fab-bg-0'],
     ]) {
       assert.match(
         css,
         new RegExp(String.raw`${selector}[^{,]*\{[^}]*[^-]color:\s*var\(${ink}\)`),
         `${selector} is inked ${ink}, the ink the solid chip takes on the same fill`
+      );
+    }
+  });
+
+  // No on-warning ink is declared, so the warning fill takes the page ground (library, Chip).
+  it('draws the partial face on the warning ground: hairline, solid pip and caption ink', async () => {
+    await harness.mount({ slots: [{ ...ESSENCE, state: 'partial' }] });
+    const css = injectedCss();
+    for (const [selector, property, token] of [
+      [String.raw`\.fab-slot-tile\S*\.is-partial`, 'border-color', '--fab-warning-border'],
+      [String.raw`\.is-partial\S* \.fab-slot-pip`, 'background', '--fab-warning'],
+      [
+        String.raw`\[data-slot-state='partial'\]\S* \.fab-slot-caption`,
+        'color',
+        '--fab-warning-text',
+      ],
+    ]) {
+      assert.match(
+        css,
+        new RegExp(String.raw`${selector}[^{,]*\{[^}]*[^-]${property}:\s*var\(${token}\)`),
+        `${selector} sets ${property} to ${token}`
       );
     }
   });

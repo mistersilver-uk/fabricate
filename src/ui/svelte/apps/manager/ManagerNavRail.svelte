@@ -1,8 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The manager's navigation rail: the aside itself, its section label, the crafting-system scope
-  card with the collapse toggle, and the nav shell that renders the system and world entry units
-  (issue 1717, extracted from the root).
+  card with the collapse toggle, and `NavSidebar`'s `labelled` nav, whose rows the system and
+  world entry units render (issue 1717, extracted from the root; issue 1777).
 
   Props:
   | prop | values | default | contract |
@@ -10,7 +10,8 @@
   | `navRail` | the `navRailModel` instance | — | the rail's own expansion, collapse and lock state; built by the root, which also writes to it |
   | `systems` | the selectable crafting systems | `[]` | the scope select's options, in the order the store publishes them |
 
-  Every other prop is forwarded unchanged to `ManagerSystemNav` or `ManagerWorldNav`.
+  Every other prop is forwarded unchanged to `ManagerSystemNav` or `ManagerWorldNav`, with the
+  sidebar's `rows` snippet.
 
   Invariants:
   - Every rail-toggle attribute reads `navRail.collapsedDisplay`, never the stored preference, so
@@ -21,6 +22,8 @@
 -->
 <script>
   import ManagerSystemNav from './ManagerSystemNav.svelte';
+  import NavSidebar from '../../components/NavSidebar.svelte';
+  import Select from '../../components/Select.svelte';
   import ManagerWorldNav from './ManagerWorldNav.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
@@ -107,6 +110,12 @@
   const railToggleIcon = $derived(
     navRail.collapsedDisplay ? 'fas fa-angles-right' : 'fas fa-angles-left'
   );
+  const systemOptions = $derived(systems.map(({ id, name }) => ({ value: id, label: name })));
+
+  // The shared Select reports a pick of the ticked row too; the system in scope is not a change.
+  function chooseScopeSystem(systemId) {
+    if (systemId !== selectedSystem?.id) changeScopeSystem(systemId);
+  }
 </script>
 
 <aside
@@ -147,17 +156,15 @@
             <i class={railToggleIcon} aria-hidden="true"></i>
           </button>
         </div>
-        <select
+        <Select
           class="manager-scope-select"
-          data-manager-scope-select
+          size="inline"
           value={selectedSystem.id}
-          aria-label={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
-          onchange={(event) => changeScopeSystem(event.currentTarget.value)}
-        >
-          {#each systems as system (system.id)}
-            <option value={system.id}>{system.name}</option>
-          {/each}
-        </select>
+          options={systemOptions}
+          ariaLabel={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
+          triggerProps={{ 'data-manager-scope-select': '' }}
+          onChange={chooseScopeSystem}
+        />
         <!--
           The systems browser IS the destination this link returns to.
         -->
@@ -202,72 +209,76 @@
     {/if}
   </section>
 
-  <nav
-    class="manager-nav"
-    aria-label={text('FABRICATE.Admin.Manager.ManagerSections', 'Manager sections')}
+  <NavSidebar
+    variant="labelled"
+    label={text('FABRICATE.Admin.Manager.ManagerSections', 'Manager sections')}
   >
-    <ManagerSystemNav
-      {navRail}
-      {selectedSystem}
-      {currentView}
-      {setView}
-      {editSystem}
-      {systemOverviewCount}
-      {isCraftingRoute}
-      {activateCraftingParent}
-      {craftingNavCount}
-      {craftingNavItems}
-      {activeCraftingTab}
-      {openCraftingSection}
-      {selectedCounts}
-      {tagCategoryCounts}
-      {canShowEssences}
-      {toolsNavCount}
-      {isChecksRoute}
-      {activateChecksParent}
-      {checksNavCount}
-      {checksNavItems}
-      {canShowEnvironments}
-      {isGatheringRoute}
-      {activateGatheringParent}
-      {gatheringNavCounts}
-      {visibleGatheringNavItems}
-      {displayedGatheringTab}
-      {openGatheringSection}
-      {experimentalFeaturesEnabled}
-    />
-    <ManagerWorldNav
-      {navRail}
-      {currentView}
-      {setView}
-      {worldScopedCounts}
-      {isWorldRoute}
-      {openWorldParties}
-      {travelParties}
-      {isWorldTravelRoute}
-      {activateWorldTravelParent}
-      {worldRealms}
-      {worldTravelTab}
-      {openWorldTravelDestination}
-      {isWorldRulesRoute}
-      {activateWorldRulesParent}
-      {selectedCurrencyUnits}
-      {selectedCharacterPrerequisites}
-      {selectedSystemModifiers}
-      {isWorldCurrencyRoute}
-      {isWorldPrerequisitesRoute}
-      {isWorldModifiersRoute}
-      {openWorldRulesDestination}
-      {worldDowntimeAvailable}
-      {isWorldDowntimeRoute}
-      {downtimeCoreFallback}
-      {downtimeTabs}
-      {downtimeNavTabBadges}
-      {downtimeTabText}
-      {downtimeNavLabelId}
-      {worldDowntimeTabId}
-      {openWorldDowntime}
-      {openWorldDowntimePreview}
-    />
-  </nav>
+    {#snippet content(rows)}
+      <ManagerSystemNav
+        {rows}
+        {navRail}
+        {selectedSystem}
+        {currentView}
+        {setView}
+        {editSystem}
+        {systemOverviewCount}
+        {isCraftingRoute}
+        {activateCraftingParent}
+        {craftingNavCount}
+        {craftingNavItems}
+        {activeCraftingTab}
+        {openCraftingSection}
+        {selectedCounts}
+        {tagCategoryCounts}
+        {canShowEssences}
+        {toolsNavCount}
+        {isChecksRoute}
+        {activateChecksParent}
+        {checksNavCount}
+        {checksNavItems}
+        {canShowEnvironments}
+        {isGatheringRoute}
+        {activateGatheringParent}
+        {gatheringNavCounts}
+        {visibleGatheringNavItems}
+        {displayedGatheringTab}
+        {openGatheringSection}
+        {experimentalFeaturesEnabled}
+      />
+      <ManagerWorldNav
+        {rows}
+        {navRail}
+        {currentView}
+        {setView}
+        {worldScopedCounts}
+        {isWorldRoute}
+        {openWorldParties}
+        {travelParties}
+        {isWorldTravelRoute}
+        {activateWorldTravelParent}
+        {worldRealms}
+        {worldTravelTab}
+        {openWorldTravelDestination}
+        {isWorldRulesRoute}
+        {activateWorldRulesParent}
+        {selectedCurrencyUnits}
+        {selectedCharacterPrerequisites}
+        {selectedSystemModifiers}
+        {isWorldCurrencyRoute}
+        {isWorldPrerequisitesRoute}
+        {isWorldModifiersRoute}
+        {openWorldRulesDestination}
+        {worldDowntimeAvailable}
+        {isWorldDowntimeRoute}
+        {downtimeCoreFallback}
+        {downtimeTabs}
+        {downtimeNavTabBadges}
+        {downtimeTabText}
+        {downtimeNavLabelId}
+        {worldDowntimeTabId}
+        {openWorldDowntime}
+        {openWorldDowntimePreview}
+      />
+    {/snippet}
+  </NavSidebar>
 </aside>

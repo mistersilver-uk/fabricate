@@ -103,12 +103,13 @@ export function assertBadgeFixtureMirrorsComponent() {
   assert.ok(isIssueBadge('data-world-downtime-badge-total'), 'and so must the parent rollup fixture');
 }
 
-// The rail chrome every fixture here needs, at the shipped 220px (or the collapsed 56px).
+// The rail chrome every fixture here needs, at the shipped 220px (or the collapsed 56px). The
+// caller writes the `nav.fabricate-nav` itself, so its rows sit lexically under their root.
 export function railPage(navMarkup, bodyClass = '') {
   return (
     `<style>${css}</style>` +
     `<div class="fabricate-manager"><div class="manager-body${bodyClass}">` +
-    `<aside class="manager-rail"><nav class="manager-nav">${navMarkup}</nav></aside>` +
+    `<aside class="manager-rail">${navMarkup}</aside>` +
     `<main class="manager-main"></main></div></div>`
   );
 }
