@@ -590,6 +590,12 @@ const textsOf = (root, selector) =>
   [...root.querySelectorAll(selector)].map((node) => node.textContent);
 const namesOf = (root) => textsOf(root, '.fabricate-list-row-name');
 const quantitiesOf = (root) => textsOf(root, '.fabricate-list-row-quantity');
+// An Active row's ListRow ROOT (issue 1778). `data-run-id` rides the row's button, and the run's
+// timing is the row's aside, beside that button rather than inside it.
+const activeRowOf = (target, runId) =>
+  target
+    .querySelector(`[data-journal-list="active"] [data-run-id="${runId}"]`)
+    ?.closest('[data-list-row]');
 const section = (target, kind) => target.querySelector(`[data-history-items="${kind}"]`);
 const yieldRows = (target) => [...target.querySelectorAll('[data-yield-entry]')];
 
@@ -2433,11 +2439,9 @@ describe('Journal versioned lifecycle (mounted)', () => {
       `width: ${expected}%;`,
       'the detail bar agrees with the label beside it rather than pegging full'
     );
-    const row = paused.target.querySelector(
-      '[data-journal-list="active"] [data-run-id="lab-v1-waiting-auto-eligible"] [data-run-progress]'
-    );
+    const row = activeRowOf(paused.target, 'lab-v1-waiting-auto-eligible');
     assert.equal(
-      row.getAttribute('data-run-progress'),
+      row.querySelector('[data-run-progress]').getAttribute('data-run-progress'),
       String(expected),
       'and so does the list row, which read the same unmoved initiatedAt'
     );
@@ -2469,11 +2473,14 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.doesNotMatch(needs.textContent, new RegExp(english.FABRICATE.App.Journal.Summary.NotStarted, 'u'));
 
     // M18 on the Active row: the bar survives the missing gate.
-    const row = mounted.target.querySelector(
-      '[data-journal-list="active"] [data-run-id="lab-v1-stage-not-started"]'
-    );
+    const row = activeRowOf(mounted.target, 'lab-v1-stage-not-started');
     assert.ok(row.querySelector('[data-run-progress]'), 'the row keeps its progress reading');
     assert.ok(!row.querySelector('[data-run-countdown]'), 'and states no remaining time');
+    // The same scope finds a countdown on a gated run, so the absence above is not a blind query.
+    const gated = [...mounted.target.querySelectorAll('[data-journal-list="active"] [data-run-id]')]
+      .map((control) => control.closest('[data-list-row]'))
+      .filter((root) => root.querySelector('[data-run-countdown]'));
+    assert.ok(gated.length > 0, 'a gated Active row shows its countdown under the same scope');
     // D-029 on the same row: the merged badge, not the retired word.
     assert.equal(
       row.querySelector('.journal-run-status').textContent.trim(),

@@ -322,12 +322,35 @@ describe('RunCard mounted behavior', () => {
     }
   });
 
-  it('names the card with the bolt, since the card takes its name from its content', async () => {
-    const target = await harness.mount({ run: { ...makeCraftingRun(), completesAsTimePasses: true }, now: 0 });
+  // Issue 1778: the card is ListRow's one button, named by the run, then each state it draws.
+  it('names the card by the run and the states it draws, and describes its context and timing', async () => {
+    const run = {
+      ...makeCraftingRun(),
+      completesAsTimePasses: true,
+      awaitingChoice: true,
+      blindSecretPreview: true,
+    };
+    const target = await harness.mount({ run, now: 500 });
     const card = target.querySelector('.journal-run-card');
-    assert.ok(!card.hasAttribute('aria-label') && !card.hasAttribute('aria-labelledby'));
-    const name = nameFromContent(card).replaceAll(/\s+/g, ' ');
-    assert.match(name, /Healing Potion FABRICATE\.App\.Journal\.WorldClock\.FinishesStageAsTimePasses/);
+    assert.equal(card.tagName, 'BUTTON', 'a native button');
+    assert.equal(card.getAttribute('data-keyboard-focus'), 'true');
+    assert.deepEqual(card.getAttribute('aria-label').split(', '), [
+      'Healing Potion',
+      'FABRICATE.App.Journal.WorldClock.FinishesStageAsTimePasses',
+      'FABRICATE.App.Journal.Status.inProgress',
+      'FABRICATE.App.Journal.Status.awaitingChoice',
+      'FABRICATE.App.Journal.BlindSecret.Badge',
+    ]);
+    const described = card
+      .getAttribute('aria-describedby')
+      .split(' ')
+      .map((id) => target.querySelector(`[id="${id}"]`));
+    assert.ok(described.every(Boolean), 'every description resolves');
+    const timing = described.at(-1).querySelector('.journal-run-card-timing');
+    assert.ok(timing, 'the last description is the timing aside');
+    assert.ok(!card.contains(timing), 'which sits outside the button');
+    assert.equal(timing.querySelectorAll('button, a, input, select, [tabindex]').length, 0);
+    assert.match(nameFromContent(described[0]), /Step 1 of 2/u, 'the context names the step');
   });
 
   it('invokes onSelect with the composite-identity run on click', async () => {

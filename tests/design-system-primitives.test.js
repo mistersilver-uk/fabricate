@@ -521,6 +521,21 @@ test('(a) a search field change publishes every surface the 38px shell moved, an
   }
 });
 
+test('(a) a ListRow change publishes a frame for every converted selectable site', () => {
+  // Issue 1778: each converted site names the frame that draws it, and the frame must be selected.
+  const sites = [['src/ui/svelte/apps/journal/RunCard.svelte', 'fabricate-journal']];
+  const selected = mapChangedFilesToCases(['src/ui/svelte/components/ListRow.svelte']).map(
+    (viewCase) => viewCase.id
+  );
+  for (const [site, caseId] of sites) {
+    assert.ok(existsSync(path.join(REPO_ROOT, site)), `${site} does not exist`);
+    assert.ok(
+      selected.includes(caseId),
+      `a ListRow change does not select '${caseId}' for ${site}`
+    );
+  }
+});
+
 test('(a) the representative pair survives an override, additively', () => {
   // The override mechanism is ADDITIVE by contract (`viewLabCases.js`: "Broad signals still select
   // REPRESENTATIVE_CASE_IDS; these are additive, narrowly named exceptions") (issue 1116).
