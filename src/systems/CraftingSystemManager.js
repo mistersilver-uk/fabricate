@@ -1525,7 +1525,7 @@ export class CraftingSystemManager {
     let dirty = false;
     try {
       for (const item of items) {
-        const uuid = `Compendium.${packId}.${item.id}`;
+        const uuid = item.uuid || `Compendium.${packId}.${item.id}`;
         const result = await this.addItemFromUuid(systemId, uuid, { persist: false });
         if (result.action === 'added') {
           added++;

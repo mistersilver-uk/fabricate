@@ -289,10 +289,12 @@ Drag any Item document from the **Items sidebar** or from an open **compendium b
 2. Drag the item onto the components list's drop zone
 3. The item appears in the list of components
 
-If the item is already registered in the system, whether by the item you dropped or by the original it was copied from, the drop reuses the existing component instead of creating a duplicate.
+If the item is already registered in the system, whether by the item you dropped or by a copy of the same compendium entry that still carries the entry's name, the drop reuses the existing component instead of creating a duplicate.
+Re-importing an item whose own UUID a component already claims never changes which compendium entry that component claims.
 If the stored name, image, or linked item is out of date, Fabricate updates the component in place and remembers the previous link so items already in characters' inventories still match.
 
 If Foundry reports an original compendium source but that source no longer exists, Fabricate links to the item you dropped instead, remembers the broken source link as a fallback, and warns the GM.
+The exception is importing again an item that is already registered: Fabricate adds no fallback and shows no warning for it.
 
 {: .note }
 > **Duplicating an item to author another component is fully supported.**
@@ -300,10 +302,20 @@ If Foundry reports an original compendium source but that source no longer exist
 > You can right-click an item in the Items sidebar, choose **Duplicate**, change the copy's name, art, and setup, and register that copy as a separate component.
 > The copy becomes its own component and does not collide with, or overwrite, the original.
 > This holds even when the original was imported from a compendium.
+>
+> The same applies to an item built from a compendium entry and then changed into something else, with a different name.
+> For example, every dnd5e spell scroll of a given level is built from one template scroll, so each scroll you import becomes its own component.
+> Fabricate tells a copy of the entry from something built from it by name: a copy that keeps the entry's name is the same thing, and a differently named one is its own.
+> A renamed copy of a compendium entry is therefore registered as its own component and does not claim the entry, so an item a player drags straight from the compendium does not match it.
+> Hand out copies from the item you registered.
+> A component that already absorbed several items before this was fixed stays merged.
+> Delete that component and import the items again, as described in [Every item I import updates the same component]({% link help/troubleshooting.md %}#every-item-i-import-updates-the-same-component).
+> Components and recipe items whose shared compendium entry can no longer be found, because the pack is missing or disabled, still merge until the pack is restored; tools do not.
 > A copy that was distributed to players before you updated Fabricate can be reconciled with [Repair Item Data]({% link help/troubleshooting.md %}#repairing-item-data).
 
 After import, Fabricate also listens for linked Foundry Item updates from a GM client.
-When a linked item changes its name, image, or description, matching components refresh their stored name, image, and display-safe plain-text description automatically.
+When a linked item changes its name, image, or description, the component linked to that item refreshes its stored name, image, and display-safe plain-text description automatically.
+Changing a duplicate, a renamed copy, an unregistered world copy, or a copy on a character sheet does not change a component linked to a different item.
 
 If the dropped document is an Actor, JournalEntry, Scene, or any other non-Item type, a warning notification is shown and nothing is imported.
 If the drag data cannot be resolved to any UUID, the same warning is shown.
@@ -314,11 +326,13 @@ To import all Item documents from a compendium pack at once, drag the **compendi
 Fabricate iterates over every Item document in the pack and adds each one.
 
 - Items not yet in the system are added as new components.
-- Items already registered, whether by the item itself or the original it was copied from, are updated in place rather than duplicated.
+- Items already registered, whether by the item itself or by a copy of the same entry that still carries its name, are updated in place rather than duplicated.
+- Items built from a pack entry and given a different name are added as their own components, the same as a single drop of that entry.
 - Items already registered and already up to date are skipped.
 - A single crafting system cannot contain two components that claim the same source item.
 - A summary notification reports how many items were added, updated, and skipped.
 - If an item's recorded original source link is broken, Fabricate links to the imported item instead, remembers the broken link as a fallback, and warns once for the bulk import.
+  Items that are already registered add no fallback and no warning.
 - Non-item document types in the pack (Actors, JournalEntries, etc.) are ignored.
 
 ### Import from the Compendium Directory
@@ -340,8 +354,9 @@ Broken original source links fall back to the imported item and warn once for th
 ### Folder drop
 
 Drag a **world folder** containing Item documents onto the drop zone to import every Item in that folder.
-Fabricate expands the folder, applies the same source-chain deduplication logic as single-item drops, and shows a summary notification with the number of items added.
+Fabricate expands the folder, applies the same de-duplication as single-item drops, and shows a summary notification with the number of items added.
 If any imported item has a broken original source link, Fabricate warns once with the affected count.
+Items that are already registered add no fallback and are not counted.
 If the folder contains no Item documents, a notification says so and nothing is written.
 
 {: .note }
