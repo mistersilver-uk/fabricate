@@ -862,9 +862,15 @@ function classMapRegion(file, constName) {
   return source.slice(open, end + 1);
 }
 
-/** The unconditional string literals inside a composed-class array — the tokens no caller omits. */
+/**
+ * The unconditional string literals inside a composed-class array — `classes`, and any other
+ * `…Classes` array the same script composes for a second root — the tokens no caller omits.
+ */
 function composedClassLiteralValues(file) {
-  return [...composedClassRegion(file).matchAll(/'([a-z][\w-]*)'/g)].map((match) => match[1]);
+  const others = [...read(file).matchAll(/const \w+Classes = \$derived\(\s*(\[[^\]]*\])/g)];
+  return [composedClassRegion(file), ...others.map((match) => match[1])].flatMap((region) =>
+    [...region.matchAll(/'([a-z][\w-]*)'/g)].map((match) => match[1])
+  );
 }
 
 /**

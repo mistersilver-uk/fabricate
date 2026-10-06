@@ -167,7 +167,7 @@
     <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
       <Select
-        size="toolbar"
+        size="form"
         value={statusFilter}
         options={statusSelectOptions}
         showTick={false}

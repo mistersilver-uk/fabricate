@@ -726,7 +726,7 @@
         <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
           <Select
-            size="toolbar"
+            size="form"
             value={statusFilter}
             options={statusSelectOptions}
             ariaLabel={text(
@@ -739,7 +739,7 @@
         <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}</span>
           <Select
-            size="toolbar"
+            size="form"
             value={selectionFilter}
             options={selectionSelectOptions}
             showTick={false}
@@ -753,7 +753,7 @@
         <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.Environment.Risk', 'Risk')}</span>
           <Select
-            size="toolbar"
+            size="form"
             value={riskFilter}
             options={riskSelectOptions}
             ariaLabel={text(
@@ -766,7 +766,7 @@
         <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
           <Select
-            size="toolbar"
+            size="form"
             value={biomeFilter}
             options={biomeSelectOptions}
             ariaLabel={text(

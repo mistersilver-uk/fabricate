@@ -121,7 +121,6 @@ const CATALOGUE_PROPS = [
   'systemRowAction',
   'systems',
   'title',
-  'toolbarLeadSize',
 ];
 
 const RULES_PROPS = [
@@ -229,7 +228,6 @@ describe('the shells declare the pinned prop sets', () => {
       'showWorldDefaults',
       'splitToolbar',
       'systemRowAction',
-      'toolbarLeadSize',
     ]);
   });
 });
@@ -747,8 +745,8 @@ actions.copyMembership(entry.id, row.systemId);`),
 });
 
 /**
- * THE ROSTER'S SURFACE DECISION IS OPT-IN (issue 1371, parity round 5, reviewer finding 7). Its
- * second, the search well, went with issue 1782: the search field draws its own box everywhere.
+ * THE ROSTER'S SURFACE DECISION IS OPT-IN (issue 1371, parity round 5, reviewer finding 7). It has
+ * one: the search field draws its own box everywhere, so the roster states none for it.
  */
 describe('the system-rules roster states its surfaces as opt-in props', () => {
   const SURFACE_PROPS = ['recessed'];
@@ -808,9 +806,9 @@ describe('the system-rules roster states its surfaces as opt-in props', () => {
 
 /**
  * THE SEAM BETWEEN THE SHELL AND THE PRIMITIVES BELOW IT (issue 1371 r9-cat).
- * Three opt-ins the world Component catalogue turns on live on components a PAGE never composes:
+ * Two opt-ins the world Component catalogue turns on live on components a PAGE never composes:
  * `SystemRulesRoster`'s surface prop is reached only through the shell's own inspector
- * snippet, and the frame's row medallion and lead-row rung are reached only through the shell's
+ * snippet, and the frame's row medallion is reached only through the shell's
  * own frame tag. So the shell declaring the prop and the shell FORWARDING it are two different
  * facts, and a declared-but-unforwarded prop is the exact failure that reads as green: the page
  * passes it, nothing throws, and the screen renders the default it always did.
@@ -820,8 +818,8 @@ describe('the catalogue shell FORWARDS what it declares', () => {
 
   it('hands the roster its surface prop, renamed at the boundary', () => {
     const source = shell();
-    // Renamed on the way in — `rosterRecessed`. The search well went with issue 1782, whose
-    // search field draws its own box at every site.
+    // Renamed on the way in — `rosterRecessed`. The search field draws its own box at every site,
+    // so no search well is threaded.
     assert.match(source, /\n\s*rosterRecessed = false,/, 'declared, and OFF by default');
     assert.match(
       source,
@@ -896,12 +894,10 @@ describe('the catalogue shell FORWARDS what it declares', () => {
     );
   });
 
-  it('hands the frame the row medallion and the lead-row rung', () => {
+  it('hands the frame the row medallion', () => {
     const source = shell();
-    assert.match(source, /\n\s*toolbarLeadSize = '',/, 'declared, and the shipped rung by default');
     assert.match(source, /\n\s*rowMedallion = null,/, 'declared, and the shipped tile by default');
     // Shorthand `{name}`, which is how every other pass-through on this tag is written.
-    assert.match(source, /\{toolbarLeadSize\}/, 'and forwarded to the frame');
     assert.match(source, /\{rowMedallion\}/, 'and forwarded to the frame');
   });
 
@@ -925,8 +921,8 @@ describe('the catalogue shell FORWARDS what it declares', () => {
     );
     assert.match(
       source,
-      /class=\{leadSelectSizeClass\(filter\)\}/,
-      'a lane-filter select takes the rung as a class, because the manager has no select component'
+      /size=\{row === 'filters' \? 'toolbar' : 'form'\}/,
+      'a lane-filter select on the search’s row takes the `form` rung, and the second row `toolbar`'
     );
     assert.match(
       source,
@@ -935,37 +931,14 @@ describe('the catalogue shell FORWARDS what it declares', () => {
     );
   });
 
-  it('the select rung is UNDEFINED when unset, never an empty class attribute', () => {
+  it('the sort select takes `form` only on a one-row toolbar, where it shares the search’s row', () => {
     const source = sourceOf(FRAME);
-    // The whole reason `leadSelectSizeClass` is a function and not a `class:` directive. A
-    // directive writes the attribute whatever the value is, so every other catalogue's three
-    // selects would go from no `class` at all to `class=""` — a real DOM change on five screens
-    // shipped as an opt-in that "defaults to off".
-    assert.match(
-      source,
-      /return toolbarLeadSize === '38' && onLeadRow \? 'is-size-38' : undefined;/,
-      'the unset branch answers undefined, which Svelte drops'
-    );
-    assert.ok(
-      !/class:is-size-38=/.test(source),
-      'and no `class:` directive writes the token, which would emit class="" when off'
-    );
-  });
-
-  it('the rung reaches the LEAD row only, so the retired 32px row keeps the ladder’s 34', () => {
-    const source = sourceOf(FRAME);
-    // `proto:582`-`585` draws the membership select.
-    assert.match(
-      source,
-      /const onLeadRow = \(filter\?\.toolbarRow \?\? 'lead'\) === 'lead';/,
-      'the helper decides on the descriptor’s ROW'
-    );
     // The sort control is written by the frame itself, outside the lane-filter snippet.
     const hook = source.indexOf("'data-scoped-list-sort'");
     assert.ok(hook > 0, 'NON-VACUITY: the sort control is still written by this frame');
     const sortSelect = source.slice(source.lastIndexOf('<Select', hook), hook);
     assert.match(sortSelect, /value=\{sortKey\}/, 'and the slice is that element');
-    assert.ok(!/is-size-38/.test(sortSelect), 'and it carries no 38px token');
+    assert.match(sortSelect, /size=\{splitToolbar \? 'toolbar' : 'form'\}/);
     assert.ok(!/\bclass=/.test(sortSelect), 'and it takes no call-site class at all');
   });
 });

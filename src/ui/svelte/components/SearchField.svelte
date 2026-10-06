@@ -44,6 +44,7 @@
   const classes = $derived(
     ['fabricate-search', density === 'compact' ? 'is-compact' : ''].filter(Boolean).join(' ')
   );
+  const fieldClasses = $derived(['fabricate-search-field', extraClass].filter(Boolean).join(' '));
 
   const { oninput: callerInput = undefined, ...inputAttributes } = $derived(inputProps ?? {});
 
@@ -80,7 +81,7 @@
 
 {#if label}
   <!-- ratchet-exempt(design-system): the spread is this primitive's own rest, forwarded to the root it composes -->
-  <Field as="label" class={`fabricate-search-field ${extraClass}`} {...rest}>
+  <Field as="label" class={fieldClasses} {...rest}>
     <span class="fabricate-search-caption">{label}</span>
     <span class={classes}>{@render control()}</span>
   </Field>

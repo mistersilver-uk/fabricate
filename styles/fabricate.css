@@ -4118,9 +4118,9 @@
   box-shadow: none;
 }
 
-/* `:not(:focus-visible)`, so the module rule that hides a focused field's placeholder still wins. */
+/* `--fab-text-muted`, not the glyph's subtle tone: the placeholder is text and must clear 4.5:1 on the soft shell. `:not(:focus-visible)`, so the module rule that hides a focused field's placeholder still wins. */
 .fabricate-search.fabricate-search:not(.is-compact) input:not(:focus-visible)::placeholder {
-  color: var(--fab-text-subtle);
+  color: var(--fab-text-muted);
 }
 
 /* A WRAPPER-DRAWN FIELD: the shell takes the full accent while its input holds focus, and the input draws no ring of its own (`design-system/spec.md`, the text-field ring variant). */
@@ -4150,8 +4150,8 @@
   box-shadow: none;
 }
 
-/* THE SEARCH FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module's text-field ring (`.fabricate :is(input, textarea):where(…):focus-visible`), which is (0,2,1) too and sits earlier, so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
-.fabricate-search input:focus-visible {
+/* THE COMPACT SEARCH'S OWN KEYBOARD RING (the default shell lights its border instead). Declarations copied verbatim from the module's text-field ring (`.fabricate :is(input, textarea):where(…):focus-visible`), which is (0,2,1) too and sits earlier, so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
+.fabricate-search:where(.is-compact) input:focus-visible {
   outline: 1px solid var(--fab-accent);
   outline-offset: -1px;
 }
@@ -20744,13 +20744,6 @@
   border-radius: 7px;
 }
 
-/* ── THE 38px CONTROL SIZE (issue 1371, maintainer ruling M12b) ── 38 IS A RUNG (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired), and the reference draws the catalogue toolbar's membership filter and the system rules list's two filters at 38px (`proto:577-578`, `proto:1053-1055`) against the 34px these controls ship at (issue 1504). The search beside them is 38 by default (issue 1782). */
-.fabricate-manager .manager-scoped-list-toolbar .is-size-38 .fabricate-select-trigger,
-.fabricate-manager .manager-component-toolbar .is-size-38 .fabricate-select-trigger {
-  min-height: 38px;
-  border-radius: 9px;
-}
-
 
 /* ── issue 1371 r8-cat: THE WORLD COMPONENT CATALOGUE'S REBUILT LIST AND INSPECTOR ── An APPENDED BLOCK. */
 
@@ -20834,12 +20827,6 @@
 /* `proto:1054` (the category filter), `proto:1056` (the essence filter) and `proto:1066` (the sort key) all ink their select `var(--text2)`; the `toolbar` rung already states their weight 500. */
 .fabricate-manager[data-manager-view="components"] .manager-component-toolbar .fabricate-select-trigger {
   color: var(--fab-text-secondary);
-}
-
-/* And the two FILTER triggers at the reference's own 12px. The sort trigger is deliberately absent: the reference draws IT at 11.5px (`proto:1066`) against the rung's 11.52px, a fiftieth of a pixel, which belongs to the rounding class rather than to this finding. */
-.fabricate-manager[data-manager-view="components"] .manager-component-category-filter .fabricate-select-trigger,
-.fabricate-manager[data-manager-view="components"] .manager-component-essence-filter .fabricate-select-trigger {
-  font-size: 12px;
 }
 
 /* `proto:1067`: the Asc/Desc toggle at `600 11px var(--sans)` in `--text2`. */

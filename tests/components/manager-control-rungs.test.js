@@ -186,12 +186,10 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   });
   after(() => harness.teardown());
 
-  // THE FIELD IS 38 BY DEFAULT (issue 1782, maintainer ruling 2), so it needs no opt-in; the
-  // converted select triggers still opt in, one member per host bar.
+  // THE FIELD IS 38 BY DEFAULT (issue 1782, maintainer ruling 2), and a select sharing its row
+  // takes `Select`'s own `form` rung, the same box, so neither needs an opt-in.
   const fieldRule = '.fabricate-search.fabricate-search:not(.is-compact)';
-  const triggerRule =
-    '.fabricate-manager .manager-scoped-list-toolbar .is-size-38 .fabricate-select-trigger, ' +
-    '.fabricate-manager .manager-component-toolbar .is-size-38 .fabricate-select-trigger';
+  const triggerRule = '.fabricate-select .fabricate-select-trigger-form';
 
   it('is on the published height ladder, which is why it needs no deviation', () => {
     assert.ok(LADDER_RUNGS.includes(38), '38 is a rung, so drawing it is compliance and not drift');
@@ -200,7 +198,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   it('states 38px and the band’s 9px corner for the field and for a toolbar select', () => {
     for (const [label, selector, heightProperty] of [
       ['field', fieldRule, 'height'],
-      ['converted select trigger', triggerRule, 'min-height']
+      ['form-rung select trigger', triggerRule, 'min-height']
     ]) {
       const [body] = bodiesOf(selector);
       assert.equal(pixels(valueOf(body, heightProperty)), 38, `the ${label} stands at the 38px rung`);
@@ -212,7 +210,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
     }
   });
 
-  it('and the shipped select it overrides is still 34px, so the opt-in is a real change', () => {
+  it('keeps the `toolbar` rung at 34px and lifts no select to 38 with a site rule', () => {
     assert.equal(
       pixels(
         valueOf(
@@ -222,10 +220,10 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
       ),
       34
     );
-    for (const selector of triggerRule.split(', ')) {
-      const classes = (selector.match(/\.[\w-]+/g) ?? []).length;
-      assert.ok(classes >= 3, `\`${selector}\` carries a third class, so it wins on specificity`);
-    }
+    assert.ok(
+      rules().every(({ selector }) => !/is-size-38 \.fabricate-select-trigger/.test(selector)),
+      'a select on the search’s row takes the `form` rung, not a height-only `is-size-38` lift'
+    );
   });
 
   it('keeps no field rung in the sheet, because the field takes none', () => {
@@ -304,8 +302,6 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
     const source = readFileSync(resolve(repoRoot, BUTTON), 'utf8');
     const script = source.slice(source.indexOf('<script>'), source.indexOf('</script>'));
     assert.match(script, /'is-size-38'/, 'the class is written out, not composed');
-    // ONE RUNG, ONE TOKEN: the button and the select opt-in spell the rung the same way.
-    assert.ok(triggerRule.includes('.is-size-38 '), 'the select triggers opt in by the same token');
   });
 });
 

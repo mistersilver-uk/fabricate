@@ -1904,7 +1904,9 @@ test('the caller-override measurement reds when the baseline is written at the f
   }
 });
 
-const TEXT_FIELD_RINGS = new Set(['.fabricate-search input:focus-visible']);
+// The compact search draws the ring; the default search shell lights its border instead, which
+// `search-field-geometry-gate.test.js` measures.
+const TEXT_FIELD_RINGS = new Set(['.fabricate-search:where(.is-compact) input:focus-visible']);
 
 test('each re-rooted family declares its own focus ring, and none of them reaches a select', async () => {
   const tab = await browser.newPage();
@@ -1923,7 +1925,7 @@ test('each re-rooted family declares its own focus ring, and none of them reache
         '.fabricate-field :is(input, textarea):focus',
         '.fabricate-field input:focus-visible, .fabricate-field textarea:focus-visible',
       ],
-      ['.fabricate-search input:focus', '.fabricate-search input:focus-visible'],
+      ['.fabricate-search input:focus', '.fabricate-search:where(.is-compact) input:focus-visible'],
       ['.fabricate-slider input:focus', '.fabricate-slider input[type="range"]:focus-visible'],
       // THE TAB STRIP'S PAIR (issue 1509).
       ['.fabricate-tabs button:focus', '.fabricate-tabs button:focus-visible'],

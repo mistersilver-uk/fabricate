@@ -359,7 +359,8 @@ const CONVERTED_SITES = Object.freeze([
       values,
     })),
   ].map((site) =>
-    Object.freeze({ ...site, column: false, floor: 144, pinned: true, drive: true, rung: 'toolbar' })
+    // `form`: each shares its bar's row with the 38px search, so takes the same shell (issue 1782).
+    Object.freeze({ ...site, column: false, floor: 144, pinned: true, drive: true, rung: 'form' })
   ),
   // And the conditions card's current-value picker, whose value a prop seeds. Its counterpart is
   // one sheet rule off the demoted field's class, as the danger ceiling's is.

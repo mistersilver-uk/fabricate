@@ -1069,13 +1069,11 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
 
 describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)', () => {
   /**
-   * The reference draws this bar's search field and both filter selects at 38px
-   * (`proto:1053-1055`). 38 is a published rung (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 /
-   * 44, with 32 / 36 / 40 retired); the field is 38 by default (issue 1782), and the two filter
-   * triggers take it from this bar's own member of the folded `is-size-38` trigger rule.
+   * The search's row is one 38px shell (issue 1782): the field is 38 by default and both filter
+   * selects take `Select`'s `form` rung, the same box; the second row's sort keeps `toolbar`.
    */
   const FIELD_SELECTOR = '.fabricate-search:not(.is-compact) input';
-  const SELECT_SELECTOR = '.manager-component-toolbar .is-size-38 .fabricate-select-trigger';
+  const SELECT_SELECTOR = '.manager-component-toolbar .fabricate-select-trigger-form';
 
   function metalWithFire() {
     return [
@@ -1121,7 +1119,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
       'the category and essence filters both reach the rung, in bar order'
     );
     assert.ok(
-      !root.querySelector('[data-component-sort]').closest('.is-size-38'),
+      root.querySelector('[data-component-sort]').classList.contains('fabricate-select-trigger-toolbar'),
       'and the sort trigger on the second row stays at the `toolbar` rung’s own 34'
     );
     for (const select of rung) {
@@ -1276,13 +1274,14 @@ describe('ComponentsBrowserView toolbar — the reference’s essence predicates
       selectedSystemId: 'sys-1',
     });
     // Category names are distinct names and drop the tick; the essence and sort lists keep it.
-    for (const [hook, name, ticked] of [
-      [CATEGORY, 'Filter components by category', false],
-      [ESSENCE, 'Filter components by essence', true],
-      [SORT, 'Sort components', true],
+    // The two filters share the search's row and take its 38px `form` rung; the sort does not.
+    for (const [hook, name, ticked, size] of [
+      [CATEGORY, 'Filter components by category', false, 'form'],
+      [ESSENCE, 'Filter components by essence', true, 'form'],
+      [SORT, 'Sort components', true, 'toolbar'],
     ]) {
       assert.equal(assertSelectHasResolvedName(root, hook), name);
-      assert.equal(root.querySelector(hook).getAttribute('data-select-size'), 'toolbar');
+      assert.equal(root.querySelector(hook).getAttribute('data-select-size'), size);
       assert.equal(
         openSelectPanel(root, hook).classList.contains('fabricate-select-popover-ticked'),
         ticked,

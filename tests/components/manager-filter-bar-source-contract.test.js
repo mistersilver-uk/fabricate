@@ -142,7 +142,7 @@ const NAMED = Object.freeze([
 function namingRoutesOf(site, routes) {
   return routes.filter((name) => {
     const declared = site.attribute(name);
-    return Boolean(declared) && !new RegExp(`^${name}=(""|'')$`).test(declared);
+    return Boolean(declared) && !new RegExp(`^${name}=(""|''|\\{\\s*(""|''|\`\`)\\s*\\})$`).test(declared);
   });
 }
 
@@ -176,6 +176,14 @@ test('every search field takes exactly one naming route (issue 1782)', () => {
       'free to drift from the one that is read. Pass exactly one of `label`, `ariaLabel` and ' +
       `\`ariaLabelledBy\`:\n  ${offenders.join('\n  ')}`
   );
+});
+
+test('an empty literal is no naming route, quoted or as an expression', () => {
+  const siteWith = (declared) => ({ attribute: (name) => (name === 'ariaLabel' ? declared : null) });
+  for (const empty of ['ariaLabel=""', "ariaLabel=''", "ariaLabel={''}", 'ariaLabel={ "" }', 'ariaLabel={``}']) {
+    assert.deepEqual(namingRoutesOf(siteWith(empty), ['ariaLabel']), [], empty);
+  }
+  assert.deepEqual(namingRoutesOf(siteWith("ariaLabel={text('x')}"), ['ariaLabel']), ['ariaLabel']);
 });
 
 test('no call site restates the class the primitive emits itself', () => {

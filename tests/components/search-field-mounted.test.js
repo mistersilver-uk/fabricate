@@ -99,9 +99,35 @@ describe('SearchField', () => {
     assert.ok(!input.hasAttribute('aria-label'));
   });
 
+  it('writes no `aria-label` or `aria-labelledby` under the `label` route, even when also given one', async () => {
+    for (const second of [{ ariaLabel: 'Other name' }, { ariaLabelledBy: 'caption-id' }]) {
+      const root = await harness.mount({ label: 'Search recipes', ...second });
+      const input = root.querySelector('input');
+      assert.ok(
+        !input.hasAttribute('aria-label') && !input.hasAttribute('aria-labelledby'),
+        `the caption is the one name, not ${JSON.stringify(second)}`
+      );
+      harness.remount();
+    }
+  });
+
+  it('with no `class`, gives the labelled root exactly its own two classes', async () => {
+    const root = await harness.mount({ label: 'Search' });
+    assert.equal(
+      root.firstElementChild.getAttribute('class'),
+      'fabricate-field fabricate-search-field'
+    );
+  });
+
   it('warns when it is given no naming route, or more than one', async () => {
-    assert.deepEqual(await warningsDuring(() => harness.mount({ ariaLabel: 'Search' })), []);
-    harness.remount();
+    for (const route of [{ ariaLabel: 'Search' }, { label: 'Search' }, { ariaLabelledBy: 'id' }]) {
+      assert.deepEqual(
+        await warningsDuring(() => harness.mount(route)),
+        [],
+        `one route, ${Object.keys(route)[0]}, is enough`
+      );
+      harness.remount();
+    }
     assert.equal((await warningsDuring(() => harness.mount({}))).length, 1, 'no route');
     harness.remount();
     const both = await warningsDuring(() =>

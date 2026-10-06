@@ -321,7 +321,7 @@
     <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
       <Select
-        size="toolbar"
+        size="form"
         value={statusFilter}
         options={statusSelectOptions}
         showTick={false}
@@ -336,7 +336,7 @@
     <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.BooksScrolls.TypeFilter', 'Type')}</span>
       <Select
-        size="toolbar"
+        size="form"
         value={typeFilter}
         options={typeSelectOptions}
         ariaLabel={text(
@@ -354,7 +354,7 @@
           : text('FABRICATE.Admin.Manager.BooksScrolls.LearningFilter', 'Learning')}</span
       >
       <Select
-        size="toolbar"
+        size="form"
         value={capFilter}
         options={capSelectOptions}
         showTick={false}

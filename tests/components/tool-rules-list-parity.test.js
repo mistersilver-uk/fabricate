@@ -680,9 +680,8 @@ test('the Tool Rules toolbar renders the design’s own type and geometry', asyn
     assert.equal(measured['sort-label'].fontSize, '8.5px', 'proto:2519 size');
     assert.equal(measured['sort-label'].fontWeight, '700', 'proto:2519 weight');
 
-    // `proto:2520` / `proto:2521` — both controls sit on their own row at the 30px rung the
-    // search field shipped at before issue 1782, and read in the SECONDARY ink, one rung down
-    // from the muted they had.
+    // `proto:2520` / `proto:2521` — both controls sit on their own row at the 30px `inline` rung,
+    // in the SECONDARY ink.
     for (const probe of ['sort-select', 'sort-direction']) {
       assert.equal(measured[probe].height, 30, `${probe} sits on the same rung`);
       assert.equal(measured[probe].fontSize, '11.5px', `${probe} reads at the design size`);

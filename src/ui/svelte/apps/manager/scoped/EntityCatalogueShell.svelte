@@ -40,8 +40,7 @@
     membershipFilter = true,
     // Threaded to the frame. OPT-IN, defaulting to the single toolbar row every catalogue renders.
     splitToolbar = false,
-    // Threaded to the frame, both OPT-IN: a toolbar rung and a row tile's descriptor.
-    toolbarLeadSize = '',
+    // Threaded to the frame, OPT-IN: a row tile's descriptor.
     rowMedallion = null,
     // Threaded to the frame and on to `BulkSelectionToolbar`; `'results'` is the shipped band.
     selectAllScope = 'results',
@@ -164,7 +163,6 @@
     {countUnit}
     {membershipFilter}
     {splitToolbar}
-    {toolbarLeadSize}
     {rowMedallion}
     {selectAllScope}
     {selectAllLabel}

@@ -134,7 +134,7 @@
     <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span>
       <Select
-        size="toolbar"
+        size="form"
         value={categoryFilter}
         options={categorySelectOptions}
         showTick={false}
@@ -149,7 +149,7 @@
     <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.Access.Filter', 'Access')}</span>
       <Select
-        size="toolbar"
+        size="form"
         value={accessFilter}
         options={accessSelectOptions}
         showTick={false}
