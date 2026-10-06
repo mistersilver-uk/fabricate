@@ -2045,7 +2045,7 @@ The trail is a `nav` named "Breadcrumbs"; a crumb with `onSelect` is a button ca
 `PageHeader` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
 At issue 1777 its callers kept the manager's shipped header geometry, which disagreed with the specimen, and decision E4 escalated that disagreement to issue 1523 rather than settling it.
 
-The manager sidebar, except its Downtime group until that group converts, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
+The manager sidebar, its Downtime group included, and the player window's rail MUST render through `NavSidebar` (`src/ui/svelte/components/NavSidebar.svelte`): the manager rail as its `labelled` variant, whose rows come from `managerNavItems.js`, and the player rail as its `icon` variant.
 Neither writes nav row, group or tab markup of its own, and the sidebar root carries `fabricate-nav`.
 `NavSidebar` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
 At issue 1777 both callers kept their shipped geometry, which disagreed with the specimen, and the convergence belongs to issue 1523.
