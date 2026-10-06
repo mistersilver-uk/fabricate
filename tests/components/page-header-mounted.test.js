@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
 import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
@@ -91,6 +92,38 @@ describe('PageHeader', () => {
     const leaf = trail.querySelector('span');
     assert.equal(leaf.getAttribute('title'), 'Smith’s Hammer', 'a crumb key lands as attribute');
     assert.ok(leaf.hasAttribute('data-probe-leaf'), 'a crumb hook lands on its element');
+  });
+
+  it('declares each crumb button focused, marks the leaf current, and forwards only hooks', async () => {
+    const root = await harness.mount({
+      breadcrumbs: [
+        {
+          label: 'Crafting Systems',
+          onSelect: () => {},
+          id: 'collides',
+          kind: 'root',
+          type: 'submit',
+          'data-keyboard-focus': 'false',
+          'aria-describedby': 'probe-hint',
+        },
+        { label: 'Tool Rules', onSelect: () => {} },
+      ],
+    });
+    const buttons = [...root.querySelectorAll(':scope .manager-breadcrumbs button')];
+    for (const button of buttons) {
+      assert.equal(button.dataset.keyboardFocus, 'true', 'a hook cannot opt a crumb out');
+      assert.equal(button.getAttribute('type'), 'button', 'a hook cannot make a crumb submit');
+    }
+    assert.deepEqual(
+      [...buttons[0].attributes].map((attribute) => attribute.name).sort(byCodePoint),
+      ['aria-describedby', 'data-keyboard-focus', 'type'],
+      'only data-*, aria-* and title keys land; label, onSelect, id and kind never do'
+    );
+    assert.deepEqual(
+      buttons.map((button) => button.getAttribute('aria-current')),
+      [null, 'page'],
+      'the last crumb, and only it, is the current page'
+    );
   });
 
   it('draws no trail at all without breadcrumbs', async () => {
