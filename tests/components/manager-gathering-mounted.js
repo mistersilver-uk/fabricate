@@ -3145,6 +3145,9 @@ export function registerGatheringCases() {
         'the operator reads negative'
       );
 
+      const overrideLabel = () =>
+        ref().querySelector(':scope .manager-character-modifier-override-row .manager-status-toggle-label');
+      assert.equal(overrideLabel().textContent.trim(), 'Override?', 'the switch offers the override');
       ref().querySelector('.manager-character-modifier-override-row button').click();
       await settleSaveAttempt();
       assert.equal(
@@ -3153,6 +3156,7 @@ export function registerGatheringCases() {
         'true',
         'the override is on'
       );
+      assert.equal(overrideLabel().textContent.trim(), 'Overridden', 'the switch names the override');
       const operator = ref().querySelector('.manager-character-modifier-operator-select select');
       operator.value = '+';
       operator.dispatchEvent(new Event('change', { bubbles: true }));
@@ -3166,6 +3170,10 @@ export function registerGatheringCases() {
         'the override seeds the library expression and the operator flips'
       );
 
+      assert.ok(
+        ref().querySelector('.manager-character-modifier-row-reference-delete.is-danger'),
+        'the reference delete carries the danger tone'
+      );
       ref().querySelector('.manager-character-modifier-row-reference-delete').click();
       await settleSaveAttempt();
       assert.deepEqual((await saveSubject(subject, calls)).characterModifiers, []);

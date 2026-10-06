@@ -183,19 +183,4 @@ describe('World and Travel navigation', () => {
     );
   });
 
-  it('StatusToggle renders the manager-status-toggle-label element', () => {
-    const statusToggleSource = read('src/ui/svelte/components/StatusToggle.svelte');
-    assert.ok(
-      statusToggleSource.includes('class="manager-status-toggle-label"'),
-      'StatusToggle renders the label with the manager-status-toggle-label class'
-    );
-  });
-
-  it('IconButton can carry the is-danger class for delete actions', () => {
-    const iconButtonSource = read('src/ui/svelte/components/IconButton.svelte');
-    assert.ok(
-      iconButtonSource.includes('class: extraClass'),
-      'IconButton passes through the extraClass prop'
-    );
-  });
 });
