@@ -466,8 +466,9 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   const dropSearchBlock = blockFor(
     '.fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact'
   );
+  // The editor's compact search rule out-ranks any drop-controls input rule, so it owns the inset.
   const dropSearchInputBlock = blockFor(
-    '.fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact input'
+    '.fabricate-manager .manager-gathering-task-edit-view .fabricate-search:where(.is-compact) input:not([type="checkbox"]):not([type="radio"])'
   );
   const dropAddBlock = blockFor('.fabricate-manager .manager-task-drop-controls > .fabricate-button');
   const dropScrollBlock = blockFor('.fabricate-data-table .fabricate-data-table-scroll');
@@ -813,7 +814,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop rules search should not collapse until its icon overlaps the text area'
   );
   assert.ok(
-    dropSearchInputBlock.includes('padding-left: 36px;'),
+    dropSearchInputBlock.includes('padding: 0 34px;'),
     'drop rules search input should reserve text inset for the leading search icon'
   );
   assert.ok(

@@ -263,9 +263,16 @@ const COMPACT_BOX = Object.freeze({
 const COMPACT_SITE_BOXES = Object.freeze({
   'manager-drop-inspector-stack': { input: 28 },
   'manager-component-entry-systems-search': { input: 30, inputRadius: '7px' },
-  'manager-task-drop-controls': { paddingLeft: '36px' },
-  'manager-task-component-browser-controls': { paddingLeft: '36px' },
 });
+
+/**
+ * Hosts that render inside one another (`GatheringTaskEditView.svelte` draws both control rows),
+ * outermost first, so a box one host's rule states but the other's out-ranks is measured composed.
+ */
+const NESTED_COMPACT_HOSTS = Object.freeze([
+  Object.freeze(['manager-gathering-task-edit-view', 'manager-task-drop-controls']),
+  Object.freeze(['manager-gathering-task-edit-view', 'manager-task-component-browser-controls']),
+]);
 
 /** The box a compact probe must measure: the shipped box, or the one its site's rule states. */
 function expectedCompactBox(entry) {
@@ -273,6 +280,17 @@ function expectedCompactBox(entry) {
     entry.compounds.some(({ classes }) => classes.includes(name))
   );
   return { ...COMPACT_BOX, ...(site && COMPACT_SITE_BOXES[site]) };
+}
+
+/** A nested host's probe markup and the box its classes expect, as one compound chain. */
+function nestedCompactProbe(chain, fieldMarkup) {
+  const markup = chain
+    .toReversed()
+    .reduce((inner, name) => `<div class="${name}">${inner}</div>`, fieldMarkup);
+  return {
+    markup: `<div class="fabricate-manager">${markup}</div>`,
+    expected: expectedCompactBox({ compounds: chain.map((name) => ({ classes: [name] })) }),
+  };
 }
 
 describe('the real field measures its ruled box in each host that reaches it', () => {
@@ -385,6 +403,28 @@ describe('the real field measures its ruled box in each host that reaches it', (
       Object.entries(expected[index]).every(([key, value]) => box[key] === value);
     const offenders = await offendersAt(1280, probes, names, accepts);
     assert.deepEqual(offenders, [], `the compact box moved:\n  ${offenders.join('\n  ')}`);
+  });
+
+  it('keeps the stated compact box where one host renders inside another', async () => {
+    const live = new Set(
+      REACHING.flatMap((entry) => entry.compounds.flatMap(({ classes }) => classes))
+    );
+    const dead = NESTED_COMPACT_HOSTS.flat().filter((name) => !live.has(name));
+    assert.deepEqual(dead, [], 'every nested host names a class a search rule reaches through');
+    const nested = NESTED_COMPACT_HOSTS.map((chain) => nestedCompactProbe(chain, markup.compact));
+    const offenders = await offendersAt(
+      1280,
+      nested.map((probe) => probe.markup),
+      NESTED_COMPACT_HOSTS.map((chain) => chain.join(' > ')),
+      (box, index) =>
+        Object.entries(nested[index].expected).every(([key, value]) => box[key] === value)
+    );
+    assert.deepEqual(
+      offenders,
+      [],
+      'a compact box one host states and the host around it out-ranks never renders, so the ' +
+        `gate must state the composed box:\n  ${offenders.join('\n  ')}`
+    );
   });
 
   /** A colour token as the page resolves it. */

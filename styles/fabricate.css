@@ -11937,10 +11937,6 @@
   max-width: 320px;
 }
 
-.fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact input {
-  padding-left: 36px;
-}
-
 .fabricate-manager .manager-task-drop-controls > .fabricate-button {
   flex: 0 0 auto;
   white-space: nowrap;
@@ -11959,10 +11955,6 @@
   position: relative;
   width: 100%;
   min-width: 0;
-}
-
-.fabricate-manager .manager-task-component-browser-controls .fabricate-search.is-compact input {
-  padding-left: 36px;
 }
 
 .fabricate-manager .manager-task-component-tag-suggestions {
