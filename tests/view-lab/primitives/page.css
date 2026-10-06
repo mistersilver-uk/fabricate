@@ -34,3 +34,9 @@
   width: 100%;
   min-width: 0;
 }
+
+/* Beside: the `shipped` chip `mount.js` puts between a kept drawing and its live specimen. */
+.pl-shipped-label {
+  align-self: center;
+  width: max-content;
+}

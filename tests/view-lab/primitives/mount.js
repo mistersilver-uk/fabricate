@@ -1,7 +1,9 @@
 /**
  * Primitive Lab boot (issue 1487): render `library.html` as the page and stand up an isolated
- * `<iframe>` (`specimen.html`) for every drawing the catalogue maps. This page links no Foundry
- * stylesheet, so core cannot repaint the library's drawings; each specimen carries the cascade.
+ * `<iframe>` (`specimen.html`) for every drawing the catalogue maps, in its place or, for a name
+ * the library does not yet record as shipped, beside it (`liveness.js`). This page links no
+ * Foundry stylesheet, so core cannot repaint the library's drawings; each specimen carries the
+ * cascade.
  *
  * `<body>` reports through three attributes `scripts/lib/primitiveLabSmoke.js` reads:
  * `data-primitive-lab-mounted` is the positive count of rows mounted, `data-primitive-lab-ready` is
@@ -9,10 +11,13 @@
  * Each iframe carries `data-primitive-lab-specimen` with its row's `path`, on the `<iframe>` itself
  * because the smoke's `page.evaluate` reads only this top document, never a specimen's realm.
  */
+import MANIFEST from '../../../scripts/lib/designSystemPrimitives.json' with { type: 'json' };
+
 import { CATALOGUE } from './catalogue.js';
 import { MAX_APPLIED_RESIZES, createSizeGovernor, describeHost } from './hostLayout.js';
 import { resolveSlots } from './inject.js';
 import { LIVE_CLASS, PAGE_CLASS, readLibrary } from './library.js';
+import { BESIDE } from './liveness.js';
 import { readSlotBox } from './slot.js';
 import {
   SPECIMEN_ASSIGN,
@@ -35,6 +40,9 @@ const SIZED_CLASS = 'pl-specimen-sized';
 
 /** Applied while a block specimen fills the replaced drawing's inline size. See `page.css`. */
 const FILL_CLASS = 'pl-specimen-fill';
+
+/** The label on a specimen standing beside its drawing, in the library's own status chip. */
+const SHIPPED_LABEL_CLASS = 'st st-shipped pl-shipped-label';
 
 /** The query parameter that says how much of the catalogue to mount. */
 const MOUNT_PARAMETER = 'mount';
@@ -188,6 +196,18 @@ function presizeBoxedSlot(iframe, row) {
   if (box?.height) iframe.style.height = `${box.height}px`;
 }
 
+/** Put the specimen where its drawing stood, or after the kept drawing under a `shipped` label. */
+function placeSpecimen(slot, iframe) {
+  if (slot.mode !== BESIDE) {
+    slot.host.replaceWith(iframe);
+    return;
+  }
+  const label = document.createElement('span');
+  label.className = SHIPPED_LABEL_CLASS;
+  label.textContent = 'shipped';
+  slot.host.after(label, iframe);
+}
+
 /**
  * Stand up one specimen: create its `<iframe>`, place it where the drawing stood, run the
  * `specimenProtocol.js` handshake, and resolve once it has settled. The listener stays after
@@ -270,7 +290,7 @@ function standUpSpecimen(slot, problems, results) {
   });
 
   iframe.src = SPECIMEN_URL;
-  slot.host.replaceWith(iframe);
+  placeSpecimen(slot, iframe);
   return settled;
 }
 
@@ -283,7 +303,10 @@ async function boot() {
 
   renderLibrary(await readLibrary());
 
-  const { slots, problems } = resolveSlots(document.body, CATALOGUE);
+  const { slots, problems } = resolveSlots(document.body, CATALOGUE, [
+    ...MANIFEST.designSystemPrimitives,
+    ...MANIFEST.notAPrimitive,
+  ]);
   const results = { mounted: 0 };
   // Every specimen settles before the report is published.
   await Promise.all(slots.map((slot) => standUpSpecimen(slot, problems, results)));
