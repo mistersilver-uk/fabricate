@@ -1245,13 +1245,16 @@ export function registerRecipesCases() {
 
   // Navigate the mounted manager to the Books & Scrolls surface via the Crafting
   // group and return the surface root for querying.
-  async function openBooksScrolls(calls, storeOptions = {}, services = {}) {
+  async function openBooksScrolls(calls, storeOptions = {}, services = {}, storeMethods = {}) {
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore(calls, { experimentalFeaturesEnabled: true, ...storeOptions }),
+        store: Object.assign(
+          createStore(calls, { experimentalFeaturesEnabled: true, ...storeOptions }),
+          storeMethods
+        ),
         services: { openCurrentAdmin: () => {}, ...services },
       },
     });
@@ -1460,6 +1463,90 @@ export function registerRecipesCases() {
       'cancelling the discard keeps the editor open'
     );
   });
+
+  // Issue 1721: the guard's discard is observable only where navigation then stops, so the
+  // refused system switch keeps the discarded editor mounted. A second definition shares ri1's
+  // link, so a preview read back off the definitions would name ri1 rather than this one.
+  it('restores the baseline and its linked-item preview when the exit guard discards', async () => {
+    const calls = [];
+    const replacement = { uuid: 'Compendium.mythwright.items.Item.guide', name: 'Guide', img: '' };
+    const reprint = {
+      ...booksScrollsFixtures[0],
+      id: 'ri3',
+      resolvedName: 'Second Printing',
+      resolvedImg: 'icons/sundries/books/book-red-exclamation.webp',
+    };
+    await openBooksScrolls(
+      calls,
+      { recipeItemDefinitions: [...booksScrollsFixtures, reprint] },
+      { resolveToolSource: async (uuid) => (uuid === replacement.uuid ? replacement : null) },
+      {
+        selectSystem: (id) => {
+          calls.push(['selectSystem', id]);
+          return false;
+        },
+      }
+    );
+    target.querySelector('[data-books-scrolls-edit="ri3"]').click();
+    await tick();
+    flushSync();
+    const enabled = () => target.querySelector('[data-recipe-item-enabled]');
+    const previewName = () => target.querySelector('[data-recipe-item-name]').textContent.trim();
+    assert.equal(previewName(), 'Second Printing');
+    assert.equal(enabled().getAttribute('aria-pressed'), 'true');
+
+    enabled().click();
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: { getData: () => JSON.stringify({ type: 'Item', uuid: replacement.uuid }) },
+    });
+    target.querySelector('[data-item-drop-zone="recipe-item"]').dispatchEvent(drop);
+    await Promise.resolve();
+    await tick();
+    flushSync();
+    assert.equal(previewName(), 'Guide');
+    assert.equal(enabled().getAttribute('aria-pressed'), 'false');
+    assert.ok(target.querySelector('[data-recipe-item-dirty]'));
+
+    await switchScopeSystemTo('smithing');
+    for (let settle = 0; settle < 5; settle += 1) await Promise.resolve();
+    await tick();
+    flushSync();
+    assert.ok(calls.some((call) => call[0] === 'confirmDiscardDirtyRecipeItemDraft'));
+    assert.ok(calls.some((call) => call[0] === 'selectSystem' && call[1] === 'smithing'));
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-item-edit',
+      'the refused switch leaves the discarded editor open'
+    );
+    assert.ok(!target.querySelector('[data-recipe-item-dirty]'), 'the draft is its baseline again');
+    assert.equal(enabled().getAttribute('aria-pressed'), 'true');
+    assert.equal(previewName(), 'Second Printing', 'the preview is the baseline’s own link');
+  });
+
+  // Issue 1721: the inspector's quick limit is a live caps write shaped by the visibility mode.
+  for (const [visibilityMode, patch] of [
+    ['item', { item: { limitUses: true, maxUses: 1 } }],
+    ['knowledge', { learn: { limitLearning: false, learnScope: 'perInstance', learnsAllowed: 1 } }],
+  ]) {
+    it(`writes the ${visibilityMode}-mode caps patch from the inspector's quick limit`, async () => {
+      const calls = [];
+      await openBooksScrolls(calls, {
+        recipeItemDefinitions: booksScrollsFixtures,
+        selectedSystemOverrides: { visibilityMode },
+      });
+      target.querySelector('[data-books-scrolls-select="ri1"]').click();
+      await tick();
+      flushSync();
+      target.querySelector('[data-item-page-quick-limit-toggle]').click();
+      await tick();
+      flushSync();
+      assert.deepEqual(
+        calls.filter((call) => call[0] === 'updateRecipeItemCaps'),
+        [['updateRecipeItemCaps', 'ri1', patch]]
+      );
+    });
+  }
 
   it('creates a recipe item by dropping a world/compendium item and then opens its editor', async () => {
     const calls = [];

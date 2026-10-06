@@ -2,7 +2,7 @@
  * World scope: currency, prerequisites, modifiers, the component catalogue, the vocabulary and the essence catalogue.
  */
 
-import { WORLD_SCOPE_MODEL_PATTERN } from './caseConstants.js';
+import { PREMIUM_ICONS_AD_PATTERN, WORLD_SCOPE_MODEL_PATTERN } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -195,8 +195,12 @@ export const CASES = Object.freeze([
       { selector: '[data-scoped-list-search]', fill: '' },
     ],
     expectView: 'world-components',
-    // The page's own hook, so a route that fell back to the systems library fails rather than publishing the wrong screen.
-    expectSelector: '[data-scoped-page="world-components"]',
+    // The page's own hook, so a route that fell back to the systems library fails rather than publishing the wrong screen,
+    // and the Premium advert alone in the header group, since the lab world opts into experimental features (issue 2220).
+    expectSelector:
+      '.fabricate-manager:has([data-scoped-page="world-components"]) .manager-header-actions > [data-premium-icons-ad]:only-child',
+    // Only the advert's full face draws the subline.
+    expectVisible: '[data-premium-icons-ad] .manager-premium-icons-ad-subline',
     // The four leaves in the prototype's authored order, each proved to hold its own icon rather than merely to exist.
     expectContained: [
       {
@@ -238,6 +242,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
       WORLD_SCOPE_MODEL_PATTERN,
+      PREMIUM_ICONS_AD_PATTERN,
     ],
   }),
   managerCase({

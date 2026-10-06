@@ -183,10 +183,33 @@ function createTextEditor(documents) {
       const name = label || documents.get(uuid)?.name;
       return name ? `<a class="content-link" data-uuid="${uuid}">${name}</a>` : whole;
     });
+  // On both the base and `.implementation`, which different callers reach (issue 1487).
   return {
-    implementation: { enrichHTML: async (raw) => enrich(raw) },
+    implementation: { enrichHTML: async (raw) => enrich(raw), getDragEventData },
     enrichHTML: async (raw) => enrich(raw),
+    getDragEventData,
   };
+}
+
+/**
+ * `TextEditor.getDragEventData`, transcribed from the harvested
+ * `client/applications/ux/text-editor.mjs`: `{}` on failure, where the bridge's fallback says null.
+ *
+ * @param {DragEvent} event A drag event.
+ * @returns {object} The parsed payload, or `{}` when there is none to parse.
+ */
+function getDragEventData(event) {
+  if (!('dataTransfer' in event)) {
+    console.warn(
+      'Incorrectly attempted to process drag event data for an event which was not a DragEvent.'
+    );
+    return {};
+  }
+  try {
+    return JSON.parse(event.dataTransfer.getData('text/plain'));
+  } catch {
+    return {};
+  }
 }
 
 /** The two dnd5e Starter Heroes the smoke imports, reconstructed. */

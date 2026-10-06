@@ -12,6 +12,8 @@
     yield: contributionYield = () => 0,
     spare = () => 0,
     held = () => 0,
+    // Cap each stepper at `held` rather than freezing it once every threshold is met.
+    capAtHeld = false,
     locked = false,
     essenceLabel = (essence) => essence,
     sourceReading = () => '',
@@ -38,7 +40,7 @@
     const byEssence = new SvelteMap();
     for (const threshold of thresholds) {
       const pool = byEssence.get(threshold.essence) ?? { ...threshold, amount: 0, sources: [] };
-      pool.amount += Math.max(0, Number(threshold.amount) || 0);
+      pool.amount = exact(pool.amount + Math.max(0, Number(threshold.amount) || 0));
       pool.sources.push(...(threshold.sources ?? []));
       byEssence.set(threshold.essence, pool);
     }
@@ -56,17 +58,24 @@
     return unique;
   });
 
+  // Twelve significant digits absorb binary drift, so 0.2 × 3 reads 0.6 rather than 0.6000000000000001.
+  function exact(value) {
+    return Number(value.toPrecision(12));
+  }
+
   function allocated(sourceId) {
     return Math.max(0, Number(allocation?.[sourceId]) || 0);
   }
 
   function totalFor(threshold) {
-    return sources.reduce(
-      (total, source) =>
-        total +
-        allocated(source.id) *
-          Math.max(0, Number(contributionYield(source.id, threshold.essence)) || 0),
-      0
+    return exact(
+      sources.reduce(
+        (total, source) =>
+          total +
+          allocated(source.id) *
+            Math.max(0, Number(contributionYield(source.id, threshold.essence)) || 0),
+        0
+      )
     );
   }
 
@@ -89,7 +98,7 @@
   function step(source, next) {
     const previous = allocated(source.id);
     allocation = { ...allocation, [source.id]: next };
-    onStep(source.id, next - previous);
+    onStep(source.id, next - previous, next);
   }
 
   /**
@@ -111,7 +120,7 @@
     pools
       .map((threshold) => ({
         essence: threshold.essence,
-        amount: totalFor(threshold) - Math.max(0, Number(threshold.amount) || 0),
+        amount: exact(totalFor(threshold) - Math.max(0, Number(threshold.amount) || 0)),
       }))
       .filter((entry) => entry.amount > 0)
   );
@@ -157,7 +166,11 @@
         {@const need = Math.max(0, Number(threshold.amount) || 0)}
         {@const isMet = got >= need}
         {@const tint = safeTint(threshold.tint)}
-        <div class="fab-essence-threshold" data-essence-threshold={threshold.essence}>
+        <div
+          {...threshold.props}
+          class="fab-essence-threshold"
+          data-essence-threshold={threshold.essence}
+        >
           <div class="fab-essence-threshold-heading">
             <Medallion icon={threshold.icon || 'fas fa-droplet'} {tint} size={26} glyph={12} />
             <span class="fab-essence-name" id={`${nameIdPrefix}-${index}`}
@@ -189,8 +202,12 @@
       {#each sources as source (source.id)}
         {@const value = allocated(source.id)}
         {@const available = Math.max(0, Number(spare(source.id)) || 0)}
-        {@const maximum = everyPoolMet ? value : value + available}
-        <div class="fab-essence-source" data-essence-source={source.id}>
+        {@const maximum = capAtHeld
+          ? Math.max(0, Number(held(source.id)) || 0)
+          : everyPoolMet
+            ? value
+            : value + available}
+        <div {...source.props} class="fab-essence-source" data-essence-source={source.id}>
           <Medallion
             art={source.art || ''}
             icon={source.icon || 'fas fa-flask'}
@@ -213,6 +230,7 @@
             ariaLabel={allocationLabel(source)}
             decrementLabel={decrementLabel(source)}
             incrementLabel={incrementLabel(source)}
+            inputProps={source.inputProps ?? {}}
             onChange={(next) => step(source, next)}
           />
         </div>
@@ -222,7 +240,9 @@
     {#if overshoots.length > 0}
       <div class="fab-essence-overshoots" data-essence-overshoot>
         {#each overshoots as overshoot (overshoot.essence)}
-          <span>{overshootLabel(essenceLabel(overshoot.essence), overshoot.amount)}</span>
+          <span data-essence-overshoot={overshoot.essence}
+            >{overshootLabel(essenceLabel(overshoot.essence), overshoot.amount)}</span
+          >
         {/each}
       </div>
     {/if}

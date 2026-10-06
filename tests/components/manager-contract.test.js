@@ -2215,9 +2215,10 @@ describe('CraftingSystemManager source contract', () => {
       'store.removeToolFromSystem',
       'store.setToolSectionInherited',
       // Tool creation is a world-scope write now.
-      'services.resolveToolSource',
       'store.worldScope.tool.createEntity',
     ],
+    // The world-scope model calls the resolver through its `services()` thunk, which no `services.` member path spells.
+    calls: ['resolveToolSource'],
     passesProps: [
       ['WorldToolCataloguePage', 'onCreateFromItemDrop'],
       ['ToolBrowserInspector', 'onAddToSystem'],

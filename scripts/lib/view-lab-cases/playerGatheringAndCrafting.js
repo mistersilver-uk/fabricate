@@ -1328,8 +1328,7 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
       {
-        selector:
-          '.essence-pool-carrier[data-essence-carrier="Item.sm-iron-ore"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-iron-ore"] .fab-stepper-input',
         fill: '0',
       },
     ],
@@ -1357,8 +1356,7 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
       {
-        selector:
-          '.essence-pool-carrier[data-essence-carrier="Item.sm-steel-ingot"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-steel-ingot"] .fab-stepper-input',
         fill: '4',
       },
       { selector: '[data-essence-overshoot="fire"]', scroll: true },
@@ -1389,11 +1387,11 @@ export const CASES = Object.freeze([
       { selector: '.crafting-browser-search input', fill: 'Rivet Chainmail' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-chainmail"]' },
       {
-        selector: '.essence-pool-carrier[data-essence-carrier="Item.sm-coal"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-coal"] .fab-stepper-input',
         fill: '0',
       },
       {
-        selector: '.essence-pool-carrier[data-essence-carrier="Item.sm-ruby"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-ruby"] .fab-stepper-input',
         fill: '0',
       },
       { selector: '.requirement-rail-wand' },
@@ -1411,18 +1409,15 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
       {
-        selector:
-          '.essence-pool-carrier[data-essence-carrier="Item.sm-iron-ore"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-iron-ore"] .fab-stepper-input',
         fill: '0',
       },
       {
-        selector:
-          '.essence-pool-carrier[data-essence-carrier="Item.sm-iron-ingot"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-iron-ingot"] .fab-stepper-input',
         fill: '0',
       },
       {
-        selector:
-          '.essence-pool-carrier[data-essence-carrier="Item.sm-steel-ingot"] .fab-stepper-input',
+        selector: '[data-essence-carrier="Item.sm-steel-ingot"] .fab-stepper-input',
         fill: '2',
       },
     ],

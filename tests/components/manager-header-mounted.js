@@ -14,6 +14,7 @@ import {
   setInputValue,
 } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
+import { makeSettingsSeam } from '../helpers/settings.js';
 import { censusDelta, censusOf, writeCensus } from '../helpers/domCensus.js';
 import {
   booksScrollsFixtures,
@@ -257,6 +258,20 @@ async function mountCompanionDowntime() {
 
 /** A save the store never answers, which is how the saving state holds still to be pinned. */
 const NEVER_SETTLES = () => new Promise(() => {});
+
+/** The Premium advert's three gates: the experimental toggle, no companion, no dismissal. */
+const ADVERT_GATE_OPEN = Object.freeze({ experimentalFeaturesEnabled: true });
+const DISMISSED_WORLD = Object.freeze({
+  getSetting: (key) => key === 'premiumIconsAdDismissed',
+  setSetting: async () => {},
+});
+
+/** Land on the world Component catalogue through its rail leaf. */
+async function openWorldComponentCatalogue() {
+  await seedWorldScope({ component: worldScopeLeg(WORLD_COMPONENTS) });
+  worldNavItem('component-catalogue').click();
+  await settleHeader();
+}
 
 /** Two errors, so the Save tooltip's join is pinned as a join rather than as one sentence. */
 const TASK_INVALID = () => ({
@@ -642,6 +657,32 @@ const CENSUS_STATES = {
       await settleHeader();
     },
     prove: () => hook('[data-downtime-chrome-status]', 'the companion chrome never landed'),
+  },
+  'Component Rules with the Premium crafting-icons advert leading its group': {
+    view: 'components',
+    open: async () => {
+      mountManager([], ADVERT_GATE_OPEN);
+      navButton('Component Rules').click();
+      await settleHeader();
+    },
+    prove: () => hook('[data-premium-icons-ad]', 'the advert did not render'),
+  },
+  'the world Component catalogue, whose group opens for the advert alone': {
+    view: 'world-components',
+    open: async () => {
+      mountManager([], ADVERT_GATE_OPEN);
+      await openWorldComponentCatalogue();
+    },
+    prove: () => hook('[data-premium-icons-ad]', 'the advert did not render'),
+  },
+  'the world Component catalogue with the gate on and the advert dismissed: no group': {
+    view: 'world-components',
+    open: async () => {
+      mountManager([], ADVERT_GATE_OPEN, DISMISSED_WORLD);
+      await openWorldComponentCatalogue();
+    },
+    prove: () =>
+      assert.ok(!target.querySelector('.manager-header-actions'), 'the dismissed group rendered'),
   },
 };
 
@@ -1770,6 +1811,111 @@ const HEADER_CENSUS = Object.freeze({
       "+ 2 button class=\"fabricate-button is-primary\" data-manager-header-action=\"save\" disabled=\"\" type=\"button\"",
       "+ 3 span | Save",
     ],
+    "Component Rules with the Premium crafting-icons advert leading its group": [
+      "- 2 div class=\"manager-page-kicker\"",
+      "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
+      "- 2 h1 class=\"manager-title\" | Crafting systems",
+      "- 2 p class=\"manager-subtitle\" | Select a row to view counts and enabled features.",
+      "- 1 div aria-label=\"System actions\" class=\"manager-header-actions\"",
+      "- 2 button class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" data-manager-import-system=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-import\"",
+      "- 3 span | Import",
+      "- 2 button class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-export\"",
+      "- 3 span | Export",
+      "- 2 button class=\"fabricate-button fab-manager-button is-primary\" data-keyboard-focus=\"true\" type=\"button\"",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 button type=\"button\" | Alchemy",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 span | Component Rules",
+      "+ 2 h1 class=\"manager-title\" | Component Rules",
+      "+ 2 p class=\"manager-subtitle\" | Component rules in Alchemy · Simple salvage · the world category resolves in; tags, essences, salvage and overrides are this system’s own.",
+      "+ 1 div aria-label=\"Component actions\" class=\"manager-header-actions\"",
+      "+ 2 div aria-label=\"Crafting icons\" class=\"manager-premium-icons-ad svelte-1h1bhxu\" data-premium-icons-ad=\"\" role=\"group\"",
+      "+ 3 div aria-hidden=\"true\" class=\"manager-premium-icons-ad-icons svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-stone svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-blood svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-entropy svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-verdant svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-catalyst svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-formula svelte-1h1bhxu\"",
+      "+ 3 div class=\"manager-premium-icons-ad-copy svelte-1h1bhxu\"",
+      "+ 4 div class=\"manager-premium-icons-ad-heading svelte-1h1bhxu\"",
+      "+ 5 span class=\"manager-premium-icons-ad-title svelte-1h1bhxu\" | Crafting icons",
+      "+ 5 span class=\"manager-premium-icons-ad-badge svelte-1h1bhxu\" | PREMIUM",
+      "+ 4 span class=\"manager-premium-icons-ad-subline svelte-1h1bhxu\" | For components and essences, with Downtime",
+      "+ 3 a class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" data-premium-icons-ad-link=\"true\" href=\"https://www.patreon.com/c/mistersilver\" rel=\"noopener noreferrer\" target=\"_blank\" title=\"Opens Fabricate Premium on Patreon in a new tab\"",
+      "+ 4 span | Get Premium",
+      "+ 4 i aria-hidden=\"true\" class=\"fas fa-arrow-up-right-from-square\"",
+      "+ 3 button aria-label=\"Hide Premium suggestion\" class=\"fabricate-icon-button is-size-24 is-ghost\" data-keyboard-focus=\"true\" data-premium-icons-ad-dismiss=\"\" title=\"Hide Premium suggestion\" type=\"button\"",
+      "+ 4 i aria-hidden=\"true\" class=\"fas fa-xmark\"",
+      "+ 2 button class=\"fabricate-button fab-manager-button is-primary is-size-38\" data-component-add-from-catalogue=\"true\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 span | Create",
+      "+ 3 span | Add from catalogue",
+    ],
+    "the world Component catalogue, whose group opens for the advert alone": [
+      "- 3 button type=\"button\" | Crafting Systems",
+      "- 2 div class=\"manager-page-kicker\"",
+      "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
+      "- 2 h1 class=\"manager-title\" | Crafting systems",
+      "- 2 p class=\"manager-subtitle\" | Select a row to view counts and enabled features.",
+      "- 1 div aria-label=\"System actions\" class=\"manager-header-actions\"",
+      "- 2 button class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" data-manager-import-system=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-import\"",
+      "- 3 span | Import",
+      "- 2 button class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-export\"",
+      "- 3 span | Export",
+      "- 2 button class=\"fabricate-button fab-manager-button is-primary\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-plus\"",
+      "- 3 span | Create",
+      "+ 3 button data-breadcrumb-world=\"\" type=\"button\" | World",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 span data-breadcrumb-world-scoped=\"world-components\" | Component catalogue",
+      "+ 2 h1 class=\"manager-title\" | Component catalogue",
+      "+ 2 p class=\"manager-subtitle\" | One component per source item — identity only. Crafting behaviour lives in each system's own component rules.",
+      "+ 1 div aria-label=\"Component catalogue actions\" class=\"manager-header-actions\"",
+      "+ 2 div aria-label=\"Crafting icons\" class=\"manager-premium-icons-ad svelte-1h1bhxu\" data-premium-icons-ad=\"\" role=\"group\"",
+      "+ 3 div aria-hidden=\"true\" class=\"manager-premium-icons-ad-icons svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-stone svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-blood svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-entropy svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-verdant svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-catalyst svelte-1h1bhxu\"",
+      "+ 4 span class=\"manager-premium-icons-ad-icon is-relic-formula svelte-1h1bhxu\"",
+      "+ 3 div class=\"manager-premium-icons-ad-copy svelte-1h1bhxu\"",
+      "+ 4 div class=\"manager-premium-icons-ad-heading svelte-1h1bhxu\"",
+      "+ 5 span class=\"manager-premium-icons-ad-title svelte-1h1bhxu\" | Crafting icons",
+      "+ 5 span class=\"manager-premium-icons-ad-badge svelte-1h1bhxu\" | PREMIUM",
+      "+ 4 span class=\"manager-premium-icons-ad-subline svelte-1h1bhxu\" | For components and essences, with Downtime",
+      "+ 3 a class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" data-premium-icons-ad-link=\"true\" href=\"https://www.patreon.com/c/mistersilver\" rel=\"noopener noreferrer\" target=\"_blank\" title=\"Opens Fabricate Premium on Patreon in a new tab\"",
+      "+ 4 span | Get Premium",
+      "+ 4 i aria-hidden=\"true\" class=\"fas fa-arrow-up-right-from-square\"",
+      "+ 3 button aria-label=\"Hide Premium suggestion\" class=\"fabricate-icon-button is-size-24 is-ghost\" data-keyboard-focus=\"true\" data-premium-icons-ad-dismiss=\"\" title=\"Hide Premium suggestion\" type=\"button\"",
+      "+ 4 i aria-hidden=\"true\" class=\"fas fa-xmark\"",
+    ],
+    "the world Component catalogue with the gate on and the advert dismissed: no group": [
+      "- 3 button type=\"button\" | Crafting Systems",
+      "- 2 div class=\"manager-page-kicker\"",
+      "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
+      "- 2 h1 class=\"manager-title\" | Crafting systems",
+      "- 2 p class=\"manager-subtitle\" | Select a row to view counts and enabled features.",
+      "- 1 div aria-label=\"System actions\" class=\"manager-header-actions\"",
+      "- 2 button class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" data-manager-import-system=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-import\"",
+      "- 3 span | Import",
+      "- 2 button class=\"fabricate-button fab-manager-button\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-export\"",
+      "- 3 span | Export",
+      "- 2 button class=\"fabricate-button fab-manager-button is-primary\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-plus\"",
+      "- 3 span | Create",
+      "+ 3 button data-breadcrumb-world=\"\" type=\"button\" | World",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 span data-breadcrumb-world-scoped=\"world-components\" | Component catalogue",
+      "+ 2 h1 class=\"manager-title\" | Component catalogue",
+      "+ 2 p class=\"manager-subtitle\" | One component per source item — identity only. Crafting behaviour lives in each system's own component rules.",
+    ],
   },
   /* header-census:end */
 });
@@ -1827,5 +1973,188 @@ export function registerHeaderCases() {
         'answer is that nothing did. If it moved deliberately, re-derive the literal with ' +
         `${CENSUS_REGENERATE} and say in the commit what moved and why.`
     );
+  });
+
+  registerPremiumIconsAdCases();
+}
+
+const advert = () => target.querySelector('[data-premium-icons-ad]');
+const headerActions = () => target.querySelector('.manager-header-actions');
+
+/** Mount with the advert's gates open over `services`, on Component Rules. */
+async function mountComponentRulesAdvert(services = {}, rootProps = {}) {
+  useShippedLocalization();
+  mountManager([], ADVERT_GATE_OPEN, services, rootProps);
+  navButton('Component Rules').click();
+  await settleHeader();
+}
+
+/** A settings seam that records each write and answers it with `answer()`. */
+function recordingSettings(answer = async () => {}) {
+  const writes = [];
+  return {
+    writes,
+    services: {
+      getSetting: () => undefined,
+      setSetting: (...args) => {
+        writes.push(args);
+        return answer();
+      },
+    },
+  };
+}
+
+/** The Premium crafting-icons advert (issue 2220), on the two routes that carry it. */
+function registerPremiumIconsAdCases() {
+  it('leads the Component Rules group, before Add from catalogue, as a labelled group', async () => {
+    await mountComponentRulesAdvert();
+    const strip = advert();
+    assert.ok(Boolean(strip), 'the advert did not render');
+    assert.equal(headerActions().firstElementChild, strip, 'the advert does not lead the group');
+    assert.ok(
+      strip.nextElementSibling.matches('[data-component-add-from-catalogue]'),
+      'Add from catalogue does not follow the advert'
+    );
+    assert.equal(strip.getAttribute('role'), 'group');
+    assert.equal(strip.getAttribute('aria-label'), 'Crafting icons');
+    assert.equal(
+      strip.querySelector('.manager-premium-icons-ad-icons').getAttribute('aria-hidden'),
+      'true'
+    );
+    assert.equal(strip.querySelectorAll('.manager-premium-icons-ad-icon').length, 6);
+    assert.equal(
+      strip.querySelector('.manager-premium-icons-ad-subline').textContent.trim(),
+      'For components and essences, with Downtime'
+    );
+  });
+
+  it('links Get Premium to the Patreon page in a new tab', async () => {
+    await mountComponentRulesAdvert();
+    const link = advert().querySelector('[data-premium-icons-ad-link]');
+    assert.equal(link.tagName, 'A');
+    assert.equal(link.getAttribute('href'), 'https://www.patreon.com/c/mistersilver');
+    assert.equal(link.getAttribute('target'), '_blank');
+    assert.equal(link.getAttribute('rel'), 'noopener noreferrer');
+    assert.equal(link.getAttribute('title'), 'Opens Fabricate Premium on Patreon in a new tab');
+    assert.equal(link.textContent.trim(), 'Get Premium');
+    assert.equal(link.querySelector('i').getAttribute('aria-hidden'), 'true');
+    assert.ok(!link.hasAttribute('data-action'), 'Get Premium is a link, not an action');
+  });
+
+  it('holds the world Component catalogue group alone, without the systems actions', async () => {
+    useShippedLocalization();
+    mountManager([], ADVERT_GATE_OPEN);
+    await openWorldComponentCatalogue();
+    assert.equal(managerView(), 'world-components');
+    const group = headerActions();
+    assert.ok(Boolean(group), 'the advert did not open the group');
+    assert.equal(group.getAttribute('aria-label'), 'Component catalogue actions');
+    assert.equal(group.children.length, 1, 'the group holds more than the advert');
+    assert.ok(Boolean(advert()), 'the advert did not render');
+    assert.ok(!target.querySelector('[data-manager-import-system]'), 'Import fell through');
+  });
+
+  it('dismisses with one world write, hides at once and keeps focus off the body', async () => {
+    const { writes, services } = recordingSettings();
+    await mountComponentRulesAdvert(services);
+    advert().querySelector('[data-premium-icons-ad-dismiss]').click();
+    await settleHeader();
+
+    assert.deepEqual(writes, [['premiumIconsAdDismissed', true]]);
+    assert.ok(!advert(), 'the advert outlived its dismissal');
+    assert.ok(
+      document.activeElement?.matches?.('[data-component-add-from-catalogue]'),
+      'focus did not move to Add from catalogue'
+    );
+  });
+
+  it('moves focus into the catalogue when the advert was alone in its group', async () => {
+    const { services } = recordingSettings();
+    useShippedLocalization();
+    mountManager([], ADVERT_GATE_OPEN, services);
+    await openWorldComponentCatalogue();
+    advert().querySelector('[data-premium-icons-ad-dismiss]').click();
+    await settleHeader();
+
+    assert.ok(!advert(), 'the advert outlived its dismissal');
+    assert.ok(document.activeElement !== document.body, 'focus fell to the body');
+    assert.ok(
+      document.activeElement?.closest?.('.manager-main'),
+      'focus did not land in the catalogue'
+    );
+  });
+
+  it('stays dismissed on the other route while the world write never settles', async () => {
+    const { services } = recordingSettings(NEVER_SETTLES);
+    await mountComponentRulesAdvert(services);
+    advert().querySelector('[data-premium-icons-ad-dismiss]').click();
+    await settleHeader();
+    await openWorldComponentCatalogue();
+
+    assert.equal(managerView(), 'world-components');
+    assert.ok(!advert(), 'the advert came back before the write settled');
+    assert.ok(!headerActions(), 'the catalogue group stayed open for nothing');
+  });
+
+  it('keeps the advert hidden, with a warning and no unhandled rejection, when the write is refused', async () => {
+    const seam = makeSettingsSeam({ isGM: false, userName: 'Assistant' });
+    const rejections = [];
+    const onRejection = (reason) => {
+      rejections.push(reason);
+    };
+    const warnings = [];
+    const warn = console.warn;
+    process.on('unhandledRejection', onRejection);
+    console.warn = (...args) => {
+      warnings.push(args);
+    };
+    try {
+      await mountComponentRulesAdvert(seam);
+      advert().querySelector('[data-premium-icons-ad-dismiss]').click();
+      await settleHeader();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      assert.deepEqual(seam.refused, ['premiumIconsAdDismissed'], 'the write was not attempted');
+      assert.ok(!advert(), 'the refused write brought the advert back');
+      assert.equal(rejections.length, 0, 'the refusal escaped as an unhandled rejection');
+      assert.ok(
+        warnings.some(([message]) => String(message).startsWith('Fabricate |')),
+        'the refusal was swallowed silently'
+      );
+    } finally {
+      console.warn = warn;
+      process.off('unhandledRejection', onRejection);
+    }
+  });
+
+  it('withholds the advert on both routes with the experimental gate shut', async () => {
+    useShippedLocalization();
+    mountManager();
+    navButton('Component Rules').click();
+    await settleHeader();
+    assert.equal(managerView(), 'components');
+    assert.ok(!advert(), 'Component Rules showed the advert with the gate shut');
+    await openWorldComponentCatalogue();
+    assert.equal(managerView(), 'world-components');
+    assert.ok(!advert(), 'the catalogue showed the advert with the gate shut');
+  });
+
+  it('withholds the advert once a Premium surface is registered, before or after mount', async () => {
+    const early = createManagerExtensionsRegistry();
+    early.publicApi.registerWorldNavProvider(downtimeProvider({ id: 'crew-quarters' }));
+    await mountComponentRulesAdvert({}, { managerExtensions: early });
+    assert.ok(!advert(), 'the advert showed beside an installed Premium surface');
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    const later = createManagerExtensionsRegistry();
+    await mountComponentRulesAdvert({}, { managerExtensions: later });
+    assert.ok(Boolean(advert()), 'the advert never rendered, so its removal proves nothing');
+    later.publicApi.registerWorldNavProvider(downtimeProvider({ id: 'crew-quarters' }));
+    await settleHeader();
+    assert.ok(!advert(), 'a companion registered after mount left the advert up');
+    await openWorldComponentCatalogue();
+    assert.ok(!advert(), 'the catalogue showed the advert beside an installed Premium surface');
   });
 }

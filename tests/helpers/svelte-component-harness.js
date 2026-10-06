@@ -559,6 +559,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SlotTile.svelte',
   'src/ui/svelte/components/Well.svelte',
   'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
+  // The shared pool the panel adapts (issue 1644).
+  'src/ui/svelte/components/EssencePool.svelte',
   'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
   // The one "N Radiant" contribution chip both of the two panels above render. They
   // are already listed, so omitting this HANGS every mounted crafting suite.
