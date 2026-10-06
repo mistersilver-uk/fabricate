@@ -4076,7 +4076,64 @@
   font-weight: 700;
 }
 
-.fabricate-search.fabricate-search input {
+/* THE SHELL IS THE BOX (issue 1782, maintainer ruling 2): the library's form rung — 38 / radius 9 / `--fab-surface-soft` / 500 12.5px — with the glyph IN FLOW at the kit's 12px, 8px before a borderless input that stretches to the shell's height. `:not(.is-compact)` keeps every declaration off the four ruled compact sites, which keep their shipped box below. */
+.fabricate-search.fabricate-search:not(.is-compact) {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  height: 38px;
+  padding: 0 var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* THE LABELLED FORM'S SHELL sits in `Field`'s flex column, where the base rule's 260px basis would be its HEIGHT. */
+.fabricate-search-field > .fabricate-search.fabricate-search {
+  flex: none;
+}
+
+.fabricate-search.fabricate-search:not(.is-compact) > i {
+  flex: none;
+  color: var(--fab-text-subtle);
+  font-size: 12px;
+}
+
+.fabricate-search.fabricate-search:not(.is-compact) input {
+  appearance: none;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* `:not(:focus-visible)`, so the module rule that hides a focused field's placeholder still wins. */
+.fabricate-search.fabricate-search:not(.is-compact) input:not(:focus-visible)::placeholder {
+  color: var(--fab-text-subtle);
+}
+
+/* A WRAPPER-DRAWN FIELD: the shell takes the full accent while its input holds focus, and the input draws no ring of its own (`design-system/spec.md`, the text-field ring variant). */
+.fabricate-search.fabricate-search:not(.is-compact):focus-within {
+  border-color: var(--fab-accent);
+}
+
+.fabricate-search.fabricate-search:not(.is-compact) input:focus-visible {
+  outline: none;
+}
+
+/* THE COMPACT EXCEPTION'S BOX, unchanged from the shipped pill: `:where()` keeps it at the (0,2,1) the base rule had. */
+.fabricate-search.fabricate-search:where(.is-compact) input {
   width: 100%;
   min-width: 0;
   height: 34px;
@@ -4207,7 +4264,7 @@
   background: var(--fab-overlay-light-12);
 }
 
-.fabricate-search.fabricate-search > i {
+.fabricate-search.fabricate-search:where(.is-compact) > i {
   position: absolute;
   top: 50%;
   left: 11px;
@@ -4697,7 +4754,6 @@
 }
 
 /* Close the Foundry BLEED on the Component Studio's own roles (issue 676). */
-.fabricate-manager[data-manager-view="components"] .fabricate-search input,
 .fabricate-manager[data-manager-view="components"] .fabricate-filter-bar .fabricate-button {
   font-size: var(--fab-recipe-control-font);
 }
@@ -5180,23 +5236,11 @@
 
 /* The three-row filter bar. Row one is every FILTER (search, status, lock, category); row two is the two VIEW controls (grouping, ordering), split by a rule; row three is the active-filter chips and the count. */
 .fabricate-manager .manager-recipe-toolbar {
-  /* The whole bar reads at the shared --fab-recipe-control-font (issue 643): the search input and the sort-direction toggle, with both select triggers at the `toolbar` rung's own 0.72rem — matching the segmented status/lock toggles (their component sets the same 0.72rem) — so the filters no longer mix 14 / 12.48 / 11.52px. */
+  /* The whole bar reads at the shared --fab-recipe-control-font (issue 643): the sort-direction toggle, with both select triggers at the `toolbar` rung's own 0.72rem — matching the segmented status/lock toggles (their component sets the same 0.72rem) — so the filters no longer mix 14 / 12.48 / 11.52px. */
   gap: var(--fab-space-2);
 }
 
-/* The Component Studio's toolbar is the SAME bar: ruling 1 makes the recipe treatment win wherever the two disagree, so the component browser joins every rule below rather than re-deriving a second, drifting filter bar (issues 676, 1036). */
-.fabricate-manager .manager-recipe-toolbar .fabricate-search input,
-.fabricate-manager .manager-component-toolbar .fabricate-search input,
-.fabricate-manager .manager-essence-toolbar .fabricate-search input {
-  font-size: var(--fab-recipe-control-font);
-}
-
-/* The search field takes the selects' 9px radius rather than the shared 6px, so the bar does not mix two corner radii across adjacent controls. */
-.fabricate-manager .manager-component-toolbar .fabricate-search input,
-.fabricate-manager .manager-essence-toolbar .fabricate-search input {
-  border-radius: 9px;
-}
-
+/* The Component Studio's toolbar is the SAME bar: ruling 1 makes the recipe treatment win wherever the two disagree, so the component browser joins every rule below rather than re-deriving a second, drifting filter bar (issues 676, 1036). Its search field states its own box and type (issue 1782). */
 .fabricate-manager .manager-recipe-filter-row,
 .fabricate-manager .manager-component-filter-row,
 .fabricate-manager .manager-essence-filter-row {
@@ -7525,12 +7569,6 @@
 
 /* THE TWO TEXT ACTIONS' TRAILING-EDGE GROUPING IS NOT HERE, AND IT CANNOT BE. */
 
-/* The control type scale. See reason 2 in the block header. */
-.fabricate-manager .manager-scoped-list-toolbar .fabricate-search input {
-  border-radius: 9px;
-  font-size: var(--fab-recipe-control-font);
-}
-
 /* The list and its rows. The skin matches the ONE browser-row treatment above — hairline edge, 8px corner, translucent overlay fill — and the geometry matches the recipe and component rows' denser 11px/12px card, because a scoped list is the same kind of library at the same density. */
 .fabricate-manager .manager-scoped-list {
   display: flex;
@@ -8163,8 +8201,8 @@
   min-height: 34px;
 }
 
-/* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome (48px wide, 22px tall, transparent) from its component-scoped \3c style> (issue 883), and the requirement row's rolled amount is sized to that stepper by its own rule (issue 1516). */
-.fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox']):not([type='range']),
+/* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome (48px wide, 22px tall, transparent) from its component-scoped \3c style> (issue 883), and the requirement row's rolled amount is sized to that stepper by its own rule (issue 1516). `[type='search']` — a labelled `SearchField`'s shell draws the box and its input is borderless (issue 1782). */
+.fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']),
 .fabricate-field.fabricate-field textarea {
   width: 100%;
   min-width: 0;
@@ -8175,7 +8213,7 @@
 }
 
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood 36px tall with 8px of side padding instead of the 28px/0 the control asks for (issue 1523). */
-.fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox']):not([type='range']) {
+.fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']) {
   height: 36px;
   padding: 0 var(--fab-space-2);
 }
@@ -11303,7 +11341,7 @@
   resize: vertical;
 }
 
-.fabricate-manager .manager-gathering-task-edit-view .fabricate-search input:not([type="checkbox"]):not([type="radio"]) {
+.fabricate-manager .manager-gathering-task-edit-view .fabricate-search:where(.is-compact) input:not([type="checkbox"]):not([type="radio"]) {
   height: 34px;
   padding: 0 34px;
 }
@@ -12512,7 +12550,7 @@
   font: inherit;
 }
 
-.fabricate-manager .manager-drop-inspector-stack .fabricate-search input {
+.fabricate-manager .manager-drop-inspector-stack .fabricate-search:where(.is-compact) input {
   height: 28px;
   min-height: 28px;
   padding-block: 0;
@@ -18211,21 +18249,6 @@
   min-width: 0;
 }
 
-/* ── THE SEARCH FIELD STATES ITS OWN TYPE ── `proto:2510` gives the box `height: 32px; padding: 0 11px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 8px`, and `proto:2512` gives the input `font: 500 11.5px var(--sans)` (issue 1373). */
-.fabricate-manager .manager-tools-library-card .fabricate-search input {
-  height: 30px;
-  border-radius: 8px;
-  background: var(--fab-surface-soft);
-  font-size: 11.5px;
-  font-weight: 500;
-}
-
-/* `proto:2511`: `font-size: 10px; color: var(--subtle)`. */
-.fabricate-manager .manager-tools-library-card .fabricate-search > i {
-  color: var(--fab-text-subtle);
-  font-size: 10px;
-}
-
 .fabricate-manager .manager-tools-result-summary {
   margin: 0 0 var(--fab-space-1);
   color: var(--fab-text-muted);
@@ -19557,7 +19580,7 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-component-entry-systems-search .fabricate-search input {
+.fabricate-manager .manager-component-entry-systems-search .fabricate-search:where(.is-compact) input {
   width: 190px;
   height: 30px;
   background: var(--fab-surface-soft);
@@ -20721,12 +20744,7 @@
   border-radius: 7px;
 }
 
-/* ── THE 38px CONTROL SIZE (issue 1371, maintainer ruling M12b) ── 38 IS A RUNG (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired), and the reference draws the catalogue toolbar's search and membership filter and the system rules list's search and two filters at 38px (`proto:577-578`, `proto:1053-1055`) against the 34px these controls ship at (issue 1504). */
-.fabricate-search.fabricate-search.is-size-38 input {
-  height: 38px;
-  border-radius: 9px;
-}
-
+/* ── THE 38px CONTROL SIZE (issue 1371, maintainer ruling M12b) ── 38 IS A RUNG (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired), and the reference draws the catalogue toolbar's membership filter and the system rules list's two filters at 38px (`proto:577-578`, `proto:1053-1055`) against the 34px these controls ship at (issue 1504). The search beside them is 38 by default (issue 1782). */
 .fabricate-manager .manager-scoped-list-toolbar .is-size-38 .fabricate-select-trigger,
 .fabricate-manager .manager-component-toolbar .is-size-38 .fabricate-select-trigger {
   min-height: 38px;

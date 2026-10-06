@@ -122,7 +122,6 @@
             <div class="journal-search-field">
               <SearchField
                 class="journal-search-control"
-                size="30"
                 value={journal?.search ?? ''}
                 onChange={(value) => journal?.setSearch?.(value)}
                 placeholder={localize('FABRICATE.App.Journal.Filters.SearchPlaceholder')}

@@ -2076,12 +2076,13 @@ test('the issue-1508 families declare their own control chrome rather than inher
       'inherit` floor is not reaching it'
   );
 
-  // SEARCH. No `min-height` and no `appearance`.
-  assert.equal(search.height, '34px');
-  assert.equal(search['border-radius'], '6px');
-  assert.equal(search['padding-left'], '34px');
-  assert.equal(search['padding-right'], '34px');
-  assert.equal(search['border-top-width'], '1px');
+  // SEARCH (issue 1782). The shell draws the box, so the input inside it is borderless, unpadded and
+  // square, and stretches to the 38px shell's 36px content height.
+  assert.equal(search.height, '36px');
+  assert.equal(search['border-radius'], '0px');
+  assert.equal(search['padding-left'], '0px');
+  assert.equal(search['padding-right'], '0px');
+  assert.equal(search['border-top-width'], '0px');
   assert.match(search['font-family'], /Signika/);
 });
 

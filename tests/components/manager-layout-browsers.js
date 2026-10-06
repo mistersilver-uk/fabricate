@@ -453,9 +453,9 @@ test('manager components browser defines drop target and compact responsive list
     'manager toolbar grid should keep rows bounded to the main content width'
   );
   // The component toolbar adopted the recipe bar's three-row shape (issue 676, ruling 1),
-  // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its search
-  // input takes the shared control font from them; its select triggers take the same 0.72rem
-  // from the shared `Select`'s `toolbar` rung.
+  // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its select
+  // triggers take the shared `Select`'s `toolbar` rung's 0.72rem; its search field states its
+  // own 500 12.5px since issue 1782, so no toolbar rule types it.
   assert.ok(
     blockFor(
       '.fabricate-manager .manager-recipe-filter-row,\n.fabricate-manager .manager-component-filter-row,\n.fabricate-manager .manager-essence-filter-row'
@@ -463,10 +463,12 @@ test('manager components browser defines drop target and compact responsive list
     'the component and essence filter rows share the recipe filter row rule'
   );
   assert.ok(
-    blockFor(
-      '.fabricate-manager .manager-recipe-toolbar .fabricate-search input,\n.fabricate-manager .manager-component-toolbar .fabricate-search input,\n.fabricate-manager .manager-essence-toolbar .fabricate-search input'
-    ).includes('font-size: var(--fab-recipe-control-font);'),
-    'the component and essence toolbar search inputs are typed by the shared control font, not the Foundry bleed'
+    !/-toolbar \.fabricate-search input[^{]*\{[^}]*font-size/.test(css),
+    'no toolbar types the search input: the field states its own 500 12.5px (issue 1782)'
+  );
+  assert.ok(
+    /\.fabricate-search\.fabricate-search:not\(\.is-compact\) \{[^}]*font-size: 12\.5px;/.test(css),
+    'and the family states it, so the field is not left to the Foundry bleed'
   );
   // The ESSENCE browser's toggle is the third selector in that group (issue 1118). It is
   // addressed by its `data-*` hook because the class it used to carry styled nothing at all —
@@ -1458,7 +1460,7 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   const gridBlock = blockFor('.fabricate-manager .manager-edit-grid');
   // `:not(.fab-stepper-input)` (issue 676); `:not([type='radio'], [type='checkbox'])` (issue 2151).
   const fieldInputBlock = blockFor(
-    ".fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox']):not([type='range'])"
+    ".fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range'])"
   );
   const toggleListBlock = blockFor('.fabricate-manager .manager-toggle-list');
   const featureTileBlock = blockFor('.fabricate-manager .manager-feature-tile');

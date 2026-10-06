@@ -95,10 +95,9 @@
     // `false` keeps the one row every caller renders today.
     splitToolbar = false,
     // ── THE LEAD ROW'S CONTROL RUNG (issue 1371 r9-cat, maintainer ruling M12b) ──────────────
-    // The control HEIGHT the search field and the lead row's lane-filter selects take, named after
-    // the rung rather than after an adjective, exactly as `SearchField`'s own `size` is:
-    // `''` is the shipped 34px control and `'38'` is the ladder's next rung up
-    // (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44).
+    // The control HEIGHT the lead row's lane-filter selects take, named after the rung rather than
+    // after an adjective: `''` is the shipped 34px control and `'38'` is the ladder's next rung up
+    // (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44). The search is 38 already (issue 1782).
     toolbarLeadSize = '',
     // ── THE ROW'S LEADING TILE (issue 1371 r9-cat, UX finding F12) ─────────────────────────── A
     // `Medallion` descriptor — `{variant, size, glyph}`, the primitive's OWN prop names — for the
@@ -950,7 +949,6 @@
 {#snippet searchField()}
   <SearchField
     value={query}
-    size={toolbarLeadSize}
     onChange={(next) => changeQuery(next)}
     placeholder={searchPlaceholder ||
       text('FABRICATE.Admin.Manager.Scoped.List.SearchPlaceholder', 'Search…')}

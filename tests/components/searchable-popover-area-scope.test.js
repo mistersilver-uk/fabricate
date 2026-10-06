@@ -298,11 +298,12 @@ const PRIMITIVES = Object.freeze([
     // ── SEARCHFIELD (issue 1508). Owns its own `<input type="search">`.
     name: 'SearchField',
     components: Object.freeze(['src/ui/svelte/components/SearchField.svelte']),
-    roots: Object.freeze(['fabricate-search']),
+    // The labelled form's `Field` root and caption are its own too (issue 1782).
+    roots: Object.freeze(['fabricate-search', 'fabricate-search-field', 'fabricate-search-caption']),
     // One exact class name; `manager-tag-search`.
     family: 'fabricate-search',
     anchors: Object.freeze(['fabricate-search']),
-    // `SIZE_CLASSES` (`is-size-38`) needs no reader.
+    // `is-compact` is its one conditional class, and it needs no reader.
     composesClasses: true,
     // Measured before this change landed: 1 written, 31 family selectors, 10 owned.
     writtenFloor: 1,

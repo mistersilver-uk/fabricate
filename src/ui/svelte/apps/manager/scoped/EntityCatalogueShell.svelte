@@ -87,9 +87,8 @@
     inspectorBodyPlacement = 'trail',
     // WHAT THE SYSTEM ROSTER SAYS WHEN NO SYSTEM HAS THE ENTITY. Threaded to `SystemRulesRoster`.
     rosterEmptyNote = '',
-    // THE ROSTER'S TWO SURFACE DECISIONS, carried here because a page never composes the roster.
+    // THE ROSTER'S SURFACE DECISION, carried here because a page never composes the roster.
     rosterRecessed = false,
-    rosterSearchWell = false,
     inspectorBody = undefined,
     bulk = undefined,
     emptyTitle = '',
@@ -244,7 +243,6 @@
     {systemRowAction}
     {rosterEmptyNote}
     recessed={rosterRecessed}
-    searchWell={rosterSearchWell}
     {armedToken}
     onArm={(token) => (armedToken = token)}
     onDisarm={() => (armedToken = '')}

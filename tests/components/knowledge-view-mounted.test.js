@@ -70,6 +70,8 @@ const harness = createMountedComponentHarness({
     // THE manager's labelled push-button (issue 1118). Both resets and the owned-copy row`s Expend use render it.
     'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/SearchField.svelte',
+    // The `Field` the search field's labelled form renders (issue 1782).
+    'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/apps/manager/KnowledgeView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/KnowledgeView.svelte',

@@ -177,7 +177,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   const harness = createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-search-field-rung-',
-    compiledModules: [FIELD],
+    compiledModules: ['src/ui/svelte/components/Field.svelte', FIELD],
     componentPath: FIELD
   });
 
@@ -186,9 +186,9 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   });
   after(() => harness.teardown());
 
-  const fieldRule = '.fabricate-search.fabricate-search.is-size-38 input';
-  // The converted select triggers' opt-in: the scoped catalogue's lead row and the component
-  // toolbar's two filters, one member per host bar.
+  // THE FIELD IS 38 BY DEFAULT (issue 1782, maintainer ruling 2), so it needs no opt-in; the
+  // converted select triggers still opt in, one member per host bar.
+  const fieldRule = '.fabricate-search.fabricate-search:not(.is-compact)';
   const triggerRule =
     '.fabricate-manager .manager-scoped-list-toolbar .is-size-38 .fabricate-select-trigger, ' +
     '.fabricate-manager .manager-component-toolbar .is-size-38 .fabricate-select-trigger';
@@ -203,25 +203,16 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
       ['converted select trigger', triggerRule, 'min-height']
     ]) {
       const [body] = bodiesOf(selector);
-      assert.equal(
-        pixels(valueOf(body, heightProperty)),
-        38,
-        `the ${label} opts into the 38px rung`
-      );
+      assert.equal(pixels(valueOf(body, heightProperty)), 38, `the ${label} stands at the 38px rung`);
       assert.equal(
         pixels(valueOf(body, 'border-radius')),
         9,
-        `and the ${label} takes the 34-38px band’s corner with it, rather than keeping the 34px control’s`
+        `and the ${label} takes the 34-38px band’s corner with it`
       );
     }
   });
 
-  it('and the shipped controls it overrides are still 34px, so the opt-in is a real change', () => {
-    // Non-vacuity again, and a specificity claim.
-    assert.equal(pixels(valueOf(bodiesOf('.fabricate-search.fabricate-search input')[0], 'height')), 34);
-    // The scoped catalogue's own shipped 34 is the `<Select>`'s `toolbar` rung since issue 1504,
-    // not the narrowed `.manager-scoped-list-toolbar select` rule — that one paints the one
-    // route still rendering a native select there, and this row's controls are triggers now.
+  it('and the shipped select it overrides is still 34px, so the opt-in is a real change', () => {
     assert.equal(
       pixels(
         valueOf(
@@ -231,55 +222,51 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
       ),
       34
     );
-    for (const selector of [fieldRule, ...triggerRule.split(', ')]) {
+    for (const selector of triggerRule.split(', ')) {
       const classes = (selector.match(/\.[\w-]+/g) ?? []).length;
       assert.ok(classes >= 3, `\`${selector}\` carries a third class, so it wins on specificity`);
     }
   });
 
-  it('emits NO size class by default, so every shipped field is unchanged', async () => {
+  it('keeps no field rung in the sheet, because the field takes none', () => {
+    assert.ok(
+      rules().every(({ selector }) => !/fabricate-search[^,]*is-size-/.test(selector)),
+      'a `.fabricate-search … is-size-*` rule paints a rung the field no longer emits'
+    );
+  });
+
+  it('emits NO size class by default, so the root is the family alone', async () => {
     const root = await harness.mount({ ariaLabel: 'Search' });
     // THIS EQUALITY IS ALSO THE FAMILY'S ROOT-EMISSION PROOF ON THE RENDERED DOM (issue 1508).
     assert.equal(
       root.querySelector('label').className.replace(/ ?svelte-[a-z0-9]+/g, ''),
       'fabricate-search',
-      'a field that does not ask for a rung is the family root plus the hook class and nothing else'
+      'a field that passes no class is the family root and nothing else'
     );
     harness.remount();
   });
 
-  it('emits is-size-38 when asked, and keeps the documented class order', async () => {
-    const root = await harness.mount({
-      size: '38',
-      density: 'compact',
-      class: 'manager-access-roster-search'
-    });
-    assert.equal(
-      root.querySelector('label').className.replace(/ ?svelte-[a-z0-9]+/g, ''),
-      'fabricate-search is-compact is-size-38 manager-access-roster-search',
-      'the family root leads, then the hook class, then the rung between the density and the caller class, which is where every hand-rolled site already writes its own extra'
-    );
-    harness.remount();
-  });
-
-  it('DROPS an unrecognised rung rather than emitting a class the sheet does not paint', async () => {
-    for (const size of ['37', 40, 'tall', '']) {
-      const root = await harness.mount({ size });
-      assert.ok(
-        !root.querySelector('label').className.includes('is-size-'),
-        `\`${size}\` is not a rung this field offers, so it renders the shipped control`
+  it('retired `size`: no rung class for any value, and the documented class order', async () => {
+    for (const size of ['38', '30', 40, '']) {
+      const root = await harness.mount({
+        size,
+        density: 'compact',
+        ariaLabel: 'Search',
+        class: 'manager-access-roster-search'
+      });
+      assert.equal(
+        root.querySelector('label').className.replace(/ ?svelte-[a-z0-9]+/g, ''),
+        'fabricate-search is-compact manager-access-roster-search',
+        `\`size=${JSON.stringify(size)}\` emits nothing: the family root, the density, then the caller class`
       );
       harness.remount();
     }
   });
 
-  it('names the class as a LITERAL, so the dead-rule gate can see a customer for the sheet rule', () => {
-    // `scripts/lib/stylesheetLiveClasses.js` never widens an `is-`/`has-` class through a
-    // positional wildcard, so a class this component only ever BUILT from a template would leave
-    // `.fabricate-search.is-size-38 input` looking like a rule with no caller.
+  it('names no rung in its script, so the dead-rule gate sees no customer for one', () => {
     const source = readFileSync(resolve(repoRoot, FIELD), 'utf8');
     const script = source.slice(source.indexOf('<script>'), source.indexOf('</script>'));
-    assert.match(script, /'is-size-38'/, 'the class is written out, not composed');
+    assert.ok(!/is-size-/.test(script), 'the field writes no `is-size-*` class');
   });
 
   // ── THE BUTTON TAKES THE SAME RUNG, AND THE SAME TOKEN (issue 1371, round 6) ───────────────
@@ -303,10 +290,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
       9,
       'and that corner is 9 — the band’s, which is why the rung needs none of its own'
     );
-    assert.ok(
-      BAND_9.includes(38) === false ? false : 38 >= BAND_9[0] && 38 <= BAND_9[1],
-      '38 is inside the band whose corner the primitive states'
-    );
+    assert.ok(38 >= BAND_9[0] && 38 <= BAND_9[1], '38 is inside the band whose corner the primitive states');
   });
 
   it('and the shipped button it overrides is still 34px, so the opt-in is a real change', () => {
@@ -316,18 +300,12 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
     assert.equal((buttonRule.match(/\.[\w-]+/g) ?? []).length, 4);
   });
 
-  it('emits the same token the field does, as a LITERAL, for the dead-rule gate', async () => {
+  it('emits the token the select triggers are opted in by, as a LITERAL, for the dead-rule gate', () => {
     const source = readFileSync(resolve(repoRoot, BUTTON), 'utf8');
     const script = source.slice(source.indexOf('<script>'), source.indexOf('</script>'));
     assert.match(script, /'is-size-38'/, 'the class is written out, not composed');
-    // ONE RUNG, ONE TOKEN. Two primitives spelling the same rung differently is the drift the
-    // shared name exists to prevent, and nothing else in the tree can see it.
-    const fieldScript = readFileSync(resolve(repoRoot, FIELD), 'utf8');
-    assert.equal(
-      (script.match(/'is-size-\d+'/g) ?? []).join(' '),
-      (fieldScript.match(/'is-size-\d+'/g) ?? []).join(' '),
-      'the button and the field name different rungs, so one ladder is spelled two ways'
-    );
+    // ONE RUNG, ONE TOKEN: the button and the select opt-in spell the rung the same way.
+    assert.ok(triggerRule.includes('.is-size-38 '), 'the select triggers opt in by the same token');
   });
 });
 

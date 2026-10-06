@@ -1,74 +1,91 @@
 <!--
-  The manager's search field: a `<label>` wrapping a leading glyph and an `<input type="search">`.
-  An import-free leaf, so callers pass already-localized `placeholder` and `ariaLabel`.
+  The library's `<Search>`: a query field that narrows a list already on screen and never commits a
+  choice (a field that commits is a `Typeahead`). The default shell is 38 high, radius 9, on
+  `--fab-surface-soft`, with an in-flow 12px glyph 8px before the input; `density="compact"` keeps
+  the ruled 32px exception at its four sites. An import-light leaf: callers pass localized text.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | bindable string | `''` | The current query. |
   | `onChange(next, event)` | function | `undefined` | Called after `value` is updated. |
-  | `placeholder` / `ariaLabel` | localized strings | `undefined` | `ariaLabel` is required; see the invariants. |
-  | `density` | `'default'` \| `'compact'` | `'default'` | `compact` emits `is-compact`, the 32px `min(220px, 30%)` density. |
-  | `size` | `''` \| `'38'` | `''` | The control-height rung, named as a string; an unrecognised value resolves to `''` rather than emitting an unstyled `is-size-*`. |
-  | `class` | class string | `''` | An extra class, appended after the primitive's own and after `is-compact`. |
-  | `inputProps` | attribute object | `undefined` | Attributes for the input, which the rest spread cannot reach. |
-
-  Rest spread:
-  - `{...rest}` lands on the `<label>`, carrying its `data-*` hooks and `id`; `class` is a named
-    prop, because the spread is written after `class={classes}` and a rest key would replace it.
-  - A bare `data-*` on a component tag is the boolean `true`, and an `inputProps` entry written
-    `{ 'data-x': true }` does the same; spell the value `''`, per
-    `openspec/specs/design-system/spec.md`.
+  | `placeholder` | localized string | `undefined` | The hint inside the empty field. |
+  | `label` / `ariaLabel` / `ariaLabelledBy` | localized string / string / id list | `''` | EXACTLY ONE names the input; see the invariants. |
+  | `density` | `'default'` \| `'compact'` | `'default'` | `compact` emits `is-compact`. |
+  | `class` | class string | `''` | Appended to the root's own class. |
+  | `inputProps` | attribute object | `undefined` | Attributes and handlers for the input, which the rest spread cannot reach. |
 
   Invariants:
-  - `ariaLabel` IS REQUIRED. The `<label>` wraps an icon and an input and no text, so it contributes
-    no accessible name. `tests/manager-search-field-source-contract.test.js` asserts every call site
-    passes it.
-  - It writes no scoped `<style>`, declares its `font: inherit` floor at `.fabricate-search input`
-    and pairs a focus strip above its repaint, per the same spec's class-family requirement. Two
-    `@container fabricate-manager` family rules stay behind in the manager for the reason it states,
-    and `tests/components/re-rooted-controls-host-independence.test.js` excludes those two by count.
+  - ONE NAMING ROUTE. `label` renders the root as `<Field as="label">` with a caption above an
+    inner `<span class="fabricate-search">`; `ariaLabel` or `ariaLabelledBy` keeps the root a
+    `<label class="fabricate-search">` wrapping a glyph and the input, which has no text of its
+    own. `tests/components/manager-filter-bar-source-contract.test.js` holds every call site to
+    exactly one, and this component warns when it is given none or several.
+  - `{...rest}` lands on the root. The input's own `type`, `value`, name and `oninput` are written
+    after `inputProps`, and a caller's `oninput` runs AFTER `onChange` rather than replacing it.
+  - It writes no scoped `<style>`: `styles/fabricate.css` owns the `fabricate-search` family.
 -->
 <script>
+  import Field from './Field.svelte';
+
   let {
     value = $bindable(''),
     onChange = undefined,
     placeholder = undefined,
-    ariaLabel = undefined,
+    label = '',
+    ariaLabel = '',
+    ariaLabelledBy = '',
     density = 'default',
-    size = '',
     class: extraClass = '',
     inputProps = undefined,
     ...rest
   } = $props();
 
-  const SIZE_CLASSES = { 38: 'is-size-38' };
-
-  const sizeClass = $derived(
-    Object.hasOwn(SIZE_CLASSES, String(size ?? '')) ? SIZE_CLASSES[String(size)] : ''
-  );
-
   const classes = $derived(
-    ['fabricate-search', density === 'compact' ? 'is-compact' : '', sizeClass, extraClass]
-      .filter(Boolean)
-      .join(' ')
+    ['fabricate-search', density === 'compact' ? 'is-compact' : ''].filter(Boolean).join(' ')
   );
+
+  const { oninput: callerInput = undefined, ...inputAttributes } = $derived(inputProps ?? {});
+
+  const namingRoutes = $derived([label, ariaLabel, ariaLabelledBy].filter(Boolean).length);
+
+  $effect(() => {
+    if (namingRoutes === 1) return;
+    console.warn(
+      `Fabricate | SearchField: given ${namingRoutes} naming routes. Pass exactly one of ` +
+        '`label`, `ariaLabel` or `ariaLabelledBy`, so the input has one accessible name.'
+    );
+  });
 
   function handleInput(event) {
     const next = event.currentTarget.value;
     value = next;
     onChange?.(next, event);
+    callerInput?.(event);
   }
 </script>
 
-<label class={classes} {...rest}>
+{#snippet control()}
   <i class="fas fa-search" aria-hidden="true"></i>
   <input
+    {...inputAttributes}
     type="search"
     {value}
     {placeholder}
-    aria-label={ariaLabel}
+    aria-label={label ? undefined : ariaLabel || undefined}
+    aria-labelledby={label ? undefined : ariaLabelledBy || undefined}
     oninput={handleInput}
-    {...inputProps}
   />
-</label>
+{/snippet}
+
+{#if label}
+  <!-- ratchet-exempt(design-system): the spread is this primitive's own rest, forwarded to the root it composes -->
+  <Field as="label" class={`fabricate-search-field ${extraClass}`} {...rest}>
+    <span class="fabricate-search-caption">{label}</span>
+    <span class={classes}>{@render control()}</span>
+  </Field>
+{:else}
+  <label class={[classes, extraClass].filter(Boolean).join(' ')} {...rest}>
+    {@render control()}
+  </label>
+{/if}

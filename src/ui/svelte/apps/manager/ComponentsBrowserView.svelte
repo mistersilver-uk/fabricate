@@ -541,8 +541,7 @@
     <div class="manager-component-filter-row">
       <!--
         THREE CONTROLS AT 38px, a published rung (26 / 28 / 30 / 34 / 38 / 44) and what the reference
-        draws: the field takes `size="38"` and each filter's `Select` root carries `is-size-38`. The
-        asymmetry is the primitives' shape — `SearchField` publishes a size prop, while
+        draws: the field is 38 by default and each filter's `Select` root carries `is-size-38`.
         `Select` publishes three rungs and no 38, so the opt-in is this bar's rule: it lifts the
         `toolbar` rung's 34px trigger to 38 beside the scoped catalogue's lead row, which takes the
         same rule for the same reason.
@@ -550,7 +549,6 @@
       <!-- The capture registry's narrowing hook: a case that has to reach a specific component types
            into this field rather than depending on where that component happens to sort. -->
       <SearchField
-        size="38"
         data-component-search=""
         value={itemSearchTerm || ''}
         onChange={(next) => onSearchChange(next)}

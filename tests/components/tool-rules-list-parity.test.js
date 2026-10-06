@@ -158,7 +158,7 @@ const listScreen = (rows = SIX_ROWS) => `
         </section>
         <section class="manager-tools-library-card" data-manager-tools-search>
           <section class="fabricate-filter-bar" aria-label="Which Tools this list shows" data-probe="filter-bar">
-            <label class="fabricate-search"><i class="fas fa-search"></i><input type="search" data-probe="search" placeholder="Search tools"></label>
+            <label class="fabricate-search" data-probe="search"><i class="fas fa-search" aria-hidden="true"></i><input type="search" placeholder="Search tools"></label>
             <div class="manager-segmented is-compact is-accent" role="radiogroup" data-tool-membership-filter="true">
               <label class="manager-segment is-active" data-tool-membership-option="in"><input type="radio" class="manager-segment-input" name="b" checked><span class="manager-segment-label">In this system</span><span class="manager-segment-count">3</span></label>
               <label class="manager-segment" data-tool-membership-option="all"><input type="radio" class="manager-segment-input" name="b"><span class="manager-segment-label">All world tools</span><span class="manager-segment-count">11</span></label>
@@ -669,19 +669,20 @@ test('the Tool Rules toolbar renders the design’s own type and geometry', asyn
   try {
     const measured = await page.evaluate(READ_PROBES);
 
-    // `proto:2512` — the search field states its own type. It declared none.
-    assert.equal(measured.search.fontSize, '11.5px', 'the search field states the design size');
-    assert.equal(measured.search.fontWeight, '500', 'and the design weight');
-    // `proto:2510` height 32 → the ladder's nearest surviving rung.
-    assert.equal(measured.search.height, 30, 'the search box sits on the control-height ladder');
-    assert.equal(measured.search.borderRadius, '8px', 'proto:2510 radius');
+    // The search field is the library's `<Search>` (issue 1782, maintainer ruling 2), which
+    // overrides `proto:2510`-`2512`'s 32 / radius 8 / 11.5px box: 38 / radius 9 / 500 12.5px.
+    assert.equal(measured.search.fontSize, '12.5px', 'the search field states the library size');
+    assert.equal(measured.search.fontWeight, '500', 'and the library weight');
+    assert.equal(measured.search.height, 38, 'the search box is the library’s 38px shell');
+    assert.equal(measured.search.borderRadius, '9px', 'at the 34-38px band’s corner');
 
     // `proto:2519` — `Sort by` is the kicker treatment in the SUBTLE ink, not the muted one.
     assert.equal(measured['sort-label'].fontSize, '8.5px', 'proto:2519 size');
     assert.equal(measured['sort-label'].fontWeight, '700', 'proto:2519 weight');
 
-    // `proto:2520` / `proto:2521` — both controls are the same height as the search field and
-    // read in the SECONDARY ink, one rung down from the muted they had.
+    // `proto:2520` / `proto:2521` — both controls sit on their own row at the 30px rung the
+    // search field shipped at before issue 1782, and read in the SECONDARY ink, one rung down
+    // from the muted they had.
     for (const probe of ['sort-select', 'sort-direction']) {
       assert.equal(measured[probe].height, 30, `${probe} sits on the same rung`);
       assert.equal(measured[probe].fontSize, '11.5px', `${probe} reads at the design size`);

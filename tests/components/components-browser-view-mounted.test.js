@@ -1071,10 +1071,10 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
   /**
    * The reference draws this bar's search field and both filter selects at 38px
    * (`proto:1053-1055`). 38 is a published rung (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 /
-   * 44, with 32 / 36 / 40 retired); the field publishes it as a size prop, and the two filter
+   * 44, with 32 / 36 / 40 retired); the field is 38 by default (issue 1782), and the two filter
    * triggers take it from this bar's own member of the folded `is-size-38` trigger rule.
    */
-  const FIELD_SELECTOR = '.fabricate-search.is-size-38 input';
+  const FIELD_SELECTOR = '.fabricate-search:not(.is-compact) input';
   const SELECT_SELECTOR = '.manager-component-toolbar .is-size-38 .fabricate-select-trigger';
 
   function metalWithFire() {
@@ -1089,7 +1089,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     ];
   }
 
-  it('opts the search field into the 38px rung, through the selector the sheet paints', async () => {
+  it('draws the search field at the 38px shell, through the selector the sheet paints', async () => {
     const root = await browser.mount({
       itemCards: metalWithFire(),
       categoryVocabulary: ['Metal', 'Herb'],
@@ -1101,7 +1101,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     assert.ok(
       // `:scope` here and not on the two constants above.
       field === root.querySelector(':scope [data-component-search] input'),
-      'and it is this bar’s own search input, not another field that happens to carry the rung'
+      'and it is this bar’s own search input, not another field the selector happens to reach'
     );
   });
 

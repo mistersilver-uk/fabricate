@@ -433,8 +433,8 @@
   /* THE ROW IS LAYOUT NOW AND NOTHING ELSE (issue 1515). It used to BE the field — a bordered
      32px box on `--fab-bg-0` at an 8px corner, holding a bare glyph and a borderless input
      pinned to its height because Foundry core gives every input an `--input-height` that
-     overflows a hand-built row. `SearchField` paints all of that, at the shipped 34px
-     rung, so what is left here is a flex row holding the field and the match counter. */
+     overflows a hand-built row. `SearchField` paints all of that, at the 38px
+     shell (issue 1782), so what is left here is a flex row holding the field and the match counter. */
   .manager-travel-parties-search {
     display: flex;
     align-items: center;

@@ -628,7 +628,8 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-drop-inspector-stack .fabricate-icon-button'
   );
   const dropInspectorSearchInputBlock = blockFor(
-    '.fabricate-manager .manager-drop-inspector-stack .fabricate-search input'
+    // The typeahead's compact box, re-keyed onto `.is-compact` at issue 1782 at an unchanged rank.
+    '.fabricate-manager .manager-drop-inspector-stack .fabricate-search:where(.is-compact) input'
   );
   const dropInspectorCharacterFieldBlock = blockFor(
     '.fabricate-manager .manager-character-modifier-row-card .fabricate-field input:not([type="checkbox"]):not([type="radio"]):not([type="range"])'

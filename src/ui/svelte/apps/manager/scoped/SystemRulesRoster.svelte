@@ -6,8 +6,8 @@
   left behind would compile to a selector matching nothing, silently. A MEMBER ROW IS A LINK and
   a NON-MEMBER ROW IS AN ADD, unless `systemRowAction: 'navigate'`, which the three world
   catalogues take because the create verb belongs on the system's own screen. `rows` is the
-  projection's JOIN; `recessed` and `searchWell` are opt-in, because SIX screens compose this
-  and an unconditional declaration repainted two other lanes' approved screens. `resetKey`
+  projection's JOIN; `recessed` is opt-in, because SIX screens compose this and an
+  unconditional declaration repainted two other lanes' approved screens. `resetKey`
   identifies the SUBJECT, without which the panel keeps the previous entity's page and search.
 -->
 <script>
@@ -30,9 +30,8 @@
     // WHAT A ZERO-MEMBER ROSTER SAYS INSTEAD OF SIX DEAD `Rules ↗` LINKS. Opt-in and empty by
     // default, so the essence and tool catalogues render the roster they always did.
     rosterEmptyNote = '',
-    // The card's two surface decisions, OFF by default. See the props block above.
+    // The card's surface decision, OFF by default. See the props block above.
     recessed = false,
-    searchWell = false,
     armedToken = '',
     onArm = () => {},
     onDisarm = () => {},
@@ -125,9 +124,7 @@
   <div class="manager-scoped-roster-card" class:is-recessed={recessed}>
     <!-- NO ELLIPSIS ON THE PLACEHOLDER: the design's field reads `Search systems` (`proto:2025`). -->
     <SearchField
-      class={searchWell
-        ? 'manager-scoped-roster-search manager-scoped-roster-search-well'
-        : 'manager-scoped-roster-search'}
+      class="manager-scoped-roster-search"
       value={systemQuery}
       onChange={(next) => changeSystemQuery(next)}
       placeholder={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystems', 'Search systems')}
@@ -261,20 +258,6 @@
     width: 100%;
     min-width: 0;
     margin-bottom: var(--fab-space-2);
-  }
-
-  /* AND ITS FIELD IS THE CARD'S SIZE, NOT THE TOOLBAR'S: 28px, a published control-height rung. */
-  :global(.fabricate-search.manager-scoped-roster-search input) {
-    height: 28px;
-    min-height: 28px;
-  }
-
-  /* AND IT IS A WELL WHERE A CALLER ASKS FOR ONE, SELECTED ON A SECOND CLASS rather than the one
-     every caller passes — which is how round 4's well landed on two other lanes' catalogues. */
-  :global(.fabricate-search.manager-scoped-roster-search-well input) {
-    border: 1px solid var(--fab-border);
-    border-radius: 7px;
-    background: var(--fab-bg-1);
   }
 
   /* THE ROSTER HOLDS ITS HEIGHT AT FIVE ROWS (`proto:2027`), so the pager cannot walk the column. */

@@ -238,17 +238,9 @@
          been a second, silent name for a control that already has one. (Written without its
          class name: this file's source-shape suite pins the surviving `fab-ib` prefix
          occurrences as an exact allow-list, and a mention in prose adds one.) -->
-    <!-- `size={38}` PUTS THE TWO CONTROLS ON ONE RUNG. The shared search field ships at 34px
-         with a 6px corner and the shared select's form rung is 38px at 9px, so a filter bar
-         holding one of each renders two control heights and two corner radii in the same bar.
-         At this window's 420px the bar wraps and they stack, one directly above the other,
-         which is the arrangement that makes the mismatch most legible rather than one that
-         excuses it. The field publishes that rung as the opt-in a caller uses for exactly this
-         pairing, which is why it is passed here rather than restated as a per-window CSS
-         override. -->
+    <!-- The field and the select beside it share the form rung's 38px and 9px corner. -->
     <SearchField
       bind:value={search}
-      size={38}
       placeholder={text('FABRICATE.Canvas.Browser.SearchPlaceholder', 'Search entries…')}
       ariaLabel={text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}
       inputProps={{ 'data-interactable-browser-search': '' }}

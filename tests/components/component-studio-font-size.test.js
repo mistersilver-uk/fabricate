@@ -370,7 +370,7 @@ const EXPECTED = {
   // the prototype — the map below is re-measured against the real markup, not carried
   // over. The old map pinned the drift and its own comments admitted it
   // ("filter-label: 12.48, // prototype toolbar micro-label 8.5px").
-  search: 11.52, // 0.72rem — prototype search input 12.5px sans
+  search: 12.5, // the library's `<Search>` at 500 12.5px, which is also the prototype's (issue 1782; was 11.52)
   // `proto:1062` — the toolbar micro-label at 8.5px, which is now the SHIPPED value rather than
   // the target this pin's own comment used to name (issue 1371 r11, UX finding F-K). The 0.08em
   // tracking is unchanged and resolves against this size, so the reference's 0.68px comes with

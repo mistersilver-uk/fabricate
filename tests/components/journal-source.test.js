@@ -100,7 +100,12 @@ describe('JournalView layout + effects', () => {
     );
     assert.ok(/<SearchField[\s/>]/.test(viewSource));
     assert.ok(viewSource.includes('class="journal-search-control"'));
-    assert.ok(viewSource.includes('size="30"'));
+    // The journal search is the 38px shell like every non-compact search (issue 1782, D3): the
+    // `size="30"` it passed named no rung and is gone.
+    assert.ok(
+      !/<SearchField\b(?:(?!\/>)[\s\S])*?\bsize=/.test(viewSource),
+      'the journal search passes no size'
+    );
     assert.equal(viewSource.includes("import Field from '../../components/Field.svelte'"), false);
     assert.equal(viewSource.includes('Filters.SearchKicker'), false, 'the accessible search name is not duplicated as a visible kicker');
     assert.ok(

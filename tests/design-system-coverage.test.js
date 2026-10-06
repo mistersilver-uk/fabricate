@@ -208,7 +208,6 @@ test('every manifest library name resolves to a library entry', () => {
  */
 const SPECIFIED_ONLY = [
   'AppTitleBar', 'BrowseCard',
-  'Search',
   'TierTrack', 'ViewToggle', 'XrefList',
 ];
 
@@ -628,6 +627,8 @@ const BUILT_BY_1782 = [
   'Rail',
   'LogList',
   'DataTable',
+  // Restyled to the specimen rather than built, by maintainer ruling 2 (2026-09-19).
+  'Search',
 ];
 
 /** Names issue 1782 merged away, which must be no entry and must be on the ruled-out register. */
@@ -746,7 +747,6 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
-  'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
 ];

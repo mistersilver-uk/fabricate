@@ -1150,13 +1150,14 @@ test('the shared Select paints identically in both areas, and beats the paint it
 
     // ── THE WEIGHT SPLIT ON THE SHIPPED TOOLBAR ROW.
     assert.equal(report.shipped.select.size, '11.52px', 'the converted sort trigger`s type size');
-    assert.equal(report.shipped.search.size, '11.52px', 'and its search field`s');
+    // The search field is the library's `<Search>` at 500 12.5px since issue 1782.
+    assert.equal(report.shipped.search.size, '12.5px', 'and its search field states its own');
     assert.equal(report.shipped.direction.size, '11.52px', 'and its direction toggle`s');
     assert.deepEqual(
       [report.shipped.select.weight, report.shipped.search.weight, report.shipped.direction.weight],
-      ['500', '400', '400'],
-      'the sort takes the rung`s 500 while its two neighbours declare no weight and compute ' +
-        '`normal`, which is OFF the published ramp'
+      ['500', '500', '400'],
+      'the sort and the search take the ramp`s 500 while the direction toggle declares no ' +
+        'weight and computes `normal`, which is OFF the published ramp'
     );
     assert.equal(
       report.triggers['manager:toolbar'].fontWeight,
