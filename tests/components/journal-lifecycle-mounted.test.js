@@ -1520,6 +1520,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     const set = ingredientSet('partial-essence', [
       { id: 'fire', options: [{ match: { type: 'essence', essenceId: 'fire', amount: 4 } }] },
       { id: 'earth', options: [{ match: { type: 'essence', essenceId: 'earth', amount: 2 } }] },
+      { id: 'water', options: [{ match: { type: 'essence', essenceId: 'water', amount: 2 } }] },
     ]);
     const fixture = selectionFixture([set], {
       selectedIngredientSetId: set.id,
@@ -1530,13 +1531,14 @@ describe('Journal versioned lifecycle (mounted)', () => {
       },
     });
     fixture.builderOptions.resolveItemEssences = ({ item }) =>
-      item.componentId === 'iron' ? { fire: 2 } : {};
+      item.componentId === 'iron' ? { fire: 2, water: 1 } : {};
     const mounted = await mountState('ready-single', fixture);
     const paint = (groupId) =>
       mounted.target.querySelector(`[data-slot-id="${groupId}"] .fab-slot-tile-shell`).dataset
         .slotState;
     assert.equal(paint('fire'), 'partial', 'two of four delivered is partial, never short');
     assert.equal(paint('earth'), 'short', 'none delivered stays short');
+    assert.equal(paint('water'), 'partial', 'a single delivered unit already starts the pool');
   });
 
   it('states confirmed receipt rows, uncertainty and unstarted effects with strict redaction', async () => {
