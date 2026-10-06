@@ -276,7 +276,8 @@ export function registerDowntimeCases() {
       ['true', null, null, null]
     );
     assert.equal(
-      target.querySelectorAll('[aria-current="page"]').length,
+      // The rail's own: the breadcrumb trail's leaf is the current page of ITS nav (issue 1777).
+      target.querySelector('.manager-rail').querySelectorAll('[aria-current="page"]').length,
       1,
       'the route is current once — the children mark themselves within the set, not as pages'
     );

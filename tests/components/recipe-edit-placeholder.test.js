@@ -6,6 +6,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { headerBreadcrumbs } from '../../src/ui/svelte/apps/manager/headerBreadcrumbs.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
@@ -19,11 +21,6 @@ const browserSource = readFileSync(browserPath, 'utf8');
 const inspectorSource = readFileSync(inspectorPath, 'utf8');
 const editSource = readFileSync(editPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
-// The header's trail and action branches moved out of the root in issue 1720.
-const breadcrumbsSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte'),
-  'utf8'
-);
 const craftingActionsSource = readFileSync(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte'),
   'utf8'
@@ -231,10 +228,23 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     });
   });
 
+  // The trail is `headerBreadcrumbs.js`'s since issue 1777, so this asks the model itself.
   it('renders a recipe-edit breadcrumb crumb back to Recipes', () => {
-    const idx = breadcrumbsSource.indexOf("currentView === 'recipe-edit'");
-    assert.ok(idx >= 0, 'recipe-edit branch should exist');
-    assert.ok(breadcrumbsSource.includes('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb'), 'breadcrumb uses the EditBreadcrumb key');
+    const backToRecipesBrowse = () => {};
+    const crumbs = headerBreadcrumbs({
+      currentView: 'recipe-edit',
+      text: (key) => key,
+      recipeDraft: null,
+      backToRecipesBrowse,
+    });
+    assert.deepEqual(
+      crumbs.slice(-2).map(({ label, onSelect }) => [label, onSelect]),
+      [
+        ['FABRICATE.Admin.Manager.Nav.Recipes', backToRecipesBrowse],
+        ['FABRICATE.Admin.Manager.Recipe.EditBreadcrumb', undefined],
+      ],
+      'the trail steps back to Recipes and names an untitled recipe with the EditBreadcrumb key'
+    );
   });
 });
 

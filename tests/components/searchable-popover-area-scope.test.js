@@ -699,6 +699,24 @@ const PRIMITIVES = Object.freeze([
     ownedFloor: 24,
     mirrored: Object.freeze([]),
   }),
+  Object.freeze({
+    // `PageHeader` (issue 1777), re-rooted from `.fabricate-manager` onto the class it emits.
+    // `manager-title` and `manager-subtitle` are OUT of the family: the rail's scope card and the
+    // scoped entry cards spell them too, so their rules keep the manager root beside this one.
+    name: 'PageHeader',
+    components: Object.freeze(['src/ui/svelte/components/PageHeader.svelte']),
+    roots: Object.freeze(['fabricate-page-header']),
+    family: String.raw`manager-(?:heading|breadcrumbs|page-kicker)(?![\w-])`,
+    anchors: Object.freeze(['manager-heading', 'manager-breadcrumbs', 'manager-page-kicker']),
+    composesClasses: true,
+    // Measured at this commit: 3 written, 12 family selectors, 8 owned; the other four are the
+    // Tool editor's and the Tool library's caller-side rules on the trail and the heading.
+    writtenFloor: 3,
+    familyFloor: 11,
+    ownedFloor: 8,
+    // No pair: the root element carries no family class, so a fixture copying it has no anchor.
+    mirrored: Object.freeze([]),
+  }),
 ]);
 
 const read = (file) => readFileSync(join(repoRoot, file), 'utf8');

@@ -1,5 +1,5 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): <PageHeader> ships at target, because its two callers keep the Tool screens' shipped header geometry, which disagrees with the specimen's (issue 1777 decision E4; geometry converges in issue 1523) -->
+<!-- ratchet-exempt(design-system): <PageHeader> ships at target, because its callers keep the manager's shipped header geometry, which disagrees with the specimen's (issue 1777 decision E4; geometry converges in issue 1523) -->
 <!--
   THE page header (`<PageHeader>`, `library.html`): a breadcrumb trail, an optional kicker, then a
   title and subtitle or a caller's `identity` snippet, with an `actions` snippet trailing.
@@ -23,6 +23,8 @@
     ...rest
   } = $props();
 
+  const classes = $derived(['fabricate-page-header', extraClass]);
+
   const CRUMB_ATTRIBUTE = /^(?:data-|aria-|title$)/u;
 
   /** The crumb keys forwarded to its element: hooks, ARIA and a `title`, never the model's own. */
@@ -30,7 +32,7 @@
     Object.fromEntries(Object.entries(crumb).filter(([key]) => CRUMB_ATTRIBUTE.test(key)));
 </script>
 
-<header class={['fabricate-page-header', extraClass]} {...rest}>
+<header class={classes} {...rest}>
   <div class="manager-heading">
     {#if breadcrumbs.length > 0}
       <nav

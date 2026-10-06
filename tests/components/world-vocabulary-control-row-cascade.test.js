@@ -145,7 +145,7 @@ function document_(managerWidth, route) {
     // THE CHROME BAND, AT ITS MEASURED HEIGHT. The real manager draws its header and a second
     // `auto` grid row above `.manager-body`; both are stubbed as one box here, at the height the
     // lab measures, so the body this fixture lays out has the same room the product gives it.
-    `<div class="manager-header" style="height: ${MEASURED_CHROME}px"></div>` +
+    `<div class="fabricate-page-header manager-header" style="height: ${MEASURED_CHROME}px"></div>` +
     '<div class="manager-body"><div class="manager-rail"></div>' +
     `<main ${route.mainAttributes} aria-label="Tags &amp; Categories">` +
     `<div class="manager-vocabulary-shell ${shell.hashClass}">` +
