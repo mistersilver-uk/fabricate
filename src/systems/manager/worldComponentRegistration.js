@@ -28,21 +28,52 @@ function rowsById(rows) {
   return index;
 }
 
-/** The rows a run has registered that no roster entity stands for yet: each becomes an entity at
- * the flush, so adoption treats it as one. Each system's rows are indexed once per call. */
-function pendingEntities(entities, registrations, rowsOf) {
-  const known = new Set(entities.map((entity) => entity?.id));
-  const indexed = new Map();
-  const pending = [];
-  for (const { systemId, componentId } of arrayOrEmpty(registrations)) {
-    if (known.has(componentId)) continue;
-    if (!indexed.has(systemId)) indexed.set(systemId, rowsById(rowsOf(systemId)));
-    const row = indexed.get(systemId).get(componentId);
-    if (!row) continue;
-    known.add(componentId);
-    pending.push(row);
+/** A roster index: each entity by id, first-wins, and under each source key the first entity in
+ * roster order that carries it. */
+function indexRoster(entities) {
+  const roster = { byId: new Map(), byKey: new Map(), size: 0 };
+  for (const entity of arrayOrEmpty(entities)) addToRoster(roster, entity);
+  return roster;
+}
+
+function addToRoster(roster, entity) {
+  const entry = { entity, order: roster.size };
+  roster.size += 1;
+  if (!roster.byId.has(entity?.id)) roster.byId.set(entity?.id, entity);
+  for (const reference of getItemMatchUuids(entity)) {
+    const key = sourceReferenceKey(reference);
+    if (!roster.byKey.has(key)) roster.byKey.set(key, entry);
   }
-  return pending;
+}
+
+/** The first entity in roster order carrying one of `keys`, or `null`. */
+function firstSharing(roster, keys) {
+  let first = null;
+  for (const key of keys) {
+    const entry = roster.byKey.get(key);
+    if (entry && (!first || entry.order < first.order)) first = entry;
+  }
+  return first?.entity ?? null;
+}
+
+const RUN_ROSTERS = new WeakMap();
+
+/** The roster a run adopts against: the store's entities, then each row the run has registered
+ * that no entity stands for yet, since the flush makes it one. Indexed once per run, keyed on its
+ * registrations array, and rebuilt when the store has published another roster. */
+function runRoster(entities, registrations, rowsOf) {
+  let run = RUN_ROSTERS.get(registrations);
+  if (run?.entities !== entities) {
+    run = { entities, roster: indexRoster(entities), folded: 0 };
+    RUN_ROSTERS.set(registrations, run);
+  }
+  for (; run.folded < registrations.length; run.folded += 1) {
+    const { systemId, componentId } = registrations[run.folded];
+    if (run.roster.byId.has(componentId)) continue;
+    const row = rowById(rowsOf(systemId), componentId);
+    if (row) addToRoster(run.roster, row);
+  }
+  return run.roster;
 }
 
 /** The id a record not yet in its system's array takes: that of the first entity in roster order
@@ -50,10 +81,8 @@ function pendingEntities(entities, registrations, rowsOf) {
 export function adoptedWorldComponentId({ entities, registrations, rowsOf, systemId, record }) {
   const keys = sourceKeys(record);
   if (keys.size === 0) return null;
-  const roster = arrayOrEmpty(entities);
-  const target = [...roster, ...pendingEntities(roster, registrations, rowsOf)].find((entity) =>
-    sharesSource(entity, keys)
-  );
+  const run = Array.isArray(registrations) ? registrations : [];
+  const target = firstSharing(runRoster(entities, run, rowsOf), keys);
   if (!target || rowById(rowsOf(systemId), target.id)) return null;
   return target.id;
 }
@@ -86,16 +115,19 @@ function membershipFor(systemId, record, added, worldDefault) {
 /** What registering one in-system record writes to a persisted scope payload: `null`, a membership
  * for the entity under its id, or a new entity with its membership. An id match alone binds nothing,
  * and an entity under another id sharing its source leaves it unregistered. */
-export function planWorldComponentRegistration(payload, { systemId, record, added = false }) {
-  const entities = arrayOrEmpty(payload?.entities);
+export function planWorldComponentRegistration(
+  payload,
+  { systemId, record, added = false },
+  roster = indexRoster(payload?.entities)
+) {
   const keys = sourceKeys(record);
-  const entity = entities.find((entry) => entry?.id === record.id);
+  const entity = roster.byId.get(record.id);
   if (entity) {
     if (payload.membership?.[membershipKey(record.id, systemId)]) return null;
     if (!sharesSource(entity, keys)) return null;
     return { membership: membershipFor(systemId, record, added, payload.defaults?.[record.id]) };
   }
-  if (entities.some((entry) => sharesSource(entry, keys))) return null;
+  if (firstSharing(roster, keys)) return null;
   return {
     entity: { id: record.id, ...identityOf(record, 'components') },
     membership: membershipFor(systemId, record, added, null),
@@ -114,13 +146,19 @@ export async function flushWorldComponentRegistrations({
   const pending = arrayOrEmpty(registrations);
   if (!store || pending.length === 0) return { registered: 0, error: null };
   const payload = store.get();
+  const roster = indexRoster(payload.entities);
+  const rows = new Map();
   let registered = 0;
   for (const { systemId, componentId, added } of pending) {
-    const record = rowById(rowsOf(systemId), componentId);
+    if (!rows.has(systemId)) rows.set(systemId, rowsById(rowsOf(systemId)));
+    const record = rows.get(systemId).get(componentId);
     if (!record || !isPersisted(systemId, componentId)) continue;
-    const planned = planWorldComponentRegistration(payload, { systemId, record, added });
+    const planned = planWorldComponentRegistration(payload, { systemId, record, added }, roster);
     if (!planned) continue;
-    if (planned.entity) payload.entities.push(planned.entity);
+    if (planned.entity) {
+      payload.entities.push(planned.entity);
+      addToRoster(roster, planned.entity);
+    }
     payload.membership[membershipKey(componentId, systemId)] = planned.membership;
     registered += 1;
   }

@@ -313,6 +313,43 @@ describe('adoption, decided before the id is minted', () => {
   });
 });
 
+describe('adoption across the calls of one run', () => {
+  const record = { registeredItemUuid: 'Item.ash' };
+
+  it('sees a registration the run recorded after an earlier call', () => {
+    const rows = { [OTHER_SYSTEM]: [], [SYSTEM]: [] };
+    const run = { entities: [], registrations: [], rowsOf: (systemId) => rows[systemId] };
+    assert.equal(adoptedWorldComponentId({ ...run, systemId: OTHER_SYSTEM, record }), null);
+
+    rows[OTHER_SYSTEM].push(row('comp-ash', 'Item.ash'));
+    run.registrations.push({ systemId: OTHER_SYSTEM, componentId: 'comp-ash', added: true });
+
+    assert.equal(adoptedWorldComponentId({ ...run, systemId: SYSTEM, record }), 'comp-ash');
+  });
+
+  it('reads the roster again once the store has published a new one', () => {
+    const run = { registrations: [], rowsOf: () => [], systemId: SYSTEM, record };
+    assert.equal(adoptedWorldComponentId({ ...run, entities: [] }), null);
+    assert.equal(
+      adoptedWorldComponentId({ ...run, entities: [entity('world-ash', 'Item.ash')] }),
+      'world-ash'
+    );
+    assert.equal(adoptedWorldComponentId({ ...run, entities: [] }), null);
+  });
+
+  it('keeps roster order ahead of the run, whichever key of the record matches first', () => {
+    const rows = { [OTHER_SYSTEM]: [row('comp-old', 'Item.old')], [SYSTEM]: [] };
+    const adopted = adoptedWorldComponentId({
+      entities: [entity('world-other', 'Item.other'), entity('world-ash', 'Item.ash')],
+      registrations: [{ systemId: OTHER_SYSTEM, componentId: 'comp-old', added: true }],
+      rowsOf: (systemId) => rows[systemId],
+      systemId: SYSTEM,
+      record: { registeredItemUuid: 'Item.old', aliasItemUuids: ['Item.ash'] },
+    });
+    assert.equal(adopted, 'world-ash');
+  });
+});
+
 describe('adoption never follows an id alone', () => {
   it('ignores a registered row whose id a foreign entity already holds', () => {
     const rows = { [OTHER_SYSTEM]: [row('comp-ash', 'Item.ash')], [SYSTEM]: [] };
