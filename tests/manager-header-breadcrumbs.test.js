@@ -115,6 +115,7 @@ describe('headerBreadcrumbs', () => {
       ['Elixir', {}, null],
     ]);
     assert.deepEqual(recipeLeaf(null)[1], [`${M}.Recipe.EditBreadcrumb`, {}, null]);
+    assert.deepEqual(recipeLeaf({ name: '' })[1], [`${M}.Recipe.EditBreadcrumb`, {}, null]);
   });
 
   it('draws the rules screens directly under the system, and their editors under the screen', () => {
