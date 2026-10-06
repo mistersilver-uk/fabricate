@@ -25,8 +25,9 @@ const MAP_READERS = COMPONENTS.filter(({ source }) => source.includes(MAP_MODULE
 
 /** THE CONVERTED SITES, COUNTED, so the clause below cannot pass over nothing. */
 // #1648 replaces HistoryRow's mapped status chip with a labeled outcome glyph. #1518 moves the
-// option selector's two option chips onto the chooser's alternatives.
-const MAPPED_TONE_SITES = 23;
+// option selector's two option chips onto the chooser's alternatives. #1644 draws the held-stack
+// picker through the shared candidate list, whose reading replaces its count chip.
+const MAPPED_TONE_SITES = 22;
 
 /** The one shipped chip that asks for the flat plate. */
 const OUTLINED_CHIP = 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte';
@@ -57,10 +58,10 @@ function dynamicToneOf(tag) {
 }
 
 describe('1506 the tone map — its landed domain', () => {
-  it('is read by the eighteen files retaining mapped status chips', () => {
+  it('is read by the seventeen files retaining mapped status chips', () => {
     assert.equal(
       MAP_READERS.length,
-      18,
+      17,
       'the number of files importing the tone map moved. A file JOINING it is a later phase ' +
         'converting more sites and this pin moves with it; a file LEAVING it is a converted ' +
         'site that must be checked for retired chips or a projected tone bound directly, which ' +

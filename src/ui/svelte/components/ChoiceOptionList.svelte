@@ -1,3 +1,4 @@
+<!-- ratchet-exempt(design-system): promoted on its second importer at issue 1644; its icon chip, disabled ink and hint line still disagree with the specimen, carried to issue 1523 -->
 <!--
   One open slot's candidates: a single-select radiogroup with a roving tab stop, whose arrows,
   Home and End move both focus and the choice. Stock is caller-owned and choosing consumes none.
