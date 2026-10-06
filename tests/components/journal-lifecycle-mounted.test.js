@@ -2129,7 +2129,10 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.doesNotMatch(slot.textContent, /iron stock/);
     slot.querySelector('button').click();
     flushSync();
-    assert.ok(!mounted.target.querySelector('[data-choice-id][aria-pressed="true"]'));
+    const checked = () =>
+      [...mounted.target.querySelectorAll('[data-choice-id][role="radio"][aria-checked="true"]')];
+    assert.ok(mounted.target.querySelectorAll('[data-choice-id][role="radio"]').length > 0);
+    assert.equal(checked().length, 0, 'the missing held item checks no candidate');
     const iron = [...mounted.target.querySelectorAll('[data-choice-id]')].find((entry) =>
       entry.textContent.includes('iron stock')
     );
@@ -2139,6 +2142,13 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(
       mounted.commands.at(-1).payload.selectionPlan.ingredientOptionOverrides.metal.heldItemId,
       'Item.iron-a'
+    );
+    mounted.target.querySelector('[data-slot-id="metal"] button').click();
+    flushSync();
+    assert.deepEqual(
+      checked().map((radio) => radio.textContent.includes('iron stock')),
+      [true],
+      'the explicit replacement is the one checked candidate'
     );
   });
 
