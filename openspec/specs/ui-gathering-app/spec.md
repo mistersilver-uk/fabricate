@@ -163,9 +163,11 @@ If the environment is `blind`:
 
 A selected visible d100 task's inspector previews its drop rows under "What you might find".
 
-- The rows are one `YieldScale` in AUTHORED row order under every `rewardSelectionMode`, because each award mode selects by authored rank (`gathering-and-harvesting`); each row's modifier-adjusted chance is its figure and never re-sorts it.
+- The rows are one `YieldScale` in authored row order under every `rewardSelectionMode`, because the system's reward selection is by authored order: `allDrops` keeps every dropped row, `highestRankedDrop` and `limitedDrops` take the first by authored rank.
+  Each row's modifier-adjusted chance is its figure and never re-sorts it.
 - A drop row authored without a name takes its component's name.
-- The award-mode hint and the event hint stay above the scale.
+- The reward-selection hint and the event hint stay above the scale.
+  The reward-selection hint for `highestRankedDrop` and `limitedDrops` says the list is in priority order and the first successful find, or first N, on it is awarded.
 - The scale carries no control.
   One labelled `RowDisclosure` beneath it opens one region holding every drop's modifier breakdown, each headed by its drop's name, in scale order.
 - Loading, a failed fetch and an empty drop table stay distinct: a loading line, an error notice, and no section.
