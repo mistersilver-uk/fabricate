@@ -286,6 +286,7 @@ test('the sites hooking the row action are exactly the listed tabs, and none res
     [
       'src/ui/svelte/apps/manager/component/ComponentRulesValidationTab.svelte',
       'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
+      'src/ui/svelte/apps/manager/gathering-task/GatheringTaskValidationTab.svelte',
       'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
       'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
       'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
@@ -297,7 +298,8 @@ test('the sites hooking the row action are exactly the listed tabs, and none res
       'ordinary rather than a recipe-editor habit. That last one is the ' +
       'arrival the previous wording said was welcome; its hook value carries the `data-` prefix ' +
       'because the surface uses the prop as the WHOLE attribute name. Issue 1522 added the ' +
-      'Component Rules tab, whose rows route to its Rules tab. This pin is here so that ' +
+      'Component Rules tab, whose rows route to its Rules tab, and the gathering task tab, whose ' +
+      'rows route to Overview or Results. This pin is here so that ' +
       'a further arrival is a deliberate edit rather than something a reviewer has to notice.'
   );
   assert.deepEqual(

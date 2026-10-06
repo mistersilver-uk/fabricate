@@ -1013,7 +1013,7 @@ describe('the task identity art picker (issue 1522)', () => {
   });
 });
 
-describe('the task editor`s three tabs (issue 1522)', () => {
+describe('the task editor`s four tabs (issue 1522)', () => {
   // The cards each tab draws, under a routed task with every gated card on.
   const TAB_CARDS = {
     overview: [
@@ -1029,6 +1029,7 @@ describe('the task editor`s three tabs (issue 1522)', () => {
       '[data-gathering-task-required-tools]',
     ],
     results: ['[data-gathering-task-results="routed"]'],
+    validation: ['[data-gathering-task-validation]'],
   };
 
   async function mountTabs(props = {}) {
@@ -1053,7 +1054,7 @@ describe('the task editor`s three tabs (issue 1522)', () => {
     assert.ok(Boolean(strip), 'the strip is the shared EditorTabs');
     assert.deepEqual(
       [...strip.querySelectorAll('[role="tab"]')].map((tab) => tab.dataset.gatheringTaskTab),
-      ['overview', 'requirements', 'results']
+      ['overview', 'requirements', 'results', 'validation']
     );
     for (const tab of Object.keys(TAB_CARDS)) {
       await harness.setProps({ activeTab: tab });
@@ -1083,10 +1084,10 @@ describe('the task editor`s three tabs (issue 1522)', () => {
   });
 
   it('leads Results with its notices: the blocking errors above the panel, then the warnings', async () => {
-    const { root } = await mountTabs({
+    const { root, chosen } = await mountTabs({
       activeTab: 'results',
       routedOutcomeTiers: [],
-      resultValidationErrors: ['Rich tier needs a result set', 'A set has no results'],
+      validation: { valid: false, errors: ['Rich tier needs a result set', 'A set has no results'] },
     });
     // The scroller chain `manager-layout-side-rail-fixtures.js` measures: the strip and the page
     // notice are the view's own children, outside the one scrolling tab panel.
@@ -1103,7 +1104,10 @@ describe('the task editor`s three tabs (issue 1522)', () => {
     assert.equal(blocking.getAttribute('role'), 'alert');
     assert.equal(blocking.dataset.noticeTone, 'danger');
     assert.match(blocking.textContent, /2 result issues block save/);
-    assert.match(blocking.textContent, /Rich tier needs a result set; A set has no results/);
+    const review = blocking.querySelector('button');
+    assert.equal(review.textContent.trim(), 'Review in Validation', 'a count with an action');
+    review.click();
+    assert.deepEqual(chosen, ['validation'], 'the action opens Validation');
     assert.equal(stack.dataset.noticePosition, 'stack');
     const noTiers = stack.querySelector('[data-gathering-routed-no-tiers]');
     assert.equal(noTiers.getAttribute('role'), 'status');
@@ -1139,7 +1143,7 @@ describe('the task editor`s three tabs (issue 1522)', () => {
   });
 });
 
-describe('the Results tab`s marks, notices and authoring (issue 1522)', () => {
+describe('the Results tab`s notices and authoring (issue 1522)', () => {
   const ROUTED_TIERS = [{ id: 'tier-rich', name: 'Rich' }];
   const row = (id, extra = {}) => ({ id, componentId: 'c1', quantity: 1, dropRate: 10, ...extra });
 
@@ -1184,55 +1188,49 @@ describe('the Results tab`s marks, notices and authoring (issue 1522)', () => {
     };
   }
 
-  /** The Results tab's marks, each as `[tone, label, accessible name]`. */
-  const resultMarks = (root) =>
+  /** The Validation tab's marks, each as `[tone, label]`. */
+  const validationMarks = (root) =>
     [
       ...root.querySelectorAll(
-        ':scope [data-gathering-task-tab="results"] [data-gathering-task-tab-badge]'
+        ':scope [data-gathering-task-tab="validation"] [data-gathering-task-tab-badge]'
       ),
-    ].map((mark) => [
-      mark.dataset.badgeTone,
-      mark.textContent.trim(),
-      mark.getAttribute('aria-label'),
-    ]);
-  const NO_TIERS = 'Define outcome tiers in the gathering check before routing result sets.';
-  const REWARD_RULE =
-    'Multiple drop rows use this component. Current drop rules may award only one matching row.';
+    ].map((mark) => [mark.dataset.badgeTone, mark.textContent.trim()]);
 
-  it('marks Results on every tab with its blocking errors and its warning, named by their notices', async () => {
+  it('marks Validation on every tab with its blocking and its warning counts', async () => {
     const { root } = await mountControlled({
       task: taskFixture(),
       resolutionMode: 'routed',
       routedOutcomeTiers: [],
-      resultValidationErrors: ['Rich tier needs a result set', 'A set has no results'],
+      validation: { valid: false, errors: ['Rich tier needs a result set', 'A set has no results'] },
     });
-    for (const tab of ['overview', 'requirements', 'results']) {
+    for (const tab of ['overview', 'requirements', 'results', 'validation']) {
       await harness.setProps({ activeTab: tab });
       assert.deepEqual(
-        resultMarks(root),
+        validationMarks(root),
         [
-          ['danger', '2', '2 result issues block save'],
-          ['warning', '1', NO_TIERS],
+          ['danger', '2'],
+          ['warning', '1'],
         ],
-        `the Results tab is marked from ${tab}`
+        `the Validation tab is marked from ${tab}`
       );
       assert.equal(root.querySelectorAll('[data-gathering-task-tab-badge]').length, 2, 'only it');
     }
     await harness.setProps({
       resolutionMode: 'd100',
+      validation: null,
       task: { ...taskFixture(), dropRows: [row('a'), row('b')] },
     });
-    assert.deepEqual(resultMarks(root), [['warning', '1', REWARD_RULE]], 'a d100 reward rule');
+    assert.deepEqual(validationMarks(root), [['warning', '1']], 'a d100 reward rule');
   });
 
-  // Each Results notice and mark belongs to one mode; another mode with the same inputs raises none.
+  // Each Results notice belongs to one mode; another mode with the same inputs raises none.
   const OUT_OF_MODE = [
     { mode: 'straight', props: { routedOutcomeTiers: [] }, absent: '[data-gathering-routed-no-tiers]' },
     { mode: 'd100', props: { routedOutcomeTiers: [] }, absent: '[data-gathering-routed-no-tiers]' },
     {
-      mode: 'd100',
-      props: { resultValidationErrors: ['A set has no results'] },
-      absent: '[data-gathering-task-results-validation]',
+      mode: 'progressive',
+      props: { routedOutcomeTiers: [] },
+      absent: '[data-gathering-routed-no-tiers]',
     },
     {
       mode: 'straight',
@@ -1254,7 +1252,7 @@ describe('the Results tab`s marks, notices and authoring (issue 1522)', () => {
       });
       assert.ok(Boolean(root.querySelector(':scope [role="tabpanel"] > *')), 'precondition: it renders');
       assert.ok(!root.querySelector(absent), `${absent} belongs to another mode`);
-      assert.deepEqual(resultMarks(root), [], 'and the tab carries no mark');
+      assert.deepEqual(validationMarks(root), [], 'and Validation carries no mark');
     });
   }
 

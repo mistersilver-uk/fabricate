@@ -317,12 +317,14 @@ The Manager rail's trailing-track marker vocabulary is one FAMILY, not four unre
 #### World Component / World Essence / World Tool
 
 The world-scoped record holding one entity's IDENTITY — name, description, icon, colour and source item link — exactly once for the whole world, never editable from a crafting system.
+A component import REGISTERS each imported component as a World Component its system HOLDS — the world entity plus a `(component, system)` **System Membership Record** — and a system that takes membership of one that already exists ADOPTS it (issue 2218).
+A component whose system holds no such pair is "a component with no World Component", never "record-less".
 
 [Notes](docs/domain/records.md#world-component--world-essence--world-tool)
 
 #### World Defaults
 
-**PERSISTED AND WRITTEN** as of `1.30.0` (issue 1358 modelled it; issue 1359 persists it at `fabricate.<entity>Scope.defaults` and normalizes it on every load; READ through it as of issue 1370, though nothing RESOLVES through it in practice: the migration writes every membership record fully OVERRIDING, and while `## CraftingSystem` requirement 36 holds the in-system record decides every key it carries, so a world default is reached only for a key that record does not carry).
+**PERSISTED, WRITTEN AND RESOLVED THROUGH** (issue 1358 modelled it; issue 1359 persists it at `fabricate.<entity>Scope.defaults` and normalizes it on every load; issue 1372 made the **Read Union** answer an INHERITING section from it): a system resolves a world default wherever its membership record inherits that section and the world has authored it, and a record written by add-from-catalogue or by a component import inherits from the start.
 The second layer of `## Scoped Entity Definitions`: the behaviour every crafting system inherits for one entity until it overrides a SECTION of it.
 
 [Notes](docs/domain/records.md#world-defaults)
@@ -335,8 +337,8 @@ ONE world setting, `fabricate.worldVocabulary`, holding THREE INDEPENDENT vocabu
 
 #### System Membership Record
 
-**PARTLY LIVE** (modelled at issue 1358, persisted at issue 1359, WRITTEN by the `1.30.0` migration of issue 1363; and READ by every non-UI reader as of issue 1370 through the **Scoped Entity Read Seam**, though it decides nothing while `## CraftingSystem` requirement 36 holds - its `member` flag is the membership filter, and the keys it resolves are only those the in-system record does not carry).
-The migration writes one record per ORIGINAL definition with EVERY SECTION OVERRIDDEN and each value copied verbatim, so nothing inherits at migration time and no system's resolved behaviour changes.
+**LIVE** (modelled at issue 1358, persisted at issue 1359, written by the `1.30.0` migration of issue 1363, read through the **Scoped Entity Read Seam** since issue 1370, and deciding which layer answers a section since issue 1372): its presence is the membership filter, and its `inherit` map selects the world default or the in-system record per section.
+HOW A RECORD IS WRITTEN DECIDES WHAT IT INHERITS: the migration writes each one so that no resolved value moves, while add-from-catalogue and a component import (issue 2218) write one that inherits every section, the import with the two exceptions its notes state.
 The third layer of `## Scoped Entity Definitions`: one record per `(entity, system)` carrying `{ entityId, systemId, inherit, <overrides>, enabled? }`.
 
 [Notes](docs/domain/records.md#system-membership-record)
@@ -361,7 +363,7 @@ The ONE door every non-UI reader of a crafting system's `components`, `essenceDe
 
 #### World Identity Snapshot
 
-The WORLD copy of an entity's identity that the `1.30.0` migration takes from the in-system record.
+The WORLD copy of an entity's identity, taken from the in-system record by the `1.30.0` migration and, for a component, by the import that registers it (issue 2218).
 **IT HAS A WRITER AS OF ISSUE 1371** — the three world entry editors, which write onto the world record itself — so it is no longer a copy nothing touches, and divergence is reachable from BOTH directions: an in-system edit the snapshot has not seen, or a world-catalogue edit no crafting system reads.
 
 [Notes](docs/domain/records.md#world-identity-snapshot)
@@ -1107,6 +1109,13 @@ The set of UUIDs that identify an owned item and its canonical source for compon
 
 [Notes](docs/domain/terms.md#item-source-reference-chain)
 
+#### Derivative Source
+
+A registration source Item built from a compendium entry and then changed into a different thing: a non-clone whose compendium **Source UUID** resolves to a document none of whose names it shares.
+At registration and source replacement it keys on its own uuid alone, as a clone does, so each one becomes its own component, tool or recipe-item definition instead of overwriting the one registered before it.
+
+[Notes](docs/domain/terms.md#derivative-source)
+
 #### Recipe Item Match Tiers
 
 The four-tier precedence the one shared, **system-scoped** matcher (`matchRecipeItemDefinition(item, definitions, systemId)`) uses to resolve which recipe-item definition an owned item IS (issue 555, made per-system by issue 567): the list-aware durable identity tier is evaluated first, then among the source tiers the first match wins with no fall-through: (1) `identity` — the durable per-system `flags.fabricate.roles[systemId].recipeItemDefinitionId` leaf (the third `roles` sibling after `componentId`/`toolId`), then the legacy scalar `flags.fabricate.recipeItemDefinitionId` (a transitional read-only fallback), each naming a definition in the candidate set exclusively and otherwise falling through; (2) `uuid` — the item's own uuid in the definition's union refs; (3) `compendium` — the item's compendium **Source UUID** in the union; (4) `duplicate` — the item's `_stats.duplicateSource` in the union.
@@ -1489,7 +1498,8 @@ Module Configuration
 |  |- travelConfig (the world realm library, revealMode and modifierVisibility; a crafting system keeps only gatheringRealmSettings.enabled)
 |  |- characterLibraries ({ characterPrerequisites, modifiers } — the two WORLD character libraries; a crafting system keeps NEITHER and has no participation flag over them)
 |  |- theme
-|  |- experimentalFeatures
+|  |- experimentalFeatures (gates the recipe graph placeholder, the GM Manager's World > Downtime surface and its Premium crafting-icons advert)
+|  |- premiumIconsAdDismissed (whether a GM has dismissed the GM Manager's Premium crafting-icons advert for this world)
 |  |- recipeItemFlagStampVersion (one-shot flag-stamp version)
 |  |- componentFlagStampVersion (one-shot flag-stamp version)
 |  |- toolFlagStampVersion (one-shot flag-stamp version)
@@ -1769,7 +1779,8 @@ Conflicting nonempty evidence leaves that field unknown rather than falling thro
 
 **Completion Mode** is a run-level preference: `manual` asks the player to execute a ready stage, while `worldTime` permits eligible completion when world time advances.
 The switch may appear during a no-check countdown even with unresolved materials; its visibility is not permission to spend them automatically.
-Automatic crafting stops without spending on material, currency, choice, essence, Tool or player-check requirements and on validation failures, retaining the preference.
+Automatic crafting stops without spending, retaining the preference: the automatic blocker refuses a stage whose selected ingredient set holds any ingredient group, whether an item, a currency option or a choice of options, a stage or recipe Tool, or a player check in the recipe's system; an owed claimable award pick holds the world-time scan; and an essence requirement or any other unmet requirement stops at the stage's own validation.
+A run **finishes its current stage as time passes** when the world-time scan will take it once its gate passes and that stage carries no automatic blocker; the Journal marks it with a bolt, and a later stage may still stop.
 Pause freezes the remaining gate time, including zero; resume reanchors it at the current world time, and neither manual nor automatic execution advances a paused run.
 Cancellation remains possible while paused, retains completed spending and awards, and forfeits elapsed time without refunding unspent inputs.
 Public crafting preserves one-call execution when the stage is ready and all choices are supplied, through the same version-1 authority boundary; Journal start controls may leave a run awaiting manual execution.

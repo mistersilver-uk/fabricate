@@ -36,6 +36,7 @@ import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { diceEngine } from '../utils/rollFormulaRollability.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
+import { automaticStageBlocker, stageIngredientSet } from './automaticStageBlocker.js';
 import { AWARD_CHOICE_PENDING, AwardChoiceSettler } from './awardChoiceSettle.js';
 import { evaluatePrerequisite } from './characterPrerequisites.js';
 import { advantageOfferFields, authoredOfferOptions } from './checkAdvantage.js';
@@ -1429,9 +1430,7 @@ export class CraftingEngine {
   }
 
   _selectedIngredientSet(step, selectedId) {
-    const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
-    if (selectedId == null || selectedId === '') return sets[0] ?? null;
-    return sets.find((set) => String(set?.id) === String(selectedId)) ?? null;
+    return stageIngredientSet(step, selectedId);
   }
 
   _versionedGateReady(run) {
@@ -1742,26 +1741,8 @@ export class CraftingEngine {
   }
 
   _automaticStageBlocker(run, recipe, step, selectedSet) {
-    if (run.completionMode !== 'worldTime') {
-      return { code: 'manualPreference', message: 'This crafting run requires manual completion.' };
-    }
-    if (Array.isArray(selectedSet?.ingredients) && selectedSet.ingredients.length > 0) {
-      return { code: 'materials', message: 'Automatic completion requires a no-input stage.' };
-    }
-    if (
-      (Array.isArray(step?.toolIds) && step.toolIds.length > 0) ||
-      (Array.isArray(recipe?.toolIds) && recipe.toolIds.length > 0)
-    ) {
-      return { code: 'tools', message: 'Automatic completion cannot use crafting tools.' };
-    }
-    const activeCheck = resolveActiveCraftingCheckFormula(this._getRecipeSystem(recipe));
-    if (activeCheck.requiresCheck || activeCheck.checkUsable) {
-      return {
-        code: 'playerCheck',
-        message: 'Automatic completion cannot resolve a player check.',
-      };
-    }
-    return null;
+    const system = this._getRecipeSystem(recipe);
+    return automaticStageBlocker({ run, recipe, step, selectedSet, system });
   }
 
   async _canExecuteVersionedStageImmediately({

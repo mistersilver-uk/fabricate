@@ -11,6 +11,7 @@ import {
   groupEvidenceFields,
   isUnsettledChoice,
   memberResultRow,
+  owesClaimablePick,
   pickedGroupAward,
 } from './choiceGroupAward.js';
 import { isRecipeKnown } from './companionKnowledgeGrant.js';
@@ -193,10 +194,7 @@ export class AwardChoiceSettler {
    * stage's start and the world-time sweep wait on.
    */
   blocks(run, actor) {
-    const claimable = this._claimable(actor, this._recipeOf(run));
-    return list(run?.steps)
-      .flatMap((step) => list(step?.pendingAwardChoices).filter(isUnsettledChoice))
-      .some((choice) => list(choice.alternatives).some(claimable));
+    return owesClaimablePick(run, () => this.unclaimable(run, actor));
   }
 
   /** Settle `choiceId` with `picks` (alternative ids) under a `chooseAward` grant. */

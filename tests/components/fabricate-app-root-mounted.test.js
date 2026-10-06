@@ -112,6 +112,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
+    // The run kinds the journal store filters by and its kind filter counts (issue 1644).
+    'src/ui/svelte/util/journalRunKinds.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
     'src/ui/svelte/util/craftingRecipeStatus.js',
@@ -255,6 +257,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',
     'src/ui/svelte/apps/journal/JournalTips.svelte',
+    'src/ui/svelte/apps/journal/JournalKindFilter.svelte',
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/journal/JournalView.svelte',
     'src/ui/svelte/apps/journal/RecentResults.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte',

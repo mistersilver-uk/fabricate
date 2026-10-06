@@ -45,6 +45,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'ready-single': 'lab-v1-ready-single',
   'legacy-armed': 'lab-v1-legacy-armed',
   'waiting-auto-eligible': 'lab-v1-waiting-auto-eligible',
+  'waiting-auto-completes': 'lab-v1-waiting-auto-completes',
   'waiting-open-choice': 'lab-v1-waiting-open-choice',
   'stage-not-started': 'lab-v1-stage-not-started',
   'stage-paid': 'lab-v1-stage-paid',
@@ -757,6 +758,7 @@ function prototypeContainers(context, state) {
   }
   if (state === 'filter-paused')
     selected.pauseState = { pausedAt: NOW - HOUR, remainingSeconds: 3 * HOUR };
+  if (state === 'waiting-auto-completes') selected.completionMode = 'worldTime';
   if (state === 'waiting-auto-eligible') {
     selected.completionMode = 'worldTime';
     const current = selected.steps[selected.currentStepIndex];

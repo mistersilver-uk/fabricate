@@ -959,7 +959,8 @@ Option cards are the two-to-four-way choice above, used when each side needs its
 Neither is a mode of the other.
 Independent criteria that narrow a list are filter toggles, because any combination is valid.
 A one-of-N SCOPE the list is always in — rather than a filter that can be cleared — is a segmented control in the same bar; a segmented whose value could be "none" is a toggle in disguise.
-The journal's kind filter is therefore four independent toggles, because any combination of kinds is a valid view, while its active-status filter stays a segmented control, because its four values are mutually exclusive.
+Where those independent criteria are a FIXED SET of named values rather than properties of the record, the filter is the shared picker's multi-select mode, which states the combination in one trigger and is not a `Search`, because nothing is typed.
+The journal's kind filter is therefore that multi-select, because any combination of kinds is a valid view and the four kinds are a fixed set (maintainer ruling 2026-10-05), while its active-status filter stays a segmented control, because its four values are mutually exclusive.
 
 An inspector rail's verbs render through the button primitive at full width, each taking the role its verb names.
 
@@ -999,6 +1000,12 @@ A GRIP is the pointer's drag handle and the keyboard's move control, one per ord
 - **WHEN** the same record's enabled state appears in a browse list and in that record's own editor
 - **THEN** the list row renders a status button
 - **AND** the editor renders a toggle
+
+#### Scenario: A list is filtered by any combination of a fixed set of values
+
+- **WHEN** a filter narrows a list to any combination of a fixed, named set of values
+- **THEN** it renders the shared picker's multi-select, whose trigger summarises the combination
+- **AND** each choice applies as it is made, with no query field where the set is short
 
 #### Scenario: A rail item is an icon well
 
@@ -1793,6 +1800,7 @@ A site whose DOM hooks, root classes, status words or reported counts differ pas
 The shared count, status and verdict vocabulary lives once, under `FABRICATE.Admin.Manager.Validation.*`, and a surface localizes only the words that are genuinely its own.
 That shared wording is the ENABLE-GATED one — `Blocks enable`, `Cannot be enabled`, `Saves and enables` — because most of these records are things a GM enables.
 A surface whose record has no enable gate localizes the words that gate colours, and only those: a recipe item is used rather than enabled, so it says `Block` and `Cannot be used` and takes every other word from the shared home.
+A gathering task is gated by Save rather than by its enabled switch, so it says `Blocks save`, `Cannot be saved` and `Saves with warnings`.
 The counts are a closed, ordered vocabulary the surface owns — pass, then warning, then blocking — and a site reports the subset it can answer rather than choosing an order or inventing a fourth.
 The count rail, the verdict and the rendered rows are one reading of one state.
 The surface is HANDED its counts, so the rule belongs to the site: the site derives the counts from the rows it renders, rather than reading the evaluation a second time, so a rail cannot report a state its own list contradicts.
@@ -2187,6 +2195,7 @@ Finished MUST remain the Journal's sole history browser, and the browse/detail c
 Past and future `StageCard` presentations MUST be inert; browsing them MUST NOT change persisted selections or the executable stage.
 `SlotRow`, `SlotTile` and `ChoiceOptionList` MUST expose the selected materials and held-versus-needed amounts without hiding unavailable choices.
 `EssencePool` MUST derive every threshold from one shared physical carrier allocation and place overshoot evidence below its source list.
+Crafting's essence pool MUST compose `EssencePool` through its adapter; its opt-in `capAtHeld` caps each carrier at its held count instead of freezing increments once every threshold is met, and per-item `props` and `inputProps` carry a caller's hooks onto the threshold, the carrier row and its input.
 Repeated thresholds for the same essence MUST sum their required amounts before comparing the shared contribution and render one keyed pool, so Fire 2 plus Fire 2 requires four Fire rather than counting the same two Fire twice.
 `ChoiceOptionList` MUST use each option's own `needed` amount when provided, falling back to the slot-level amount only for uniform-quantity callers.
 `SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.

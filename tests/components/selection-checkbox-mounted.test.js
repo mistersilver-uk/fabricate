@@ -68,6 +68,28 @@ describe('SelectionCheckbox', () => {
     harness.remount();
   });
 
+  it('draws only the box when decorative, with no input, label or callback', async () => {
+    const changes = [];
+    const target = await harness.mount({
+      decorative: true,
+      checked: true,
+      ariaLabel: 'Ignored',
+      onChange: (checked) => {
+        changes.push(checked);
+      },
+    });
+
+    assert.equal(input(target), null, 'no real control');
+    assert.equal(target.querySelector('label'), null, 'no label wrapper');
+    assert.equal(box(target).getAttribute('aria-hidden'), 'true');
+    assert.equal(box(target).classList.contains('is-checked'), true);
+    box(target).click();
+    assert.deepEqual(changes, [], 'the box is inert');
+    await harness.setProps({ checked: false });
+    assert.equal(box(target).classList.contains('is-checked'), false, 'is-checked follows checked');
+    harness.remount();
+  });
+
   it('reports the new checked state to onChange, in both directions', async () => {
     const changes = [];
     const target = await harness.mount({ onChange: (checked) => changes.push(checked) });

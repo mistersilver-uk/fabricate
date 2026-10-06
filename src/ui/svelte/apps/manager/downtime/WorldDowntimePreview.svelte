@@ -1,6 +1,7 @@
 <script>
   import { downtimePreviewDefinition } from './worldDowntimePreviewProvider.js';
   import { localize } from '../../../util/foundryBridge.js';
+  import { PREMIUM_PATREON_URL as cta } from '../premiumIconsAdModel.js';
 
   let { tabId = 'tracking', hidden = false } = $props();
   const preview = $derived(downtimePreviewDefinition(tabId));
@@ -16,7 +17,6 @@
       value: localize(`${copyBase}.Rows.${index + 1}.Value`),
     }))
   );
-  const cta = 'https://www.patreon.com/c/mistersilver';
 </script>
 
 <div

@@ -5117,16 +5117,14 @@ export function createAdminStore(services) {
   }
 
   function _validateGatheringLibraryTaskForSystem(task, systemId = get(selectedSystemId)) {
-    const errors = [];
     const resultErrors = [];
     if (!task || typeof task !== 'object') {
-      errors.push('Task is required');
-      return { valid: false, errors, resultErrors };
+      return { valid: false, errors: ['Task is required'], nameErrors: [], resultErrors };
     }
     const name = String(task.name || '').trim();
-    if (!name) {
-      errors.push('Task name is required');
-    }
+    // The editor files `nameErrors` under Overview; `errors` stays the union the Save reads.
+    const nameErrors = name ? [] : ['Task name is required'];
+    const errors = [...nameErrors];
     const label = `Task "${name || task.id || 'unnamed'}"`;
     const system = _selectedGatheringSystem(systemId);
     const mode = TASK_RESOLUTION_MODES.has(task.resolutionMode) ? task.resolutionMode : 'd100';
@@ -5192,7 +5190,7 @@ export function createAdminStore(services) {
       }
     }
     errors.push(...resultErrors);
-    return { valid: errors.length === 0, errors, resultErrors };
+    return { valid: errors.length === 0, errors, nameErrors, resultErrors };
   }
 
   function validateGatheringLibraryTask(task) {

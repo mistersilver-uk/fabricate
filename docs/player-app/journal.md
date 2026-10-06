@@ -31,11 +31,14 @@ Select a row in either list to read its detail.
 The lists and selected detail scroll independently, with sort controls and page controls kept outside the scrolling lists.
 In a narrow window they stack in the order Active, Finished, then detail.
 
-Use **Search runs** and the four kind switches to filter both lists.
-Each switch shows or hides one kind of run, **Crafting**, **Alchemy**, **Gathering**, or **Salvage**, and any combination is allowed.
-All four start on each time the window opens, and switching a kind returns both lists to their first page.
+Use **Search runs** and the **Run types** filter to narrow both lists.
+The filter sits under the search field as a menu button that names your choice, such as "Crafting, Salvage", "All run types", or "No run types".
+Open it to see **Crafting**, **Gathering**, **Salvage**, and **Alchemy**, each with a checkbox and its count of runs.
+Any combination is allowed, and each tick applies immediately and returns both lists to their first page.
+**Show all run types** clears the filter, and is disabled when every type is already shown.
+All run types start shown each time the window opens.
 The Active status filter selects one of **All**, **Ready**, **In progress**, or **Paused**.
-Its counts describe the kinds switched on before search or paging, so a search can show fewer rows than the status count.
+Its counts describe the run types shown before search or paging, so a search can show fewer rows than the status count.
 
 Both lists start with four runs per page and have independent page sizes and page controls.
 You can choose 4, 6, 12, or 25 runs per page.
@@ -65,6 +68,13 @@ Where a run needs something from **you**, a second badge sits beside the status 
   A route, an option, or an essence allocation has not been made yet.
 - **Needs materials**, **Needs essences**, **Needs payment**, **Needs tools**.
   The stage is short of something you have to acquire.
+
+A small bolt before the status badge, labelled **Finishes this stage as time passes**, means the run's current stage will complete on its own once its wait is over.
+It shows only for a run that is set to complete as time passes, is not paused, and is still waiting on its time gate.
+It also needs the run to owe no reward pick and to have nothing that would stop it, such as missing materials, tools, or a player check.
+Crafting runs show it; gathering runs do not yet.
+A later stage may still stop and wait for you.
+For a crafting run with no check, a step completes on its own when the run is set to, and otherwise you can complete it by hand.
 
 You can sort the active list by **Soonest Ready** or by **Newest**.
 Soonest Ready puts the runs you can act on first, then the ones that will be ready soonest.

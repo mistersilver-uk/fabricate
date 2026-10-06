@@ -1,19 +1,28 @@
 /**
  * The item-source cluster (issue 1923): the legacy recipe-item reconciler, component and
  * recipe-item registration from an Item uuid, component source replacement and the GM metadata
- * refresh; collaborators arrive in `io`. Import de-duplication (`addItemFromUuid`) and
- * source-metadata propagation (`refreshComponentMetadataForUpdatedItem`) key on the narrower Item
- * Source Reference Chain, `getItemIdentityReferences`, which excludes `_stats.duplicateSource`.
+ * refresh; collaborators arrive in `io`. Import de-duplication (`addItemFromUuid`) keys on the
+ * source's own uuid plus its compendium source, the latter dropped for a clone or a derivative;
+ * the metadata refresh (`refreshComponentMetadataForUpdatedItem`) keys on the own uuid alone.
  */
 import { advanceDefinitionRevision } from '../../utils/definitionIndex.js';
+import { isEmbeddedItemUuid } from '../../utils/sourceReferenceUnion.js';
 import {
   getCompendiumSourceUuid,
   getDuplicateSourceUuid,
   getItemIdentityReferences,
   getItemMatchUuids,
+  getOwnSourceUuids,
+  normalizeMatchName,
+  settleCompendiumClaim,
+  storedMatchName,
 } from '../../utils/sourceUuid.js';
 
 import { baseCollaborators, COMPONENT_FACTS, RECIPE_ITEM_FACTS } from './collaborators.js';
+import {
+  adoptedWorldComponentId,
+  flushWorldComponentRegistrations,
+} from './worldComponentRegistration.js';
 
 /** This cluster's `io` bag: the base thunks plus the manager members these bodies reach. */
 export function itemSourcesCollaborators(manager) {
@@ -37,6 +46,11 @@ export function itemSourcesCollaborators(manager) {
     findRecipeItemDefinitionForSource: (system, snapshot, source) =>
       manager._findRecipeItemDefinitionForSource(system, snapshot, source),
     scopeBasis: (system) => manager._scopeBasis(system),
+    addItemFromUuid: (...args) => manager.addItemFromUuid(...args),
+    componentScopeStore: () => manager._resolveComponentScopeStore(),
+    persistedSystems: () => manager._repository.readReplicatedSnapshot(),
+    flushWorldComponentRegistrations: (registrations) =>
+      manager.flushWorldComponentRegistrations(registrations),
     salvageNormalizationContext: (system) => manager._salvageNormalizationContext(system),
     normalizeComponent: (item, options) => manager._normalizeComponent(item, options),
     normalizeRecipeItemDefinition: (entry, usedIds) =>
@@ -166,8 +180,9 @@ export async function addRecipeItemFromUuid(io, systemId, itemUuid) {
   // runs and the item resolves through the legacy scalar and raw references.
   const roleFlagKey = io.recipeItemRoleFlagKey(system.id);
 
-  const snapshot = await io.buildRecipeItemSourceSnapshot(itemUuid, source);
-  const existing = io.findRecipeItemDefinitionForSource(system, snapshot, source);
+  const resolved = await io.buildRecipeItemSourceSnapshot(itemUuid, source);
+  const existing = io.findRecipeItemDefinitionForSource(system, resolved, source);
+  const snapshot = settleCompendiumClaim(resolved, existing, source);
   if (existing) {
     const unchanged =
       existing.name === snapshot.name &&
@@ -188,6 +203,15 @@ export async function addRecipeItemFromUuid(io, systemId, itemUuid) {
     existing.img = snapshot.img;
     existing.description = snapshot.description;
     existing.originItemUuid = snapshot.originItemUuid;
+    // An origin move releases no claim the registration still lists, and no alias repeats the
+    // origin or the registered uuid (issue 2217).
+    const aliases = new Set(existing.aliasItemUuids || []);
+    if ((snapshot.aliasItemUuids || []).includes(previousSourceUuid)) {
+      aliases.add(previousSourceUuid);
+    }
+    aliases.delete(existing.originItemUuid);
+    aliases.delete(existing.registeredItemUuid);
+    existing.aliasItemUuids = [...aliases];
     // Indexed fields changed at constant length, invisible to the `definitionIndex` rule.
     advanceDefinitionRevision(system.recipeItemDefinitions);
 
@@ -225,8 +249,8 @@ function resolveImportedSourceData(itemUuid, source = null) {
   }
   // A world source with `_stats.duplicateSource` is a clone whose inherited `compendiumSource`
   // names the original's pack, so it keys on its own uuid or it would overwrite the original's
-  // definition (issue 555). Registration only: Foundry stamps `duplicateSource` on every
-  // non-compendium drag-drop, so `matchRecipeItemDefinition` has no clone gate.
+  // definition (issue 555). Registration only: an actor-owned copy may carry `duplicateSource`
+  // too, depending on the core build, so `matchRecipeItemDefinition` has no clone gate.
   const isClone = !!getDuplicateSourceUuid(source);
   const identityRefs = isClone
     ? [source?.uuid].filter((ref) => typeof ref === 'string' && ref.trim())
@@ -239,9 +263,22 @@ function resolveImportedSourceData(itemUuid, source = null) {
   return { currentUuid, canonicalUuid, references, isClone };
 }
 
+/** Whether a non-clone source is a derivative of its resolved compendium source (issue 2217): its
+ * stored name is neither the entry's stored name nor the original a translation module recorded
+ * on the entry. The source's own recorded original is not read, because `fromCompendium` copies
+ * the entry's flags into everything built from it. A side with no name is no evidence. */
+function isDerivativeOf(source, compendiumDocument) {
+  const name = storedMatchName(source);
+  const entryNames = [
+    storedMatchName(compendiumDocument),
+    normalizeMatchName(compendiumDocument?.flags?.babele?.originalName),
+  ].filter(Boolean);
+  return !!name && entryNames.length > 0 && !entryNames.includes(name);
+}
+
 /**
- * Component import source references, falling back when the recorded canonical source no
- * longer resolves.
+ * Import source references for every kind. A derivative keys on its own uuid as a clone does, with
+ * its `_stats` left alone; a recorded canonical source that no longer resolves falls back.
  * @returns {Promise<{currentUuid: string|null, canonicalUuid: string|null, references: string[],
  *   aliasItemUuids: string[],
  *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>}>}
@@ -268,7 +305,16 @@ export async function resolveImportedComponentSourceData(itemUuid, source = null
   }
 
   if (canonicalSource) {
-    return { ...sourceData, aliasItemUuids, sourceFallbacks };
+    if (!isDerivativeOf(source, canonicalSource)) {
+      return { ...sourceData, aliasItemUuids, sourceFallbacks };
+    }
+    return {
+      ...sourceData,
+      canonicalUuid: currentUuid,
+      references: sourceData.references.filter((ref) => ref !== recordedCanonicalUuid),
+      aliasItemUuids,
+      sourceFallbacks,
+    };
   }
 
   if (!sourceData.references.includes(recordedCanonicalUuid)) {
@@ -288,11 +334,102 @@ export async function resolveImportedComponentSourceData(itemUuid, source = null
   };
 }
 
+// ratchet-exempt(world-scope): import, a registration is built from the in-system record itself
+const componentRowsOf = (io) => (systemId) => io.getSystem(systemId)?.components ?? [];
+
+/** Whether the persisted `craftingSystems` setting holds a component row, read once on first use.
+ * A row a rejected or pending write left only in memory is not held, nor is any row of a setting
+ * that cannot be read, so no membership is written for a row the setting lacks. */
+function persistedRowTest(io) {
+  let held = null;
+  return (systemId, componentId) => {
+    held ??= persistedComponentIds(io);
+    return held.get(systemId)?.has(componentId) === true;
+  };
+}
+
+function persistedComponentIds(io) {
+  let systems;
+  try {
+    systems = io.persistedSystems();
+  } catch {
+    systems = null;
+  }
+  const held = new Map();
+  for (const system of systems ?? []) {
+    // ratchet-exempt(world-scope): import, a registration asks what the persisted record holds
+    held.set(system.id, new Set((system.components ?? []).map((component) => component.id)));
+  }
+  return held;
+}
+
+/** A run's world-component registrations, written in one `fabricate.componentScope` save. A
+ * non-GM writes and registers nothing, and is answered rather than refused, because two callers
+ * flush inside `finally`. */
+export async function flushImportRegistrations(io, registrations) {
+  if (!globalThis.game?.user?.isGM) return { registered: 0, error: null };
+  return flushWorldComponentRegistrations({
+    store: io.componentScopeStore(),
+    registrations,
+    rowsOf: componentRowsOf(io),
+    isPersisted: persistedRowTest(io),
+  });
+}
+
+/** The array one import records its registration into, or `null` when it registers nothing: an
+ * Item embedded in an actor, read off its uuid when it no longer resolves, or an unpersisted call
+ * whose owner passed no array to flush. */
+function registrationsFor(itemUuid, source, options) {
+  const embedded = source
+    ? source.isEmbedded
+    : isEmbeddedItemUuid(itemUuid, globalThis.foundry?.utils?.parseUuid);
+  if (embedded) return null;
+  if (options.registrations) return options.registrations;
+  return options.persist === false ? null : [];
+}
+
+/** `{ id }` naming the World Component a new record adopts, or `{}` to mint its own id. */
+function adoptedIdentity(io, system, registrations, record) {
+  const store = registrations ? io.componentScopeStore() : null;
+  if (!store) return {};
+  const id = adoptedWorldComponentId({
+    entities: store.listEntities(),
+    registrations,
+    rowsOf: componentRowsOf(io),
+    systemId: system.id,
+    record,
+  });
+  return id ? { id } : {};
+}
+
+function withRegistrationError(result, flushed) {
+  return flushed?.error ? { ...result, worldRegistrationError: flushed.error } : result;
+}
+
+/** One exit of `addItemFromUuid`: the `craftingSystems` write when this call owns it, then the
+ * row's registration, flushed here unless a batch owner passed `options.registrations`. A rejected
+ * save throws before anything registers; a rejected scope write is a `worldRegistrationError`. */
+async function settleImport(io, system, options, registrations, result) {
+  if (result.action !== 'skipped' && options.persist !== false) {
+    await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
+  }
+  if (!registrations) return result;
+  registrations.push({
+    systemId: system.id,
+    componentId: result.item.id,
+    added: result.action === 'added',
+  });
+  if (registrations === options.registrations) return result;
+  return withRegistrationError(result, await io.flushWorldComponentRegistrations(registrations));
+}
+
 /**
- * Import (or refresh) a single component from a source Item uuid.
+ * Import (or refresh) a single component from a source Item uuid, registering it as a World
+ * Component the system holds (`### Component scope` requirement 6).
  *
- * @param {{persist?: boolean}} [options] `persist: false` lets a batch caller such as
- *   `addItemsFromPack` issue one `save()` for many items; nothing else changes.
+ * @param {{persist?: boolean, registrations?: object[]}} [options] `persist: false` lets a batch
+ *   owner issue one `save()` for many items; `registrations` is the array that owner later hands
+ *   to `flushWorldComponentRegistrations`.
  */
 export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
   io.assertGM('add component from uuid');
@@ -303,14 +440,19 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
     itemUuid,
     (documentName) => `Cannot add non-Item document (${documentName}) as a crafting component`
   );
+  const registrations = registrationsFor(itemUuid, source, options);
+  const settle = (result) => settleImport(io, system, options, registrations, result);
 
   const nextSourceData = await io.resolveImportedComponentSourceData(itemUuid, source);
-  const existing = io.findComponentBySourceReferences(system, nextSourceData.references);
-  const nextSnapshot = await io.buildComponentSourceSnapshot(
-    itemUuid,
-    source,
+  // The component claiming the source's own uuid wins over one claiming only its compendium
+  // source (issue 2217).
+  const existing =
+    io.findComponentBySourceReferences(system, getOwnSourceUuids(itemUuid, source)) ||
+    io.findComponentBySourceReferences(system, nextSourceData.references);
+  const nextSnapshot = settleCompendiumClaim(
+    await io.buildComponentSourceSnapshot(itemUuid, source, existing, nextSourceData),
     existing,
-    nextSourceData
+    source
   );
   if (existing) {
     const nextFallbacks = io.buildFallbackSourceReferences(
@@ -333,9 +475,8 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
     const existingRoleKey = io.componentRoleFlagKey(system.id);
     if (existingRoleKey) await io.stampSourceIdentity(source, existingRoleKey, existing.id);
 
-    if (unchanged) {
-      return { item: existing, action: 'skipped', sourceFallbacks: nextSnapshot.sourceFallbacks };
-    }
+    const sourceFallbacks = nextSnapshot.sourceFallbacks;
+    if (unchanged) return settle({ item: existing, action: 'skipped', sourceFallbacks });
 
     existing.name = nextSnapshot.name;
     existing.img = nextSnapshot.img;
@@ -346,17 +487,14 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
     // Indexed fields rewritten in place (issue 1076).
     advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
 
-    if (options.persist !== false) await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
-    return { item: existing, action: 'updated', sourceFallbacks: nextSnapshot.sourceFallbacks };
+    return settle({ item: existing, action: 'updated', sourceFallbacks });
   }
 
   // No match: create a new component. A `_normalizeSystem` bypass site (issue 1359): same basis,
   // same helper, `Set|null`; see `_scopeBasis`.
   const { essenceIds: validEssenceIds } = io.scopeBasis(system);
   const item = io.normalizeComponent(
-    {
-      ...nextSnapshot,
-    },
+    { ...nextSnapshot, ...adoptedIdentity(io, system, registrations, nextSnapshot) },
     { validEssenceIds, ...io.salvageNormalizationContext(system) }
   );
 
@@ -365,8 +503,54 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
   advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
   const addedRoleKey = io.componentRoleFlagKey(system.id);
   if (addedRoleKey) await io.stampSourceIdentity(source, addedRoleKey, item.id);
-  if (options.persist !== false) await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
-  return { item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks };
+  return settle({ item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks });
+}
+
+/** Bulk-import every Item document of a compendium pack through `addItemFromUuid`, with one
+ * `craftingSystems` write and then one flush of the run's world registrations.
+ * @returns {Promise<{added: number, updated: number, skipped: number, total: number,
+ *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>,
+ *   worldRegistrationError?: Error}>} */
+export async function addItemsFromPack(io, systemId, packId) {
+  io.assertGM('bulk import from compendium');
+  const system = io.getSystem(systemId);
+  if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+  const pack = globalThis.game?.packs?.get(packId);
+  if (!pack) throw new Error(`Compendium pack not found: ${packId}`);
+
+  const documents = await pack.getDocuments();
+  const items = documents.filter((d) => d.documentName === 'Item');
+
+  // No `_primeEnricherCache` here (issue 800): `getDocuments()` already cached this pack, and
+  // intra-pack references are the common case, so per-item priming mostly hits the cache.
+  const counts = { added: 0, updated: 0, skipped: 0 };
+  const sourceFallbacks = [];
+  // Items mutate memory only (`persist: false`) and one `save()` below flushes the batch (issue
+  // 1086); `dirty` keeps an all-skipped re-drop from writing.
+  let dirty = false;
+  const registrations = [];
+  let flushed;
+  try {
+    for (const item of items) {
+      const uuid = item.uuid || `Compendium.${packId}.${item.id}`;
+      const result = await io.addItemFromUuid(systemId, uuid, { persist: false, registrations });
+      if (result.action === 'added' || result.action === 'updated') {
+        counts[result.action] += 1;
+        dirty = true;
+      } else counts.skipped += 1;
+      if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
+    }
+  } finally {
+    // In `finally`, so items imported before a throw still persist; named, because every item
+    // went into this one system (issue 1078).
+    if (dirty) await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
+    // After the save and never gated on `dirty`: a rejected save has thrown past this line, and
+    // an all-skipped run may still register a component that has no World Component.
+    flushed = await io.flushWorldComponentRegistrations(registrations);
+  }
+
+  return withRegistrationError({ ...counts, total: items.length, sourceFallbacks }, flushed);
 }
 
 /** Replace a component's source Item link and return fallback metadata when the dropped Item's
@@ -462,10 +646,10 @@ export async function refreshComponentMetadataForUpdatedItem(io, item, changes =
   const refreshDescription = hasUpdatedItemDescription(changes);
   if (!refreshName && !refreshImg && !refreshDescription) return { updated: 0 };
 
-  // Identity references only: a clone's duplicateSource names its original, which must not
-  // receive this edit.
-  const itemRefs = new Set(getItemIdentityReferences(item));
-  if (itemRefs.size === 0) return { updated: 0 };
+  // The edited Item's own uuid only: its compendium and duplicate sources name sibling Items,
+  // whose components must not receive this edit (issue 2217).
+  const ownUuids = getOwnSourceUuids(item?.uuid, item);
+  if (ownUuids.length === 0) return { updated: 0 };
 
   const nextName = refreshName ? item?.name || changes.name || 'Unnamed Item' : null;
   const nextImg = refreshImg ? item?.img || changes.img || 'icons/svg/item-bag.svg' : null;
@@ -480,8 +664,7 @@ export async function refreshComponentMetadataForUpdatedItem(io, item, changes =
   for (const system of io.systems().values()) {
     const components = Array.isArray(system.components) ? system.components : []; // ratchet-exempt(world-scope): writer
     for (const component of components) {
-      const matches = getItemMatchUuids(component).some((ref) => itemRefs.has(ref));
-      if (!matches) continue;
+      if (getItemMatchUuids(component).every((ref) => !ownUuids.includes(ref))) continue;
 
       let changed = false;
       if (refreshName && component.name !== nextName) {

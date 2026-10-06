@@ -8,6 +8,7 @@ import {
   groupEvidenceFields,
   groupStrategy,
   isUnsettledChoice,
+  owesClaimablePick,
 } from '../../systems/choiceGroupAward.js';
 import { historyEvidenceFields } from '../../systems/runHistoryEvidence.js';
 import { STAGE_BLOCKERS } from '../../systems/stageReadiness.js';
@@ -38,12 +39,7 @@ export function owedAwardChoices(run) {
  * answers the settle's own `unclaimable(member)` and is asked only of a run that owes a pick.
  */
 export function awardHeldAvailability(availability, run, claimability) {
-  const owed = owedAwardChoices(run);
-  if (owed.length === 0) return availability;
-  const unclaimable = claimability();
-  const held = owed.some(({ choice }) =>
-    list(choice.alternatives).some((member) => !unclaimable(member))
-  );
+  const held = owesClaimablePick(run, claimability);
   return held ? { ...availability, blocker: STAGE_BLOCKERS.award } : availability;
 }
 

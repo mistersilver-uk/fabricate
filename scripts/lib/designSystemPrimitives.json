@@ -14,7 +14,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified pool on its active StepDetails and HistoricalRunDetail consumers. Its history prop renders recorded contributions and source-qualified carriers without active controls. The components path selects broad evidence; rendered acceptance remains pending."
+      "why": "Issue 1648 promotes the specified pool on its active StepDetails and HistoricalRunDetail consumers. Its history prop renders recorded contributions and source-qualified carriers without active controls. Issue 1644 adopts it in crafting through the EssencePoolPanel adapter, which passes capAtHeld and per-item hooks. Measured against its specimen, it stays target pending a maintainer ruling on five geometry figures. The components path selects broad evidence."
     },
     {
       "path": "src/ui/svelte/components/StageCard.svelte",
@@ -22,7 +22,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io, including read-only content snippets for future alternatives and route/ladder output, extend its existing meaning; current-only body controls remain unchanged. The components path selects broad evidence; rendered acceptance remains pending."
+      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io, including read-only content snippets for future alternatives and route/ladder output, extend its existing meaning; current-only body controls remain unchanged. Measured at issue 1644 on its five override frames: radius, frames, numeral and tag match, but its 12px region inset is not the specimen's 48px indent, so it stays target with that disagreement recorded in the library's migrations table."
     },
     {
       "path": "src/ui/svelte/components/YieldScale.svelte",
@@ -438,7 +438,7 @@
       "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "`library.html:690` — \"The box a gate list and a selection header both use\", including the tri-state a some-rows-selected header needs. 8 callers."
+      "why": "`library.html:690` — \"The box a gate list and a selection header both use\", including the tri-state a some-rows-selected header needs. 13 importing files, measured with `componentImporters.js` at issue 1644 against the 8 this row had said (12 at that change's base). That change added the `decorative` form, the box alone and `aria-hidden` with no input, for a host that already announces the checked state: the Journal's run-type filter draws it in each `role=\"option\"` row of `SearchablePopover`'s multi-select, where an input would nest one control in another."
     },
     {
       "path": "src/ui/svelte/components/StatBox.svelte",
@@ -454,7 +454,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "`library.html:595` — \"Binary state that takes effect immediately\", and the manager's one on/off switch (25 callers, issue 1040). It was a CSS convention over an element TREE — track span, nested knob span, optional reading — hand-written at 37 sites in 26 components, and `scoped/InheritRow.svelte` and `scoped/MembershipActions.svelte` each recorded in their own docblocks that they had to. Carries a three-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because its `as` prop is a closed set of three element HOSTS and no representative frame draws even one of them: `fabricate-app-shell` is the player window and `manager-components-normal` holds only the track-only filter switch. The shipped 34x20 track against this ladder's 38x22 is recorded as a migration in the entry's own delta, not resolved here. Issue 1508 rooted its family at `fabricate-toggle`, emitted as the leading literal of its own `classes` array: 18 of its 25 family selectors are compounds or descendants of that root and the other seven name a caller’s own row or card and are exempt. TWO of the 18 are owned ONLY because the gate learned to read a declared class MAP — the checkbox host’s `manager-tool-setting-toggle` reaches the DOM from a frozen `HOST_CLASSES` object in the component’s script rather than from the class array or the markup, so an array-only reader reported the family clean while both of those rules stayed application-rooted. Its focus PAIR was re-rooted IN PLACE at unchanged (0,3,0) and unchanged declarations rather than replaced by a second pair at the root, and the checkbox host gained the strip it never had — declared on the transparent `input` that can TAKE focus rather than on the `label` its `:has()` ring paints, and costing zero pixels because that input resolves `opacity: 0`. Here the root IS the control, so its font floor is written at the family root ALONE, (0,1,0), the same form the two button families take."
+      "why": "`library.html:595` — \"Binary state that takes effect immediately\", and the manager's one on/off switch (36 importing files, measured with `componentImporters.js` at issue 1644 against the 25 issue 1040 recorded; 37 at that change's base, which retired the Journal's four kind toggles onto `SearchablePopover`'s multi-select by maintainer ruling 2026-10-05, because a filter over a fixed set of kinds is a multi-select picker rather than a row of switches). It was a CSS convention over an element TREE — track span, nested knob span, optional reading — hand-written at 37 sites in 26 components, and `scoped/InheritRow.svelte` and `scoped/MembershipActions.svelte` each recorded in their own docblocks that they had to. Carries a three-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because its `as` prop is a closed set of three element HOSTS and no representative frame draws even one of them: `fabricate-app-shell` is the player window and `manager-components-normal` holds only the track-only filter switch. The shipped 34x20 track against this ladder's 38x22 is recorded as a migration in the entry's own delta, not resolved here. Issue 1508 rooted its family at `fabricate-toggle`, emitted as the leading literal of its own `classes` array: 18 of its 25 family selectors are compounds or descendants of that root and the other seven name a caller’s own row or card and are exempt. TWO of the 18 are owned ONLY because the gate learned to read a declared class MAP — the checkbox host’s `manager-tool-setting-toggle` reaches the DOM from a frozen `HOST_CLASSES` object in the component’s script rather than from the class array or the markup, so an array-only reader reported the family clean while both of those rules stayed application-rooted. Its focus PAIR was re-rooted IN PLACE at unchanged (0,3,0) and unchanged declarations rather than replaced by a second pair at the root, and the checkbox host gained the strip it never had — declared on the transparent `input` that can TAKE focus rather than on the `label` its `:has()` ring paints, and costing zero pixels because that input resolves `opacity: 0`. Here the root IS the control, so its font floor is written at the family root ALONE, (0,1,0), the same form the two button families take."
     },
     {
       "path": "src/ui/svelte/components/Stepper.svelte",
@@ -478,7 +478,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 implements the library contract and adopts it in src/ui/svelte/apps/journal/RunCard.svelte and src/ui/svelte/apps/journal/RunDetail.svelte. Since issue 1782 it is `StageBars` under a run heading: its kicker and blocker are its own, and the bars, their group and their stage-named progress roles are `StageBars`'. Target status remains until the final state captures and comparison are accepted by the owner of its library block."
+      "why": "Issue 1648 implements the library contract and adopts it in src/ui/svelte/apps/journal/RunCard.svelte and src/ui/svelte/apps/journal/RunDetail.svelte. Since issue 1782 it is `StageBars` under a run heading: its kicker and blocker are its own, and the bars, their group and their stage-named progress roles are `StageBars`'. Measured at issue 1644 on `fabricate-journal-lifecycle-past-stage`: its tracks match, but its hand-rolled kicker is not the shipped `Kicker`, so it stays target with that disagreement recorded in the library's migrations table."
     },
     {
       "path": "src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte",
@@ -598,7 +598,7 @@
       "status": "shipped",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1782 builds the specified meter over `FillBar`: a `meter` with its own value, maximum and caller-formatted `aria-valuetext`, named by the caller's own head (`labelId`) or by a visually hidden `label`. Three importers: `components/EssencePool.svelte`'s per-essence thresholds, `apps/crafting/detail/EssencePoolPanel.svelte`'s per-requirement meters and `apps/ActorSelectTopBar.svelte`'s stamina strip, each keeping its markup above the track. Scoped `shared`: the player window and the journal both draw it. Its broad-signal override names the crafting essence pool and the journal's shared essence stage."
+      "why": "Issue 1782 builds the specified meter over `FillBar`: a `meter` with its own value, maximum and caller-formatted `aria-valuetext`, named by the caller's own head (`labelId`) or by a visually hidden `label`. Two importers: `components/EssencePool.svelte`'s per-essence thresholds, which crafting's pool now composes, and `apps/ActorSelectTopBar.svelte`'s stamina strip, each keeping its markup above the track. Scoped `shared`: the player window and the journal both draw it. Its broad-signal override names the crafting essence pool and the journal's shared essence stage."
     },
     {
       "path": "src/ui/svelte/components/BandedBar.svelte",
@@ -746,7 +746,7 @@
       "callers": [
         "src/ui/svelte/apps/journal/ActionsPanel.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar. Measured at issue 1644 on its three override frames and the switch's: height, radius, gap, order and the primary and Resume families match; the 36px switch, the hand-rolled kicker and the armed-cancel layout disagree, so its library specimen reads target with those recorded in the migrations table."
     },
     {
       "path": "src/ui/svelte/components/WorldClockChip.svelte",
@@ -755,7 +755,7 @@
       "callers": [
         "src/ui/svelte/apps/FabricateAppRoot.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal through Chip's opt-in clock presentation, which owns the 28px/r7 box and direct-child alignment. ONE independent importer, `src/ui/svelte/apps/FabricateAppRoot.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+      "why": "Issue 1648 implements the specified library component for the Journal through Chip's opt-in clock presentation, which owns the 28px/r7 box and direct-child alignment. ONE independent importer, `src/ui/svelte/apps/FabricateAppRoot.svelte`, is below the two-importer membership bar. Measured at issue 1644 on `fabricate-journal-lifecycle-ready-single`: the box, family and value match; its 11px glyph and its kicker disagree, so its library specimen reads target with those recorded in the migrations table."
     },
     {
       "path": "src/ui/svelte/components/SlotRow.svelte",
@@ -782,7 +782,7 @@
       "callers": [
         "src/ui/svelte/apps/journal/RunDetail.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Measured at issue 1644 on `fabricate-journal-lifecycle-past-stage` and `-future-stage`, it matches its canonical spec, and its library specimen reads `shipped`."
     },
     {
       "path": "src/ui/svelte/components/OutcomeLadder.svelte",
