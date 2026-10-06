@@ -40,6 +40,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'systems'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       // `SystemsBrowserView` alone (issue 1515).
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
@@ -84,6 +85,7 @@ export const CASES = Object.freeze([
     // No pattern for `components/EmptyState.svelte`: it is a broad signal, so no case's `sourceMatches` ever sees it.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],
@@ -102,6 +104,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'systems'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],
@@ -122,6 +125,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'systems'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerNavRail\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
@@ -139,6 +143,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'systems'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerNavRail\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
@@ -160,6 +165,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'systems', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],

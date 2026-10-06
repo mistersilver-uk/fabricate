@@ -608,6 +608,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      // The one frame that draws the title bar's PREMIUM mark (issue 1777).
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,

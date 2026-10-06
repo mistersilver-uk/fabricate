@@ -135,6 +135,7 @@ const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
 const MANAGER_NAV_RAIL = 'src/ui/svelte/apps/manager/ManagerNavRail.svelte';
 const MANAGER_PAGE_HEADER = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
+const MANAGER_TITLE_BAR = 'src/ui/svelte/apps/manager/ManagerTitleBar.svelte';
 const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte';
 const MANAGER_HEADER_ACTIONS = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
 const MANAGER_HEADER_CRAFTING_ACTIONS =
@@ -806,7 +807,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'uses manager localization keys rather than hard-coded copy',
-    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, HEADER_MODEL],
+    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, HEADER_MODEL, MANAGER_TITLE_BAR],
     {
       // In full: a substring claim is satisfied by `…Titlebar.Premium` next door. The mounted
       // cases render this copy, which `text(key, fallback)` still produces under a renamed key.

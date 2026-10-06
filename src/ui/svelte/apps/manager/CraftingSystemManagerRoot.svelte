@@ -106,6 +106,7 @@
   import { createImportFlowModel } from './importFlowModel.svelte.js';
   import ManagerNavRail from './ManagerNavRail.svelte';
   import ManagerPageHeader from './ManagerPageHeader.svelte';
+  import ManagerTitleBar from './ManagerTitleBar.svelte';
   import {
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
@@ -1896,12 +1897,6 @@
     return result;
   }
 
-  function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
-    const key = count === 1 ? keySingular : keyPlural;
-    const fallback = count === 1 ? fallbackSingular : fallbackPlural;
-    return `${count} ${text(key, fallback)}`;
-  }
-
   // The recipe editor's header subline: "<category> · <resolution mode>".
   function recipeEditSubtitle() {
     const category = getRecipeCategoryLabel(
@@ -1947,25 +1942,15 @@
     );
   }
 
-  // The titlebar's right-hand status line.
+  // The title bar's status line: no selection draws none.
+  const titlebarModeLabel = $derived(
+    selectedSystem ? resolutionModeLabel(selectedSystem.resolutionMode) : ''
+  );
   const titlebarOutcomeTierCount = $derived(
     selectedSystem?.resolutionMode === 'routedByCheck'
       ? routedOutcomeTierCount(selectedSystem?.craftingCheck?.routed)
       : 0
   );
-
-  function titlebarStatusLabel() {
-    const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
-    if (titlebarOutcomeTierCount <= 0) return mode;
-    const tiers = formatCount(
-      'FABRICATE.Admin.Manager.Titlebar.OutcomeTier',
-      'outcome tier',
-      'FABRICATE.Admin.Manager.Titlebar.OutcomeTiers',
-      'outcome tiers',
-      titlebarOutcomeTierCount
-    );
-    return `${mode} · ${tiers}`;
-  }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     // `checks` is RETAINED as a redirect to the first available child (issue 1096), so existing
@@ -4083,43 +4068,12 @@
   data-world-travel-tab={worldTravelTabAttribute}
   data-world-rules-tab={isWorldRulesRoute ? worldRulesTab : undefined}
 >
-  <!--
-    The manager titlebar: a thin identity strip above the header, on the tool routes too (issue 1373).
-  -->
-  <div
-    class="manager-titlebar"
-    data-manager-titlebar
-    aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}
-  >
-    {#if premiumInstalled}
-      <span
-        class="manager-titlebar-badge"
-        data-manager-titlebar-premium
-        title={text(
-          'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
-          'Fabricate Premium is installed and connected'
-        )}
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
-          'Fabricate Premium is installed and connected'
-        )}>{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
-      >
-    {/if}
-    {#if selectedSystem}
-      <span
-        class="manager-titlebar-status"
-        data-manager-titlebar-status
-        title={titlebarStatusLabel()}
-        aria-label={text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}
-      >
-        <!-- The reference marks this line with an INFORMATION glyph, not a die. What follows
-             it is a statement about how the selected system resolves, which a d20 reads as a
-             dice-roll control rather than as a caption (issue 1373). -->
-        <i class="fas fa-circle-info manager-titlebar-status-icon" aria-hidden="true"></i>
-        <span class="manager-titlebar-status-text">{titlebarStatusLabel()}</span>
-      </span>
-    {/if}
-  </div>
+  <ManagerTitleBar
+    {text}
+    {premiumInstalled}
+    modeLabel={titlebarModeLabel}
+    outcomeTierCount={titlebarOutcomeTierCount}
+  />
 
   <ManagerPageHeader
     {header}
