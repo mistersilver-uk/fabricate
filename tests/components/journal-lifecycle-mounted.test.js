@@ -2478,7 +2478,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.ok(!row.querySelector('[data-run-countdown]'), 'and states no remaining time');
     // The same scope finds a countdown on a gated run, so the absence above is not a blind query.
     const gated = [...mounted.target.querySelectorAll('[data-journal-list="active"] [data-run-id]')]
-      .map((control) => control.closest('[data-list-row]'))
+      .map((control) => activeRowOf(mounted.target, control.dataset.runId))
       .filter((root) => root.querySelector('[data-run-countdown]'));
     assert.ok(gated.length > 0, 'a gated Active row shows its countdown under the same scope');
     // D-029 on the same row: the merged badge, not the retired word.

@@ -12,6 +12,7 @@ import {
 import { makeCraftingRun } from '../helpers/journal-fixtures.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -351,6 +352,18 @@ describe('RunCard mounted behavior', () => {
     assert.ok(!card.contains(timing), 'which sits outside the button');
     assert.equal(timing.querySelectorAll('button, a, input, select, [tabindex]').length, 0);
     assert.match(nameFromContent(described[0]), /Step 1 of 2/u, 'the context names the step');
+  });
+
+  it('draws the run at the 30px mark, truncated, with phrasing content only inside its button', async () => {
+    const run = { ...makeCraftingRun(), completesAsTimePasses: true, awaitingChoice: true, blindSecretPreview: true };
+    const target = await harness.mount({ run, now: 500 });
+    const card = target.querySelector('.journal-run-card');
+    const row = card.closest('[data-list-row]');
+    assert.ok(row.classList.contains('is-truncated'), 'the name ellipsizes beside its badges');
+    assert.equal(card.querySelector('.fab-medallion').style.width, '30px', "the run's 30px mark");
+    const inside = [...card.querySelectorAll(NON_PHRASING_CONTENT)].map((node) => node.tagName.toLowerCase());
+    assert.deepEqual(inside, [], 'no block content inside the button');
+    assert.ok(row.querySelectorAll(NON_PHRASING_CONTENT).length > 0, 'while the timing beside it holds some');
   });
 
   it('invokes onSelect with the composite-identity run on click', async () => {
