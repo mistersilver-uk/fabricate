@@ -38,7 +38,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1644 promotes the routed ladder on three importers: the Journal's previews (`apps/journal/RunDetail.svelte`), crafting's routed-by-check tiers (`apps/crafting/detail/OutcomeTierTable.svelte`) and salvage's routed body (`apps/inventory/detail/salvage/SalvageRoutedBody.svelte`). `reachedId` and `reachedLabel` mark the one tier a successful roll routed through, the band is optional, and each tier, band chip, pill and yield takes per-item `props`. Measured on its override frames, its band chip and its row-form yields disagree with the drawn specimen, so it stays target; the planned-migrations table records both for the geometry sweep."
+      "why": "Issue 1644 promotes the routed ladder on three importers: the Journal's previews (`apps/journal/RunDetail.svelte`), crafting's routed-by-check tiers (`apps/crafting/detail/OutcomeTierTable.svelte`) and salvage's routed body (`apps/inventory/detail/salvage/SalvageRoutedBody.svelte`). `reachedId` and `reachedLabel` mark the one tier a successful roll routed through, the band is optional, and each tier, band chip, pill and yield takes per-item `props`. Measured on its override frames, four figures disagree with the drawn specimen: the head glyph (14px against 10px), the band (a list-density Chip against bare mono text), the yields (40px ListRow rows against 24px wrapping chips) and the kicker (9px subtle against `k-kicker`). It stays target, and the planned-migrations table records all four for the geometry sweep."
     },
     {
       "path": "src/ui/svelte/components/ArmedDangerButton.svelte",

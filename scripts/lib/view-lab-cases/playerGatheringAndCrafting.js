@@ -1057,6 +1057,7 @@ export const CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_ROUTED_CHECK,
       /^src\/systems\/(?:versionedCommandResults|journalRollFacts)\.js$/,
+      /^src\/systems\/CraftingEngine\.js$/,
     ],
   }),
   playerCase({
