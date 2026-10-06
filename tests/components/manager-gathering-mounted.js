@@ -1605,6 +1605,10 @@ export function registerGatheringCases() {
     flushSync();
     const tagList = target.querySelector('[data-gathering-component-tag-suggestions]');
     assert.equal(tagSearch.getAttribute('role'), 'combobox');
+    assert.ok(
+      tagSearch.closest('.fabricate-search').querySelector(':scope > i.fas.fa-tags'),
+      'the tag filter draws the tag glyph, so it reads apart from the name search beside it'
+    );
     assert.equal(tagSearch.getAttribute('aria-controls'), tagList.id, 'the field names its list');
     assert.equal(tagList.getAttribute('role'), 'listbox');
     assert.ok(

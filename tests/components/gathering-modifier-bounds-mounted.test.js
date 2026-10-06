@@ -1,6 +1,7 @@
 /**
  * The character-modifier bounds row MOUNTED through `GatheringModifierEditor`, at both subjects
  * (issues 1050, 1521): each bound forwards its own patch, and a cleared bound is `null`, never `0`.
+ * Its character-modifier search is refused, with the reason as its tooltip, on an empty library.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -105,6 +106,32 @@ for (const subject of ['drop', 'event']) {
       const { patches, minInput } = await mountRow(subject, { min: 5, max: 20 });
       type(minInput, '');
       assert.deepEqual(patches, [['ref-1', { min: null }]]);
+    });
+  });
+}
+
+for (const subject of ['drop', 'event']) {
+  describe(`the ${subject} subject's character-modifier search (issue 1782)`, () => {
+    const selector = `[data-gathering-${subject}-character-modifier-search] input`;
+
+    it('is disabled, its tooltip saying why, while the library is empty', async () => {
+      const root = await harness.mount({ subject, characterModifierLibrary: [] });
+      const input = root.querySelector(selector);
+      assert.equal(input.disabled, true);
+      assert.equal(
+        input.getAttribute('data-tooltip'),
+        'Add a modifier to the system library first to reference it here.'
+      );
+    });
+
+    it('is enabled, with no tooltip, once the library holds a modifier', async () => {
+      const root = await harness.mount({
+        subject,
+        characterModifierLibrary: [{ id: 'mod-1', label: 'Training' }],
+      });
+      const input = root.querySelector(selector);
+      assert.equal(input.disabled, false);
+      assert.ok(!input.hasAttribute('data-tooltip'));
     });
   });
 }

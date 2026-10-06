@@ -216,3 +216,38 @@ test('no call site restates the class the primitive emits itself', () => {
       `restating it emits the token twice:\n  ${offenders.join('\n  ')}`
   );
 });
+
+/** The ruled compact exception (issue 1782, maintainer ruling 2): four fields, two typeaheads. */
+const RULED_COMPACT_SITES = Object.freeze([
+  'SearchField src/ui/svelte/apps/manager/gathering-task/GatheringTaskComponentBrowserCard.svelte',
+  'SearchField src/ui/svelte/apps/manager/gathering-task/GatheringTaskDropsCard.svelte',
+  'SearchField src/ui/svelte/apps/manager/gathering-task/GatheringTaskRequiredToolsCard.svelte',
+  'SearchField src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
+  'Typeahead src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
+  'Typeahead src/ui/svelte/apps/manager/gathering-task/GatheringTaskComponentBrowserCard.svelte',
+]);
+
+test('only the ruled sites take the compact density, each as a literal (issue 1782)', () => {
+  const forward = field.callSites.find((site) => site.file === TYPEAHEAD_PATH);
+  assert.equal(forward?.attribute('density'), '{density}', 'the typeahead forwards its own');
+  const declared = [
+    ...field.callSites.map((site) => ['SearchField', site]),
+    ...componentCallSites('Typeahead').map((site) => ['Typeahead', site]),
+  ]
+    .filter(([, site]) => site !== forward && site.attribute('density'))
+    .map(([tag, site]) => ({ name: `${tag} ${site.file}`, density: site.attribute('density') }));
+  const unread = declared
+    .filter(({ density }) => !/^density="(?:compact|default)"$/.test(density))
+    .map(({ name, density }) => `${name}: ${density}`);
+  assert.deepEqual(unread, [], 'a density this clause cannot read hides a compact site');
+  const compact = declared
+    .filter(({ density }) => density === 'density="compact"')
+    .map(({ name }) => name)
+    .sort((a, b) => a.localeCompare(b));
+  assert.deepEqual(
+    compact,
+    [...RULED_COMPACT_SITES],
+    'every non-compact search is the 38 shell (maintainer ruling 2); a new compact site, or a ' +
+      'ruled one moving to the shell, is a ruling change and lands with one'
+  );
+});
