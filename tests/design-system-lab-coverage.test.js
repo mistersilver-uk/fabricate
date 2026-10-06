@@ -32,6 +32,7 @@ import {
   primitiveNamesIn,
   readDesignLibrary,
 } from './helpers/designLibrary.js';
+import { readLibrarySections } from './helpers/designLibrarySections.js';
 import { declaredPropNames, PROP_NAME } from './helpers/sveltePropsDeclaration.js';
 import { resolveSlots } from './view-lab/primitives/inject.js';
 import { normalize, specBlocks, unitsOf } from './view-lab/primitives/library.js';
@@ -39,11 +40,14 @@ import { SPECIMEN_SNIPPET_NAMES } from './view-lab/primitives/specimenSnippets.j
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Why a rule is held as `todo` until the gate is re-derived on `main`. */
-const PHASE_16 = 'issue 1487 Phase 16';
-
 /** The library's derived facts, parsed once: a `Window` per test runs `npm test` out of heap. */
 const LIBRARY = parseDesignLibrary(readDesignLibrary());
+
+/** The library's sections, and the one each heading sits in, positional against its headings. */
+const SECTIONS = readLibrarySections(readDesignLibrary());
+
+/** The headings with their sections, the shape the coverage rules below read. */
+const SECTIONED_LIBRARY = { headings: LIBRARY.headings, headingSections: SECTIONS.headingSections };
 
 /** The library as a live document, never mutated, because a `draws` selector must be evaluated. */
 const LIBRARY_WINDOW = new Window();
@@ -67,10 +71,8 @@ const SHIPPED_COMPONENTS = toRepositoryPaths(
   listSvelteComponents(path.join(REPO_ROOT, 'src'))
 );
 
-/** A library name, brackets included, to the component that ships it. Unbuilt names are absent. */
-const SHIPS_AS = new Map(
-  MANIFEST_ROWS.filter((row) => row.library !== null).map((row) => [row.library, row.path])
-);
+/** The manifest rows that name a library entry. */
+const NAMED_ROWS = MANIFEST_ROWS.filter((row) => row.library !== null);
 
 /** What `declaredPropNames` reports for a `...rest` collector, through which any key reaches. */
 const REST_PROP = '...rest';
@@ -196,32 +198,27 @@ test('the corpora every rule below quantifies over are alive', () => {
   assert.ok(LIBRARY.blockCount > 0, 'the library parser found no spec-head block; the anchor died');
   assert.ok(SPEC_BLOCKS.size > 40, `the live document yielded ${SPEC_BLOCKS.size} entries`);
   assert.ok(MANIFEST_ROWS.length > 50, `the manifest holds ${MANIFEST_ROWS.length} rows`);
-  assert.ok(SHIPS_AS.size > 20, `only ${SHIPS_AS.size} manifest rows name a library entry`);
+  assert.ok(NAMED_ROWS.length > 20, `only ${NAMED_ROWS.length} manifest rows name a library entry`);
   assert.ok(
     SHIPPED_COMPONENTS.length > 100,
     `the component walk found ${SHIPPED_COMPONENTS.length} files, so it is not walking`
   );
 });
 
-/**
- * Fail on an assertion rather than a TypeError while the library's sections are underived.
- *
- * @param {{headingSections?: (string|null)[]}} library Parsed library facts.
- */
-function requireSections(library) {
-  assert.ok(
-    Array.isArray(library.headingSections),
-    `parseDesignLibrary() derives no headingSections yet, which ${PHASE_16} adds`
-  );
-}
-
-test('the library derives a section for every heading', { todo: PHASE_16 }, () => {
-  requireSections(LIBRARY);
+test('the library derives a section for every heading', () => {
+  const ids = SECTIONS.sections.map((section) => section.id);
+  assert.ok(ids.length > 0, 'the library yielded no `section[id]`, so no heading has a section');
   assert.equal(
-    LIBRARY.headingSections.length,
+    SECTIONS.headingSections.length,
     LIBRARY.headings.length,
-    'headingSections is positional against headings; the coverage rule below is scoped by section'
+    'headingSections is positional against headings; the coverage rule below reports by section'
   );
+  for (const [index, section] of SECTIONS.headingSections.entries()) {
+    assert.ok(
+      ids.includes(section),
+      `${LIBRARY.headings[index]} sits under no library section (${section})`
+    );
+  }
 });
 
 test('the catalogue is alive and every row carries an address', () => {
@@ -334,7 +331,8 @@ test('no drawing a row claims contains a drawing another row claims', () => {
 test('the page resolver reads the catalogue exactly as this gate does', () => {
   const { slots, problems } = resolveSlots(
     LIBRARY_BODY,
-    CATALOGUE.map((entry) => entry.row)
+    CATALOGUE.map((entry) => entry.row),
+    MANIFEST_ROWS
   );
   assert.deepEqual(
     problems,
@@ -432,65 +430,39 @@ test('every prop name every shipped component declares is a name', () => {
 });
 
 /**
- * A library's naming entries with their enclosing section, zipped positionally.
+ * The coverage rule: every manifest row naming a library entry needs a catalogue row standing its
+ * component up under each heading that names it, in every section. Two rows naming one entry both
+ * need one, and a removed catalogue row leaves its manifest row uncovered.
  *
- * @param {{headings: string[], headingSections: (string|null)[]}} library Parsed library facts.
- * @returns {{heading: string, section: string|null}[]} Naming entries, in document order.
+ * @param {object} corpus `{library, catalogue, manifestRows}`, shaped as `SECTIONED_LIBRARY`,
+ *   `CATALOGUE` and `MANIFEST_ROWS`.
+ * @returns {{required: number, missing: string[]}} `missing` holds `<section> <Name> <path>`.
  */
-function libraryEntries(library) {
-  requireSections(library);
-  return library.headings
-    .map((heading, index) => ({ heading, section: library.headingSections[index] }))
-    .filter((entry) => primitiveNamesIn(entry.heading).length > 0);
-}
-
-/**
- * The coverage rule: a shipped primitive named by an entry in a section any row resolves to needs
- * a row standing it up under that entry. An unbuilt name keeps its drawing.
- *
- * @param {object} corpus `{library, catalogue, shipsAs}`, shaped as `LIBRARY`, `CATALOGUE`, `SHIPS_AS`.
- * @returns {{catalogued: Set<string>, required: number, problems: string[]}} What it found.
- */
-function uncoveredPrimitives({ library, catalogue, shipsAs }) {
-  const entries = libraryEntries(library);
-  const sectionOf = new Map(entries.map((entry) => [entry.heading, entry.section]));
-  const catalogued = new Set(
-    catalogue
-      .map((entry) => sectionOf.get(entry.row.spec))
-      .filter((section) => typeof section === 'string')
-  );
-  const standsUp = new Map();
-  for (const entry of catalogue) {
-    if (!standsUp.has(entry.row.spec)) standsUp.set(entry.row.spec, new Set());
-    standsUp.get(entry.row.spec).add(entry.row.path);
-  }
+function uncoveredManifestRows({ library, catalogue, manifestRows }) {
+  const standsUp = new Set(catalogue.map((entry) => `${entry.row.spec}\n${entry.row.path}`));
   let required = 0;
-  const problems = [];
-  for (const { heading, section } of entries) {
-    if (!catalogued.has(section)) continue;
-    for (const name of primitiveNamesIn(heading)) {
-      const componentPath = shipsAs.get(`<${name}>`);
-      if (!componentPath) continue;
+  const missing = [];
+  for (const row of manifestRows) {
+    if (row.library === null) continue;
+    const name = row.library.slice(1, -1);
+    for (const [index, heading] of library.headings.entries()) {
+      if (!primitiveNamesIn(heading).includes(name)) continue;
       required += 1;
-      if (standsUp.get(heading)?.has(componentPath)) continue;
-      problems.push(
-        `the library's "${section}" section is catalogued, its entry ${heading} names ` +
-          `<${name}>, and ${componentPath} ships, but no row stands it up under that entry`
-      );
+      if (standsUp.has(`${heading}\n${row.path}`)) continue;
+      missing.push(`${library.headingSections[index]} ${row.library} ${row.path}`);
     }
   }
-  return { catalogued, required, problems };
+  return { required, missing };
 }
 
 /**
  * The manifest rows whose library name no sectioned heading carries, which the coverage rule
- * would stop requiring a specimen for.
+ * could not report under a section.
  *
- * @param {object} corpus `{library, manifestRows}`, shaped as `LIBRARY` and `MANIFEST_ROWS`.
+ * @param {object} corpus `{library, manifestRows}`, shaped as `SECTIONED_LIBRARY` and `MANIFEST_ROWS`.
  * @returns {string[]} One problem per such row.
  */
 function unsectionedManifestRows({ library, manifestRows }) {
-  requireSections(library);
   const sectioned = library.headings.filter((_, index) => library.headingSections[index] !== null);
   return manifestRows
     .filter((row) => row.library !== null)
@@ -501,51 +473,125 @@ function unsectionedManifestRows({ library, manifestRows }) {
     .map(
       (row) =>
         `${row.path} records library entry ${row.library}, which no sectioned ` +
-        '`div.spec-head > h4` names, so the coverage rule would stop requiring its specimen'
+        '`div.spec-head > h4` names, so the coverage rule cannot place its specimen'
     );
 }
 
-test(
-  'every shipped primitive a catalogued section names has a live specimen',
-  { todo: PHASE_16 },
-  () => {
-    const { catalogued, required, problems } = uncoveredPrimitives({
-      library: LIBRARY,
-      catalogue: CATALOGUE,
-      shipsAs: SHIPS_AS,
-    });
-    assert.ok(catalogued.size > 0, 'no catalogue row resolves to a library section');
-    assert.deepEqual(problems, []);
-    assert.ok(required > 5, `${required} shipped primitive(s) were required to have a specimen`);
-  }
-);
+/**
+ * The manifest rows with no specimen yet, by section. Phase 17 catalogues sections 06–09 and
+ * Phase 18 sections 10–11, each deleting a line as it lands; the rule below is exact both ways.
+ */
+const AWAITING_SPECIMEN = Object.freeze({
+  controls: [
+    '<RunActionBar> src/ui/svelte/components/RunActionBar.svelte',
+    '<Search> src/ui/svelte/components/SearchField.svelte',
+    '<Select> src/ui/svelte/components/Select.svelte',
+  ],
+  pickers: [
+    '<ArtPicker> src/ui/svelte/components/ArtPicker.svelte',
+    '<Menu> src/ui/svelte/components/ActionMenu.svelte',
+    '<SearchPopover> src/ui/svelte/components/SearchablePopoverPanel.svelte',
+  ],
+  marks: [
+    '<BandedBar> src/ui/svelte/components/BandedBar.svelte',
+    '<Chip> src/ui/svelte/components/Chip.svelte',
+    '<DiceTiles> src/ui/svelte/components/DiceTiles.svelte',
+    '<EssenceChip> src/ui/svelte/apps/manager/components/EssenceChip.svelte',
+    '<IconChip> src/ui/svelte/components/Medallion.svelte',
+    '<Kicker> src/ui/svelte/components/Kicker.svelte',
+    '<Meter> src/ui/svelte/components/Meter.svelte',
+    '<StageBars> src/ui/svelte/components/StageBars.svelte',
+    '<StatBox> src/ui/svelte/components/StatBox.svelte',
+    '<WorldClockChip> src/ui/svelte/components/WorldClockChip.svelte',
+  ],
+  surfaces: [
+    '<InfoStrip> src/ui/svelte/components/InfoStrip.svelte',
+    '<Notice> src/ui/svelte/components/Notice.svelte',
+    '<Well> src/ui/svelte/components/Well.svelte',
+  ],
+  structures: [
+    '<Avatar> src/ui/svelte/components/Avatar.svelte',
+    '<BulkStagingInset> src/ui/svelte/apps/manager/BulkStagingInset.svelte',
+    '<DataTable> src/ui/svelte/components/DataTable.svelte',
+    '<ListRow> src/ui/svelte/components/ListRow.svelte',
+    '<LogList> src/ui/svelte/components/LogList.svelte',
+    '<NavSidebar> src/ui/svelte/components/NavSidebar.svelte',
+    '<NavSidebar> src/ui/svelte/components/NavSidebarRows.svelte',
+    '<PageHeader> src/ui/svelte/components/PageHeader.svelte',
+    '<Rail> src/ui/svelte/components/Rail.svelte',
+    '<ValidationSummary> src/ui/svelte/components/EditorValidationSurface.svelte',
+  ],
+  composites: [
+    '<ChoiceGroup> src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
+    '<ChoiceOptionList> src/ui/svelte/components/ChoiceOptionList.svelte',
+    '<EssencePool> src/ui/svelte/components/EssencePool.svelte',
+    '<OutcomeLadder> src/ui/svelte/components/OutcomeLadder.svelte',
+    '<PickerRow> src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+    '<RequirementChooser> src/ui/svelte/components/RequirementChooser.svelte',
+    '<RuleRow> src/ui/svelte/components/RuleRow.svelte',
+    '<RuleSentence> src/ui/svelte/components/RuleSentence.svelte',
+    '<RunProgress> src/ui/svelte/components/RunProgress.svelte',
+    '<SetPicker> src/ui/svelte/components/SetPicker.svelte',
+    '<SlotRow> src/ui/svelte/components/SlotRow.svelte',
+    '<SlotTile> src/ui/svelte/components/SlotTile.svelte',
+    '<SortableList> src/ui/svelte/components/SortableList.svelte',
+    '<StageCard> src/ui/svelte/components/StageCard.svelte',
+    '<StageNav> src/ui/svelte/components/StageNav.svelte',
+    '<YieldScale> src/ui/svelte/components/YieldScale.svelte',
+  ],
+});
 
-test(
-  'every library entry the manifest names sits under a library section',
-  { todo: PHASE_16 },
-  () => {
-    const named = MANIFEST_ROWS.filter((row) => row.library !== null);
-    assert.ok(
-      named.length > 20,
-      `${named.length} rows name a library entry, so this has no domain`
-    );
-    assert.deepEqual(
-      unsectionedManifestRows({ library: LIBRARY, manifestRows: MANIFEST_ROWS }),
-      []
-    );
-  }
-);
+/** The baseline as the rule reports it. */
+function awaitingSpecimen(baseline) {
+  return Object.entries(baseline).flatMap(([section, rows]) =>
+    rows.map((row) => `${section} ${row}`)
+  );
+}
 
-/** Two catalogued sections and one with no row, so the rules run live before Phase 16. */
+test('every manifest row naming a library entry has a live specimen, bar the named baseline', () => {
+  const { required, missing } = uncoveredManifestRows({
+    library: SECTIONED_LIBRARY,
+    catalogue: CATALOGUE,
+    manifestRows: MANIFEST_ROWS,
+  });
+  assert.ok(required >= NAMED_ROWS.length, `${required} specimen(s) required, fewer than the rows`);
+  const baseline = awaitingSpecimen(AWAITING_SPECIMEN);
+  assert.deepEqual(
+    missingFrom(baseline, missing),
+    [],
+    'these manifest rows have no catalogue row under the library entry naming them: add one, ' +
+      'which is what a new named member owes the lab'
+  );
+  assert.deepEqual(
+    missingFrom(missing, baseline),
+    [],
+    'these now have a specimen: delete them from AWAITING_SPECIMEN, which only shrinks'
+  );
+});
+
+test('every library entry the manifest names sits under a library section', () => {
+  assert.ok(NAMED_ROWS.length > 20, `${NAMED_ROWS.length} rows name a library entry`);
+  assert.deepEqual(
+    unsectionedManifestRows({ library: SECTIONED_LIBRARY, manifestRows: MANIFEST_ROWS }),
+    []
+  );
+});
+
+/** Two sections with a catalogue row and one without, and one name shipped by two rows. */
 const SYNTHETIC_LIBRARY = Object.freeze({
   headings: ['Controls', '<Button>', '<Chip> <Kicker>', '<Ghost>', '<Meter>'],
   headingSections: ['controls', 'controls', 'marks', 'marks', 'structures'],
 });
 
-/** `<Ghost>` is unbuilt, so it ships as nothing. */
-const SYNTHETIC_SHIPS_AS = new Map(
-  ['Button', 'Chip', 'Kicker', 'Meter'].map((name) => [`<${name}>`, `src/${name}.svelte`])
-);
+/** `<Ghost>` is unbuilt, so no row names it; `<Meter>` ships as a member and a near-member. */
+const SYNTHETIC_ROWS = Object.freeze([
+  ...['Button', 'Chip', 'Kicker', 'Meter'].map((name) => ({
+    path: `src/${name}.svelte`,
+    library: `<${name}>`,
+  })),
+  { path: 'src/MeterPanel.svelte', library: '<Meter>' },
+  { path: 'src/Plain.svelte', library: null },
+]);
 
 /** A catalogue entry as `catalogueEntries()` shapes one. */
 function syntheticEntry(spec, name) {
@@ -556,40 +602,46 @@ const SYNTHETIC_CATALOGUE = Object.freeze([
   syntheticEntry('<Button>', 'Button'),
   syntheticEntry('<Chip> <Kicker>', 'Chip'),
   syntheticEntry('<Chip> <Kicker>', 'Kicker'),
+  syntheticEntry('<Meter>', 'Meter'),
+  syntheticEntry('<Meter>', 'MeterPanel'),
 ]);
 
-test('the coverage rule requires every shipped name in a catalogued section, and only those', () => {
-  const corpus = { library: SYNTHETIC_LIBRARY, shipsAs: SYNTHETIC_SHIPS_AS };
-  assert.deepEqual(uncoveredPrimitives({ ...corpus, catalogue: SYNTHETIC_CATALOGUE }), {
-    catalogued: new Set(['controls', 'marks']),
-    required: 3,
-    problems: [],
+test('the coverage rule requires every named row in every section, and only those', () => {
+  const corpus = { library: SYNTHETIC_LIBRARY, manifestRows: SYNTHETIC_ROWS };
+  assert.deepEqual(uncoveredManifestRows({ ...corpus, catalogue: SYNTHETIC_CATALOGUE }), {
+    required: 5,
+    missing: [],
   });
 
-  // Mode 3, a removed row, reds as mode 4: a shipped name left with no specimen.
-  const removed = uncoveredPrimitives({
+  // Mode 3, a removed row, reds as mode 4: a named manifest row left with no specimen.
+  const removed = uncoveredManifestRows({
     ...corpus,
     catalogue: SYNTHETIC_CATALOGUE.filter((entry) => entry.row.path !== 'src/Kicker.svelte'),
   });
-  assert.equal(removed.required, 3);
-  assert.equal(removed.problems.length, 1, removed.problems.join('\n'));
-  assert.match(
-    removed.problems[0],
-    /entry <Chip> <Kicker> names <Kicker>, and src\/Kicker\.svelte/
-  );
+  assert.deepEqual(removed.missing, ['marks <Kicker> src/Kicker.svelte']);
 
-  const misfiled = uncoveredPrimitives({
+  // Every section, not only one some row already resolves to.
+  const uncatalogued = uncoveredManifestRows({
+    ...corpus,
+    catalogue: SYNTHETIC_CATALOGUE.filter((entry) => entry.row.spec !== '<Meter>'),
+  });
+  assert.deepEqual(uncatalogued.missing, [
+    'structures <Meter> src/Meter.svelte',
+    'structures <Meter> src/MeterPanel.svelte',
+  ]);
+
+  const misfiled = uncoveredManifestRows({
     ...corpus,
     catalogue: [...SYNTHETIC_CATALOGUE.slice(0, 2), syntheticEntry('<Button>', 'Kicker')],
   });
-  assert.equal(misfiled.problems.length, 1, 'a row under another entry stands nothing up here');
+  assert.ok(
+    misfiled.missing.includes('marks <Kicker> src/Kicker.svelte'),
+    'a row under another entry stands nothing up here'
+  );
 });
 
 test('the section rule refuses a manifest name no sectioned heading carries', () => {
-  const rows = [
-    { path: 'src/Button.svelte', library: '<Button>' },
-    { path: 'src/Plain.svelte', library: null },
-  ];
+  const rows = SYNTHETIC_ROWS.slice(0, 2);
   assert.deepEqual(unsectionedManifestRows({ library: SYNTHETIC_LIBRARY, manifestRows: rows }), []);
   const library = {
     headings: [...SYNTHETIC_LIBRARY.headings, '<Orphan>'],
@@ -609,11 +661,10 @@ test('the section rule refuses a manifest name no sectioned heading carries', ()
   );
 });
 
-test('the section rules fail on an assertion, not a TypeError, while sections are underived', () => {
-  assert.throws(() => libraryEntries({ headings: ['<Button>'] }), {
-    name: 'AssertionError',
-    message: new RegExp(PHASE_16),
-  });
+test('the baseline reads as the rule reports, section first', () => {
+  assert.deepEqual(awaitingSpecimen({ marks: ['<Chip> src/Chip.svelte'], controls: [] }), [
+    'marks <Chip> src/Chip.svelte',
+  ]);
 });
 
 test('the catalogue directory holds nothing the lab cannot see', () => {
