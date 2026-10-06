@@ -334,7 +334,8 @@ export async function resolveImportedComponentSourceData(itemUuid, source = null
   };
 }
 
-const componentRowsOf = (io) => (systemId) => io.getSystem(systemId)?.components ?? []; // ratchet-exempt(world-scope): writer
+// ratchet-exempt(world-scope): import, a registration is built from the in-system record itself
+const componentRowsOf = (io) => (systemId) => io.getSystem(systemId)?.components ?? [];
 
 /** Whether the persisted `craftingSystems` setting holds a component row, read once on first use.
  * A row a rejected or pending write left only in memory is not held, nor is any row of a setting
@@ -356,7 +357,8 @@ function persistedComponentIds(io) {
   }
   const held = new Map();
   for (const system of systems ?? []) {
-    held.set(system.id, new Set((system.components ?? []).map((component) => component.id))); // ratchet-exempt(world-scope): writer
+    // ratchet-exempt(world-scope): import, a registration asks what the persisted record holds
+    held.set(system.id, new Set((system.components ?? []).map((component) => component.id)));
   }
   return held;
 }
@@ -507,7 +509,8 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
 /** Bulk-import every Item document of a compendium pack through `addItemFromUuid`, with one
  * `craftingSystems` write and then one flush of the run's world registrations.
  * @returns {Promise<{added: number, updated: number, skipped: number, total: number,
- *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>}>} */
+ *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>,
+ *   worldRegistrationError?: Error}>} */
 export async function addItemsFromPack(io, systemId, packId) {
   io.assertGM('bulk import from compendium');
   const system = io.getSystem(systemId);
