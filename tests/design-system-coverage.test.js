@@ -208,7 +208,7 @@ test('every manifest library name resolves to a library entry', () => {
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BrowseCard',
-  'NavSidebar', 'PageHeader',
+  'NavSidebar',
   'Search',
   'TierTrack', 'ViewToggle', 'XrefList',
 ];

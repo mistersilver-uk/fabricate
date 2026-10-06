@@ -2014,6 +2014,21 @@ A player never authors a choice group, and MAY pick from a result-side choice gr
 - **THEN** its identity header carries no primary, unless the screen's spec requires a disabled start action that names its blocker
 - **AND** no second-choice verb takes its place
 
+### Requirement: The application shell renders through the shell primitives
+
+The Tool editor's header and the Tool library header MUST render through `PageHeader` (`src/ui/svelte/components/PageHeader.svelte`).
+Each passes its trail as `breadcrumbs`, its title block as `title` and `subtitle` or as an `identity` snippet, and its action group as an `actions` snippet, and writes no breadcrumb markup of its own.
+The trail is a `nav` named "Breadcrumbs"; a crumb with `onSelect` is a button called with no argument and declared focused to Foundry, and the last crumb carries `aria-current="page"`.
+`PageHeader` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
+At issue 1777 both callers kept the Tool screens' shipped geometry, which disagreed with the specimen, and decision E4 escalated that disagreement to issue 1523 rather than settling it.
+
+#### Scenario: A Tool screen draws its header
+
+- **WHEN** the Tool editor or the Tool library renders its header
+- **THEN** it passes `breadcrumbs`, its title block and its actions, when it has any, to `PageHeader`
+- **AND** it writes no breadcrumb markup
+- **AND** the header root carries `fabricate-page-header`
+
 ### Requirement: A window is registered in the View Lab before a change re-skins it
 
 Screenshot evidence for a change to a window OUTSIDE the case registry is not merely absent; it is FALSELY POSITIVE, and that is why registration is a requirement rather than a courtesy.

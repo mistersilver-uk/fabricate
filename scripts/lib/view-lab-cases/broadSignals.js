@@ -208,6 +208,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-world-downtime-tracking-described',
     'manager-world-downtime-narrow-settings',
   ]),
+  // The page header (issue 1777): the Tool library's header, and the Tool editor's on a tab.
+  'src/ui/svelte/components/PageHeader.svelte': Object.freeze([
+    'manager-tool-parity-01-library-1280x720',
+    'manager-tool-parity-04-requirements-1280x720',
+  ]),
   // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
     'manager-checks-validation',
