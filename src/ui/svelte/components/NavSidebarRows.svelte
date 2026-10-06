@@ -26,10 +26,10 @@
 </script>
 
 {#snippet row(item, base, expanded)}
-  <!-- ratchet-exempt(design-system): the row button moved unchanged from ManagerSystemNav and ManagerWorldNav, which carried it undeclared at base; the census pins its attributes -->
   <button
     type="button"
     class={rowClass(base, item)}
+    data-keyboard-focus="true"
     id={item.domId}
     {...item.hooks}
     title={item.title ?? item.disabledReason}
@@ -78,10 +78,10 @@
         `manager-nav-button manager-nav-parent${leafClass}`,
         entry.expanded
       )}
-      <!-- ratchet-exempt(design-system): the chevron moved unchanged from ManagerSystemNav and ManagerWorldNav, which carried it undeclared at base -->
       <button
         type="button"
         class="manager-nav-toggle"
+        data-keyboard-focus="true"
         id={entry.toggle.domId}
         {...entry.toggle.hooks}
         aria-label={entry.toggle.label}

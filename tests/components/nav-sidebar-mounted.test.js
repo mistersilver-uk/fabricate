@@ -58,9 +58,12 @@ const tabs = (root) => [...root.querySelectorAll('[role="tab"]')];
 const tab = (root, id) => root.querySelector(`[data-probe-tab="${id}"]`);
 const focused = (root) => root.ownerDocument.activeElement?.dataset?.probeTab ?? null;
 
+/** Dispatches a cancelable keydown on a tab and returns the event, to read `defaultPrevented`. */
 function press(root, id, key) {
   const view = root.ownerDocument.defaultView;
-  tab(root, id).dispatchEvent(new view.KeyboardEvent('keydown', { key, bubbles: true }));
+  const event = new view.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+  tab(root, id).dispatchEvent(event);
+  return event;
 }
 
 const lockedReason = 'This section stays open while you are on one of its pages.';
@@ -155,6 +158,11 @@ describe('NavSidebar, icon variant', () => {
       ['false', 'false', 'true', 'false'],
       'aria-selected follows `current`'
     );
+    assert.deepEqual(
+      tabs(root).map((button) => button.classList.contains('active')),
+      [false, false, true, false],
+      'the active treatment follows `current`'
+    );
     for (const button of tabs(root)) {
       assert.equal(button.getAttribute('aria-controls'), 'probe-panel');
       assert.equal(button.dataset.keyboardFocus, 'true', 'a focused tab holds Foundry keybindings');
@@ -197,25 +205,34 @@ describe('NavSidebar, icon variant', () => {
       await tick();
       await tick();
     };
-    press(root, 'crafting', 'ArrowUp');
+    const handled = [press(root, 'crafting', 'ArrowUp')];
     await settle();
     assert.equal(focused(root), 'ext:board', 'Up from the first tab wraps to the last');
-    press(root, 'ext:board', 'ArrowDown');
+    handled.push(press(root, 'ext:board', 'ArrowDown'));
     await settle();
     assert.equal(focused(root), 'crafting', 'and Down from the last wraps to the first');
-    press(root, 'crafting', 'End');
+    handled.push(press(root, 'crafting', 'End'));
     await settle();
-    press(root, 'ext:board', 'Home');
+    assert.equal(focused(root), 'ext:board', 'End focuses the last tab');
+    handled.push(press(root, 'ext:board', 'Home'));
     await settle();
-    press(root, 'crafting', 'ArrowDown');
+    assert.equal(focused(root), 'crafting', 'Home focuses the first tab');
+    handled.push(press(root, 'crafting', 'ArrowDown'));
     await settle();
     assert.equal(focused(root), 'gathering');
     assert.deepEqual(selected, ['ext:board', 'crafting', 'ext:board', 'crafting', 'gathering']);
     assert.equal(tab(root, 'gathering').getAttribute('tabindex'), '0', 'the stop moved with it');
-    press(root, 'gathering', 'ArrowLeft');
-    press(root, 'gathering', 'ArrowRight');
+    assert.ok(
+      handled.every((event) => event.defaultPrevented),
+      'a handled key never also scrolls the rail or reaches Foundry'
+    );
+    const ignored = [press(root, 'gathering', 'ArrowLeft'), press(root, 'gathering', 'ArrowRight')];
     await settle();
     assert.equal(selected.length, 5, 'the horizontal pair does nothing on a vertical tablist');
+    assert.ok(
+      ignored.every((event) => !event.defaultPrevented),
+      'and is not swallowed either'
+    );
   });
 
   it('selects a clicked tab by its id', async () => {
@@ -253,6 +270,18 @@ describe('NavSidebar, labelled variant', () => {
       ),
       ['Crafting sections'],
       'an open sub-list keeps its name'
+    );
+  });
+
+  it('declares every row and chevron focused, so Foundry keybindings stay quiet', async () => {
+    const root = await mountLabelled();
+    const buttons = [
+      ...root.querySelectorAll('.manager-nav-button, .manager-nav-subitem, .manager-nav-toggle'),
+    ];
+    assert.ok(buttons.length >= 7, 'the rows and chevrons rendered');
+    assert.ok(
+      buttons.every((button) => button.dataset.keyboardFocus === 'true'),
+      'every row and chevron declares itself focused, so Foundry keybindings stay quiet'
     );
   });
 

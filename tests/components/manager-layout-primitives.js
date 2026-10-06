@@ -225,6 +225,11 @@ test('the rail crafting-system card selects a system and links back to the libra
     'the selected system name keeps the display face'
   );
   assert.ok(selectBlock.includes('width: 100%;'), 'the trigger takes the card width');
+  // 32px is off the ladder: 30 lifts the rail 2px and 34 drops it 2px; issue 1523 snaps it.
+  assert.ok(
+    selectBlock.includes('min-height: 32px;'),
+    'the trigger keeps the native select’s 32px, so the nav below it does not move'
+  );
   assert.ok(
     blockFor('.fabricate-select-value').includes('text-overflow: ellipsis;'),
     'a long system name ellipsises rather than reflowing the nav'
@@ -995,6 +1000,16 @@ test('the stacked manager body sizes its regions to content instead of sharing i
     railRule.includes('overflow: hidden auto;'),
     'the bounded stacked rail scrolls its own nav'
   );
+});
+
+test('the scope trigger is 32px and ellipsises a long system name inside the 220px rail', async () => {
+  const report = await readShortWindowRailGeometry({
+    systemName: 'The Grand Consolidated Guild of Artificers and Alchemists',
+  });
+  assert.equal(report.triggerHeight, 32, 'the trigger is the native select’s 32px');
+  assert.ok(report.valueClipped, 'the long name overflows its value span');
+  assert.equal(report.valueTextOverflow, 'ellipsis', 'and the overflow is an ellipsis');
+  assert.ok(report.triggerRight <= report.scopeRight, 'the trigger stays inside the card');
 });
 
 test('a short window scrolls the rail nav instead of clipping its bottom entries', async () => {

@@ -6314,6 +6314,8 @@
 /* The rail card's full width, which the `inline` rung's trigger never declares, at the 32px the native select drew so the nav below it does not move; the system's name is set in the display face wherever it is named, including as this select's value. */
 .fabricate-manager .manager-scope-select .fabricate-select-trigger {
   width: 100%;
+
+  /* ratchet-exempt(design-system): off the ladder on purpose, the native select's 32px: the 30px rung lifts the rail 2px and the 34px rung drops it 2px; issue 1523 snaps it */
   min-height: 32px;
   font-family: var(--fab-font-serif);
   font-weight: 600;

@@ -1121,7 +1121,7 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-vocabulary-sort',
   'data-recipe-route="ingredient-set"',
   // Issue 1777 — the manager rail's crafting-system scope select, the last native select a capture
-  // producer drove; with it converted no producer calls `selectOption`, so that ban was retired.
+  // producer drove.
   'data-manager-scope-select',
 ]);
 
@@ -1186,6 +1186,48 @@ function drivenLocators(source, index, bindings) {
   const bound = receiver ? (bindings.get(receiver[1]) ?? []) : [];
   return [...new Set([...bound, hops.at(-1)?.[2] ?? ''])].filter(Boolean);
 }
+
+/** Every `.selectOption(` drive in `producers` aimed at a converted select's hook. */
+function convertedSelectDrives(producers) {
+  const offenders = [];
+  for (const producer of producers) {
+    const bindings = locatorBindings(producer.source);
+    for (const match of producer.source.matchAll(/\.selectOption\(/g)) {
+      const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
+      const resolved = drivenLocators(producer.source, match.index, bindings);
+      for (const hook of CONVERTED_SELECT_HOOKS) {
+        if (!chain.includes(hook) && !resolved.some((selector) => selector.includes(hook))) continue;
+        offenders.push(`${producer.path}: \`${hook}\` is driven by .selectOption()`);
+      }
+    }
+  }
+  return offenders;
+}
+
+test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
+  // No producer calls `selectOption` any more (issue 1777 converted the last native select it
+  // drove), so the scan's non-vacuity is a synthetic drive it must catch, bound and unbound.
+  const bound = {
+    path: 'bound.mjs',
+    source:
+      "const scope = page.locator('[data-manager-scope-select]');\n" +
+      "await scope.selectOption('alchemy');\n",
+  };
+  const chained = {
+    path: 'chained.mjs',
+    source: "await page.locator('[data-manager-scope-select]').selectOption('alchemy');\n",
+  };
+  assert.deepEqual(convertedSelectDrives([bound, chained]), [
+    'bound.mjs: `data-manager-scope-select` is driven by .selectOption()',
+    'chained.mjs: `data-manager-scope-select` is driven by .selectOption()',
+  ]);
+  assert.deepEqual(
+    convertedSelectDrives(CAPTURE_PRODUCERS),
+    [],
+    'these capture steps drive an app-drawn option list with Playwright’s `<select>`-only API, ' +
+      'which throws on a `<button role="combobox">`: click the trigger, then the option row'
+  );
+});
 
 // THE REGISTRY NEVER CALLS `.selectOption(` IN SOURCE. A View Lab step names the verb as DATA —
 // `{ selector, select: '10' }` — and `scripts/view-lab-screenshots.mjs` is what turns it into

@@ -111,6 +111,11 @@
     navRail.collapsedDisplay ? 'fas fa-angles-right' : 'fas fa-angles-left'
   );
   const systemOptions = $derived(systems.map(({ id, name }) => ({ value: id, label: name })));
+
+  // The shared Select reports a pick of the ticked row too; the system in scope is not a change.
+  function chooseScopeSystem(systemId) {
+    if (systemId !== selectedSystem?.id) changeScopeSystem(systemId);
+  }
 </script>
 
 <aside
@@ -158,7 +163,7 @@
           options={systemOptions}
           ariaLabel={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
           triggerProps={{ 'data-manager-scope-select': '' }}
-          onChange={changeScopeSystem}
+          onChange={chooseScopeSystem}
         />
         <!--
           The systems browser IS the destination this link returns to.
