@@ -196,7 +196,7 @@ function managerFixture(theme, width, height) {
         </div>
       </header>
       <div class="manager-body">
-        <nav class="manager-rail" data-region data-boundary>
+        <nav class="manager-rail fabricate-nav" data-region data-boundary>
           <button type="button" class="manager-nav-button is-active" data-boundary>
             <i aria-hidden="true">*</i>
             <span class="manager-nav-label">Crafting Systems With Extra Words</span>
@@ -477,7 +477,7 @@ function liveUpdateFixture(origin) {
         <section id="mounted-surface" class="fabricate fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="systems">
           <header class="fabricate-page-header manager-header"><h1 class="manager-title">Mounted Fabricate Surface</h1><button class="fabricate-button fab-manager-button is-primary">Action</button></header>
           <div class="manager-body">
-            <nav class="manager-rail"><button class="manager-nav-button is-active">Systems</button></nav>
+            <nav class="manager-rail fabricate-nav"><button class="manager-nav-button is-active">Systems</button></nav>
             <main class="manager-main"><div class="fabricate-filter-bar"><span class="manager-chip manager-selected-tag-pill">Live theme</span></div></main>
             <aside class="manager-inspector"><p>Inspector stays mounted.</p></aside>
           </div>

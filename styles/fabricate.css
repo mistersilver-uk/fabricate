@@ -808,7 +808,6 @@
 .fabricate a:focus,
 .fabricate button:focus,
 .fabricate input:focus,
-.fabricate select:focus,
 .fabricate textarea:focus,
 .fabricate [tabindex]:focus {
   outline: none;
@@ -826,7 +825,6 @@
 .fabricate a:focus-visible,
 .fabricate button:focus-visible,
 .fabricate input:focus-visible,
-.fabricate select:focus-visible,
 .fabricate textarea:focus-visible,
 .fabricate [tabindex]:focus-visible {
   outline: 2px solid var(--fab-accent);
@@ -849,7 +847,6 @@
 .fabricate a[data-validation-focused],
 .fabricate button[data-validation-focused],
 .fabricate input[data-validation-focused],
-.fabricate select[data-validation-focused],
 .fabricate textarea[data-validation-focused] {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
@@ -923,7 +920,7 @@
 }
 
 /* The rail's count pip: filled, on the icon well's outer corner and ringed in the rail's ground so it never covers the glyph. The fill stays success for the run-ready meaning (maintainer ruling, 2026-09-19). */
-.fabricate-app .fabricate-app-nav-count {
+.fabricate-nav .fabricate-app-nav-count {
   position: absolute;
   top: -3px;
   right: -3px;
@@ -1007,7 +1004,6 @@
 
 .fabricate-manager button,
 .fabricate-manager input,
-.fabricate-manager select,
 .fabricate-manager textarea {
   font: inherit;
 }
@@ -1022,7 +1018,7 @@
 
 /* PERMANENT baseline for free-text controls in the manager (issues 643, 1050, 1515). */
 
-/* skin census (issue 1523): not an adopter — an element-level baseline with no class; `.fab-field-skin` does not reproduce the (0,2,1) contract this comment states across hundreds of unmarked manager text fields and selects. */
+/* skin census (issue 1523): not an adopter — an element-level baseline with no class; `.fab-field-skin` does not reproduce the (0,2,1) contract this comment states across hundreds of unmarked manager text fields. */
 .fabricate-manager input[type="text"],
 .fabricate-manager input[type="url"],
 .fabricate-manager input[type="email"],
@@ -1044,100 +1040,6 @@
   min-height: 68px;
   padding: var(--fab-space-2);
   line-height: 1.4;
-}
-
-/* …and the SAME baseline for `<select>` (issue 1286). */
-
-/* skin census (issue 1523): not an adopter — an element-level baseline with no class; its (0,1,1) low-specificity fallback exists so ANY select nothing else claims still paints, a guarantee a class-scoped skin does not reproduce. */
-.fabricate-manager select {
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager select:disabled {
-  color: var(--fab-text-muted);
-  background: var(--fab-overlay-light-04);
-  cursor: default;
-}
-
-/* The OPEN state of every manager `<select>` (issues 772, 1511). */
-.fabricate-manager select option {
-  color: var(--fab-text);
-  background: var(--fab-bg-3);
-}
-
-/* The selected row, on the engines that paint the list in-page (Firefox today). */
-.fabricate-manager select option:checked {
-  color: var(--fab-accent);
-  background: var(--fab-overlay-light-08);
-}
-
-/* …and the opt-in that makes the rules above actually VISIBLE (issue 772). */
-@supports (appearance: base-select) {
-  /* `base-select` re-boxes the CLOSED control: it stops being a platform widget that centres its own text and becomes an ordinary flex container holding the selected option's content plus a `::picker-icon`. */
-  .fabricate-manager select {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    justify-content: space-between;
-    line-height: 1;
-    appearance: base-select;
-  }
-
-  /* The closed control renders the chosen row through `selectedcontent`, which clones the option's children — so the picker's row padding must not ride along into the field. */
-  .fabricate-manager select selectedcontent {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    padding: 0;
-  }
-
-  /* Both halves opt in separately, not as one grouped selector: the picker needs the opt-in AND its own surface, and grouping them left two blocks answering to the same selector with the paint in only one of them. */
-  .fabricate-manager select::picker(select) {
-    appearance: base-select;
-    padding: var(--fab-space-1);
-    border: 1px solid var(--fab-border-strong);
-    border-radius: 9px;
-    background: var(--fab-bg-3);
-    box-shadow: var(--fab-shadow-lg);
-  }
-
-  .fabricate-manager select option {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    padding: var(--fab-space-1) var(--fab-space-2);
-    border-radius: 6px;
-    background: transparent;
-  }
-
-  .fabricate-manager select option:hover,
-  .fabricate-manager select option:focus {
-    background: var(--fab-overlay-light-08);
-  }
-
-  .fabricate-manager select option:checked {
-    color: var(--fab-text);
-    background: var(--fab-overlay-light-08);
-  }
-
-  /* The tick the customizable select reserves space for on every row: hidden until the row is the selected one, so the list does not gain a ragged empty gutter. */
-  .fabricate-manager select option::checkmark {
-    color: var(--fab-accent);
-    content: '\2713';
-  }
-
-  .fabricate-manager select::picker-icon {
-    color: var(--fab-text-muted);
-    transition: transform 120ms ease;
-  }
-
-  .fabricate-manager select:open::picker-icon {
-    transform: rotate(180deg);
-  }
 }
 
 .fabricate-manager input[type="text"]:disabled,
@@ -6311,21 +6213,14 @@
   font-size: 0.62rem;
 }
 
-/* The system's name is set in the display face wherever it is named — including here, where it is now the select's own value rather than a static span. */
-.fabricate-manager .manager-scope-select {
+/* The rail card's full width, which the `inline` rung's trigger never declares, at the 32px the native select drew so the nav below it does not move; the system's name is set in the display face wherever it is named, including as this select's value. */
+.fabricate-manager .manager-scope-select .fabricate-select-trigger {
   width: 100%;
-  min-width: 0;
-  height: 32px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 7px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
+
+  /* ratchet-exempt(design-system): off the ladder on purpose, the native select's 32px: the 30px rung lifts the rail 2px and the 34px rung drops it 2px; issue 1523 snaps it */
+  min-height: 32px;
   font-family: var(--fab-font-serif);
-  font-size: 0.8rem;
   font-weight: 600;
-  text-overflow: ellipsis;
-  cursor: pointer;
 }
 
 .fabricate-manager .manager-scope-return {
@@ -7770,7 +7665,6 @@
 }
 
 .fabricate-manager .form-group input,
-.fabricate-manager .form-group select,
 .fabricate-manager .form-group textarea {
   width: 100%;
   min-width: 0;
@@ -7780,8 +7674,7 @@
   background: var(--fab-bg-1);
 }
 
-.fabricate-manager .form-group input,
-.fabricate-manager .form-group select {
+.fabricate-manager .form-group input {
   min-height: 34px;
   padding: 0 var(--fab-space-2);
 }
@@ -10150,7 +10043,7 @@
   overflow-wrap: break-word;
 }
 
-.fabricate-manager .manager-nav,
+.fabricate-nav.manager-nav,
 .fabricate-manager .manager-rail-block,
 .fabricate-card.fabricate-card {
   display: flex;
@@ -10160,7 +10053,7 @@
 }
 
 /* THE NAV IS THE RAIL'S SCROLLER. */
-.fabricate-manager .manager-nav {
+.fabricate-nav.manager-nav {
   flex: 1 1 auto;
   min-height: 96px;
   overflow: hidden auto;
@@ -10227,7 +10120,7 @@
   letter-spacing: 0.14em;
 }
 
-.fabricate-manager .manager-nav-button {
+.fabricate-nav .manager-nav-button {
   appearance: none;
   -webkit-appearance: none;
   display: grid;
@@ -10246,13 +10139,13 @@
   text-align: left;
 }
 
-.fabricate-manager .manager-nav-button:hover:not(:disabled) {
+.fabricate-nav .manager-nav-button:hover:not(:disabled) {
   color: var(--fab-text);
   background: var(--fab-overlay-light-04);
 }
 
 /* World established the manager rail's quiet selected language. The same link styling is shared by every system-specific direct, parent, and child route so changing scope does not change the meaning of an active navigation row. */
-.fabricate-manager .manager-nav-button.is-active {
+.fabricate-nav .manager-nav-button.is-active {
   color: var(--fab-text);
   border-color: var(--fab-border-strong);
   background: var(--fab-surface-active);
@@ -10260,16 +10153,16 @@
   font-weight: 600;
 }
 
-.fabricate-manager .manager-nav-button:focus {
+.fabricate-nav .manager-nav-button:focus {
   outline: none;
   box-shadow: none;
 }
 
-.fabricate-manager .manager-nav-button.is-active:focus {
+.fabricate-nav .manager-nav-button.is-active:focus {
   box-shadow: none;
 }
 
-.fabricate-manager .manager-nav-group {
+.fabricate-nav .manager-nav-group {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -10278,33 +10171,33 @@
 }
 
 /* AN EXPANDED GROUP IS INDENTED ROWS AGAINST A GUIDE, NOT A SECOND CARD (issue 1373). */
-.fabricate-manager .manager-nav-group.is-expanded {
+.fabricate-nav .manager-nav-group.is-expanded {
   gap: var(--fab-space-chip);
 }
 
 /* 36px, not 40px: the toggle is 28px wide and sits at `right: 4px`, so 36px still clears it by 4px and returns the other 4px to the label track. */
-.fabricate-manager .manager-nav-parent {
+.fabricate-nav .manager-nav-parent {
   grid-template-columns: 24px minmax(0, 1fr) auto;
   padding-right: 36px;
 }
 
-.fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent {
+.fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent {
   border-color: transparent;
   background: transparent;
   box-shadow: none;
 }
 
-.fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent.is-active {
+.fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent.is-active {
   color: var(--fab-text);
   background: var(--fab-surface-active);
 }
 
-.fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent:hover {
+.fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent:hover {
   border-color: transparent;
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-nav-toggle {
+.fabricate-nav .manager-nav-toggle {
   position: absolute;
   top: 4px;
   right: 4px;
@@ -10322,14 +10215,14 @@
 }
 
 /* `:not(:disabled)` is load-bearing rather than tidy: a group locked open by its own active sub-tab renders this control genuinely disabled, and a hover treatment on a control that cannot act is the same lie the silently-swallowed click used to tell (issue 1185). */
-.fabricate-manager .manager-nav-toggle:not(:disabled):hover {
+.fabricate-nav .manager-nav-toggle:not(:disabled):hover {
   color: var(--fab-text);
   border-color: var(--fab-border);
   background: var(--fab-overlay-light-06);
 }
 
 /* The locked disclosure. It keeps `pointer-events` so the `title` explaining WHY it cannot collapse still surfaces on hover — the counter-example is `.manager-scope-return.is-disabled` above, which has no reason to convey and can afford `pointer-events: none`. */
-.fabricate-manager .manager-nav-toggle:disabled {
+.fabricate-nav .manager-nav-toggle:disabled {
   color: var(--fab-text-muted);
   border-color: transparent;
   background: transparent;
@@ -10337,18 +10230,18 @@
   cursor: default;
 }
 
-.fabricate-manager .manager-nav-toggle:focus {
+.fabricate-nav .manager-nav-toggle:focus {
   outline: none;
   box-shadow: none;
 }
 
-.fabricate-manager .manager-nav-toggle:focus-visible {
+.fabricate-nav .manager-nav-toggle:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
 /* The guide the group's box used to be. `border-left` on the submenu rather than a pseudo-element, so it starts and ends exactly where the children do. */
-.fabricate-manager .manager-nav-submenu {
+.fabricate-nav .manager-nav-submenu {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
@@ -10360,11 +10253,11 @@
 }
 
 /* The submenu's bottom padding closes the expanded group when nothing follows it, and every group except Downtime ends there. */
-.fabricate-manager .manager-nav-submenu:not(:last-child) {
+.fabricate-nav .manager-nav-submenu:not(:last-child) {
   padding-bottom: 0;
 }
 
-.fabricate-manager .manager-nav-subitem {
+.fabricate-nav .manager-nav-subitem {
   appearance: none;
   -webkit-appearance: none;
   display: grid;
@@ -10385,13 +10278,13 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-nav-subitem:hover {
+.fabricate-nav .manager-nav-subitem:hover {
   color: var(--fab-text);
   border-color: var(--fab-border);
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-nav-subitem.is-active {
+.fabricate-nav .manager-nav-subitem.is-active {
   color: var(--fab-text);
   border-color: transparent;
   background: var(--fab-surface-active);
@@ -10399,26 +10292,26 @@
   font-weight: 600;
 }
 
-.fabricate-manager .manager-nav-subitem:focus {
+.fabricate-nav .manager-nav-subitem:focus {
   outline: none;
   box-shadow: none;
 }
 
-.fabricate-manager .manager-nav-subitem.is-active:focus {
+.fabricate-nav .manager-nav-subitem.is-active:focus {
   box-shadow: none;
 }
 
-.fabricate-manager .manager-nav-subitem:focus-visible {
+.fabricate-nav .manager-nav-subitem:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
-.fabricate-manager .manager-nav-button:focus-visible {
+.fabricate-nav .manager-nav-button:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
-.fabricate-manager .manager-nav-button:disabled {
+.fabricate-nav .manager-nav-button:disabled {
   color: var(--fab-text-muted);
   cursor: default;
   opacity: 0.72;
@@ -10507,7 +10400,7 @@
 }
 
 /* A rail label degrades by WRAPPING AT A SPACE, and then by ELLIPSIS — never by splitting a word (issue 1185). */
-.fabricate-manager .manager-nav-label {
+.fabricate-nav .manager-nav-label {
   overflow: hidden;
   min-width: 0;
 
@@ -10519,7 +10412,7 @@
 }
 
 /* A rail count badge is a BARE NUMERAL, not a badge (issue 643): mono, tabular, subtle, pushed to the end of the row (issues 1515, 1304). */
-.fabricate-manager .manager-nav-count {
+.fabricate-nav .manager-nav-count {
   flex: 0 0 auto;
   min-width: 0;
   color: var(--fab-text-secondary);
@@ -10533,7 +10426,7 @@
 }
 
 /* THE PLANNED-VIEW WORD, and deliberately NOT a member of the Rail Marker Family (issue 1515). */
-.fabricate-manager .manager-nav-planned {
+.fabricate-nav .manager-nav-planned {
   min-width: 0;
   color: var(--fab-text-secondary);
   font-family: inherit;
@@ -10585,7 +10478,7 @@
 }
 
 /* THREE distinguishable markers share the rail's trailing column — a record COUNT (a bare mono numeral), an ISSUE count (this filled, bordered pill, whose `aria-label` names its unit) and an UNSAVED marker (a dot, a different SHAPE with its own accessible name) — so 2 and 3 are told apart by shape and by name, never by colour alone (issues 1096, 1515). */
-.fabricate-manager .manager-nav-issue-badge {
+.fabricate-nav .manager-nav-issue-badge {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -10605,7 +10498,7 @@
 }
 
 /* Drawn as a BOX rather than as a bullet glyph, and that is not a style preference: an HTML entity for a filled circle is a numeric character reference, which `tests/components/theme-colour-contract.test.js` reads as a hex colour literal and fails. */
-.fabricate-manager .manager-nav-dirty-marker {
+.fabricate-nav .manager-nav-dirty-marker {
   flex: 0 0 auto;
   display: inline-block;
   width: 6px;
@@ -11327,7 +11220,7 @@
 /* Excludes `[type="range"]` for the reason documented on the task edit view's twin rule: the chance slider paints its fill behind a transparent input, and this blanket rule outranks the slider's own reset (issue 883). */
 .fabricate-manager
   .manager-gathering-event-edit-view
-  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea) {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
@@ -11338,7 +11231,7 @@
   font: inherit;
 }
 
-.fabricate-manager .manager-gathering-event-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+.fabricate-manager .manager-gathering-event-edit-view input:not([type="checkbox"]):not([type="radio"]) {
   min-height: 32px;
   padding: var(--fab-space-1) var(--fab-space-2);
 }
@@ -13288,7 +13181,7 @@
   }
 
   /* Hand the scrolling back to the rail here. Stacked, the rail is already a bounded strip; if the nav kept the scroller it would grow to that cap and scroll the list inside whatever the pinned label and scope card left of it — a much smaller window than the strip the rule above deliberately built. */
-  .fabricate-manager .manager-nav {
+  .fabricate-nav.manager-nav {
     flex: 0 0 auto;
     overflow: visible;
   }

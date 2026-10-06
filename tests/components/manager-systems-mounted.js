@@ -625,14 +625,23 @@ export function registerSystemsCases() {
     assert.ok(scopeCard, 'selected system scope card should render');
     const scopeSelect = scopeCard.querySelector('[data-manager-scope-select]');
     assert.ok(scopeSelect, 'the rail card should expose a system select');
-    assert.equal(scopeSelect.tagName, 'SELECT');
-    assert.equal(scopeSelect.value, 'alchemy', 'the select names the selected system');
+    assert.equal(scopeSelect.getAttribute('role'), 'combobox', 'it is the shared Select (issue 1777)');
+    assert.equal(
+      assertSelectHasResolvedName(target, '[data-manager-scope-select]'),
+      'Select a system',
+      'the trigger keeps the name the native select had'
+    );
     assert.ok(
-      Array.from(scopeSelect.options)
-        .map((option) => option.value)
-        .includes('alchemy'),
+      selectOptionValues(target, '[data-manager-scope-select]').includes('alchemy'),
       'the select lists the systems the manager knows about'
     );
+    assert.equal(
+      target.querySelector(':scope .fabricate-select-popover [aria-selected="true"]')?.dataset
+        .popoverOption,
+      'alchemy',
+      'the select names the selected system'
+    );
+    closeSelectPanel(target, '[data-manager-scope-select]');
     assert.equal(
       scopeCard.querySelector('.manager-scope-name'),
       null,
@@ -1460,9 +1469,7 @@ export function registerSystemsCases() {
       confirmDiscardSystemDetailsResult: 'cancel',
     });
     typeSystemName('Greater Alchemy');
-    const scope = target.querySelector('[data-manager-scope-select]');
-    scope.value = 'smithing';
-    scope.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-manager-scope-select]', 'smithing');
     await settle();
     assert.ok(
       calls.some((call) => call[0] === 'confirmDiscardDirtySystemDetailsDraft'),

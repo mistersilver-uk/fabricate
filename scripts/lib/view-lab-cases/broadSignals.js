@@ -218,6 +218,20 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-tool-parity-01-library-1280x720',
     'manager-tool-parity-04-requirements-1280x720',
   ]),
+  // The app navigation (issue 1777): the manager sidebar expanded and collapsed, the collapsed
+  // Downtime rail, and the player rail, its icon variant.
+  'src/ui/svelte/components/NavSidebar.svelte': Object.freeze([
+    'manager-rail-expanded',
+    'manager-rail-collapsed',
+    'manager-world-downtime-collapsed',
+    'fabricate-app-shell',
+  ]),
+  // Its labelled rows and groups (issue 1777), which only the manager sidebar draws.
+  'src/ui/svelte/components/NavSidebarRows.svelte': Object.freeze([
+    'manager-rail-expanded',
+    'manager-rail-collapsed',
+    'manager-world-downtime-collapsed',
+  ]),
   // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
     'manager-checks-validation',

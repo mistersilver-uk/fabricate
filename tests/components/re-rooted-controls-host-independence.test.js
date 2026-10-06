@@ -1657,11 +1657,9 @@ test('the values the comparison holds over are the ones the family declares, not
 function readRules(tab) {
   return tab.evaluate(() => {
     const out = [];
-    // THE AT-CONTEXT IS CARRIED (issue 1508) because two rules in this sheet share the prelude
-    // `.fabricate-manager select` — the (0,1,1) select baseline at the top level, and the one
-    // inside `@supports (appearance: base-select)` that restates `line-height: 1`. The floor's
-    // position clause below is about the SECOND of those, and a filter on `selectorText` alone
-    // cannot tell them apart.
+    // THE AT-CONTEXT IS CARRIED (issue 1508), so a clause can name a TOP-LEVEL rule: a prelude
+    // repeated inside a conditional block is a different rule that a `selectorText` filter alone
+    // cannot tell apart from it.
     const walk = (rules, at) => {
       for (const rule of rules) {
         const nested = rule.conditionText ? [...at, rule.conditionText] : at;
@@ -3006,26 +3004,16 @@ test('the chrome these families declare reaches the control they own and nothing
   assert.notEqual(shipped['neg-checkbox'].height, '34px', 'a checkbox is never floored to 34');
   assert.equal(shipped['neg-textarea']['min-height'], '92px', 'the field textarea keeps its 92');
 
-  // THE TWO AREA RULES THE FLOOR TIES.
+  // THE AREA RULE THE FLOOR TIES. Its `@supports (appearance: base-select)` select twin went with
+  // the last native select (issue 1777); `neg-select` stays, as the floor's element-typed control.
   assert.equal(
     shipped['neg-textarea']['line-height'],
     `${Number.parseFloat(shipped['neg-textarea']['font-size']) * 1.4}px`,
     '`.fabricate-manager textarea { line-height: 1.4 }` must still beat the family font floor'
   );
-  assert.equal(
-    shipped['neg-select']['line-height'],
-    shipped['neg-select']['font-size'],
-    "`@supports (appearance: base-select)`'s `.fabricate-manager select { line-height: 1 }` must " +
-      'still beat the family font floor'
-  );
-  assert.equal(
-    shipped['neg-select'].appearance,
-    'base-select',
-    'a select in a field keeps the area`s own `appearance`; the family declares none for it'
-  );
 });
 
-test('the font floor is declared between the area baseline and the two rules that restate a font longhand', async () => {
+test('the font floor is declared between the area baseline and the rule that restates a font longhand', async () => {
   // N1's INTERVAL, STATED AS AN ASSERTION. The floor ties `.fabricate-manager button, … textarea`
   // at (0,1,1) and beats it on source order with that rule's own declaration, which is a no-op.
   const tab = await browser.newPage();
@@ -3043,7 +3031,7 @@ test('the font floor is declared between the area baseline and the two rules tha
     const baselineIndex = only(
       (rule) =>
         rule.selectorText ===
-        '.fabricate-manager button, .fabricate-manager input, .fabricate-manager select, .fabricate-manager textarea',
+        '.fabricate-manager button, .fabricate-manager input, .fabricate-manager textarea',
       'the area`s bare-element font baseline'
     );
     const floorIndex = only(
@@ -3054,11 +3042,6 @@ test('the font floor is declared between the area baseline and the two rules tha
       (rule) => rule.selectorText === '.fabricate-manager textarea' && rule.at === '',
       'the area`s own textarea block'
     );
-    const supportsSelectIndex = only(
-      (rule) =>
-        rule.selectorText === '.fabricate-manager select' && rule.at === '(appearance: base-select)',
-      'the `@supports (appearance: base-select)` select block'
-    );
 
     assert.ok(
       baselineIndex < floorIndex,
@@ -3066,9 +3049,9 @@ test('the font floor is declared between the area baseline and the two rules tha
         `with that baseline's own declaration; baseline=${baselineIndex} floor=${floorIndex}`
     );
     assert.ok(
-      floorIndex < textareaIndex && floorIndex < supportsSelectIndex,
-      'the floor must be declared BEFORE both rules that restate a `font` longhand at its own ' +
-        `rank; floor=${floorIndex}, textarea=${textareaIndex}, @supports select=${supportsSelectIndex}`
+      floorIndex < textareaIndex,
+      'the floor must be declared BEFORE the rule that restates a `font` longhand at its own ' +
+        `rank; floor=${floorIndex}, textarea=${textareaIndex}`
     );
 
     // AND ITS REACH IS READ AS THE DECLARATION, never as a resolved value.

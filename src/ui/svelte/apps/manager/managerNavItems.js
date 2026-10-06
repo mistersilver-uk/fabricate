@@ -43,7 +43,8 @@ function pageRow(current, fields) {
 
 const countMarker = (value) => ({ kind: 'count', value });
 
-/** A row's class: `base`, then its pill slot, which a row with no `active` does not carry. */
+/** A row's class: `base`, then its pill slot, which a row with no `active` does not carry; the
+ * Downtime group's, which `NavSidebar` does not draw yet. */
 export function navRowClass(base, item) {
   return item.active === undefined ? base : `${base} ${item.active ? 'is-active' : ''}`;
 }
@@ -308,7 +309,7 @@ function placeholderItems({ selectedSystem, experimentalFeaturesEnabled }, text)
       label,
       icon: view.icon,
       disabled: true,
-      title: text(
+      disabledReason: text(
         'FABRICATE.Admin.Manager.PlannedView',
         '{view} is planned for a future release.'
       ).replace('{view}', label),

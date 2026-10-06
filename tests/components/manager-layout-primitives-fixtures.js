@@ -38,11 +38,7 @@ export function stackedBodyRule() {
 }
 
 // The rail nav was unreachable in a SHORT window.
-function shortWindowRailMarkup(navItems) {
-  const items = Array.from({ length: navItems }, (item, index) => {
-    const last = index === navItems - 1 ? ' data-last-nav' : '';
-    return `<button class="manager-nav-button"${last}><span class="manager-nav-icon"><i class="fas fa-gem"></i></span><span class="manager-nav-label">Section ${index + 1}</span><span class="manager-nav-count">${index}</span></button>`;
-  }).join('');
+function shortWindowRailMarkup(navItems, systemName) {
   return `<div class="fabricate-manager" data-manager-view="systems">
       <div class="manager-titlebar" data-manager-titlebar><span>Fabricate</span></div>
       <header class="fabricate-page-header manager-header"><h1>Crafting systems</h1></header>
@@ -52,11 +48,14 @@ function shortWindowRailMarkup(navItems) {
           <section class="manager-rail-block">
             <div class="manager-scope-card" data-scope-card>
               <div class="manager-scope-card-head"><p class="manager-kicker">Crafting system</p><button class="manager-rail-toggle manager-scope-collapse" data-manager-rail-toggle>&lsaquo;</button></div>
-              <select class="manager-scope-select"><option>Lab Smithing</option></select>
+              <div class="fabricate-picker manager-travel-picker fabricate-select manager-scope-select"><button class="fabricate-select-trigger fabricate-select-trigger-inline"><span class="fabricate-select-value">${systemName}</span><i class="fas fa-chevron-down"></i></button></div>
               <button class="manager-scope-return">All crafting systems</button>
             </div>
           </section>
-          <nav class="manager-nav">${items}</nav>
+          <nav class="fabricate-nav manager-nav">${Array.from({ length: navItems }, (item, index) => {
+            const last = index === navItems - 1 ? ' data-last-nav' : '';
+            return `<button class="manager-nav-button"${last}><span class="manager-nav-icon"><i class="fas fa-gem"></i></span><span class="manager-nav-label">Section ${index + 1}</span><span class="manager-nav-count">${index}</span></button>`;
+          }).join('')}</nav>
         </aside>
         <main class="manager-main"><div class="manager-table-scroll">Rows</div></main>
         <aside class="manager-inspector"><section class="fabricate-card">Inspector</section></aside>
@@ -64,7 +63,12 @@ function shortWindowRailMarkup(navItems) {
     </div>`;
 }
 
-export async function readShortWindowRailGeometry({ width = 1280, height = 560, navItems = 14 } = {}) {
+export async function readShortWindowRailGeometry({
+  width = 1280,
+  height = 560,
+  navItems = 14,
+  systemName = 'Lab Smithing',
+} = {}) {
   const context = await openLayoutContext({
     viewport: { width, height },
     deviceScaleFactor: 1,
@@ -72,7 +76,7 @@ export async function readShortWindowRailGeometry({ width = 1280, height = 560, 
   const page = await context.newPage();
   try {
     await page.setContent(
-      `<style>${css}</style><style>html,body{margin:0}</style><div style="width:${width}px;height:${height}px">${shortWindowRailMarkup(navItems)}</div>`
+      `<style>${css}</style><style>html,body{margin:0}</style><div style="width:${width}px;height:${height}px">${shortWindowRailMarkup(navItems, systemName)}</div>`
     );
     return await page.evaluate(() => {
       const rail = document.querySelector('.manager-rail');
@@ -87,7 +91,13 @@ export async function readShortWindowRailGeometry({ width = 1280, height = 560, 
 
       const navRect = nav.getBoundingClientRect();
       const scopeRect = scope.getBoundingClientRect();
+      const trigger = document.querySelector('.manager-scope-select .fabricate-select-trigger');
+      const value = trigger.querySelector('.fabricate-select-value');
       return {
+        triggerHeight: trigger.getBoundingClientRect().height,
+        triggerRight: trigger.getBoundingClientRect().right,
+        valueClipped: value.scrollWidth > value.clientWidth,
+        valueTextOverflow: getComputedStyle(value).textOverflow,
         navOverflowY: getComputedStyle(nav).overflowY,
         navScrollable,
         navScrolledBy: nav.scrollTop,
@@ -99,6 +109,7 @@ export async function readShortWindowRailGeometry({ width = 1280, height = 560, 
         scopeTopBefore,
         scopeTopAfter: scopeRect.top,
         scopeBottom: scopeRect.bottom,
+        scopeRight: scopeRect.right,
       };
     });
   } finally {

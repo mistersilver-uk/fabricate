@@ -1120,6 +1120,9 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-tool-sort-key',
   'data-vocabulary-sort',
   'data-recipe-route="ingredient-set"',
+  // Issue 1777 — the manager rail's crafting-system scope select, the last native select a capture
+  // producer drove.
+  'data-manager-scope-select',
 ]);
 
 /**
@@ -1184,16 +1187,12 @@ function drivenLocators(source, index, bindings) {
   return [...new Set([...bound, hops.at(-1)?.[2] ?? ''])].filter(Boolean);
 }
 
-test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
+/** Every `.selectOption(` drive in `producers` aimed at a converted select's hook. */
+function convertedSelectDrives(producers) {
   const offenders = [];
-  let calls = 0;
-  for (const producer of CAPTURE_PRODUCERS) {
+  for (const producer of producers) {
     const bindings = locatorBindings(producer.source);
     for (const match of producer.source.matchAll(/\.selectOption\(/g)) {
-      calls += 1;
-      // The locator chain that reaches the call, which may be spread over several lines. A
-      // window rather than a line, because the harness's own idiom wraps a long chain — and the
-      // RESOLVED locator beside it, for the drive written against a binding declared above it.
       const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
       const resolved = drivenLocators(producer.source, match.index, bindings);
       for (const hook of CONVERTED_SELECT_HOOKS) {
@@ -1202,38 +1201,38 @@ test('no capture producer drives a converted select with Playwright’s <select>
       }
     }
   }
-  // NON-VACUITY, both ways. `selectOption` must still appear somewhere — the smoke's two drives of
-  // the manager's crafting-system scope select, a residue control issue 1777 owns — or this scan
-  // is reading a corpus with nothing in it to judge.
-  assert.ok(
-    calls > 0,
-    'no capture producer calls `selectOption` at all, so this guard is judging an empty set. ' +
-      'If the last native select has converted, delete this clause rather than leaving it green.'
-  );
-  const driven = CONVERTED_SELECT_HOOKS.filter((hook) =>
-    CAPTURE_PRODUCERS.some((producer) => producer.source.includes(hook))
-  );
-  assert.ok(
-    driven.length >= 3,
-    `only ${driven.length} converted select hooks are named by a capture producer, against a ` +
-      'floor of 3. A lower number means the hooks were renamed and this ban now names controls ' +
-      'nothing drives.'
-  );
-  assertEveryConvertedHookResolves();
+  return offenders;
+}
+
+test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
+  // No producer calls `selectOption` any more (issue 1777 converted the last native select it
+  // drove), so the scan's non-vacuity is a synthetic drive it must catch, bound and unbound.
+  const bound = {
+    path: 'bound.mjs',
+    source:
+      "const scope = page.locator('[data-manager-scope-select]');\n" +
+      "await scope.selectOption('alchemy');\n",
+  };
+  const chained = {
+    path: 'chained.mjs',
+    source: "await page.locator('[data-manager-scope-select]').selectOption('alchemy');\n",
+  };
+  assert.deepEqual(convertedSelectDrives([bound, chained]), [
+    'bound.mjs: `data-manager-scope-select` is driven by .selectOption()',
+    'chained.mjs: `data-manager-scope-select` is driven by .selectOption()',
+  ]);
   assert.deepEqual(
-    offenders,
+    convertedSelectDrives(CAPTURE_PRODUCERS),
     [],
     'these capture steps drive an app-drawn option list with Playwright’s `<select>`-only API, ' +
-      'which throws on a `<button role="combobox">`. Click the trigger, then click the row by ' +
-      'its `[data-popover-option="…"]` identity handle — and address the row from the PAGE, ' +
-      'because the panel is portaled out of the trigger’s container:\n  ' + offenders.join('\n  ')
+      'which throws on a `<button role="combobox">`: click the trigger, then the option row'
   );
 });
 
-// THE REGISTRY DOES NOT CALL `.selectOption(`, SO THE BAN ABOVE CANNOT SEE ITS HALF. A View Lab
-// step names the verb as DATA — `{ selector, select: '10' }` — and `scripts/view-lab-screenshots.mjs`
-// is what turns it into `await target.selectOption(step.select)` at run time. So the pre-1504
-// spelling of every converted step is a line the ban above reads and passes over, and reverting
+// THE REGISTRY NEVER CALLS `.selectOption(` IN SOURCE. A View Lab step names the verb as DATA —
+// `{ selector, select: '10' }` — and `scripts/view-lab-screenshots.mjs` is what turns it into
+// `await target.selectOption(step.select)` at run time. So the pre-1504 spelling of every
+// converted step is a line no scan for that call can see, and reverting
 // one lands as a 30-second Playwright actionability throw inside the `capture` job that publishes
 // this PR's own screenshot evidence — not as a red unit test. Eleven steps converted at issue
 // 1504, the player app's six joined the hook list at issue 1511, and issue 1510 is converting the
@@ -1269,6 +1268,7 @@ test('no View Lab step drives a converted select with the registry’s native `s
       'glob reads too. Converted steps were reverted to the native `select:` verb, or the helper ' +
       'was renamed and this clause is now judging an empty set.'
   );
+  assertEveryConvertedHookResolves();
   assert.deepEqual(
     offenders,
     [],

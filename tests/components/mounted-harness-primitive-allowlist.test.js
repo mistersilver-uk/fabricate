@@ -173,6 +173,10 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/ListRow.svelte',
   // The yield scale (issue 1644): the gathering find section draws it over the same dense row.
   'src/ui/svelte/components/YieldScale.svelte',
+  // The app navigation and its labelled rows (issue 1777): the manager root and the player shell
+  // both render the first, and the second is in its static closure wherever it is mounted.
+  'src/ui/svelte/components/NavSidebar.svelte',
+  'src/ui/svelte/components/NavSidebarRows.svelte',
 ];
 
 /** Components adjudicated AGAINST membership, and why a non-entry is worth recording. */

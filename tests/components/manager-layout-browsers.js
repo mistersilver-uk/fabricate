@@ -323,8 +323,8 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     '.fabricate-manager .manager-rail-title,\n.fabricate-manager .manager-card-title',
     '.fabricate-manager .manager-inspector-name',
     '.fabricate-manager .manager-recipe-name-row .manager-system-name',
-    // The rail's selected system is now the `<select>`'s own value, not a static span.
-    '.fabricate-manager .manager-scope-select',
+    // The rail's selected system is the scope Select's own value, not a static span.
+    '.fabricate-manager .manager-scope-select .fabricate-select-trigger',
     '.fabricate-manager .manager-recipe-ingredient-set-name',
     '.fabricate-manager input[data-recipe-field="name"]',
   ];
@@ -350,7 +350,7 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     '.fabricate-tabs .manager-chip.manager-editor-tab-badge',
     // The composition list's mono pip is the shared ordered list's ordinal badge (issue 1512).
     '.fabricate-sortable-list-ordinal',
-    '.fabricate-manager .manager-nav-count',
+    '.fabricate-nav .manager-nav-count',
   ];
   for (const selector of MONO) {
     const block = selector.startsWith('.manager-chip')

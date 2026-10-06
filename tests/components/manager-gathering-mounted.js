@@ -226,9 +226,7 @@ export function registerGatheringCases() {
       flushSync();
     };
     const switchSystem = async (systemId) => {
-      const scope = target.querySelector('[data-manager-scope-select]');
-      scope.value = systemId;
-      scope.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+      chooseSelectOption(target, '[data-manager-scope-select]', systemId);
       await settle();
       await settle();
     };
