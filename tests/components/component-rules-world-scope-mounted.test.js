@@ -146,14 +146,14 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     // AC-13 and AC-16's mounted half. The banner is the ONE callout since issue 1371's parity
     // round 4 (gap-list row 129): the `SharedDefinitionCallout` under the identity strip and the
     // strip itself were two stacked cards making one statement, and the reference draws one.
-    it('states no sharing for a component NO system has a record for', async () => {
+    it('states no sharing for a component no system has a record for', async () => {
       const { target } = await openEditor(componentRecord('resin', 'Wildwood Resin', 'general'));
       const note = target.querySelector('[data-component-identity-note]');
       assert.ok(Boolean(note), 'the editor renders the identity callout');
       assert.match(note.textContent, /authored in the world catalogue\. Everything below belongs to/);
       assert.ok(
         !note.textContent.includes('other system'),
-        "transcribing the prototype's own unclamped string renders `shared with -1 other systems`"
+        'a component no system holds is shared with none, so no count of other systems is stated'
       );
     });
 

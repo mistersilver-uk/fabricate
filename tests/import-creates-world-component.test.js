@@ -537,6 +537,56 @@ describe('one run, one registration per component', () => {
     assert.equal(membershipKeys().length, 1);
   });
 
+  it('a batch owner importing one Item into two systems makes the second adopt the first', async () => {
+    const { manager, entityIds, membershipKeys } = world({
+      systems: [{ id: FORGE }, { id: KITCHEN }],
+    });
+    const options = { persist: false, registrations: [] };
+    const ash = worldItem('ash');
+
+    const first = await manager.addItemFromUuid(FORGE, ash.uuid, options);
+    const second = await manager.addItemFromUuid(KITCHEN, ash.uuid, options);
+    assert.equal(
+      second.item.id,
+      first.item.id,
+      'a registration already made in the run is adopted'
+    );
+
+    await manager.save();
+    await manager.flushWorldComponentRegistrations(options.registrations);
+
+    assert.deepEqual(entityIds(), [first.item.id]);
+    assert.deepEqual(membershipKeys(), [
+      `${first.item.id}|${FORGE}`,
+      `${first.item.id}|${KITCHEN}`,
+    ]);
+  });
+
+  it('two concurrent single drops of one Item into two systems register only the first to flush', async () => {
+    // Neither run sees the other's entity before minting its id, so the later flush meets
+    // requirement 6d: an entity under another id shares its source, and an import re-keys nothing.
+    const { manager, events, entityIds, membershipKeys } = world({
+      systems: [{ id: FORGE }, { id: KITCHEN }],
+    });
+    const ash = worldItem('ash');
+
+    const [forge, kitchen] = await Promise.all([
+      manager.addItemFromUuid(FORGE, ash.uuid),
+      manager.addItemFromUuid(KITCHEN, ash.uuid),
+    ]);
+
+    assert.notEqual(forge.item.id, kitchen.item.id, 'each mints its own id');
+    assert.equal(entityIds().length, 1);
+    const [registered] = entityIds();
+    const [winner, loser] = registered === forge.item.id ? [FORGE, KITCHEN] : [KITCHEN, FORGE];
+    assert.deepEqual(membershipKeys(), [`${registered}|${winner}`]);
+
+    const writes = events.length;
+    assert.equal((await manager.addItemFromUuid(loser, ash.uuid)).action, 'skipped');
+    assert.equal(events.length, writes, 'importing again leaves it unregistered');
+    assert.deepEqual(membershipKeys(), [`${registered}|${winner}`]);
+  });
+
   it('two overlapping runs each write only their own registrations', async () => {
     const { manager, entityIds } = world();
     const options = (registrations) => ({ persist: false, registrations });

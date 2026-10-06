@@ -151,7 +151,7 @@ test('(c) the detector is neither ALWAYS-EQUAL nor ALWAYS-UNEQUAL, on ONE corpus
   );
 });
 
-test('a World Component a component import registers starts equal to its in-system record', async () => {
+test('a World Component a component import creates starts equal to its in-system record', async () => {
   // The import is a snapshot writer (issue 2218), so its output must report nothing, as the
   // migration's does.
   const record = {

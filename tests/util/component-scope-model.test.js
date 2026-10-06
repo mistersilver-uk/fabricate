@@ -1,5 +1,6 @@
 /** The pure half of the world Component screens (issue 1371, epic 1357). */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
@@ -186,6 +187,38 @@ describe('the attribution sentence is clamped at zero', () => {
   it('and pluralises the singular case rather than saying "1 other systems"', () => {
     assert.match(noteFor('list', 2), /shared with 1 other system\./);
     assert.match(noteFor('editor', 2), /shared with 1 other system\. .* belongs to Forge alone\./);
+  });
+
+  it('reads the same sentence from lang/en.json as from its fallback, on every surface and count', () => {
+    const lang = JSON.parse(readFileSync(new URL('../../lang/en.json', import.meta.url), 'utf8'));
+    const fill = (copy, data) =>
+      Object.entries(data ?? {}).reduce(
+        (text, [token, value]) => text.replaceAll(`{${token}}`, String(value)),
+        copy
+      );
+    const fromLang = (key, _fallback, data) =>
+      fill(
+        key.split('.').reduce((node, part) => node?.[part], lang),
+        data
+      );
+    for (const surface of ['editor', 'list', 'entry']) {
+      for (const memberCount of [0, 1, 2, 3, 5]) {
+        const args = { surface, memberCount, systemName: 'Forge' };
+        assert.equal(
+          componentAttributionNote(args, fromLang),
+          componentAttributionNote(args, phrase),
+          `${surface} at ${memberCount}`
+        );
+      }
+    }
+  });
+
+  it('and still counts the others past two', () => {
+    assert.match(noteFor('list', 5), /shared with 4 other systems\.$/);
+    assert.match(
+      noteFor('editor', 5),
+      /shared with 4 other systems\. .* belongs to Forge alone\.$/
+    );
   });
 
   it('and the ENTRY surface counts members rather than OTHERS, in all three branches', () => {
