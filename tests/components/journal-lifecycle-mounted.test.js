@@ -1541,6 +1541,47 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(paint('water'), 'partial', 'a single delivered unit already starts the pool');
   });
 
+  it('offers a short candidate, selects it without readying the run, and locks claimed stock', async () => {
+    const set = ingredientSet('short', [
+      {
+        id: 'choice',
+        options: [
+          componentOption('lots', 'iron', 5),
+          componentOption('spare', 'copper', 1),
+          componentOption('one', 'iron', 1),
+        ],
+      },
+      { id: 'fixed', options: [componentOption('reserved', 'copper', 2)] },
+    ]);
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture([set], {
+        selectedIngredientSetId: set.id,
+        ingredientOptionOverrides: { choice: { optionIndex: 2 } },
+      })
+    );
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
+    const begin = () => mounted.target.querySelector('[data-run-action="begin"]');
+    assert.equal(begin().disabled, false, 'the met selection can begin');
+    mounted.target.querySelector(':scope [data-slot-id="choice"] button').click();
+    await settleAction();
+    const options = [...mounted.target.querySelectorAll('[data-choice-id][role="radio"]')];
+    const short = options.find((option) => /needs 5/.test(option.textContent));
+    const claimed = options.find((option) => option.textContent.includes('copper stock'));
+    assert.equal(claimed.disabled, true, 'the fixed group claims both copper');
+    assert.equal(short.disabled, false, 'three iron against five is offered, not locked');
+    const reading = mounted.target.querySelector(`[id="${short.getAttribute('aria-describedby')}"]`);
+    assert.match(reading.textContent, /3 held · needs 5/);
+    short.click();
+    await settleAction();
+    const overrides =
+      mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan
+        .ingredientOptionOverrides;
+    assert.equal(overrides.choice.optionIndex, 0, 'pressing the short candidate selects it');
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
+    assert.equal(begin().disabled, true, 'a short stack never readies the run');
+  });
+
   it('states confirmed receipt rows, uncertainty and unstarted effects with strict redaction', async () => {
     for (const visible of [true, false]) {
       const mounted = await mountState('recovery-required', {
