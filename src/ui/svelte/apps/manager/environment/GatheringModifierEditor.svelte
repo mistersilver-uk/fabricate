@@ -18,7 +18,11 @@
   import { tick } from 'svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import Field from '../../../components/Field.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import RuleRow from '../../../components/RuleRow.svelte';
+  import Select from '../../../components/Select.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localizeOr } from '../../../util/localizeOr.js';
@@ -109,6 +113,29 @@
     }),
   });
 
+  const allConditionsAdded = $derived(
+    localizeOr(
+      'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
+      'All conditions already added.'
+    )
+  );
+  const operatorOptions = $derived([
+    {
+      value: '+',
+      label: localizeOr(
+        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive',
+        'Positive'
+      ),
+    },
+    {
+      value: '-',
+      label: localizeOr(
+        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative',
+        'Negative'
+      ),
+    },
+  ]);
+
   // Clearing a bound persists literal `null`, "no bound", which `0` is not; no `min`, because a
   // modifier's bounds are signed.
   const bounds = $derived(
@@ -142,7 +169,7 @@
     onDeleteConditionModifier(kind, id);
     if (!last) return;
     await tick();
-    pickers[kind]?.querySelector('select')?.focus();
+    pickers[kind]?.querySelector('.fabricate-select-trigger')?.focus();
   }
 
   /** One hook attribute, spread so its name follows the subject rather than the call site. */
@@ -182,8 +209,9 @@
       <span aria-hidden="true">%</span>
     </label>
   {/snippet}
-  <section
-    class="fabricate-card manager-drop-editor-condition-modifier-card"
+  <!-- ratchet-exempt(design-system): the spread is `hook()`'s one `data-*` name from `HOOK_NAMES` -->
+  <InspectorCard
+    class="manager-drop-editor-condition-modifier-card"
     {...hook('conditionModifiers', kind)}
   >
     <header class="manager-character-modifier-row-card-header">
@@ -197,33 +225,30 @@
       {...hook('conditionModifierPicker', kind)}
       bind:this={pickers[kind]}
     >
-      <label class="fabricate-field manager-condition-modifier-picker">
-        <span class="visually-hidden"
+      <Field as="div" class="manager-condition-modifier-picker">
+        <span class="visually-hidden" id={`${idPrefix}-${kind}-condition-picker-caption`}
           >{localizeOr(
             'FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel',
             'Condition'
           )}</span
         >
-        <select
+        <Select
+          size="inline"
           value={pickerSelection}
+          options={availableConditions.map((option) => ({
+            value: option.id,
+            label: option.label || option.id,
+          }))}
           disabled={availableConditions.length === 0}
-          data-tooltip={availableConditions.length === 0
-            ? localizeOr(
-                'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
-                'All conditions already added.'
-              )
-            : null}
-          onchange={(event) => onSelectModifierPickerOption(kind, event.currentTarget.value)}
-        >
-          {#each availableConditions as option (option.id)}
-            <option value={option.id}>{option.label || option.id}</option>
-          {/each}
-        </select>
-      </label>
-      <button
-        type="button"
-        class="fabricate-icon-button"
-        aria-label={localizeOr(
+          triggerProps={{
+            'data-tooltip': availableConditions.length === 0 ? allConditionsAdded : null,
+          }}
+          ariaLabelledBy={`${idPrefix}-${kind}-condition-picker-caption`}
+          onChange={(next) => onSelectModifierPickerOption(kind, next)}
+        />
+      </Field>
+      <IconButton
+        ariaLabel={localizeOr(
           'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
           'Add modifier'
         )}
@@ -232,16 +257,11 @@
           'Add modifier'
         )}
         disabled={availableConditions.length === 0 || !pickerSelection}
-        data-tooltip={availableConditions.length === 0
-          ? localizeOr(
-              'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
-              'All conditions already added.'
-            )
-          : null}
+        data-tooltip={availableConditions.length === 0 ? allConditionsAdded : null}
         onclick={() => onAddConditionModifier(kind, pickerSelection)}
       >
         <i class="fas fa-plus" aria-hidden="true"></i>
-      </button>
+      </IconButton>
     </div>
     <div class="manager-condition-modifier-row-list">
       {#each attachedModifiers as modifier (modifier.id)}
@@ -274,7 +294,7 @@
         {/if}
       {/each}
     </div>
-  </section>
+  </InspectorCard>
 {/each}
 
 {#snippet boundsRow(ref)}
@@ -298,7 +318,8 @@
   </div>
 {/snippet}
 
-<section class="fabricate-card manager-character-modifier-row-card" {...hook('characterModifiers')}>
+<!-- ratchet-exempt(design-system): the spread is `hook()`'s one `data-*` name from `HOOK_NAMES` -->
+<InspectorCard class="manager-character-modifier-row-card" {...hook('characterModifiers')}>
   <header class="manager-character-modifier-row-card-header">
     <div class="manager-character-modifier-row-card-heading">
       <h3 class="manager-card-title">
@@ -389,71 +410,52 @@
               <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
             </span>
           {/if}
-          <label class={`manager-character-modifier-operator-select ${operatorClass}`}>
-            <span class="visually-hidden"
-              >{localizeOr(
-                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator',
-                'Operator'
-              )}</span
-            >
-            <select
-              value={ref.operator || '+'}
-              onchange={(event) =>
-                onUpdateCharacterModifier(ref.id, { operator: event.currentTarget.value })}
-            >
-              <option value="+"
-                >{localizeOr(
-                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive',
-                  'Positive'
-                )}</option
-              >
-              <option value="-"
-                >{localizeOr(
-                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative',
-                  'Negative'
-                )}</option
-              >
-            </select>
-          </label>
-          <button
-            type="button"
-            class="fabricate-icon-button is-danger manager-character-modifier-row-reference-delete"
-            aria-label={localizeOr(
+          <span
+            class="visually-hidden"
+            id={`${idPrefix}-character-modifier-${ref.id}-operator-caption`}
+            >{localizeOr(
+              'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator',
+              'Operator'
+            )}</span
+          >
+          <Select
+            class={`manager-character-modifier-operator-select ${operatorClass}`}
+            size="inline"
+            value={ref.operator || '+'}
+            options={operatorOptions}
+            ariaLabelledBy={`${idPrefix}-character-modifier-${ref.id}-operator-caption`}
+            onChange={(next) => onUpdateCharacterModifier(ref.id, { operator: next })}
+          />
+          <IconButton
+            class="is-danger manager-character-modifier-row-reference-delete"
+            ariaLabel={localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
               'Delete character modifier reference'
             )}
             onclick={() => onDeleteCharacterModifier(ref.id)}
           >
             <i class="fas fa-trash" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </header>
         {@render boundsRow(ref)}
         <div class="manager-character-modifier-override-row">
-          <button
-            type="button"
-            class={`fabricate-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
-            aria-pressed={hasOverride}
-            aria-label={localizeOr(
+          <StatusToggle
+            on={hasOverride}
+            ariaLabel={localizeOr(
               'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
               'Override?'
             )}
+            label={hasOverride
+              ? localizeOr(
+                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn',
+                  'Overridden'
+                )
+              : localizeOr(
+                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
+                  'Override?'
+                )}
             onclick={() => onSetCharacterModifierOverride(ref, !hasOverride, libraryEntry)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true">
-              <span class="manager-status-toggle-knob"></span>
-            </span>
-            <span class="manager-status-toggle-label">
-              {hasOverride
-                ? localizeOr(
-                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn',
-                    'Overridden'
-                  )
-                : localizeOr(
-                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
-                    'Override?'
-                  )}
-            </span>
-          </button>
+          />
         </div>
         {#if hasOverride}
           <p class="manager-muted manager-character-modifier-override-hint">
@@ -462,10 +464,7 @@
               'Overrides the library expression for this row.'
             )}
           </p>
-          <label
-            class="fabricate-field"
-            for={`${idPrefix}-character-modifier-${ref.id}-expression`}
-          >
+          <Field as="label" for={`${idPrefix}-character-modifier-${ref.id}-expression`}>
             <span
               >{localizeOr(
                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression',
@@ -481,7 +480,7 @@
                   expressionOverride: event.currentTarget.value,
                 })}
             />
-          </label>
+          </Field>
         {/if}
       </article>
     {:else}
@@ -495,4 +494,4 @@
       />
     {/each}
   </div>
-</section>
+</InspectorCard>

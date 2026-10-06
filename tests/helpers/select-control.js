@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 
-import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 /** The portaled panel a `<Select>` opens, addressed from the application root it lands on. */
 const PANEL = '.fabricate-select-popover';
@@ -166,4 +166,75 @@ export function assertSelectHasResolvedName(root, triggerSelector) {
       '`aria-label` on the trigger'
   );
   return ariaLabel.trim();
+}
+
+/**
+ * Asserts the open panel is named by the trigger's own `aria-labelledby`, on both the dialog and
+ * its list, then closes it (issue 1777).
+ *
+ * @param {HTMLElement} root The harness mount target.
+ * @param {string} triggerSelector A selector for the trigger.
+ * @returns {string} The id list naming all three.
+ */
+export function assertSelectPanelNamedByTrigger(root, triggerSelector) {
+  const labelledBy = root.querySelector(triggerSelector)?.getAttribute('aria-labelledby') ?? '';
+  assert.ok(labelledBy, `${triggerSelector} is not named by \`aria-labelledby\``);
+  const panel = openSelectPanel(root, triggerSelector);
+  assert.equal(panel.getAttribute('aria-labelledby'), labelledBy, 'the panel shares its name');
+  assert.equal(
+    panel.querySelector('[role="listbox"]').getAttribute('aria-labelledby'),
+    labelledBy,
+    'and so does the list inside it'
+  );
+  closeSelectPanel(root, triggerSelector);
+  return labelledBy;
+}
+
+/** Press a key on whatever holds focus, then let the primitive's queued focus moves run. */
+async function pressFocused(key) {
+  const event = new globalThis.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+  globalThis.document.activeElement.dispatchEvent(event);
+  flushSync();
+  await tick();
+  await new Promise((done) => setTimeout(done, 0));
+  flushSync();
+}
+
+/** Asserts the panel is shut and the trigger holds focus again. */
+function assertClosedOnTrigger(trigger, why) {
+  assert.equal(trigger.getAttribute('aria-expanded'), 'false', `${why}: the panel is shut`);
+  assert.ok(trigger.ownerDocument.activeElement === trigger, `${why}: focus is on the trigger`);
+}
+
+/**
+ * Drives a converted select from the keyboard (issue 1777): ArrowDown opens it on the focused
+ * trigger and Escape shuts it with nothing chosen; ArrowDown reopens it and walks to `value`, and
+ * Enter commits that row. Focus must be back on the trigger after both.
+ *
+ * @param {HTMLElement} root The harness mount target.
+ * @param {string} triggerSelector A selector for the trigger.
+ * @param {string|number} value The option to commit, as the caller declared it.
+ */
+export async function chooseSelectOptionByKeyboard(root, triggerSelector, value) {
+  const trigger = root.querySelector(triggerSelector);
+  assert.ok(Boolean(trigger), `no converted select trigger matches ${triggerSelector}`);
+  trigger.focus();
+  await pressFocused('ArrowDown');
+  assert.equal(trigger.getAttribute('aria-expanded'), 'true', 'ArrowDown opens the list');
+  await pressFocused('Escape');
+  assertClosedOnTrigger(trigger, 'Escape');
+
+  await pressFocused('ArrowDown');
+  const wanted = String(value);
+  const rows = root.querySelectorAll(':scope .fabricate-select-popover [role="option"]').length;
+  const active = () =>
+    root
+      .querySelector(`[id="${trigger.getAttribute('aria-activedescendant')}"]`)
+      ?.getAttribute('data-popover-option');
+  for (let press = 0; press < rows && active() !== wanted; press += 1) {
+    await pressFocused('ArrowDown');
+  }
+  assert.equal(active(), wanted, `ArrowDown never reached ${wanted} on ${triggerSelector}`);
+  await pressFocused('Enter');
+  assertClosedOnTrigger(trigger, 'Enter');
 }

@@ -1377,16 +1377,20 @@ test('getTaskDropBreakdown returns award/event info + per-drop chances with comp
       previewCalls.push(args);
       return {
         drops: [{
-          id: 'd1', name: 'Iron', componentId: 'iron', quantity: 2,
+          id: 'd1', name: 'Iron vein', componentId: 'iron', quantity: 2,
           baseChance: 0.4, finalChance: 0.53,
           modifiers: { weather: { value: 10 }, timeOfDay: { value: -5 }, biome: { value: 3 }, character: [] }
-        }],
+        }, { id: 'd2', name: '', componentId: 'coal', quantity: 1, baseChance: 0.2, finalChance: 0.2 },
+        { id: 'd3', name: ' '.repeat(3), componentId: 'iron', quantity: 1, baseChance: 0.1, finalChance: 0.1 },
+        { id: 'd4', quantity: 1, baseChance: 0.1, finalChance: 0.1 }],
         successChance: 0.53,
         awardMode: 'allDrops', awardLimit: 1, eventPolicy: 'successWithEvent'
       };
     }
   };
-  const systemManager = { getItems: () => [{ id: 'iron', name: 'Iron', img: 'icons/iron.webp' }] };
+  const systemManager = {
+    getItems: () => [{ id: 'iron', name: 'Iron', img: 'icons/iron.webp' }, { id: 'coal', name: 'Coal' }]
+  };
   const engine = makeEngine({
     environments: [environment({ tasks: [task({ id: 'task-a', resolutionMode: 'd100', dropRows: [{ id: 'd1', dropRate: 40 }] })] })],
     richState,
@@ -1398,8 +1402,11 @@ test('getTaskDropBreakdown returns award/event info + per-drop chances with comp
   assert.equal(result.successChance, 0.53, 'aggregate success chance passes through from the preview');
   assert.equal(result.awardMode, 'allDrops');
   assert.equal(result.eventPolicy, 'successWithEvent');
-  assert.equal(result.drops.length, 1);
+  assert.equal(result.drops.length, 4);
   assert.equal(result.drops[0].img, 'icons/iron.webp', 'drop image resolved from the component');
+  // Issue 1644: a drop authored by dropping a component carries no name of its own.
+  assert.deepEqual(result.drops.map((drop) => drop.name), ['Iron vein', 'Coal', 'Iron', ''],
+    'authored name, else the component, else an empty string; a blank name is no name');
   assert.equal(previewCalls.length, 1, 'delegated to richState.previewDropBreakdown once');
 });
 

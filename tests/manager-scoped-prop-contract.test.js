@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 
 import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 
+import { walkNodes } from './helpers/moduleAst.js';
+import { moduleAstOf } from './helpers/parsedSource.js';
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ROOT_PATH = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const ADMIN_STORE_PATH = 'src/ui/svelte/stores/adminStore.js';
@@ -107,6 +110,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // group and took `Kicker`, `Medallion`, `ComponentEditorHeader`, `ScopedEntryHeaderActions`
   // and the `managerHeaderActionClass` named import with them.
   './ManagerPageHeader.svelte',
+  // Added by issue 1777: the title bar is its own unit.
+  './ManagerTitleBar.svelte',
   './RecipeEditView.svelte',
   './RecipeItemEditor.svelte',
   './RecipesBrowserView.svelte',
@@ -499,13 +504,12 @@ test('the rail declares exactly the props the root hands it, in both directions'
 
 /**
  * Every key the shell hands `<ManagerPageHeader>` is declared by the unit that reads it. The
- * header forwards `{...rest}` to both children, so a mis-keyed prop is not an error: it is a
- * default, and the control it wires goes inert with the census and the compiler both silent
- * (issue 1720).
+ * header forwards `{...rest}` to the trail model and the action group, so a mis-keyed prop is not
+ * an error: it is a default, and the control it wires goes inert with the census and the compiler
+ * both silent (issues 1720 and 1777).
  */
 const HEADER_UNITS = Object.freeze([
   'ManagerPageHeader',
-  'ManagerHeaderBreadcrumbs',
   'ManagerHeaderActions',
   'ManagerHeaderCraftingActions',
   'ManagerHeaderGatheringActions',
@@ -535,8 +539,36 @@ function pageHeaderSiteProps() {
     .map((hit) => hit[1] ?? hit[2]);
 }
 
+/**
+ * The input keys `headerBreadcrumbs.js` reads: every destructured key and every `input.<key>`. It
+ * takes one object, so its reads ARE its declaration.
+ */
+function trailModelInputs() {
+  const { ast } = moduleAstOf('src/ui/svelte/apps/manager/headerBreadcrumbs.js');
+  const keys = new Set();
+  for (const node of walkNodes(ast)) {
+    if (node.type === 'ObjectPattern') {
+      for (const property of node.properties) {
+        if (property.type === 'Property' && property.key.type === 'Identifier') {
+          keys.add(property.key.name);
+        }
+      }
+    }
+    const readsInput =
+      node.type === 'MemberExpression' &&
+      node.object.type === 'Identifier' &&
+      node.object.name === 'input' &&
+      node.property.type === 'Identifier';
+    if (readsInput) keys.add(node.property.name);
+  }
+  return [...keys];
+}
+
 test('the page-header composition site names no prop the five units leave unread', () => {
-  const declared = new Set(HEADER_UNITS.flatMap(headerUnitProps));
+  const trailInputs = trailModelInputs();
+  // NON-VACUITY: the trail reads its route predicates and its handlers, not a stray key or two.
+  assert.ok(trailInputs.includes('openWorldParties') && trailInputs.length > 30, trailInputs);
+  const declared = new Set([...HEADER_UNITS.flatMap(headerUnitProps), ...trailInputs]);
   const passed = pageHeaderSiteProps();
   // NON-VACUITY: the site is the 138-prop one, not an empty slice.
   assert.ok(passed.length > 100, `the site parsed only ${passed.length} props`);

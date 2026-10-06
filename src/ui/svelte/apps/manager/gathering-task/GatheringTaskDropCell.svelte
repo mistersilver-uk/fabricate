@@ -1,14 +1,12 @@
 <!--
-  One d100 drop rule row (issue 1522): its rank stepper under ranked rewards, its component cell and
-  drop zone, its chance slider, count and modifier chips. A component drop assigns and selects the
-  row; any other drop goes to `onImportDrop(rowId, data)`. Row writes go through
-  `onUpdateDrop(rowId, patch)`.
+  One cell of a d100 drop rule's `DataTable` row (issues 1522, 1782), chosen by `column`: the rank
+  rocker under ranked rewards, the component button that is the row's keyboard path, the chance
+  slider, the count, or the modifier chips. Writes go through `onUpdateDrop(rowId, patch)`.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import IconButton from '../../../components/IconButton.svelte';
-  import { dragDrop } from '../../../actions/dragDrop.js';
   import { dropRateTierClass, dropRateTierColor } from '../../../util/dropRateTier.js';
   import {
     conditionIcon,
@@ -20,9 +18,9 @@
   let {
     text,
     row,
+    column,
     rankIndex,
     rowCount,
-    rankedMode = false,
     selected = false,
     managedItemOptions = [],
     weatherOptions = [],
@@ -32,7 +30,6 @@
     onSelectDrop = () => {},
     onUpdateDrop = () => {},
     onMoveDrop = () => {},
-    onImportDrop = () => {},
   } = $props();
 
   const maxVisibleModifiers = 4;
@@ -216,82 +213,42 @@
     if (event.button !== 2) return;
     onClearDropComponent(event);
   }
-
-  function handleDropZoneDrop(data) {
-    if (data?.type === 'FabricateManagedComponent' && data.componentId) {
-      onUpdateDrop(row.id, {
-        componentId: data.componentId,
-        itemUuid: '',
-        systemItemId: '',
-        name: '',
-        enabled: true,
-      });
-      onSelectDrop(row.id);
-      return;
-    }
-    onImportDrop(row.id, data);
-  }
 </script>
 
-<!-- The row's `onclick` is a pointer convenience (issue 1512): the keyboard path is the component
-     cell's real `<button>`, and `aria-selected` here is the single carrier. A focusable
-     `role="row"` is invisible to Foundry's `KeyboardManager#hasFocus`, so the arrows panned. -->
-<!-- svelte-ignore a11y_interactive_supports_focus -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<div
-  class={`manager-gathering-task-drop-row ${selected ? 'is-selected' : ''}`}
-  role="row"
-  data-gathering-task-drop-id={row.id}
-  data-gathering-task-drop-zone={row.id}
-  aria-selected={selected}
-  use:dragDrop={{
-    onDrop: (data) => handleDropZoneDrop(data),
-    activeClass: 'is-drop-active',
-  }}
-  onclick={() => onSelectDrop(row.id)}
->
-  {#if rankedMode}
-    <span
-      role="cell"
-      class="manager-drop-cell manager-drop-rank-cell"
-      data-gathering-task-drop-rank-cell
+{#if column === 'rank'}
+  <span class="manager-drop-rank-cell" data-gathering-task-drop-rank-cell>
+    <IconButton
+      class="manager-drop-rank-button"
+      ariaLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp', 'Move drop up')}
+      title={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp', 'Move drop up')}
+      disabled={rankIndex <= 0}
+      data-gathering-task-drop-move="up"
+      onclick={(event) => {
+        event.stopPropagation();
+        onMoveDrop(row.id, 'up');
+      }}
+      onkeydown={(event) => event.stopPropagation()}
     >
-      <IconButton
-        class="manager-drop-rank-button"
-        ariaLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp', 'Move drop up')}
-        title={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp', 'Move drop up')}
-        disabled={rankIndex <= 0}
-        data-gathering-task-drop-move="up"
-        onclick={(event) => {
-          event.stopPropagation();
-          onMoveDrop(row.id, 'up');
-        }}
-        onkeydown={(event) => event.stopPropagation()}
-      >
-        <i class="fas fa-chevron-up" aria-hidden="true"></i>
-      </IconButton>
-      <span class="manager-drop-rank-value" data-gathering-task-drop-rank>#{rankIndex + 1}</span>
-      <IconButton
-        class="manager-drop-rank-button"
-        ariaLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown', 'Move drop down')}
-        title={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown', 'Move drop down')}
-        disabled={rankIndex < 0 || rankIndex >= rowCount - 1}
-        data-gathering-task-drop-move="down"
-        onclick={(event) => {
-          event.stopPropagation();
-          onMoveDrop(row.id, 'down');
-        }}
-        onkeydown={(event) => event.stopPropagation()}
-      >
-        <i class="fas fa-chevron-down" aria-hidden="true"></i>
-      </IconButton>
-    </span>
-  {/if}
-  <span
-    role="cell"
-    class="manager-drop-cell manager-drop-component-cell"
-    data-gathering-task-drop-component-cell
-  >
+      <i class="fas fa-chevron-up" aria-hidden="true"></i>
+    </IconButton>
+    <span class="manager-drop-rank-value" data-gathering-task-drop-rank>#{rankIndex + 1}</span>
+    <IconButton
+      class="manager-drop-rank-button"
+      ariaLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown', 'Move drop down')}
+      title={text('FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown', 'Move drop down')}
+      disabled={rankIndex < 0 || rankIndex >= rowCount - 1}
+      data-gathering-task-drop-move="down"
+      onclick={(event) => {
+        event.stopPropagation();
+        onMoveDrop(row.id, 'down');
+      }}
+      onkeydown={(event) => event.stopPropagation()}
+    >
+      <i class="fas fa-chevron-down" aria-hidden="true"></i>
+    </IconButton>
+  </span>
+{:else if column === 'component'}
+  <span class="manager-drop-component-cell" data-gathering-task-drop-component-cell>
     <!-- The row's keyboard path in both branches (issue 1512): a new row is born empty, and a
          `<div>` there would leave it keyboard-unselectable. The empty branch clears nothing. -->
     <button
@@ -300,6 +257,7 @@
         assigned ? 'manager-drop-component-button' : 'manager-drop-empty-component is-empty'
       }`}
       data-keyboard-focus="true"
+      aria-current={selected ? 'true' : undefined}
       aria-label={assigned
         ? componentLabel()
         : text('FABRICATE.Admin.Manager.Environment.Tasks.CreateOrAssign', 'Create or assign')}
@@ -344,11 +302,8 @@
       {/if}
     </button>
   </span>
-  <span
-    role="cell"
-    class="manager-drop-cell manager-drop-rate-cell"
-    data-gathering-task-drop-chance-cell
-  >
+{:else if column === 'chance'}
+  <span class="manager-drop-rate-cell" data-gathering-task-drop-chance-cell>
     <ChanceSlider
       value={normalizeDropRate(row?.dropRate ?? 1)}
       numberLabel={text(
@@ -362,7 +317,8 @@
       onChange={(dropRate) => onUpdateDrop(row.id, { dropRate })}
     />
   </span>
-  <span role="cell" class="manager-drop-cell manager-drop-quantity-cell">
+{:else if column === 'count'}
+  <span class="manager-drop-quantity-cell">
     <input
       type="text"
       inputmode="numeric"
@@ -375,33 +331,32 @@
       onkeydown={onQuantityKeydown}
     />
   </span>
-  <span role="cell" class="manager-drop-cell manager-chip-row">
-    <span class="manager-drop-modifier-list">
-      {#if hasModifierOverflow()}
-        <Chip tone="neutral" class="manager-drop-modifier-overflow"
-          >{text(
-            'FABRICATE.Admin.Manager.Environment.Tasks.DropModifierOverflowHint',
-            'See selected rule for modifiers'
-          )}</Chip
+{:else}
+  <span class="manager-drop-modifier-list">
+    {#if hasModifierOverflow()}
+      <Chip tone="neutral" class="manager-drop-modifier-overflow"
+        >{text(
+          'FABRICATE.Admin.Manager.Environment.Tasks.DropModifierOverflowHint',
+          'See selected rule for modifiers'
+        )}</Chip
+      >
+    {:else if visibleModifierEntries().length > 0}
+      {#each visibleModifierEntries() as modifier (modifier.id)}
+        <Chip
+          tone={modifierTone(modifier)}
+          icon={modifierIcon(modifier)}
+          class="manager-drop-modifier-pill"
         >
-      {:else if visibleModifierEntries().length > 0}
-        {#each visibleModifierEntries() as modifier (modifier.id)}
-          <Chip
-            tone={modifierTone(modifier)}
-            icon={modifierIcon(modifier)}
-            class="manager-drop-modifier-pill"
-          >
-            <span>{modifierLabel(modifier)}</span>
-            {#if modifier.kind !== 'character'}
-              <strong>{modifierValueLabel(modifier)}</strong>
-            {/if}
-          </Chip>
-        {/each}
-      {:else}
-        <Chip tone="neutral"
-          >{text('FABRICATE.Admin.Manager.Environment.Tasks.NoModifiers', 'Not specified')}</Chip
-        >
-      {/if}
-    </span>
+          <span>{modifierLabel(modifier)}</span>
+          {#if modifier.kind !== 'character'}
+            <strong>{modifierValueLabel(modifier)}</strong>
+          {/if}
+        </Chip>
+      {/each}
+    {:else}
+      <Chip tone="neutral"
+        >{text('FABRICATE.Admin.Manager.Environment.Tasks.NoModifiers', 'Not specified')}</Chip
+      >
+    {/if}
   </span>
-</div>
+{/if}

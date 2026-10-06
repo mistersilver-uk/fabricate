@@ -64,7 +64,7 @@ const LONG_SUBTITLE =
  */
 function header(subtitle, title = 'Nimithernian Institute for the Arcane') {
   return `
-<header class="manager-header">
+<header class="fabricate-page-header manager-header">
   <div class="manager-heading">
     <nav class="manager-breadcrumbs"><span>World</span></nav>
     <div class="manager-recipe-edit-heading" data-downtime-chrome-heading>
@@ -187,7 +187,7 @@ const CHIP_CLUSTERS = [
     name: 'the page header beside a ghost button',
     compared: ['height', 'radius', 'fontSize', 'paddingLeft', 'paddingRight'],
     markup: (chipClass) => `
-<header class="manager-header">
+<header class="fabricate-page-header manager-header">
   <div class="manager-header-actions" aria-label="Actions">
     <span class="${chipClass}" title="Unsaved">Unsaved</span>
     <button type="button" class="fabricate-button fab-manager-button is-ghost">
@@ -348,7 +348,7 @@ before(async () => {
 
 /** Component Rules' header: the longest title a GM can give a system, the advert, the action. */
 const advertHeader = () => `
-<header class="manager-header">
+<header class="fabricate-page-header manager-header">
   <div class="manager-heading">
     <nav class="manager-breadcrumbs"><span>Crafting Systems</span></nav>
     <h1 class="manager-title">The Most Serene and Ancient Nimithernian Institute Component Rules</h1>

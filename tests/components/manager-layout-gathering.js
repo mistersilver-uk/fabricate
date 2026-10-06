@@ -13,6 +13,7 @@ import { openLayoutContext } from '../helpers/layout-harness.js';
 
 import {
   blockFor,
+  blockIn,
   css,
   pagerBarFixture,
   readWorkspaceGrid,
@@ -185,10 +186,8 @@ test('manager gathering rules inspector stacks descriptions above normal-weight 
   const ruleCopyBlock = blockFor('.fabricate-manager .manager-rule-copy');
   const ruleCopyDescriptionBlock = blockFor('.fabricate-manager .manager-rule-copy span');
   const ruleFieldBlock = blockFor('.fabricate-manager .manager-rule-field');
-  // Was a two-selector rule that also painted `.manager-rule-stepper input`. That field is
-  // the shared `Stepper` now (issue 1050) and brings its own chrome, so the rule is the
-  // `<select>` alone.
-  const ruleInputBlock = blockFor('.fabricate-manager .manager-rule-field select');
+  // The rule's control is the shared `<Select>` (issue 1777), so the rule is its trigger's skin.
+  const ruleTriggerBlock = blockFor('.fabricate-manager .manager-rule-field .fabricate-select-trigger');
 
   assert.ok(
     ruleRowBlock.includes('grid-template-columns: 34px minmax(0, 1fr);'),
@@ -211,8 +210,8 @@ test('manager gathering rules inspector stacks descriptions above normal-weight 
     'rule field text should not force bold select text'
   );
   assert.ok(
-    ruleInputBlock.includes('font-weight: 400;'),
-    'rule select and input text should not inherit bold labels'
+    ruleTriggerBlock.includes('width: 100%;') && !ruleTriggerBlock.includes('height'),
+    'rule selects fill the description column at the form rung, with no retired 36px pin'
   );
   assert.equal(
     css.includes('.fabricate-manager .manager-gathering-settings-summary'),
@@ -459,10 +458,10 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   const selectedTagPillBlock = blockFor(
     '.fabricate-manager .manager-chip.manager-selected-tag-pill'
   );
-  const dropCardBlock = blockFor('.fabricate-manager .manager-task-drops-card');
-  const dropHeaderBlock = blockFor(
-    '.fabricate-manager .manager-task-drops-card .manager-task-card-header'
-  );
+  // The drop rules are a `DataTable` since issue 1782: its root is the card, its caption the header.
+  const dropCardBlock = blockFor('.fabricate-data-table');
+  const dropHeaderBlock = blockFor('.fabricate-data-table .fabricate-data-table-caption-line');
+  const dropHeaderSearchBlock = blockFor('.fabricate-data-table .fabricate-data-table-search');
   const dropControlsBlock = blockFor('.fabricate-manager .manager-task-drop-controls');
   const dropSearchBlock = blockFor(
     '.fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact'
@@ -470,35 +469,31 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   const dropSearchInputBlock = blockFor(
     '.fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact input'
   );
-  const dropFooterBlock = blockFor('.fabricate-manager .manager-task-drop-footer');
-  const dropFooterPaginationBlock = blockFor(
-    '.fabricate-manager .manager-task-drop-footer .fabricate-pagination'
+  const dropAddBlock = blockFor('.fabricate-manager .manager-task-drop-controls > .fabricate-button');
+  const dropScrollBlock = blockFor('.fabricate-data-table .fabricate-data-table-scroll');
+  const dropTableBlock = blockFor(
+    '.fabricate-data-table.fabricate-data-table .fabricate-data-table-table'
   );
-  const dropScrollBlock = blockFor(
-    '.fabricate-manager .manager-task-drops-card .manager-table-scroll'
-  );
-  const dropTableBlock = blockFor('.fabricate-manager .manager-gathering-task-drops-table');
-  const dropTableRankedBlock = blockFor(
-    '.fabricate-manager .manager-gathering-task-drops-table.is-ranked-mode'
+  const dropTableBodyRowBlock = blockFor(
+    '.fabricate-data-table.fabricate-data-table .fabricate-data-table-table > tbody > tr'
   );
   const dropRankCellBlock = blockFor('.fabricate-manager .manager-drop-rank-cell');
   const dropRankValueBlock = blockFor('.fabricate-manager .manager-drop-rank-value');
   const dropRankButtonBlock = blockFor('.fabricate-manager .manager-drop-rank-button');
-  const dropTableHeadBlock = blockFor('.fabricate-manager .manager-gathering-task-drop-table-head');
-  const dropRowBlock = blockFor(
-    '.fabricate-manager .manager-gathering-task-drop-table-head,\n.fabricate-manager .manager-gathering-task-drop-row'
+  const dropTableHeadBlock = blockFor(
+    '.fabricate-data-table.fabricate-data-table .fabricate-data-table-head'
   );
-  const firstDropRowBlock = blockFor(
-    '.fabricate-manager .manager-gathering-task-drop-table-head + .manager-gathering-task-drop-row'
-  );
-  const dropCellBlock = blockFor(
-    '.fabricate-manager .manager-gathering-task-drop-table-head > *,\n.fabricate-manager .manager-gathering-task-drop-row > *'
-  );
-  const dropCellSeparatorBlock = blockFor(
-    '.fabricate-manager .manager-gathering-task-drop-table-head > * + *,\n.fabricate-manager .manager-gathering-task-drop-row > * + *'
+  const dropRowBlock = blockFor('.fabricate-manager .manager-gathering-task-drops-table tbody tr');
+  // Read from the line start, so the reader cannot land on a longer selector ending in this one.
+  const dropRowCellBlock = blockIn(
+    css.slice(css.indexOf('\n.fabricate-data-table.fabricate-data-table .fabricate-data-table-cell {')),
+    '.fabricate-data-table.fabricate-data-table .fabricate-data-table-cell'
   );
   const selectedDropRowBlock = blockFor(
-    '.fabricate-manager .manager-gathering-task-drop-row.is-selected'
+    '.fabricate-data-table .fabricate-data-table-row.is-selected > .fabricate-data-table-cell'
+  );
+  const selectedDropBarBlock = blockFor(
+    '.fabricate-data-table .fabricate-data-table-row.is-selected > .fabricate-data-table-cell:first-child::before'
   );
   const dropComponentButtonBlock = blockFor(
     '.fabricate-manager .manager-drop-component-button,\n.fabricate-manager .manager-drop-empty-component'
@@ -586,7 +581,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   const dropModifierOverflowBlock = blockFor('.fabricate-manager .manager-drop-modifier-overflow');
   const dropEditorInputBlock = blockFor(
-    '.fabricate-manager .manager-drop-editor-card :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]))'
+    '.fabricate-manager .manager-drop-editor-card input:not([type="checkbox"]):not([type="radio"]):not([type="range"])'
   );
   const dropEditorValuesBlock = blockFor('.fabricate-manager .manager-drop-editor-values');
   const dropEditorRatePercentBlock = blockFor(
@@ -636,10 +631,10 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-drop-inspector-stack .fabricate-search input'
   );
   const dropInspectorCharacterFieldBlock = blockFor(
-    '.fabricate-manager .manager-character-modifier-row-card .fabricate-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]))'
+    '.fabricate-manager .manager-character-modifier-row-card .fabricate-field input:not([type="checkbox"]):not([type="radio"]):not([type="range"])'
   );
   const dropInspectorCharacterOperatorBlock = blockFor(
-    '.fabricate-manager .manager-character-modifier-operator-select select'
+    '.fabricate-manager .manager-character-modifier-operator-select.is-negative .fabricate-select-trigger'
   );
   const dropEditorActionsBlock = blockFor('.fabricate-manager .manager-drop-editor-actions');
   const dropInspectorStackBlock = blockFor('.fabricate-manager .manager-drop-inspector-stack');
@@ -648,9 +643,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   const dropInspectorDividerBlock = blockFor('.fabricate-manager .manager-drop-inspector-divider');
   const dropInspectorScrollBlock = blockFor('.fabricate-manager .manager-drop-inspector-scroll');
-  const dropQuantityCellBlock = blockFor(
-    '.fabricate-manager .manager-gathering-task-drop-row > .manager-drop-quantity-cell'
-  );
+  const dropQuantityCellBlock = blockFor('.fabricate-manager .manager-drop-quantity-cell');
   const dropQuantityInputBlock = blockFor(
     '.fabricate-manager .manager-drop-quantity-cell input[type="text"]'
   );
@@ -791,22 +784,23 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'component browser footer should not nest pagination chrome'
   );
   assert.ok(
-    dropCardBlock.includes('--fab-manager-task-drop-table-visible-height: 262px;'),
-    'drop rules card should define an exact table viewport equal to header plus three rows'
+    dropCardBlock.includes('display: flex;') &&
+      dropCardBlock.includes('flex-direction: column;') &&
+      dropCardBlock.includes('overflow: hidden;'),
+    'the drop rules table is one framed column: caption and rows, then its pager'
+  );
+  assert.equal(
+    css.includes('--fab-manager-task-drop-table-visible-height'),
+    false,
+    'the drop rules card no longer fixes a three-row viewport; a page of rows sets its height'
   );
   assert.ok(
-    dropCardBlock.includes(
-      'grid-template-rows: auto var(--fab-manager-task-drop-table-visible-height) auto;'
-    ),
-    'drop rules card should keep the table viewport definite between the card header and footer'
+    dropHeaderBlock.includes('display: flex;') && dropHeaderBlock.includes('flex-wrap: wrap;'),
+    'the drop rules caption puts the heading and count first and wraps its controls under them'
   );
   assert.ok(
-    dropCardBlock.includes('height: 410px;') && dropCardBlock.includes('max-height: 410px;'),
-    'task editor drop rules card should be exactly tall enough for the three-row table viewport and footer'
-  );
-  assert.ok(
-    dropHeaderBlock.includes('grid-template-columns: minmax(0, 1fr) auto;'),
-    'drop rules header should put copy left and controls right'
+    dropHeaderSearchBlock.includes('margin-left: auto;'),
+    'the drop rules search and add action sit at the end of the caption'
   );
   assert.ok(
     dropControlsBlock.includes('display: inline-flex;') &&
@@ -814,7 +808,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop rules search and add action should share a compact toolbar'
   );
   assert.ok(
-    dropSearchBlock.includes('min-width: min(220px, 100%);'),
+    dropSearchBlock.includes('min-width: 220px;'),
     'drop rules search should not collapse until its icon overlaps the text area'
   );
   assert.ok(
@@ -822,101 +816,76 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop rules search input should reserve text inset for the leading search icon'
   );
   assert.ok(
-    dropFooterBlock.includes('border-top: 1px solid var(--fab-border);'),
-    'drop rules count should live in a footer area with pagination'
-  );
-  assert.ok(
-    dropFooterPaginationBlock.includes('background: transparent;'),
-    'drop rules footer should not nest pagination chrome'
-  );
-  assert.ok(
-    dropScrollBlock.includes('height: var(--fab-manager-task-drop-table-visible-height);') &&
-      dropScrollBlock.includes('max-height: var(--fab-manager-task-drop-table-visible-height);'),
-    'drop rules table scroll region should show exactly three complete rows before scrolling'
-  );
-  assert.ok(
-    dropScrollBlock.includes('padding: var(--fab-space-3) 0 0;'),
-    'drop rules table scroll region should not add horizontal inset'
-  );
-  assert.ok(
-    dropScrollBlock.includes('overflow: hidden auto;'),
-    'drop rules table should suppress horizontal scroll while retaining vertical scrolling'
-  );
-  assert.ok(
-    dropTableBlock.includes('--fab-manager-task-drop-grid:'),
-    'task editor drop rows should define compact desktop geometry'
-  );
-  assert.ok(
-    dropTableBlock.includes('minmax(0, 1.05fr)') &&
-      dropTableBlock.includes('minmax(220px, 1.35fr)') &&
-      dropTableBlock.includes('56px') &&
-      dropTableBlock.includes('minmax(180px, 1.65fr)'),
-    'drop row desktop grid should keep component/chance/quantity geometry while widening modifiers'
+    dropAddBlock.includes('white-space: nowrap;') && dropAddBlock.includes('flex: 0 0 auto;'),
+    'the add action keeps its label on one line beside the search'
   );
   assert.equal(
-    dropTableBlock.includes('88px'),
+    css.includes('.manager-task-drop-footer'),
     false,
-    'drop row desktop grid should not reserve a row actions column'
+    'the pager is the table footer, so the card keeps no footer of its own'
   );
   assert.ok(
-    dropTableBlock.includes('width: 100%;') && dropTableBlock.includes('max-width: 100%;'),
-    'drop table should fill the drop rules card without exceeding it'
+    dropScrollBlock.includes('overflow-x: auto;') && dropScrollBlock.includes('min-width: 0;'),
+    'the drop rules table scrolls horizontally inside its own container, never the page'
+  );
+  assert.equal(
+    css.includes('--fab-manager-task-drop-grid'),
+    false,
+    'the drop rows are table rows, so no column grid survives for them'
   );
   assert.ok(
-    dropTableHeadBlock.includes('padding: 0;'),
-    'drop rules header row should clear generic table-head padding so columns align with value rows'
+    dropTableBlock.includes('width: 100%;') &&
+      dropTableBlock.includes('margin: 0;') &&
+      dropTableBlock.includes('border-collapse: collapse;') &&
+      dropTableBlock.includes('background: transparent;'),
+    'drop table should fill the drop rules card and clear the core table box'
   );
   assert.ok(
-    dropRowBlock.includes('grid-template-columns: var(--fab-manager-task-drop-grid);'),
-    'drop rows should use the shared single-line editor grid'
+    dropTableBodyRowBlock.includes('background: transparent;'),
+    'drop rows clear the core striping, so only selection and hover paint a row'
   );
   assert.ok(
-    dropRowBlock.includes('gap: 0;') && dropRowBlock.includes('max-width: 100%;'),
-    'drop rows should use separators instead of gap-driven overflow'
+    dropTableHeadBlock.includes('padding: 0 var(--fab-space-3) var(--fab-space-2) 0;') &&
+      dropTableHeadBlock.includes('font-family: var(--fab-font-mono);'),
+    'drop rules header row is the mono kicker of the table, flush under the caption'
   );
   assert.ok(
-    firstDropRowBlock.includes('border-top: 0;'),
-    'first drop row should not double the header bottom border'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-gathering-task-drop-row {\n  min-height: 72px;'),
+    dropRowBlock.includes('height: 72px;'),
     'drop rows should be tall enough for two visible modifier chip lines'
   );
   assert.ok(
-    dropCellBlock.includes('padding: var(--fab-space-1) var(--fab-space-2);') &&
-      dropCellBlock.includes('box-sizing: border-box;'),
+    dropRowCellBlock.includes('border-top: 1px solid var(--fab-border);'),
+    'each drop row is divided from the one above by a hairline, and the header row takes none'
+  );
+  assert.ok(
+    dropRowCellBlock.includes(
+      'padding: var(--fab-space-2) var(--fab-space-3) var(--fab-space-2) 0;'
+    ),
     'drop cells should keep padding inside full-width rows'
   );
-  assert.ok(
-    dropCellSeparatorBlock.includes('border-left: 1px solid var(--fab-border);'),
-    'drop cells should use vertical separators'
-  );
-  assert.ok(
-    css.includes('.fabricate-manager .manager-gathering-task-drop-row.is-drop-active'),
-    'drop rows should expose a full-row active drop target state'
+  assert.equal(
+    dropRowCellBlock.includes('border-left'),
+    false,
+    'drop cells are divided by row hairlines, not vertical separators'
   );
   assert.ok(
     selectedDropRowBlock.includes('background: var(--fab-success-soft);') &&
-      selectedDropRowBlock.includes('var(--fab-accent)'),
+      selectedDropBarBlock.includes('background: var(--fab-accent);') &&
+      selectedDropBarBlock.includes('width: 3px;'),
     'selected drop rows should use the component-browser success/accent family'
   );
-  assert.ok(
-    selectedDropRowBlock.includes('inset 0 1px 0 var(--fab-border-strong)') &&
-      selectedDropRowBlock.includes('inset 0 -1px 0 var(--fab-border-strong)'),
-    'selected drop row outline should avoid a right edge next to the card border'
-  );
   assert.equal(
-    selectedDropRowBlock.includes('inset 0 0 0 1px'),
+    `${selectedDropRowBlock}${selectedDropBarBlock}`.includes('inset 0 0 0 1px'),
     false,
     'selected drop row should not draw a full inset border against the card edge'
   );
   assert.equal(
-    selectedDropRowBlock.includes('var(--fab-info'),
+    `${selectedDropRowBlock}${selectedDropBarBlock}`.includes('var(--fab-info'),
     false,
     'selected drop rows should not use the info family'
   );
   assert.equal(
-    selectedDropRowBlock.includes('var(--fab-warning'),
+    `${selectedDropRowBlock}${selectedDropBarBlock}`.includes('var(--fab-warning'),
     false,
     'selected drop rows should not use the warning family'
   );
@@ -1067,9 +1036,8 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     dropQuantityCellBlock.includes('display: flex;') &&
-      dropQuantityCellBlock.includes('justify-content: center;') &&
-      dropQuantityCellBlock.includes('padding: var(--fab-space-chip);'),
-    'quantity cells should spend less horizontal space while centering the input'
+      dropQuantityCellBlock.includes('justify-content: center;'),
+    'quantity cells should center the input inside the cell padding of the table'
   );
   assert.ok(
     dropQuantityInputBlock.includes('max-width: 44px;') &&
@@ -1115,7 +1083,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     dropEditorInputBlock.includes('height: 28px;') &&
       dropEditorInputBlock.includes('min-height: 28px;') &&
       dropEditorInputBlock.includes('padding: var(--fab-space-2xs) var(--fab-space-2);'),
-    'selected drop inspector generic inputs and selects should use compact 28px right-sidebar geometry'
+    'selected drop inspector generic inputs should use compact 28px right-sidebar geometry'
   );
   assert.ok(
     dropEditorValuesBlock.includes('grid-template-columns: minmax(0, 1fr) 72px;') &&
@@ -1235,10 +1203,9 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'selected drop inspector character modifier fields should override shared 36px field height'
   );
   assert.ok(
-    dropInspectorCharacterOperatorBlock.includes('height: 28px;') &&
-      dropInspectorCharacterOperatorBlock.includes('min-height: 28px;') &&
-      dropInspectorCharacterOperatorBlock.includes('padding: 0 var(--fab-space-chip);'),
-    'selected drop inspector character modifier operator select should keep compact 28px height'
+    dropInspectorCharacterOperatorBlock.includes('border-color: var(--fab-danger-border);') &&
+      dropInspectorCharacterOperatorBlock.includes('color: var(--fab-danger-text);'),
+    'the operator select carries the sign tone on the inline trigger itself'
   );
   assert.ok(
     dropEditorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));') &&
@@ -1285,27 +1252,9 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop row actions should not reserve row layout or styling'
   );
   assert.equal(
-    taskEditorIntermediateQuery.includes(
-      '.manager-gathering-task-drop-row {\n    grid-template-columns: minmax(0, 1fr);'
-    ),
+    taskEditorIntermediateQuery.includes('manager-gathering-task-drop'),
     false,
-    'task editor should not stack drop rows at the intermediate desktop width'
-  );
-  assert.ok(
-    taskEditorIntermediateQuery.includes('minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr)'),
-    'intermediate task editor drop grid should preserve drop chance width while widening modifiers'
-  );
-  assert.ok(
-    dropTableRankedBlock.includes(
-      '--fab-manager-task-drop-grid: 44px minmax(0, 0.92fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);'
-    ),
-    'ranked-mode drop grid should prepend a narrow 44px rank column and take width from the component column while preserving drop chance and quantity widths'
-  );
-  assert.ok(
-    taskEditorIntermediateQuery.includes(
-      '--fab-manager-task-drop-grid: 44px minmax(0, 0.96fr) minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr);'
-    ),
-    'intermediate ranked-mode drop grid should keep drop chance and quantity widths while reducing the component column'
+    'the drop table needs no intermediate-width track set: its columns are the table own'
   );
   assert.ok(
     dropRankCellBlock.includes('display: flex;') &&
@@ -1321,11 +1270,10 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     dropRankButtonBlock.includes('width: 18px;') && dropRankButtonBlock.includes('height: 18px;'),
     'rank reorder buttons should be small enough to stack inside the row'
   );
-  assert.ok(
-    mediumQuery.includes(
-      '.fabricate-manager .manager-gathering-task-drop-table-head,\n  .fabricate-manager .manager-gathering-task-drop-row'
-    ) && mediumQuery.includes('grid-template-columns: var(--fab-manager-task-drop-grid);'),
-    'medium manager layout should preserve the drop row grid and headers instead of duplicate row labels'
+  assert.equal(
+    mediumQuery.includes('manager-gathering-task-drop'),
+    false,
+    'medium manager layout keeps the drop table and its header row without restating either'
   );
   assert.equal(
     css.includes(
@@ -1438,14 +1386,15 @@ test('a range input inside the gathering edit views stays transparent for the sl
         await page.setContent(
           `<style>${css}</style>` +
             `<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate"><div class="${view}">` +
-            '<div class="manager-gathering-task-drop-row" role="row" style="width:640px">' +
-            '<span role="cell" class="manager-drop-cell manager-drop-rate-cell">' +
+            '<div class="fabricate-data-table manager-gathering-task-drops-table" style="width:640px">' +
+            '<table class="fabricate-data-table-table"><tbody><tr class="fabricate-data-table-row">' +
+            '<td class="fabricate-data-table-cell"><span class="manager-drop-rate-cell">' +
             '<span class="fabricate-slider manager-chance-slider manager-drop-rate-value">' +
             '<span class="manager-chance-slider-control manager-drop-rate-control is-common" ' +
             'style="--fab-drop-rate-value:90%; --fab-drop-rate-color:#5EC3B0;">' +
             '<span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>' +
             '<input type="range" min="0" max="100" step="1" value="90"/>' +
-            '</span></span></span></div></div></div>'
+            '</span></span></span></td></tr></tbody></table></div></div></div>'
         );
         const seen = await page.evaluate(() => {
           const input = document.querySelector('input[type="range"]');
@@ -1472,6 +1421,66 @@ test('a range input inside the gathering edit views stays transparent for the sl
   } finally {
     await context.close();
   }
+});
+
+// The data table paints a row's CELLS and clears the row behind them (issue 1782), so a row-level
+// ground never shows: the drop target must paint its cells, and hover must yield to selection.
+test('the drop table paints a drop-target row and keeps a hovered selected row selected', async () => {
+  const context = await openLayoutContext({ viewport: { width: 700, height: 300 } });
+  const page = await context.newPage();
+  try {
+    const row = (id, state) =>
+      '<div class="fabricate-data-table is-selectable manager-task-drops-card manager-gathering-task-drops-table">' +
+      '<div class="fabricate-data-table-scroll"><table class="fabricate-data-table-table"><tbody>' +
+      `<tr id="${id}" class="fabricate-data-table-row ${state}">` +
+      '<th scope="row" class="fabricate-data-table-cell">Moss</th>' +
+      '<td class="fabricate-data-table-cell">1</td></tr></tbody></table></div></div>';
+    await page.setContent(
+      `<style>${css}</style>` +
+        '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
+        '<div class="manager-gathering-task-edit-view">' +
+        `${row('plain', '')}${row('target', 'is-drop-active')}${row('chosen', 'is-selected')}` +
+        `${row('chosen-target', 'is-selected is-drop-active')}</div>` +
+        '<i id="soft" style="background: var(--fab-success-soft)"></i>' +
+        '<i id="raised" style="background: var(--fab-surface-raised)"></i></div>'
+    );
+    const ground = (selector) =>
+      page.evaluate((one) => getComputedStyle(document.querySelector(one)).backgroundColor, selector);
+    const soft = await ground('#soft');
+    const raised = await ground('#raised');
+    assert.notEqual(soft, raised, 'precondition: the two grounds are told apart');
+    assert.equal(await ground('#plain > td'), 'rgba(0, 0, 0, 0)', 'a plain row is unpainted');
+    for (const id of ['target', 'chosen-target']) {
+      assert.equal(await ground(`#${id} > td`), soft, `the ${id} row's cells take the drop ground`);
+    }
+    await page.hover('#plain > td');
+    assert.equal(await ground('#plain > td'), raised, 'precondition: hover paints a plain row');
+    await page.hover('#chosen > td');
+    assert.equal(await ground('#chosen > td'), soft, 'hover never repaints the selected row');
+  } finally {
+    await context.close();
+  }
+});
+
+// The count is the specimen's `k-count` (issue 1782): the sheet restates its declarations exactly.
+test('the data table count is the library specimen`s k-count', () => {
+  const declarations = (block) =>
+    block
+      .slice(block.indexOf('{') + 1, block.lastIndexOf('}'))
+      .split(';')
+      .map((one) => one.replaceAll(/\s+/g, ''))
+      .filter(Boolean)
+      .sort((left, right) => left.localeCompare(right));
+  const library = readFileSync(
+    resolve(__dirname, '../../openspec/specs/design-system/library.html'),
+    'utf8'
+  );
+  const specimen = library.match(/\.k-count\{[^}]*\}/)?.[0] ?? '';
+  assert.ok(specimen, 'the library still defines k-count');
+  assert.deepEqual(
+    declarations(blockFor('.fabricate-data-table .fabricate-data-table-count')),
+    declarations(specimen)
+  );
 });
 
 // The gathering task library's inspector rail stacks three cards.
@@ -2048,5 +2057,49 @@ test('World Travel Map Region Links rows and empty state sit on the 12px browse 
         assert.ok(near(pane.bottom, main.bottom), `${at}: the pane fills .manager-main to its foot`);
       }
     }
+  }
+});
+// The operator's sign tone is a border on its trigger, which outranks the Select family's focus
+// border; keyboard focus must still repaint it in the accent (issue 1777, WCAG 2.4.7).
+test('the character-modifier operator keeps a visible keyboard focus over its sign tone', async () => {
+  const context = await openLayoutContext({ viewport: { width: 420, height: 200 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style>` +
+        '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
+        '<span data-accent style="border:1px solid var(--fab-accent-border)"></span>' +
+        ['is-positive', 'is-negative']
+          .map(
+            (tone) =>
+              `<div class="fabricate-picker manager-travel-picker fabricate-select ` +
+              `manager-character-modifier-operator-select ${tone}">` +
+              `<button type="button" data-tone="${tone}" ` +
+              'class="fabricate-select-trigger fabricate-select-trigger-inline">Sign</button></div>'
+          )
+          .join('') +
+        '</div>'
+    );
+    const accent = await page.evaluate(
+      () => getComputedStyle(document.querySelector('[data-accent]')).borderTopColor
+    );
+    const border = (tone) =>
+      page.evaluate(
+        (selector) => getComputedStyle(document.querySelector(selector)).borderTopColor,
+        `[data-tone="${tone}"]`
+      );
+    for (const tone of ['is-positive', 'is-negative']) {
+      const rest = await border(tone);
+      assert.notEqual(rest, accent, `${tone}: the resting trigger carries its tone, not the accent`);
+      await page.keyboard.press('Tab');
+      assert.equal(
+        await page.evaluate(() => document.activeElement?.dataset.tone),
+        tone,
+        `${tone}: Tab lands on the trigger, so the state below is keyboard focus`
+      );
+      assert.equal(await border(tone), accent, `${tone}: keyboard focus repaints the border`);
+    }
+  } finally {
+    await context.close();
   }
 });

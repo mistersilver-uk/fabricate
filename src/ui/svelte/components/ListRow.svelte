@@ -1,4 +1,5 @@
-<!-- Dense, read-only ListRow. The caller supplies entitled display strings, including quantity. -->
+<!-- Dense, read-only ListRow. The caller supplies entitled display strings, including quantity.
+     `class` and a rest spread land on the root; the row's own `data-list-row` wins. -->
 <script>
   import Medallion from './Medallion.svelte';
 
@@ -13,14 +14,17 @@
     muted = false,
     truncateName = false,
     trailing = null,
+    class: extraClass = '',
+    ...rest
   } = $props();
 </script>
 
 <div
-  class="fabricate-list-row"
+  class={['fabricate-list-row', extraClass]}
   class:is-positive={tone === 'positive'}
   class:is-muted={muted}
   class:is-truncated={truncateName}
+  {...rest}
   data-list-row="dense"
 >
   <Medallion {art} {icon} {tint} alt="" size={22} />

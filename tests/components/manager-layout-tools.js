@@ -1212,12 +1212,13 @@ test('a squeezed breadcrumb crumb ellipsises from its left edge under the core b
       '<style>a.button, button { display: flex; justify-content: center; align-items: center; }</style>' +
         `<style>${css}</style>` +
         '<div class="fabricate-manager" style="width: 300px">' +
+        '<header class="fabricate-page-header"><div class="manager-heading">' +
         '<nav class="manager-breadcrumbs" aria-label="Breadcrumbs">' +
         '<button type="button">Crafting Systems</button><i class="fas fa-chevron-right" aria-hidden="true"></i>' +
         '<button type="button">Greenwarden Herbalism</button><i class="fas fa-chevron-right" aria-hidden="true"></i>' +
         '<button type="button">Environments</button><i class="fas fa-chevron-right" aria-hidden="true"></i>' +
         '<span>Sunlit Grove of the Long Evening</span>' +
-        '</nav></div>'
+        '</nav></div></header></div>'
     );
     return page.evaluate(() => {
       return [...document.querySelectorAll('.manager-breadcrumbs > button')].map((button) => {

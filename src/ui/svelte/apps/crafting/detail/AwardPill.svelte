@@ -1,10 +1,11 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): a composition of the Medallion member and two text runs, shared by the crafting detail's three award lists rather than offered as a vocabulary member -->
+<!-- ratchet-exempt(design-system): a composition of the Medallion member and two text runs, shared by the crafting detail's two award lists rather than offered as a vocabulary member -->
 <!--
   AwardPill is one awarded output in the crafting detail (issue 1773): its art, or a currency or
   knowledge reward's glyph, its name, and its amount, which a reward states itself and an item
-  reads as `×qty`. The detail's output list, its outcome tiers and the roll result each render it,
-  as `variant` `output`, `tier` or `roll`, which sets the pill's size and keeps each host's classes.
+  reads as `×qty`. The detail's output list and the roll result render it, as `variant` `output`
+  or `roll`, which sets the pill's size and keeps each host's classes; the outcome tiers draw the
+  shared ladder's rows (issue 1644).
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
@@ -17,12 +18,6 @@
       name: 'crafting-io-output-name',
       qty: 'crafting-io-output-qty',
       size: 32,
-    },
-    tier: {
-      base: 'crafting-tier-award',
-      name: 'crafting-tier-award-name',
-      qty: 'crafting-tier-award-qty',
-      size: 26,
     },
     roll: {
       base: 'crafting-roll-award',
@@ -44,7 +39,7 @@
   data-award-kind={kind}
   data-io-output={variant === 'output' ? kind : undefined}
 >
-  <!-- ratchet-exempt(design-system): the three hosts' sizes moved here unchanged (32, 26, 24); the geometry sweep owns their rungs -->
+  <!-- ratchet-exempt(design-system): the two hosts' sizes moved here unchanged (32, 24); the geometry sweep owns their rungs -->
   <Medallion art={artwork.art} icon={artwork.icon} alt="" size={shape.size} />
   <span class={shape.name}>{item?.name}</span>
   <span class={shape.qty}>{item?.amountText ?? `×${item?.qty ?? 1}`}</span>
@@ -67,18 +62,6 @@
 
   .crafting-io-output-name {
     font-size: 13px;
-  }
-
-  .crafting-tier-award {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--fab-space-chip);
-    padding: var(--fab-space-2xs) var(--fab-space-2) var(--fab-space-2xs) var(--fab-space-2xs);
-    border: 1px solid var(--fab-border);
-    /* ratchet-exempt(design-system): moved unchanged from OutcomeTierTable, which carried it at base */
-    border-radius: 8px;
-    background: var(--fab-surface);
-    font-size: 12px;
   }
 
   /* Capped to the column so a long name ellipsizes instead of widening or wrapping the pill, so
@@ -104,7 +87,6 @@
   }
 
   .crafting-io-output-qty,
-  .crafting-tier-award-qty,
   .crafting-roll-award-qty {
     font-variant-numeric: tabular-nums;
     font-weight: 600;

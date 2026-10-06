@@ -26,7 +26,7 @@ import {
   workingTree,
 } from '../helpers/designSystemRatchet.js';
 import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
-import { parseMarkers, siteMarker } from '../helpers/mergeBaseRatchet.js';
+import { siteMarker } from '../helpers/mergeBaseRatchet.js';
 import { collectWorkingTreeSources, stripComments } from '../helpers/sourceScan.js';
 import {
   declarationsIn,
@@ -634,8 +634,10 @@ test('a reasoned marker above a native <select> exempts it, and prose or distanc
   );
 });
 
-test('a converted select did not pay its ratchet with a marker', () => {
-  // THE THIRD POLARITY (issue 1504), and the one the two clauses above cannot express.
+test('a converted select file renders no native <select>, marked or not', () => {
+  // THE THIRD POLARITY (issue 1504), and the one the two clauses above cannot express: a marker
+  // pays the ratchet while the operating system's drop-down goes on shipping. The scan reads the
+  // template, not the markers, so a marked `<select>` in one of these files still fails here.
   const CONVERTED = [
     'src/ui/svelte/components/Select.svelte',
     'src/ui/svelte/components/Pagination.svelte',
@@ -646,7 +648,17 @@ test('a converted select did not pay its ratchet with a marker', () => {
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',
+    // The relocated manager selects (issue 1777).
+    'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte',
+    'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
+    'src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte',
   ];
+  const probe = '<!-- ratchet-exempt(design-system): a probe -->\n<select></select>';
+  assert.equal(
+    nativeSelectSites(templatesOf(() => probe, ['src/ui/svelte/Probe.svelte'])).length,
+    1,
+    'the scan must count a marked native `<select>`, or every file below passes on nothing'
+  );
   const { readFile } = workingTree(TEMPLATE_CORPUS);
   for (const file of CONVERTED) {
     const source = readFile(file);
@@ -656,12 +668,11 @@ test('a converted select did not pay its ratchet with a marker', () => {
         'moved — retarget this list — or the walk has stopped reading `.svelte`.'
     );
     assert.deepEqual(
-      parseMarkers(file, source).filter((marker) => marker.family === DESIGN_SYSTEM_FAMILY),
+      nativeSelectSites(templatesOf(readFile, [file])).map((site) => site.line),
       [],
-      `${file} carries a \`ratchet-exempt(design-system)\` marker. Issues 1504 and 1511 paid ` +
-        'this file’s native selects down by converting it to the app’s own option list; a ' +
-        'marker here would pay the same debt while the operating system’s drop-down went on ' +
-        'shipping, which is the one way that ratchet can be paid without the defect being fixed.'
+      `${file} renders a native \`<select>\` again. It was converted to the app’s own option ` +
+        'list; render `<Select>`, and a `ratchet-exempt(design-system)` marker does not excuse ' +
+        'it here.'
     );
   }
 });

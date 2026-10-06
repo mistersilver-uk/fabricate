@@ -5,6 +5,10 @@
 import { ANCHORED_POPOVER_SOURCES } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
+/** A weather value long enough to outrun the inspector column's trigger, and the id it slugs to. */
+const LONG_WEATHER = 'Freezing fog rolling in off the northern coast';
+const LONG_WEATHER_ID = 'freezing-fog-rolling-in-off-the-northern-coast';
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipes-editor-roundtrip',
@@ -39,7 +43,8 @@ export const CASES = Object.freeze([
     expectView: 'systems',
     kinds: ['manager', 'systems'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       // `SystemsBrowserView` alone (issue 1515).
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
@@ -83,7 +88,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'systems'],
     // No pattern for `components/EmptyState.svelte`: it is a broad signal, so no case's `sourceMatches` ever sees it.
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],
@@ -101,9 +107,43 @@ export const CASES = Object.freeze([
     expectView: 'systems',
     kinds: ['manager', 'systems'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
+    ],
+  }),
+  // The library inspector's weather shortcut open (issue 1777), in the inspector's narrow column
+  // with a long authored value, which the GM adds on Gathering settings before returning.
+  managerCase({
+    id: 'manager-selected-condition-select-long-option',
+    label: 'Manager — Selected system weather shortcut list with a long value',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      {
+        selector:
+          '[data-gathering-condition-panel="weather"] .manager-condition-add .fabricate-field input',
+        fill: LONG_WEATHER,
+      },
+      { selector: '[data-gathering-condition-add="weather"]' },
+      { selector: '.manager-scope-return' },
+      { selector: '.manager-system-row[data-system-id="lab-herbalism"] .manager-system-identity' },
+      { selector: '[data-systems-gathering-condition="weather"] .fabricate-select-trigger' },
+    ],
+    expectView: 'systems',
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover' +
+      ` [data-popover-option="${LONG_WEATHER_ID}"] .fabricate-select-label`,
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'systems'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({
@@ -121,10 +161,12 @@ export const CASES = Object.freeze([
     expectView: 'systems',
     kinds: ['manager', 'systems'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerNavRail\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
     ],
   }),
@@ -138,10 +180,12 @@ export const CASES = Object.freeze([
     expectView: 'systems',
     kinds: ['manager', 'systems'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerNavRail\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
     ],
   }),
@@ -159,7 +203,8 @@ export const CASES = Object.freeze([
     position: { width: 1000, height: 700 },
     kinds: ['manager', 'systems', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerTitleBar\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],

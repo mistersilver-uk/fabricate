@@ -87,6 +87,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
+    // The shared ladder the routed body draws, and the row each recovered result is (issue 1644).
+    'src/ui/svelte/components/OutcomeLadder.svelte',
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',

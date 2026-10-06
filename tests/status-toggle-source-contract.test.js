@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import path from 'node:path';
 
+import { defineSoleWriterClauses } from './helpers/primitiveSourceContract.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import { withoutComments } from './helpers/stepperSourceContract.js';
 
@@ -16,8 +17,9 @@ const TREE_CLASSES = Object.freeze([
 const PRIMITIVE = 'src/ui/svelte/components/StatusToggle.svelte';
 
 /**
- * The `.svelte` files under `src/` that may still write the tree, each with its reason and the
- * exact number of times it writes each class.
+ * The `.svelte` files under `src/` that may write the tree, each with its reason and the exact
+ * number of times it writes each class. Issue 1777 converted the last hand-rolled switch, the
+ * character-modifier override in `environment/GatheringModifierEditor.svelte`.
  */
 const TREE_EXCEPTIONS = Object.freeze([
   Object.freeze({
@@ -30,20 +32,6 @@ const TREE_EXCEPTIONS = Object.freeze([
     why:
       'the primitive itself, which writes the tree once so that no call site has to remember ' +
       'it; its docblock names all three classes in prose, which the comment stripping removes',
-  }),
-  Object.freeze({
-    file: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
-    counts: Object.freeze({
-      'manager-status-toggle-track': 1,
-      'manager-status-toggle-knob': 1,
-      'manager-status-toggle-label': 1,
-    }),
-    why:
-      'deferred with a named reason. The root held the drop-scope and event-scope ' +
-      'character-modifier override switches as a hand-rolled pair; issue 1707 wrote that panel ' +
-      'once, so one of the two was de-duplicated rather than converted and the survivor moved ' +
-      'here with the rest of the panel. Pinned by count so a later pass that removes it without ' +
-      'converting it fails here instead of leaving a deferral nobody is tracking.',
   }),
 ]);
 
@@ -82,6 +70,14 @@ test('the switch element tree is written only by the primitive', () => {
       '`aria-label` ride the rest spread — see `StatusToggle.svelte`:\n  ' +
       offenders.join('\n  ')
   );
+});
+
+defineSoleWriterClauses({
+  label: 'status-toggle',
+  primitive: PRIMITIVE,
+  exemptions: TREE_EXCEPTIONS,
+  components: COMPONENTS,
+  tokens: TREE_CLASSES,
 });
 
 test('every recorded exemption is still earned, at the count it was recorded with', () => {

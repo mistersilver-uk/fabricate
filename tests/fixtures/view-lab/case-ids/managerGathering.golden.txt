@@ -35,6 +35,7 @@ manager-gathering-task-editor-routed
 manager-gathering-task-editor-routed-unmatched
 manager-gathering-task-availability-menu
 manager-gathering-task-editor-stacked
+manager-gathering-task-drops-ranked-narrow
 manager-environment-edit-placeholder
 manager-environment-empty-membership-normal
 manager-environment-empty-membership-narrow
@@ -52,6 +53,7 @@ manager-gathering-events-normal
 manager-gathering-event-editor-normal
 manager-gathering-task-drop-modifiers-normal
 manager-gathering-task-drop-condition-modifier-attached
+manager-gathering-task-drop-character-modifier-attached
 manager-gathering-task-editor-check-fixed-over
 manager-gathering-task-editor-check-fixed-under
 manager-gathering-task-editor-check-add
