@@ -1399,8 +1399,8 @@ const CHECKS_STUDIO_DIR = 'src/ui/svelte/apps/manager/checks';
 const CHECKS_STUDIO_SRC = [
   ...readdirSync(CHECKS_STUDIO_DIR).map((entry) => join(CHECKS_STUDIO_DIR, entry)),
   'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-  // The Checks rail entries and their issue badges are `ManagerSystemNav.svelte`'s (issue 1717).
-  'src/ui/svelte/apps/manager/ManagerSystemNav.svelte',
+  // The Checks rail entries and their issue badges are the rail item model's (issue 1777).
+  'src/ui/svelte/apps/manager/managerNavItems.js',
   // `data-checks-save` is the page header's crafting action unit (issue 1720).
   'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
 ]
@@ -1431,7 +1431,7 @@ test('every Checks hook a capture producer navigates by is still shipped', () =>
   // The rail sub-item is addressed by its id, built by interpolation at both ends, so the
   // name-level scan above cannot see it. Pin the two halves against each other instead.
   assert.match(HARNESS, /#manager-checks-nav-\$\{activity\}/);
-  assert.match(CHECKS_STUDIO_SRC, /id=\{`manager-checks-nav-\$\{checksItem\.id\}`\}/);
+  assert.match(CHECKS_STUDIO_SRC, /domId: `manager-checks-nav-\$\{checksItem\.id\}`/);
 });
 
 test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () => {

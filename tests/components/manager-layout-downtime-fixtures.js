@@ -1,13 +1,13 @@
 /** Fixtures and rendered-geometry readers for `manager-layout-downtime.js` (issue 1670). */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { openLayoutContext } from '../helpers/layout-harness.js';
 
+import { DOWNTIME_NAV_CENSUS } from './manager-downtime-nav-census.js';
 import { css } from './manager-layout-shared.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -76,33 +76,31 @@ export async function readDowntimePreviewArrangement(paneWidth) {
 }
 
 // -- Downtime rail tab badges, measured (issue 1302) --------------------------------------
-const downtimeNavGroupPath = resolve(
-  __dirname,
-  '../../src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte'
-);
-const downtimeNavGroupSource = readFileSync(downtimeNavGroupPath, 'utf8');
+// One row per rendered element, from the mounted suite's census of the group (issue 1777).
+const downtimeNavRows = [
+  ...DOWNTIME_NAV_CENSUS.base,
+  ...Object.values(DOWNTIME_NAV_CENSUS.deltas).flat(),
+].filter((row) => row.includes(' span '));
 
 export function assertBadgeFixtureMirrorsComponent() {
   // BOTH Downtime badges are the ISSUE-SUMMARY vehicle (issue 1515). The sub-item badge was
   // `.manager-nav-count`, which drew a companion's attention signal as a record count while
-  // the parent rollup — the SUM of exactly those badges — drew as the issue pill. Matched as
-  // ADJACENCY rather than as two independent `includes`, which any two unrelated lines satisfy
-  // now that both marks name the same class.
-  assert.match(
-    downtimeNavGroupSource,
-    /class="manager-nav-issue-badge"\s+data-world-downtime-badge=\{item\.id\}/,
+  // the parent rollup — the SUM of exactly those badges — drew as the issue pill. Matched on ONE
+  // rendered element rather than as two independent `includes`, which any two unrelated rows
+  // satisfy now that both marks name the same class.
+  const classesOf = (hook) =>
+    downtimeNavRows
+      .filter((row) => row.includes(`${hook}=`))
+      .map((row) => / class="([^"]*)"/.exec(row)?.[1]);
+  const isIssueBadge = (hook) => {
+    const classes = classesOf(hook);
+    return classes.length > 0 && classes.every((name) => name === 'manager-nav-issue-badge');
+  };
+  assert.ok(
+    isIssueBadge('data-world-downtime-badge'),
     'the sub-item badge fixture below must be the marker the component actually emits'
   );
-  assert.match(
-    downtimeNavGroupSource,
-    /class="manager-nav-issue-badge"\s+data-world-downtime-badge-total/,
-    'and so must the parent rollup fixture'
-  );
-  assert.equal(
-    /class="manager-nav-count"\s+data-world-downtime-badge/.test(downtimeNavGroupSource),
-    false,
-    'and neither Downtime badge has gone back to the record-count vehicle'
-  );
+  assert.ok(isIssueBadge('data-world-downtime-badge-total'), 'and so must the parent rollup fixture');
 }
 
 // The rail chrome every fixture here needs, at the shipped 220px (or the collapsed 56px).
@@ -159,7 +157,7 @@ async function readDowntimeRoute(managerWidth, hostClasses, hostChildren, readIn
         `<div style="width:${managerWidth}px;height:760px">` +
         `<div class="fabricate-manager" data-manager-view="world-downtime">` +
         `<div class="manager-titlebar">titlebar</div>` +
-        `<div class="manager-header">header</div>` +
+        `<div class="fabricate-page-header manager-header">header</div>` +
         `<div class="manager-body">` +
         `<aside class="manager-rail">rail</aside>` +
         `<main class="manager-main">` +

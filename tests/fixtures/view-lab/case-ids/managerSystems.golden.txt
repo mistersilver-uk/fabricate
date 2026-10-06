@@ -3,6 +3,7 @@ manager-default-selection
 manager-systems-row-menu-open
 manager-systems-empty
 manager-selected-normal
+manager-selected-condition-select-long-option
 manager-rail-expanded
 manager-rail-collapsed
 manager-selected-stacked

@@ -149,7 +149,7 @@ const requirementRailFrame = (id, label) => ({
 // header actions of every manager frame the shell appears in are drawn by these six.
 const PAGE_HEADER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ManagerPageHeader\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderBreadcrumbs\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/headerBreadcrumbs\.js$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderActions\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderCraftingActions\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderGatheringActions\.svelte$/,
@@ -190,6 +190,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/navRailModel\.svelte\.js$/,
       /^styles\/fabricate\.css$/,
     ],
@@ -205,6 +206,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/managerNavItems\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/navRailModel\.svelte\.js$/,
       /^styles\/fabricate\.css$/,
     ],

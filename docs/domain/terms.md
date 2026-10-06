@@ -192,11 +192,11 @@ Spec reference: openspec/specs/recipes-and-steps/spec.md
 A slot IS an `IngredientGroup` — the same record, named for how the player meets it — so "slot" and "ingredient group" are never two different things.
 A slot is **fixed** when its group authors exactly one option, a **choice** when it authors more than one, and an **essence** slot when the option resolved for it is an essence alternative.
 Slot state is `met` / `partial` / `short`, and the rail keeps at most one slot's chooser open at a time.
-An unchosen choice slot is `partial`, a to-do rather than an error, and its tile is drawn open; a chosen choice that falls short is `short`; a partly delivered essence is `partial` but paints as `short` until the slot tile gains a partial face (issue 1644), and the difference is stated in words.
+An unchosen choice slot is `partial`, a to-do rather than an error, and its tile is drawn open; a chosen choice that falls short is `short`; a partly delivered essence is `partial` and paints the slot tile's own partial face, on the warning ground rather than the danger one, in the crafting rail and the Journal alike.
 A short alternative is dimmed but still offered, and its shortfall is stated in words beside it.
 The shared requirement chooser draws every slot as a slot tile, and the crafting rail is its adopter.
 
-Canonical mapping: `IngredientGroup`, `requirementSlots.js`, `RequirementChooser.svelte`, `SlotTile.svelte`, `RequirementRail.svelte`
+Canonical mapping: `IngredientGroup`, `requirementSlots.js`, `RequirementChooser.svelte`, `SlotTile.svelte`, `SlotRow.svelte`, `RequirementRail.svelte`
 
 Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
 
@@ -1976,6 +1976,7 @@ The clamp routes to the closest tier, it does not force success — a below-lowe
 It is threaded only by the crafting `_runRoutedCheck` caller through `runFormulaRouted`'s optional `minOutcomeId`, so salvage and gathering routed checks are unaffected; on a blocked craft the tier it blocked is recorded as `data.blockedOutcomeId`.
 **One ranking (issue 975):** tier ORDER is derived in exactly one place, `rankedRoutedOutcomes`, shared by the forced reroute, this minimum gate and the tier-step pass, and the same ranking rule picks the best qualifying tier and the clamp's tier — a fixed range by `start` and a multiply tier by its threshold, both in the check's direction, an additive relative tier by its benefit-signed `dc`, an **Otherwise Tier** lowest, other non-finite ranks dropped, and the FIRST authored tier kept among equal ranks in both directions.
 The gate consumes it only to LOCATE the required tier and still compares `start` VALUES as a meet in the check's direction, so two fixed tiers sharing a `start` compare equal and the craft passes, where an index comparison would strictly fail it.
+After a successful crafting or salvage roll the player sees the reached tier marked **Your roll**, read from the recorded `outcomeId`; a failed roll, or a secret or blind one, marks no tier.
 
 Canonical mapping: `classifyCheckTotal` and its private `matchRoutedOutcome`/`routeCritOutcome`/`rankedRoutedOutcomes`/`applyTierStepTriggers` in `src/systems/checkRouting.js` (re-exported by `src/systems/checkRoll.js`); `relativeOutcomes[]`/`fixedOutcomes[]` from `_normalizeRoutedCraftingCheck`, `normalizeRoutedCraftingCheck` in `src/systems/normalize/craftingCheck.js`; `Recipe.minSuccessOutcomeId`; `resolveRecipeFixedOutcomeTierOptions` in `src/utils/routedOutcomeKeywords.js`
 

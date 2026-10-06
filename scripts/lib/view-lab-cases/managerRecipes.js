@@ -10,6 +10,10 @@ import {
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
+// The selection the inspector draws, and the draft whose refused save the notice reports.
+const RECIPE_ITEM_MODEL_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/recipe-item\/recipeItemModel\.svelte\.js$/;
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipes-normal',
@@ -492,7 +496,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       ...RECIPE_BULK_EDIT_MATCHES,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeOverviewSelectOptions\.js$/,
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
     ],
   }),
   // Issue 2006: under a counting check each tier names its successes needed, and the axis says so.
@@ -610,7 +614,7 @@ export const CASES = Object.freeze([
       // The inspector aside this route mounts (issue 1505).
       /^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/,
       // The manager router and the Crafting entry model (issue 1151).
-      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(?:(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte|headerBreadcrumbs\.js)$/,
       /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
   }),
@@ -630,8 +634,11 @@ export const CASES = Object.freeze([
     // The grid with its accented tile, not the aside root, and `tone="info"` is that tone's one reach in the tree.
     expectSelector: '[data-item-page-stats] [data-stat-tone="info"]',
     kinds: ['manager', 'books-scrolls'],
-    // The inspector only.
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/],
+    // The inspector, and the model whose selection it draws (issue 1721).
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/,
+      RECIPE_ITEM_MODEL_PATTERN,
+    ],
   }),
   // The browse toolbars' first open-panel frame (issue 1510), and the tightest panel of the commit
   // that converted them: `Limited learning` is 84px of the 128px an unticked row leaves once the
@@ -718,6 +725,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(BooksScrollsView|RecipeItemEditor)\.svelte$/,
+      RECIPE_ITEM_MODEL_PATTERN,
     ],
   }),
   managerCase({

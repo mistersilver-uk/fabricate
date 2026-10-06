@@ -52,6 +52,7 @@ player-crafting-category-filter-list
 player-crafting-sources-picker
 player-crafting-ingredient-routed
 player-crafting-routed-by-check
+player-crafting-routed-reached
 player-crafting-run-summary
 player-crafting-roll-result
 player-crafting-roll-prompt

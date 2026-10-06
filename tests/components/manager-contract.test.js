@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { headerBreadcrumbs } from '../../src/ui/svelte/apps/manager/headerBreadcrumbs.js';
 import { COMPONENT_EDITOR_CARD_FILES } from '../helpers/componentEditorCards.js';
 import {
   calledName,
@@ -135,7 +136,9 @@ const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
 const MANAGER_NAV_RAIL = 'src/ui/svelte/apps/manager/ManagerNavRail.svelte';
 const MANAGER_PAGE_HEADER = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
-const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte';
+const MANAGER_TITLE_BAR = 'src/ui/svelte/apps/manager/ManagerTitleBar.svelte';
+const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/headerBreadcrumbs.js';
+const PAGE_HEADER = 'src/ui/svelte/components/PageHeader.svelte';
 const MANAGER_HEADER_ACTIONS = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
 const MANAGER_HEADER_CRAFTING_ACTIONS =
   'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte';
@@ -162,12 +165,10 @@ const GATHERING_UNITS = [
   GATHERING_MODIFIER_HANDLERS,
 ];
 const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
-const MANAGER_WORLD_NAV = 'src/ui/svelte/apps/manager/ManagerWorldNav.svelte';
 const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
   'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte';
-// The rail's three entry units answer together for a claim over the entries they share; a claim
-// narrowed to one of them would drop most of its population (issue 1717).
-const MANAGER_NAV_UNITS = [MANAGER_SYSTEM_NAV, MANAGER_WORLD_NAV, MANAGER_WORLD_DOWNTIME_NAV_GROUP];
+// The rail's three entry units render the rows this one model builds (issue 1777).
+const MANAGER_NAV_ITEMS = 'src/ui/svelte/apps/manager/managerNavItems.js';
 // The page header's copy is spelled across two units since issue 1720 — the shell's markup and the
 // model it resolves from — so a key that must appear once appears once across the pair.
 const headerCopyLiterals = () => [
@@ -206,6 +207,7 @@ const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svel
 // The world Tool entry, which took the linked-item card off the system editor (issue 1373).
 const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte';
 const CHANCE_SLIDER = 'src/ui/svelte/components/ChanceSlider.svelte';
+const INSPECTOR_CARD = 'src/ui/svelte/components/InspectorCard.svelte';
 const ENVIRONMENT_EDIT = 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte';
 // The reward and event limit counts are one shared component (issue 1050).
 const GATHERING_INSPECTOR_RAIL =
@@ -234,7 +236,7 @@ const GATHERING_TASK_PARTS = Object.freeze(
     'ResultsTab',
     'ComponentBrowserCard',
     'DropsCard',
-    'DropRow',
+    'DropCell',
     'Card',
   ].map(taskPart)
 );
@@ -341,20 +343,22 @@ describe('CraftingSystemManager source contract', () => {
   );
 
   // What the `AC-11` to `AC-15` mounted cases cannot say is how many render sites exist: a third
-  // one added outside the provider-mode guard would satisfy every one of them (issue 1302).
+  // one added outside the provider-mode guard would satisfy every one of them (issue 1302). The
+  // badge is a model row's marker since issue 1777, so its hook is a model key, never an attribute.
   it('renders the Downtime badge at exactly two sites', () => {
-    const sites = templateNodes(componentAstOf(MANAGER_WORLD_DOWNTIME_NAV_GROUP))
-      .filter((node) =>
-        (node.attributes ?? []).some((attribute) =>
-          String(attribute.name ?? '').startsWith('data-world-downtime-badge')
-        )
-      )
-      .map((node) => node.name);
+    const isBadgeHook = (name) => String(name ?? '').startsWith('data-world-downtime-badge');
+    const sites = [...walkNodes(moduleAstOf(MANAGER_NAV_ITEMS).ast)]
+      .filter((node) => node.type === 'Property' && isBadgeHook(node.key?.value ?? node.key?.name))
+      .map((node) => node.key.value);
     assert.equal(
       sites.length,
       2,
       `the sub-item badge and the parent rollup, and nothing else (found ${sites.join(', ')})`
     );
+    const written = templateNodes(componentAstOf(MANAGER_WORLD_DOWNTIME_NAV_GROUP)).filter((node) =>
+      (node.attributes ?? []).some((attribute) => isBadgeHook(attribute.name))
+    );
+    assert.equal(written.length, 0, 'and the group writes no badge of its own beside the model');
   });
 
   // The companion is disposed before ApplicationV2 removes its Svelte target; that ordering is
@@ -632,20 +636,29 @@ describe('CraftingSystemManager source contract', () => {
     attributes: [['class', 'manager-rail']],
   });
 
-  // `manager-header` is the page header's own identity since issue 1720, and it draws the two
-  // `<header>` elements as bare siblings rather than under a wrapper of its own.
+  // `manager-header` is the page header's identity since issue 1720, a caller class on
+  // `PageHeader` since issue 1777, and the two headers stay bare siblings under no wrapper.
   defineStructureContract('names both page headers', MANAGER_PAGE_HEADER, {
-    attributes: [
-      ['class', 'manager-header'],
-      ['class', 'manager-heading'],
-    ],
+    attributes: [['class', 'manager-header']],
     spells: ['manager-tools-context-header'],
-    renders: ['ManagerHeaderBreadcrumbs', 'ManagerHeaderActions', 'Kicker', 'Medallion'],
+    renders: ['PageHeader', 'ManagerHeaderActions', 'Medallion'],
+    rendersNo: ['Kicker'],
+    writesNo: ['aria-current'],
   });
 
-  // `manager-breadcrumbs` is the trail's own identity since issue 1720.
-  defineStructureContract('names the breadcrumb trail', MANAGER_HEADER_BREADCRUMBS, {
-    attributes: [['class', 'manager-breadcrumbs']],
+  // `manager-breadcrumbs` and `manager-heading` are `PageHeader`'s since issue 1777: the manager
+  // hands it crumbs from `headerBreadcrumbs.js` and writes no trail markup of its own.
+  defineStructureContract('names the breadcrumb trail', PAGE_HEADER, {
+    attributes: [
+      ['class', 'manager-breadcrumbs'],
+      ['class', 'manager-heading'],
+    ],
+  });
+  defineStructureContract('writes no trail markup in the manager header', MANAGER_PAGE_HEADER, {
+    attributesNo: [
+      ['class', 'manager-breadcrumbs'],
+      ['class', 'manager-heading'],
+    ],
   });
 
   // `manager-header-actions` is the action group's own identity since issue 1720, and the two
@@ -805,7 +818,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'uses manager localization keys rather than hard-coded copy',
-    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, HEADER_MODEL],
+    [MANAGER_ROOT, MANAGER_NAV_ITEMS, HEADER_MODEL, MANAGER_TITLE_BAR],
     {
       // In full: a substring claim is satisfied by `…Titlebar.Premium` next door. The mounted
       // cases render this copy, which `text(key, fallback)` still produces under a renamed key.
@@ -1111,7 +1124,7 @@ describe('CraftingSystemManager source contract', () => {
   // is selected, rather than rendering an empty heading (#429).
   defineStructureContract(
     'titles the page after the record it edits',
-    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, MANAGER_HEADER_BREADCRUMBS],
+    [MANAGER_ROOT, MANAGER_NAV_ITEMS, MANAGER_HEADER_BREADCRUMBS],
     {
       reads: ['selectedSystem.name'],
       spellsExactly: [
@@ -1119,7 +1132,9 @@ describe('CraftingSystemManager source contract', () => {
         'FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb',
       ],
       spellsNo: ['SystemEdit.Summary', 'SystemEdit.PageTitle'],
-      writes: ['data-nav-system-edit'],
+      // The rail row's hook is a model key (issue 1777); the rail census renders it.
+      keys: ['data-nav-system-edit'],
+      keysNo: ['data-nav-system-overview'],
       writesNo: ['data-nav-system-overview'],
       names: ['systemOverviewCount'],
       assignsNo: [['activeView', 'system-overview']],
@@ -1160,7 +1175,7 @@ describe('CraftingSystemManager source contract', () => {
   // real routes now, which is why neither may reappear in the placeholder list either.
   defineStructureContract(
     'derives the placeholder rail from selection and feature gates',
-    [MANAGER_ROOT, MANAGER_SYSTEM_NAV],
+    [MANAGER_ROOT, MANAGER_NAV_ITEMS],
     {
     names: ['visiblePlaceholderViews', 'selectSystemAndShowBrowser'],
     declares: ['experimentalFeaturesEnabled'],
@@ -1182,7 +1197,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'advertises the Graph placeholder as the only one, behind the experimental toggle',
-    { file: MANAGER_SYSTEM_NAV, constant: 'placeholderViews' },
+    { file: MANAGER_NAV_ITEMS, constant: 'placeholderViews' },
     {
       property: [
         ['id', 'graph'],
@@ -1200,7 +1215,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'and gates it on the experimental toggle rather than on a system feature',
-    { file: MANAGER_SYSTEM_NAV, fn: 'isViewAvailableForSystem' },
+    { file: MANAGER_NAV_ITEMS, fn: 'isViewAvailableForSystem' },
     { compares: ['graph'], names: ['experimentalFeaturesEnabled'] }
   );
 
@@ -1253,30 +1268,16 @@ describe('CraftingSystemManager source contract', () => {
 
   });
 
-  // A universal over every composition site, which is why it reads all three entry units: the
-  // sites are spread across them and narrowing it to one would drop most of its population.
-  it('never takes the selected pill class from the route a nav parent groups', () => {
-    const parentClasses = MANAGER_NAV_UNITS.flatMap((file) =>
-      [...walkNodes(componentAstOf(file).fragment)].filter(
-        (node) =>
-          node.type === 'TemplateLiteral' &&
-          literalStrings(node).some((literal) => literal.includes('manager-nav-parent'))
-      )
-    );
-    assert.ok(parentClasses.length > 0, 'the gathering parent still composes its class');
-    assert.ok(
-      parentClasses.every((node) => !identifierNames(node).has('isGatheringRoute')),
-      'and does not take the selected pill class from the route it groups'
-    );
-  });
+  // A nav parent's pill is pinned by value: tests/manager-nav-items.test.js ("keeps the Crafting and Gathering parents out of the pill") and the rail census's Crafting and Gathering locked-open states.
 
   // The gathering rail is one submenu group with its own expand/collapse control and a rollup
   // count summarising the three sections beneath it.
-  defineStructureContract('groups the gathering sections into a rail submenu', MANAGER_SYSTEM_NAV, {
+  defineStructureContract('groups the gathering sections into a rail submenu', [MANAGER_SYSTEM_NAV, MANAGER_NAV_ITEMS], {
     spells: ['manager-nav-group '],
-    // The member path the unit reads through its `navRail` prop, which is what replaced the
-    // root's own `railGroupExpanded` (issue 1717).
-    reads: ['navRail.expanded.gathering'],
+    // The member path the model reads through the unit's `navRail` prop, which is what replaced
+    // the root's own `railGroupExpanded` (issue 1717); it keys it by group id (issue 1777).
+    reads: ['navRail.expanded'],
+    property: [['id', 'gathering']],
     spellsExactly: [
       'manager-nav-submenu',
       'manager-nav-toggle',
@@ -1794,28 +1795,32 @@ describe('CraftingSystemManager source contract', () => {
   // The per-system condition shortcut card moved with the systems inspector chain (issue 1721).
   defineStructureContract('draws the global condition shortcuts', SYSTEM_BROWSER_INSPECTOR, {
     names: ['selectedGatheringConditionShortcuts'],
-    // A hand-written card, so the recipe inspector's `spellsNo` card shell reads a token the
-    // reader can find. The real pair is the liveness test in
-    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
-    // `fabricate-card`.
-    spells: ['fabricate-card'],
+    // An `InspectorCard` since issue 1777, so the shell class is the primitive's to spell.
+    spells: ['manager-condition-shortcut-card'],
+    spellsNo: ['fabricate-card'],
     calls: ['buildSelectedGatheringConditionShortcuts'],
     writes: ['data-systems-gathering-conditions', 'data-systems-gathering-condition'],
+  });
+
+  // The positive control for every `spellsNo: ['fabricate-card']` row: the token the reader can find,
+  // in the one component that writes it since issue 1777.
+  defineStructureContract('spells the card shell class in the primitive', INSPECTOR_CARD, {
+    spells: ['fabricate-card'],
   });
 
   // The rules card moved into `environment/GatheringRulesInspector.svelte` (issue 1707 phase 2):
   // its copy, its event-specific drop label and its two limit steppers are that leaf's own.
   defineStructureContract('draws the gathering rules inspector', GATHERING_RULES_INSPECTOR, {
     writes: ['data-gathering-inspector-rules'],
+    // The two limits are one shared component (issue 1050), which the rule table names by field
+    // since its selects render through `Select` (issue 1777).
     spellsExactly: [
       'manager-rule-copy',
       'FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop',
+      'rewardLimit',
+      'eventLimit',
     ],
-    // The two limits are one shared component now (issue 1050).
-    attributes: [
-      ['rule', 'rewardLimit'],
-      ['rule', 'eventLimit'],
-    ],
+    renders: ['GatheringRuleLimitStepper', 'Select'],
   });
 
   // The rail's own states moved with the branch chain (issue 1707 phase 3): the placeholder hook
@@ -2039,29 +2044,31 @@ describe('CraftingSystemManager source contract', () => {
       'manager-task-component-card-grip',
     ],
   });
+  // A `DataTable` since issue 1782: each row is a drop target through the table's row action.
   defineStructureContract('tables the drop rules', taskPart('DropsCard'), {
-    renders: ['GatheringTaskDropRow'],
-    writes: ['data-gathering-task-drops-table', 'data-gathering-task-drop-count'],
-    spellsExactly: ['manager-task-drop-controls', 'manager-task-drop-footer'],
+    renders: ['DataTable', 'GatheringTaskDropCell'],
+    names: ['dragDrop', 'dropZone'],
+    callsWith: [['onImportDrop', 'rowId']],
+    writes: ['data-gathering-task-drops-table', 'data-gathering-add-drop'],
+    spellsExactly: ['manager-task-drop-controls', 'data-gathering-task-drop-id'],
   });
-  defineStructureContract('draws a drop rule as one row', taskPart('DropRow'), {
+  defineStructureContract('draws each cell of a drop rule', taskPart('DropCell'), {
     renders: ['ChanceSlider'],
     names: [
-      'dragDrop',
       'dropRateTierColor',
       'onDropComponentMouseDown',
       'onQuantityInput',
       'onQuantityKeydown',
     ],
     calls: ['onClearDropComponent', 'dropRateTierClass'],
-    callsWith: [['onImportDrop', 'row']],
     writes: [
       'data-gathering-task-drop-component-cell',
       'data-gathering-task-drop-chance-cell',
       'oncontextmenu',
+      'aria-current',
     ],
     attributes: [['inputmode', 'numeric']],
-    spells: ['manager-drop-cell', 'manager-drop-component-cell', 'manager-drop-quantity-cell'],
+    spells: ['manager-drop-component-cell', 'manager-drop-quantity-cell'],
     spellsExactly: [
       'manager-drop-modifier-pill',
       'manager-drop-modifier-list',
@@ -2094,10 +2101,10 @@ describe('CraftingSystemManager source contract', () => {
   // resets the row's identity and enables it.
   defineStructureContract(
     'resets a drop row identity when a managed component lands on it',
-    { file: taskPart('DropRow'), fn: 'handleDropZoneDrop' },
+    { file: taskPart('DropsCard'), fn: 'handleDropZoneDrop' },
     {
       compares: ['FabricateManagedComponent'],
-      callsWith: [['onUpdateDrop', 'row']],
+      callsWith: [['onUpdateDrop', 'rowId']],
       reads: ['data.componentId'],
       keys: ['componentId', 'itemUuid', 'systemItemId', 'name', 'enabled'],
     }
@@ -2213,9 +2220,10 @@ describe('CraftingSystemManager source contract', () => {
       'store.removeToolFromSystem',
       'store.setToolSectionInherited',
       // Tool creation is a world-scope write now.
-      'services.resolveToolSource',
       'store.worldScope.tool.createEntity',
     ],
+    // The world-scope model calls the resolver through its `services()` thunk, which no `services.` member path spells.
+    calls: ['resolveToolSource'],
     passesProps: [
       ['WorldToolCataloguePage', 'onCreateFromItemDrop'],
       ['ToolBrowserInspector', 'onAddToSystem'],
@@ -2256,11 +2264,17 @@ describe('CraftingSystemManager source contract', () => {
 
   // A rail count is a bare mono numeral in its own span, not a chip (issue 643). The Tool Studio
   // entry is driven by `tests/components/manager-rail-mounted.js`, which presses it, reads the
-  // route and asserts the badge is absent at zero; which derivation each span renders is not.
+  // route and asserts the badge is absent at zero; which derivation each span renders is not. The
+  // derivation is a model count marker's value since issue 1777, and the span renders that value.
   it('renders each rail count as the derived number inside the shared count span', () => {
-    const rendered = classRenderedExpressions(
-      componentAstOf(MANAGER_SYSTEM_NAV),
-      'manager-nav-count'
+    const spans = classRenderedExpressions(componentAstOf(MANAGER_SYSTEM_NAV), 'manager-nav-count');
+    assert.deepEqual(
+      spans.flatMap((expression) => memberPaths(expression)),
+      ['marker.value'],
+      'the unit renders the count marker value, and nothing else, in the count span'
+    );
+    const rendered = [...walkNodes(moduleAstOf(MANAGER_NAV_ITEMS).ast)].flatMap((node) =>
+      node.type === 'CallExpression' && calledName(node) === 'countMarker' ? node.arguments : []
     );
     const read = rendered.flatMap((expression) => [
       ...memberPaths(expression),
@@ -3041,18 +3055,26 @@ describe('world scoped-entity source contract (issue 1362)', () => {
   // rendering no inspector, would have had no way back at all if this were left to them.
   it('renders the entry trail as three crumbs, the middle one a button back to the catalogue', () => {
     const root = componentAstOf(MANAGER_ROOT);
-    const crumbs = templateNodes(componentAstOf(MANAGER_HEADER_BREADCRUMBS)).filter((node) =>
-      declaresAttribute(node, 'data-breadcrumb-world-scoped-catalogue', { directives: false })
-    );
-    assert.equal(crumbs.length, 1, 'the entry trail draws one intermediate catalogue crumb');
-    const [crumb] = crumbs;
-    assert.equal(crumb.name, 'button', 'and it is a real button, not a static crumb');
-    const navigation = attributeExpression(crumb, 'onclick');
-    assert.ok(callNames(navigation).has('setView'), 'the crumb navigates');
-    assert.ok(
-      memberPaths(navigation).includes('worldScopedEntryRoute.catalogueView'),
-      'to the catalogue the entry route records, rather than to a second copy of that mapping'
-    );
+    // The trail is `headerBreadcrumbs.js`'s since issue 1777, so the model answers for it. The
+    // catalogue view is a value no route has, so a second copy of the mapping cannot pass.
+    const views = [];
+    const crumbs = headerBreadcrumbs({
+      text: (key) => key,
+      header: { title: 'Entry' },
+      currentView: 'world-essence-entry',
+      isWorldScopedRoute: true,
+      worldScopedEntryRoute: { catalogueView: 'catalogue-sentinel', catalogueTitleKey: 'k' },
+      worldScopedEntryCrumb: 'Water',
+      setView: (view) => {
+        views.push(view);
+      },
+    });
+    assert.equal(crumbs.length, 3, 'the entry trail draws World, the catalogue and the entry');
+    const catalogue = crumbs.filter((crumb) => 'data-breadcrumb-world-scoped-catalogue' in crumb);
+    assert.equal(catalogue.length, 1, 'the entry trail draws one intermediate catalogue crumb');
+    assert.equal(typeof catalogue[0].onSelect, 'function', 'and it is a control, not a static crumb');
+    catalogue[0].onSelect();
+    assert.deepEqual(views, ['catalogue-sentinel'], 'to the catalogue the entry route records');
 
     // AND THE SUBJECT REACHES IT WITHOUT REOPENING THIS FILE. A catalogue row in PR 6a calls
     // `onOpenEntry(entityId)`; the shell records the subject, performs the navigation through

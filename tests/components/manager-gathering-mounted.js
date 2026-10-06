@@ -557,12 +557,12 @@ export function registerGatheringCases() {
     await openEditor('task', 'task-herbs');
     await openTaskTab('results');
     const rows = () =>
-      Array.from(target.querySelectorAll('.manager-gathering-task-drop-row')).map((node) =>
+      Array.from(target.querySelectorAll('tr[data-gathering-task-drop-id]')).map((node) =>
         node.getAttribute('data-gathering-task-drop-id')
       );
     const selected = () =>
       target
-        .querySelector('.manager-gathering-task-drop-row.is-selected')
+        .querySelector('tr.is-selected[data-gathering-task-drop-id]')
         ?.getAttribute('data-gathering-task-drop-id');
     const press = async (node) => {
       node.click();
@@ -592,6 +592,76 @@ export function registerGatheringCases() {
     target.querySelector('[data-gathering-task-drop-id="drop-c"]').dispatchEvent(drop);
     await settleRouteExit();
     assert.equal(selected(), 'drop-c', 'an imported item selects the row it landed on');
+  });
+
+  /** Open the Results tab of a task whose drop rows and reward mode the options shape (issue 1782). */
+  async function openDropTable(storeOptions) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore([], storeOptions), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    navButton('Gathering').click();
+    await settleRouteExit();
+    gatheringSubitem('Tasks').click();
+    await settleRouteExit();
+    await openEditor('task', 'task-herbs');
+    await openTaskTab('results');
+    const ids = () =>
+      [...target.querySelectorAll('tr[data-gathering-task-drop-id]')].map(
+        (node) => node.dataset.gatheringTaskDropId
+      );
+    const selectedId = () =>
+      target.querySelector('tr.is-selected[data-gathering-task-drop-id]')?.dataset
+        .gatheringTaskDropId;
+    return { ids, selectedId };
+  }
+
+  // A lone row is also the editor's default selection, so this proves the empty state's add only;
+  // the next test proves an add selects the NEW row over another one.
+  it('selects the first drop rule added from the empty drop table', async () => {
+    const { ids, selectedId } = await openDropTable({ taskDropRows: [] });
+    assert.deepEqual(ids(), [], 'the table opens empty');
+    target.querySelector('[data-gathering-add-drop="empty"]').click();
+    await settleRouteExit();
+    assert.equal(ids().length, 1, 'the empty state adds a row');
+    assert.equal(selectedId(), ids()[0], 'and selects it, so the rail edits it next');
+  });
+
+  it('selects a drop rule added from the toolbar over the rule that was selected', async () => {
+    const row = (id) => ({ id, componentId: 'c1', quantity: 1, dropRate: 40, enabled: true });
+    const { ids, selectedId } = await openDropTable({
+      taskDropRows: [row('drop-a'), row('drop-b')],
+    });
+    target.querySelector('[data-gathering-task-drop-id="drop-b"]').click();
+    await settleRouteExit();
+    assert.equal(selectedId(), 'drop-b', 'precondition: another rule is selected');
+    target.querySelector('[data-gathering-add-drop="toolbar"]').click();
+    await settleRouteExit();
+    const added = ids().filter((id) => id !== 'drop-a' && id !== 'drop-b');
+    assert.equal(added.length, 1, 'the toolbar adds one rule');
+    assert.equal(selectedId(), added[0], 'and the rail moves to it');
+  });
+
+  it('keeps the selected drop selected when a rank rocker moves it', async () => {
+    const row = (id) => ({ id, componentId: 'c1', quantity: 1, dropRate: 40, enabled: true });
+    const { ids, selectedId } = await openDropTable({
+      taskDropRows: [row('drop-a'), row('drop-b'), row('drop-c')],
+      rewardSelectionMode: 'highestRankedDrop',
+    });
+    target.querySelector('[data-gathering-task-drop-id="drop-b"]').click();
+    await settleRouteExit();
+    assert.equal(selectedId(), 'drop-b');
+    target
+      .querySelector(
+        ':scope [data-gathering-task-drop-id="drop-b"] [data-gathering-task-drop-move="down"]'
+      )
+      .click();
+    await settleRouteExit();
+    assert.deepEqual(ids(), ['drop-a', 'drop-c', 'drop-b'], 'the rocker moved the row');
+    assert.equal(selectedId(), 'drop-b', 'and the selection stayed with it');
   });
 
   /** Mount on the Tasks section of a system whose library the options shape. */
@@ -1338,7 +1408,7 @@ export function registerGatheringCases() {
         (node) => node.dataset.gatheringTaskDropId
       )
     );
-    Array.from(target.querySelectorAll('.manager-task-card-header .fabricate-button'))
+    Array.from(target.querySelectorAll('.manager-task-drops-card caption .fabricate-button'))
       .find((button) => button.textContent.includes('Add drop rule'))
       .click();
     await tick();
@@ -2833,7 +2903,7 @@ export function registerGatheringCases() {
     );
 
     biomeCard
-      .querySelector('[data-gathering-drop-condition-modifier-picker="biome"] button')
+      .querySelector('[data-gathering-drop-condition-modifier-picker="biome"] .fabricate-icon-button')
       .click();
     await settleSaveAttempt();
 
@@ -3073,8 +3143,10 @@ export function registerGatheringCases() {
       const picker = () =>
         card().querySelector(`[data-gathering-${subject}-condition-modifier-picker="timeOfDay"]`);
       const rows = () => [...card().querySelectorAll(`[data-gathering-${subject}-modifier-id]`)];
+      const add = () => picker().querySelector('.fabricate-icon-button');
+      const trigger = `[data-gathering-${subject}-condition-modifier-picker="timeOfDay"] .fabricate-select-trigger`;
 
-      picker().querySelector('button').click();
+      add().click();
       await settleSaveAttempt();
       assert.deepEqual(
         rows().map((row) => row.textContent.includes('First Light')),
@@ -3082,11 +3154,9 @@ export function registerGatheringCases() {
         'the add control attaches the option the picker reconciled to'
       );
 
-      const select = picker().querySelector('select');
-      select.value = 'night';
-      select.dispatchEvent(new Event('change', { bubbles: true }));
+      chooseSelectOption(target, trigger, 'night');
       await settleSaveAttempt();
-      picker().querySelector('button').click();
+      add().click();
       await settleSaveAttempt();
       const night = rows().find((row) => row.textContent.includes('Deep Night'));
       assert.ok(Boolean(night), 'a picked option is the one the add control attaches');
@@ -3098,10 +3168,9 @@ export function registerGatheringCases() {
         .querySelector('input')
         .dispatchEvent(new globalThis.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
       await settleSaveAttempt();
-      picker().querySelector('select').value = 'day';
-      picker().querySelector('select').dispatchEvent(new Event('change', { bubbles: true }));
+      chooseSelectOption(target, trigger, 'day');
       await settleSaveAttempt();
-      picker().querySelector('button').click();
+      add().click();
       await settleSaveAttempt();
       const row = (name) => rows().find((entry) => entry.textContent.includes(name));
       setInputValue(row('High Day').querySelector('input'), '-3');
@@ -3130,7 +3199,10 @@ export function registerGatheringCases() {
       await removeRow('High Day');
       assert.ok(focused(row('Deep Night').querySelector('input')), 'the last falls back to the previous');
       await removeRow('Deep Night');
-      assert.ok(focused(picker().querySelector('select')), 'the only one hands focus to the picker');
+      assert.ok(
+        focused(picker().querySelector('.fabricate-select-trigger')),
+        'the only one hands focus to the picker'
+      );
     });
 
     it(`edits the ${subject}'s Modifier Library reference through the shell's writers`, async () => {
@@ -3145,6 +3217,9 @@ export function registerGatheringCases() {
         'the operator reads negative'
       );
 
+      const overrideLabel = () =>
+        ref().querySelector(':scope .manager-character-modifier-override-row .manager-status-toggle-label');
+      assert.equal(overrideLabel().textContent.trim(), 'Override?', 'the switch offers the override');
       ref().querySelector('.manager-character-modifier-override-row button').click();
       await settleSaveAttempt();
       assert.equal(
@@ -3153,9 +3228,12 @@ export function registerGatheringCases() {
         'true',
         'the override is on'
       );
-      const operator = ref().querySelector('.manager-character-modifier-operator-select select');
-      operator.value = '+';
-      operator.dispatchEvent(new Event('change', { bubbles: true }));
+      assert.equal(overrideLabel().textContent.trim(), 'Overridden', 'the switch names the override');
+      chooseSelectOption(
+        target,
+        `[data-gathering-${subject}-character-modifier-ref="ref-1"] .manager-character-modifier-operator-select .fabricate-select-trigger`,
+        '+'
+      );
       await settleSaveAttempt();
       assert.ok(ref().querySelector('.manager-character-modifier-operator-select.is-positive'));
 
@@ -3166,6 +3244,10 @@ export function registerGatheringCases() {
         'the override seeds the library expression and the operator flips'
       );
 
+      assert.ok(
+        ref().querySelector('.manager-character-modifier-row-reference-delete.is-danger'),
+        'the reference delete carries the danger tone'
+      );
       ref().querySelector('.manager-character-modifier-row-reference-delete').click();
       await settleSaveAttempt();
       assert.deepEqual((await saveSubject(subject, calls)).characterModifiers, []);
@@ -3301,7 +3383,8 @@ export function registerGatheringCases() {
     );
   });
 
-  // `saveRecipeItemDraft` already reset `recipeItemSaveFailed` before its awaited store call.
+  // The recipe-item model's `saveRecipeItemDraft` already reset `recipeItemSaveFailed` before its
+  // awaited store call.
   it('re-announces a recipe-item save that fails the same way twice', async () => {
     await openDirtyRecipeItemEditor([], { saveRecipeItemResult: false });
     await assertRepeatFailureReAnnounces('[data-recipe-item-save-error]', clickRecipeItemSave);

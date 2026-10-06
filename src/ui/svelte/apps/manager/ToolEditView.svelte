@@ -2,6 +2,7 @@
   import Chip from '../../components/Chip.svelte';
   import Button from '../../components/Button.svelte';
   import Notice from '../../components/Notice.svelte';
+  import PageHeader from '../../components/PageHeader.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ToolBehaviorPreview from './tools/ToolBehaviorPreview.svelte';
   import ToolBreakageTab from './tools/ToolBreakageTab.svelte';
@@ -202,25 +203,25 @@
   <div class="visually-hidden" role="status" aria-live="polite" data-tool-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
   </div>
-  <header class="manager-tool-edit-header" data-tool-editor-header>
-    <nav
-      class="manager-breadcrumbs"
-      aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
-    >
-      <button type="button" data-tool-editor-open-systems onclick={onOpenSystems}
-        >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
-      >
-      <i class="fas fa-chevron-right" aria-hidden="true"></i>
-      <button type="button" data-tool-editor-open-system onclick={onOpenSystem}>{systemName}</button
-      >
-      <i class="fas fa-chevron-right" aria-hidden="true"></i>
-      <button type="button" data-tool-editor-open-tools onclick={onOpenTools}
-        >{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</button
-      >
-      <i class="fas fa-chevron-right" aria-hidden="true"></i>
-      <span title={displayName}>{displayName}</span>
-    </nav>
-    <div class="manager-tool-edit-header-main">
+  <PageHeader
+    class="manager-tool-edit-header"
+    data-tool-editor-header=""
+    breadcrumbs={[
+      {
+        label: text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems'),
+        onSelect: onOpenSystems,
+        'data-tool-editor-open-systems': '',
+      },
+      { label: systemName, onSelect: onOpenSystem, 'data-tool-editor-open-system': '' },
+      {
+        label: text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules'),
+        onSelect: onOpenTools,
+        'data-tool-editor-open-tools': '',
+      },
+      { label: displayName, title: displayName },
+    ]}
+  >
+    {#snippet identity()}
       <div class="manager-tool-edit-identity">
         <img src={displayImage} alt="" data-tool-editor-image />
         <div class="manager-tool-edit-identity-copy">
@@ -228,6 +229,8 @@
           <p data-tool-editor-source-context>{sourceContext}</p>
         </div>
       </div>
+    {/snippet}
+    {#snippet actions()}
       <div class="manager-header-actions manager-tool-edit-actions">
         {#if dirty}<Chip tone="warning" density="action" data-tool-editor-status
             >{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</Chip
@@ -286,8 +289,8 @@
           ></Button
         >
       </div>
-    </div>
-  </header>
+    {/snippet}
+  </PageHeader>
 
   <ToolEditorTabs
     {activeTab}

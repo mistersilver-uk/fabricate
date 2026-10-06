@@ -81,6 +81,8 @@ A candidate with fewer is recorded as ruled out WITH ITS CALLERS NAMED — or wi
 That bar is measured over EVERY `.svelte` under `src/ui/svelte/` and not only over `src/ui/svelte/components/`, because nothing in this requirement turns on which directory a candidate sits in and a component under `apps/` can acquire twenty callers without anyone asking whether it belongs in the vocabulary — one has.
 `tests/design-system-primitives.test.js` holds a register of every path outside `components/` that clears the bar and carries no manifest row, and a path leaves that register only by GAINING a row in one of the two manifest tables, so a component crossing the bar is a decision somebody has to record rather than a threshold nothing watches.
 `environment/GatheringModifierEditor.svelte` is the worked example of that register doing its job: a composition reaching two independent callers is owed a manifest row and cannot be recorded as a non-member instead, so when issue 1707 wrote the twice-authored gathering modifier panel once and the gathering task and gathering event inspector leaves became its two callers, it left the register by entering the member table as a manager-only row naming no library entry, because no specimen specifies a condition-and-character modifier editor.
+`apps/manager/ManagerTitleBar.svelte` is a one-caller component and not a member: its caller is `CraftingSystemManagerRoot.svelte`, it has no manifest row, and `<AppTitleBar>` stays `target` until a second host exists (#1777 decision E1).
+The title bar (`AppTitleBar`) and the page header (`PageHeader`) are distinct entries.
 
 Those recorded callers MUST be a structured field on the row rather than a sentence, and `tests/design-system-primitives.test.js` MUST assert the field EQUALS what the import graph measures.
 "Re-test the count" is what the clause above asks for and what nothing did: the register's caller claims were prose for as long as it existed, and prose is not resolved by anything.
@@ -121,7 +123,7 @@ An entry whose specimen states no Svelte API therefore cannot read `shipped`, be
 A heading that names several primitives MUST declare a status PER NAME, so every member of the set carries exactly one, and the block's own value is the weakest of them — `divergent` if any name is, otherwise `target` if any name is, otherwise `shipped`.
 The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 40 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
 
-Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the `deferred: root convergence pending` exemptions in the source-contract tests record.
+Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the per-file deferral exemptions in the source-contract tests record.
 An entry may be `shipped` while most of the tree still hand-rolls the thing it replaces, and an entry whose every caller is perfect may be `target` because the specimen names props nothing has built.
 A single inline disagreement between a shipped component and its specimen puts that entry at `target`, and the library's planned-migrations table carries the row that says what the disagreement is and what it moves to.
 That row is not a licence to leave the entry at `shipped`, and it is not `divergent` either, which is reserved for a decision that the component STAYS different.
@@ -221,6 +223,7 @@ The same issue adds the rule pair: `RuleRow` emits `fabricate-rule-row` on its o
 The same issue adds `SetPicker`, which emits `fabricate-set-picker` on its own root and the rest of its `fabricate-set-picker-*` family beneath it and on the panel parts it hands `SearchablePopover`; it portals only through that primitive, whose two roots it keeps.
 The same issue adds `Rail`, which emits `fab-rail` on its own `<section>` root and `fab-rail-label` on its kicker, both painted from its own scoped block; the section rules it replaces were each scoped to one inspector, so no sheet selector moved, and the two inspectors whose sections keep a rhythm or a kicker of their own state it in a caller rule anchored on their own container.
 The same issue adds `LogList`, which emits `fab-log-list` on its own root and the rest of its `fab-log-list-*` family beneath it, all painted from its own scoped block; the history row rules it replaces were scoped to the journal's own components, so no sheet selector moved.
+The same issue adds `DataTable`, which emits `fabricate-data-table` on its own root and the rest of its `fabricate-data-table-*` family beneath it, rooted in the module sheet, so the drop rules' column grid that was rooted at `.fabricate-manager` under `manager-gathering-task-drop-*` is retired for the rules the table writes; its table, head and rows double the root to clear core's element rules for tables, and the drop rules card keeps its frame and row height through its own card classes.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
 The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issues 1523 and 1779.
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
@@ -256,6 +259,8 @@ Issue 1518 turned `EditorTabs` into a fact in the player application: `gathering
 `EditorValidationSurface`, `ToggleCard` and `ItemDropZone` remain capabilities, every importer of each still lying under `src/ui/svelte/apps/manager/`, and `ChanceSlider` remains a capability whose every importer lies there too; none has a player-application site to convert.
 `SortableList` satisfies it as of issue 1512, emitting `fabricate-sortable-list`; it portals nothing and needs one root, and it is the first entry here whose family was never application-rooted at all, so the gate is told by name that a class matching the family pattern is a namespace class.
 It declares NO `mirrored` fixture pair, and that is measured rather than omitted: the only class a hand-written fixture of a converted list carries is `manager-checks-tier-row`, which `checks/CraftingCheckEditor.svelte` writes too, so a mirror keyed on it would demand that row class on rows this list does not render.
+`PageHeader` satisfies it as of issue 1777, emitting `fabricate-page-header` on its `<header>`: the box, the heading block, the eyebrow and the trail are rooted there, the box rule doubled to `.fabricate-page-header.fabricate-page-header` so it keeps the (0,2,0) it had under `.fabricate-manager`.
+`manager-title` and `manager-subtitle` are outside its gated family, because the manager's rail and scoped cards spell them too, so their rules carry `.fabricate-page-header` beside `.fabricate-manager` rather than instead of it; it declares NO `mirrored` pair, because its root element carries no family class.
 `tests/components/searchable-popover-area-scope.test.js` derives each class set from the components' own markup and fails when a rule a primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
 It reads a class another entry's namespace owns as that primitive's caller container — `.fabricate-pagination .fabricate-icon-button` is the pager's rule over the button it composes, not `IconButton`'s — unless the selector also names an application root no entry owns, such as `.fabricate-manager`, in which case the rule is the primitive's own and that root fails it.
 For every other clause the other entry's class stays an application root by name.
@@ -354,7 +359,7 @@ A family that ALREADY declares its own pair re-roots that pair IN PLACE, at unch
 `StatusToggle`'s pair is at (0,3,0) and its repaint carries a `box-shadow: none` the module repaint does not; both survive the re-root unchanged, and a second pair at the root would have been a new rule rather than the same rule moved.
 `Field` is the second instance of the scoping rule the pager's `select` states above.
 Its pair covers `input` and `textarea` and excludes `select`, and the exclusion outlived the reason it was written for: at (0,2,1) a `select` leg tied `.fabricate-app select:focus-visible` and won on source order, deleting the inset ring that stopped a clipped outline, and that rule went with the player app's last native select at issue 1511.
-What keeps the exclusion is narrower and still true — the only selects a `Field` can host are the manager's remaining native ones, which take the module ring at `fabricate.css:841` until they convert at issue 1777 — and a leg here would be family chrome for a control this primitive is about to stop hosting entirely.
+What keeps the exclusion is narrower and still true — issue 1777 converted the manager's last native selects a `Field` hosted, so its floor and element chrome cover `input` and `textarea` alone — and a leg here would be family chrome for a control this primitive no longer hosts.
 The STRIP half is declared on the element that can TAKE focus, which is not always the element the repaint paints.
 A `:has()` ring on a non-focusable host pairs with a strip on the descendant control it watches: the checkbox host of `StatusToggle` paints its ring on the `label` through `:has()` and strips the host's own treatment on the transparent `input` inside it, so one pair spans two elements while strip-above-repaint still holds.
 
@@ -768,6 +773,7 @@ A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel
 A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.
 A rail section (`Rail`) is a `group` named by its kicker `label`, or an unnamed `<section>` when it has none, and never a `region`, because a column of named landmarks would bury the screen's own.
 A log list (`LogList`) is a `list` named by its required `ariaLabel`; an entry it opens is a button pressed while it is the selected entry, and an entry's outcome is an image named by its label, so an outcome is never told by colour alone.
+A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
@@ -993,6 +999,7 @@ It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier 
 `SetPicker` is a bounded trigger opening a staged panel committed on Apply, and its `choose` form exists only for the session control "Set membership is edited through a bounded, staged picker" exempts; a control that commits one choice into a single slot, a filter or a short list its caller renders is not a set picker.
 The deciding test is the widget and when the write lands, never how the control looks.
 `Rail` is ONE SECTION of a right-hand inspector column, the library's inspector rail section: never the column itself, never the nav rail's `.manager-rail-block`, which carries the Rail Marker Family, and never `AppRail`.
+`DataTable` is for records compared down columns and `ListRow` for records scanned one at a time; a ladder of tiers is `OutcomeLadder`, never a table.
 A GRIP is the pointer's drag handle and the keyboard's move control, one per ordered row; a ROCKER is the stacked up and down chevron PAIR that steps a row one position, and neither word names the other's affordance.
 
 #### Scenario: A list row and an editor both show the same record state
@@ -1763,9 +1770,14 @@ A headed, paged table is the right shape only where a reader compares the same f
 A record carrying art, a status and actions is a list row, and forcing it into columns costs those affordances and buys nothing; the test is whether the columns would be worth sorting.
 
 A table states its record count in its heading rather than leaving it to be inferred from the pager, and scrolls horizontally inside its own container so the page never does.
-It closes with the standard pagination bar WHEN the record count can exceed a page; a table whose rows are bounded and few — an outcome-tier table, a craft’s inputs and outputs — carries no pager, and adding one to reach a uniform shape would be furniture.
+It closes with the standard pagination bar WHEN the record count can exceed a page; a table whose rows are bounded and few — a craft’s inputs and outputs — carries no pager, and adding one to reach a uniform shape would be furniture.
 A column header MUST NOT appear sortable unless sorting it is meaningful.
 An empty table keeps its heading and count, drops the header row, and says what would put a row in it.
+
+Its one implementation is `src/ui/svelte/components/DataTable.svelte`, the library's `<DataTable>`, whose `heading` and `count` are the table's visible `<caption>`; it closes with the shipped pager only when it pages and its count exceeds the smallest page.
+Issue 1782 converts the gathering task editor's drop rules, paged, searchable, selectable, ranked under highest-ranked rewards and a drop target per row, and `IoTable`'s essence, tool and output groups in the crafting detail, which are bounded and carry no pager.
+The crafting detail's ingredient rail stays the requirement chooser's, and `OutcomeTierTable` is a ladder rather than a table, owned by issue 1644's `OutcomeLadder`.
+A table whose rows hold controls — the drop rules' chance sliders, count fields and rank rockers — keeps a taller row than the specimen's text rows, because its controls set the row's height.
 
 ### Requirement: Validation is one screen everywhere
 
@@ -2006,6 +2018,22 @@ A player never authors a choice group, and MAY pick from a result-side choice gr
 - **THEN** its identity header carries no primary, unless the screen's spec requires a disabled start action that names its blocker
 - **AND** no second-choice verb takes its place
 
+### Requirement: The application shell renders through the shell primitives
+
+Every manager page header MUST render through `PageHeader` (`src/ui/svelte/components/PageHeader.svelte`): the Tool editor's, the Tool library's and the header every other manager route draws.
+Each passes its trail as `breadcrumbs`, its title block as `title` and `subtitle` or as an `identity` snippet, and its action group as an `actions` snippet, and writes no breadcrumb markup of its own.
+The manager's route trail is derived by `src/ui/svelte/apps/manager/headerBreadcrumbs.js`, one chain per route under the world root or the crafting-system root, and a crumb is a control only where pressing it leaves the screen.
+The trail is a `nav` named "Breadcrumbs"; a crumb with `onSelect` is a button called with no argument and declared focused to Foundry, and the last crumb carries `aria-current="page"`.
+`PageHeader` MUST stay `target` until its callers draw its `library.html` specimen's geometry.
+At issue 1777 its callers kept the manager's shipped header geometry, which disagreed with the specimen, and decision E4 escalated that disagreement to issue 1523 rather than settling it.
+
+#### Scenario: A manager route draws its header
+
+- **WHEN** a manager route, the Tool editor and the Tool library included, renders its header
+- **THEN** it passes `breadcrumbs`, its title block and its actions, when it has any, to `PageHeader`
+- **AND** it writes no breadcrumb markup
+- **AND** the header root carries `fabricate-page-header`
+
 ### Requirement: A window is registered in the View Lab before a change re-skins it
 
 Screenshot evidence for a change to a window OUTSIDE the case registry is not merely absent; it is FALSELY POSITIVE, and that is why registration is a requirement rather than a courtesy.
@@ -2199,6 +2227,8 @@ Crafting's essence pool MUST compose `EssencePool` through its adapter; its opt-
 Repeated thresholds for the same essence MUST sum their required amounts before comparing the shared contribution and render one keyed pool, so Fire 2 plus Fire 2 requires four Fire rather than counting the same two Fire twice.
 `ChoiceOptionList` MUST use each option's own `needed` amount when provided, falling back to the slot-level amount only for uniform-quantity callers.
 `SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.
+`SlotTile` has a `partial` face: a `--fab-warning-border` hairline, its pip on solid `--fab-warning` inked `--fab-bg-0`, and `--fab-warning-text` caption ink.
+`SlotRow` and `RequirementChooser` MUST paint a partly delivered essence with that face, never the `short` one, even while its group is still reported missing; an unchosen choice slot keeps the `open` face.
 Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
 `StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
 `YieldScale` MUST show one shared d100 cut against the item chances when shared-roll evidence is established.
@@ -2208,8 +2238,14 @@ The optional `labels.evidence(entry)` callback MUST support each row's independe
 A missing field MUST NOT hide other known fields or rows, and unknown outcomes MUST remain neutral.
 A known shared roll whose unknown outcomes prevent locating a cut MUST remain visible as a standalone roll reading without inventing a cut position.
 Default preview callers MUST retain the existing shared comparison and ordering.
+`YieldScale` MAY keep authored order: with `order` `authored` it MUST keep entry order and MUST NOT draw a cut, and a known shared roll stays a standalone reading.
+Gathering's drop preview MUST compose `YieldScale` in authored order, because its reward selection is by authored order.
 An explicitly recorded `cleared` boolean MUST govern historical row outcomes, preserving native high-roll semantics; an explicit unknown outcome MUST remain unknown, while callers omitting that field retain the default low-roll comparison.
 `OutcomeLadder` MUST display the complete noninteractive routed outcome ladder for authored previews; ordinary routed history MUST instead use its recorded outcome log as specified by `ui-journal-app`.
+`OutcomeLadder` MAY mark the one reached tier: `reachedId` matches a tier's merged `ids`, else its `id`, and only the first matching tier carries the `reachedLabel` pill and the accent edge.
+Its band is optional, and a tier with no band MUST draw no chip.
+Each tier, its band chip, its pill and each yield MUST pass a caller's per-item `props` through as hooks.
+Crafting's routed-by-check tiers and salvage's routed body compose `OutcomeLadder`.
 
 #### Scenario: A player views another stage while allocating materials
 
@@ -2223,3 +2259,9 @@ An explicitly recorded `cleared` boolean MUST govern historical row outcomes, pr
 - **WHEN** the player activates the run bar's cancel control
 - **THEN** the bar presents the cancellation consequence and confirm-or-keep actions
 - **AND** pause, completion preference and execution cannot be activated through the armed bar
+
+#### Scenario: A routed roll marks the one tier it reached
+
+- **WHEN** a successful roll routes through a tier that a ladder row merged with others
+- **THEN** that row alone carries the reached pill
+- **AND** a failed roll, or an outcome no row names, marks no row

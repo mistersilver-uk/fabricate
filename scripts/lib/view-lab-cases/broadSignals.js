@@ -31,13 +31,18 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/WorldClockChip.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
   ]),
+  // Issue 1644: the read-only row, and every frame that paints a partly delivered essence.
   'src/ui/svelte/components/SlotRow.svelte': Object.freeze([
     'fabricate-journal-lifecycle-waiting-open-choice',
     'fabricate-journal-lifecycle-material-shortage',
+    'fabricate-journal-lifecycle-legacy',
   ]),
   'src/ui/svelte/components/SlotTile.svelte': Object.freeze([
     'fabricate-journal-lifecycle-waiting-open-choice',
     'fabricate-journal-lifecycle-material-shortage',
+    'player-crafting-essence-pool-shared',
+    'player-crafting-essence-shopping',
+    'player-crafting-pick-for-me',
   ]),
   'src/ui/svelte/components/ChoiceOptionList.svelte': Object.freeze([
     'fabricate-journal-lifecycle-waiting-open-choice',
@@ -50,6 +55,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   'src/ui/svelte/components/RunProgress.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
+  ]),
+  // The data table (issue 1782): the drop rules with a row selected, ranked at the intermediate width,
+  // and the crafting detail's tool and output groups, one holding a choice group.
+  'src/ui/svelte/components/DataTable.svelte': Object.freeze([
+    'manager-gathering-task-drop-modifiers-normal',
+    'manager-gathering-task-drops-ranked-narrow',
+    'player-crafting-results-choice-group',
   ]),
   // The log list (issue 1782): the Finished list with a failed entry open, and a cancelled one open.
   'src/ui/svelte/components/LogList.svelte': Object.freeze([
@@ -84,8 +96,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-crafting-tier-step',
     'manager-checks-v3-count-triggers',
   ]),
-  // The bare leaf's one remaining caller: an opened gathering drop row's chance track.
-  'src/ui/svelte/components/FillBar.svelte': Object.freeze(['player-gathering-drop-open']),
+  // No app caller since issue 1644: one frame per instrument over the leaf (stage, meter, band).
+  'src/ui/svelte/components/FillBar.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-past-stage',
+    'player-crafting-essence-pool',
+    'player-gathering-task-ready',
+  ]),
   'src/ui/svelte/components/StageNav.svelte': Object.freeze([
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-future-stage',
@@ -104,14 +120,27 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-gathering-d100',
     'fabricate-journal-lifecycle-gathering-check',
   ]),
-  // The preview scale, plus the two historical branches no other frame draws.
+  // The preview scale, the two historical branches no other frame draws, and the gathering
+  // preview's authored-order scale, closed and with its breakdown open (issue 1644).
   'src/ui/svelte/components/YieldScale.svelte': Object.freeze([
     'fabricate-journal-lifecycle-gathering-d100',
     'fabricate-journal-history-data-legacy-row-rolls-1240',
     'fabricate-journal-history-data-unknown-material-resolution-1240',
+    'player-gathering-task-ready',
+    'player-gathering-drop-open',
   ]),
+  // The Journal's gathering ladder, crafting's and salvage's routed tiers, before and after a roll.
   'src/ui/svelte/components/OutcomeLadder.svelte': Object.freeze([
     'fabricate-journal-lifecycle-gathering-check',
+    'player-crafting-routed-by-check',
+    'player-crafting-routed-tier-reward',
+    'player-crafting-routed-reached',
+    'player-salvage-routed-dc',
+    'player-salvage-count-routed',
+    'player-salvage-count-routed-botch',
+    'player-salvage-fixed-routed',
+    'player-salvage-under-routed',
+    'player-salvage-routed-reached',
   ]),
   // The shared die tiles (issue 2006): the simulator's rolled pool, marked, and a botch's cancels.
   'src/ui/svelte/components/DiceTiles.svelte': Object.freeze([
@@ -183,6 +212,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // The padlocked strip with its first tab's description, wide (`-tracking-described`) and wrapped with its last tab's (`-narrow-settings`) (issue 1779).
     'manager-world-downtime-tracking-described',
     'manager-world-downtime-narrow-settings',
+  ]),
+  // The page header (issue 1777): the Tool library's header, and the Tool editor's on a tab.
+  'src/ui/svelte/components/PageHeader.svelte': Object.freeze([
+    'manager-tool-parity-01-library-1280x720',
+    'manager-tool-parity-04-requirements-1280x720',
   ]),
   // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
@@ -372,11 +406,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-simple',
   ]),
   // The requirement chooser (issue 1518): open on a choice slot, and the rail's three slot states;
-  // and its award face at the ceiling (issue 1773).
+  // its award face at the ceiling (issue 1773); and the partly delivered essences (issue 1644).
   'src/ui/svelte/components/RequirementChooser.svelte': Object.freeze([
     'player-crafting-chooser-open',
     'player-crafting-slot-rail',
     'player-journal-award-choice-ceiling',
+    'player-crafting-essence-pool-shared',
+    'player-crafting-essence-shopping',
+    'player-crafting-pick-for-me',
   ]),
   // The track (issue 1516): its 30px inline rung is drawn only by the requirement row's amount toggle.
   'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([

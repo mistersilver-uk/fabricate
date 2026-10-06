@@ -23,6 +23,9 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Field from '../../components/Field.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
+  import Select from '../../components/Select.svelte';
   import Button from '../../components/Button.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
@@ -174,7 +177,7 @@
 </script>
 
 {#if selectedSystem}
-  <section class="fabricate-card">
+  <InspectorCard>
     <div class="manager-inspector-title-row is-hero-large">
       <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
         <i class="fas fa-layer-group"></i>
@@ -201,9 +204,9 @@
       {selectedSystem.description ||
         text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
     </p>
-  </section>
+  </InspectorCard>
 
-  <section class="fabricate-card">
+  <InspectorCard>
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Counts', 'Counts')}</h3>
     <div class="manager-fact-grid">
       {#each selectedCountFacts as fact (fact.id)}
@@ -232,12 +235,9 @@
         </div>
       {/each}
     </div>
-  </section>
+  </InspectorCard>
 
-  <section
-    class="fabricate-card"
-    aria-label={text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
-  >
+  <InspectorCard aria-label={text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}>
     <h3 class="manager-card-title">
       {text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
     </h3>
@@ -252,12 +252,12 @@
         {text('FABRICATE.Admin.Manager.NoOptionalFeatures', 'No optional features enabled.')}
       </p>
     {/if}
-  </section>
+  </InspectorCard>
 
   {#if selectedGatheringConditionShortcuts.length > 0}
-    <section
-      class="fabricate-card manager-condition-shortcut-card"
-      data-systems-gathering-conditions
+    <InspectorCard
+      class="manager-condition-shortcut-card"
+      data-systems-gathering-conditions=""
       aria-label={text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}
     >
       <h3 class="manager-card-title">
@@ -265,27 +265,40 @@
       </h3>
       <div class="manager-condition-shortcut-list">
         {#each selectedGatheringConditionShortcuts as condition (condition.kind)}
-          <label
-            class="fabricate-field manager-condition-shortcut"
+          {@const triggerId = `manager-system-condition-${condition.kind}`}
+          {@const options = conditionValues(condition.setting).map((option) => ({
+            value: conditionId(option),
+            label: conditionLabel(option),
+          }))}
+          <Field
+            as="div"
+            class="manager-condition-shortcut"
             data-systems-gathering-condition={condition.kind}
           >
-            <span class="manager-condition-shortcut-label">
+            <!-- The caption's click focuses its trigger, a pointer convenience; the trigger is the keyboard path. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <span
+              class="manager-condition-shortcut-label"
+              id={`${triggerId}-caption`}
+              onclick={() => document.getElementById(triggerId)?.focus()}
+            >
               <i class={condition.icon} aria-hidden="true"></i>
               <span>{condition.label}</span>
             </span>
-            <select
+            <Select
+              id={triggerId}
               value={condition.setting.current}
-              onchange={(event) =>
-                updateSelectedGatheringCondition(condition.kind, event.currentTarget.value)}
-            >
-              {#each conditionValues(condition.setting) as option (conditionId(option))}
-                <option value={conditionId(option)}>{conditionLabel(option)}</option>
-              {/each}
-            </select>
-          </label>
+              {options}
+              triggerTitle={options.find((option) => option.value === condition.setting.current)
+                ?.label ?? ''}
+              ariaLabelledBy={`${triggerId}-caption`}
+              onChange={(next) => updateSelectedGatheringCondition(condition.kind, next)}
+            />
+          </Field>
         {/each}
       </div>
-    </section>
+    </InspectorCard>
   {/if}
 {:else if systemsLoading}
   <section

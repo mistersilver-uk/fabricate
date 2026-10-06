@@ -1,20 +1,18 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  GatheringDropModifiers is the expanded body of a single drop row in
-  GatheringTaskDrops. It breaks the drop's (modifier-adjusted) chance down into
-  base + weather + time-of-day + biome + per-character-ability contributions,
-  rendering each non-zero non-base contributor as a signed, tone-coloured line.
-  When only the base chance contributes it shows a "no modifiers" note instead.
-  The parent gates this on the row being expanded.
+  GatheringDropModifiers is one drop's breakdown in GatheringTaskDrops' opened
+  region, headed by the drop's `name`. It breaks the drop's (modifier-adjusted)
+  chance down into base + weather + time-of-day + biome + per-character-ability
+  contributions, rendering each non-zero non-base contributor as a signed,
+  tone-coloured line. When only the base chance contributes it shows a "no
+  modifiers" note instead.
 -->
 <script>
   import Kicker from '../../components/Kicker.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { toPercent as pct } from '../../util/gatheringFormat.js';
 
-  // `bodyId` lands on this root rather than a wrapper, so the region the row's disclosure names
-  // with `aria-controls` is the body (issue 1512).
-  let { drop = null, bodyId = '' } = $props();
+  let { drop = null, name = '' } = $props();
 
   function signedPercent(value) {
     const magnitude = Math.abs(Math.trunc(Number(value) || 0));
@@ -74,8 +72,8 @@
   const lines = $derived(modifierLines(drop));
 </script>
 
-<div class="gathering-task-drop-modifiers" id={bodyId || undefined} data-gathering-drop-modifiers>
-  <Kicker as="p">{localize('FABRICATE.App.Gathering.Detail.Modifiers')}</Kicker>
+<div class="gathering-task-drop-modifiers" data-gathering-drop-modifiers>
+  <Kicker as="p" data-gathering-drop-modifiers-name="">{name}</Kicker>
   <ul class="gathering-task-drop-modifier-list">
     <li class="gathering-task-drop-modifier is-base">
       <span class="gathering-task-drop-modifier-label"

@@ -276,12 +276,15 @@ describe('RequirementRail mounted behavior', () => {
   });
 
   // An unchosen choice is a to-do, never an error (ui-crafting-app, Requirement Rail).
-  it('paints an unchosen choice slot with the open face and a partly met essence as short', async () => {
+  it('paints an unchosen choice slot open and a partly delivered essence partial', async () => {
     const target = await harness.mount({ slots: slots() });
     assert.deepEqual(
       tilesIn(target).map((tile) => tile.querySelector('.fab-slot-tile-shell').dataset.slotState),
-      ['met', 'open', 'short']
+      ['met', 'open', 'partial']
     );
+    const essence = tilesIn(target)[2].querySelector('.fab-slot-tile');
+    assert.ok(essence.classList.contains('is-partial'), 'the essence tile takes the partial face');
+    assert.ok(!essence.classList.contains('is-short'), 'and is never painted short');
     const chosen = await harness.setProps({
       slots: buildRequirementSlots({ ingredientStates: STATES }, { chosenGroupIds: ['g-choice'] }),
     });

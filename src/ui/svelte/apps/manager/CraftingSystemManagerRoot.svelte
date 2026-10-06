@@ -106,6 +106,7 @@
   import { createImportFlowModel } from './importFlowModel.svelte.js';
   import ManagerNavRail from './ManagerNavRail.svelte';
   import ManagerPageHeader from './ManagerPageHeader.svelte';
+  import ManagerTitleBar from './ManagerTitleBar.svelte';
   import {
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
@@ -163,6 +164,7 @@
   import { createNavRailModel } from './navRailModel.svelte.js';
   import { createHeaderModel } from './headerModel.svelte.js';
   import { createWorldScopeModel } from './worldScopeModel.svelte.js';
+  import { createRecipeItemModel } from './recipe-item/recipeItemModel.svelte.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -375,19 +377,9 @@
   // The selected Downtime preview is owned here rather than inside the extension host
   // because the rail, the page header and the breadcrumb all name it.
   let worldDowntimeTabId = $state('tracking');
-  // The selected recipe item on the Books & Scrolls surface (issue 511).
-  let selectedRecipeItemId = $state('');
   // The recipe selected on the Access surface (visibility=restricted); drives the
   // GrantAccessInspector aside.
   let selectedRecipeIdForAccess = $state('');
-  // Recipe-item editor draft (recipe-item-edit route).
-  let recipeItemDraft = $state(null);
-  let recipeItemDraftBaseline = $state(null);
-  let recipeItemLinkedSourceSnapshot = $state(null);
-  let recipeItemEditSaving = $state(false);
-  // Set on every failed recipe-item save.
-  let recipeItemSaveFailed = $state(false);
-  let recipeItemActiveTab = $state('overview');
   // World-item options fed to the recipe-item editor's Overview link picker.
   let worldItemOptions = $state([]);
   // `Add from catalogue to {system}` (issue 1371, M9): the system Component Rules list's header
@@ -1637,56 +1629,25 @@
   const selectedRecipeForAccess = $derived(
     ($viewState.recipes || []).find((recipe) => recipe.id === selectedRecipeIdForAccess) || null
   );
-  // The projected recipe item selected on Books & Scrolls (drives the inspector).
-  const selectedRecipeItem = $derived(
-    (recipeItemDefinitions || []).find((def) => def.id === selectedRecipeItemId) || null
-  );
-  // ---- Recipe-item editor draft derivations (recipe-item-edit route) ---------
-  const recipeItemEditDirty = $derived(
-    Boolean(recipeItemDraft) &&
-      JSON.stringify(recipeItemDraft) !== JSON.stringify(recipeItemDraftBaseline)
-  );
-  const canSaveRecipeItemEdit = $derived(
-    recipeItemEditDirty === true && recipeItemEditSaving !== true
-  );
-  // The linked linked world item for the editor's Overview preview.
-  const recipeItemEditorLinkedItem = $derived.by(() => {
-    const uuid = String(recipeItemDraft?.originItemUuid || '');
-    if (!uuid) return null;
-    if (recipeItemLinkedSourceSnapshot?.uuid === uuid) {
-      return { ...recipeItemLinkedSourceSnapshot };
-    }
-    const persisted = (recipeItemDefinitions || []).find((def) => def.originItemUuid === uuid);
-    if (persisted) {
-      return {
-        uuid,
-        name: persisted.resolvedName,
-        img: persisted.resolvedImg,
-        type: persisted.derivedType,
-        description: persisted.description || '',
-      };
-    }
-    const option = (worldItemOptions || []).find((item) => item.uuid === uuid);
-    return option ? { ...option } : { uuid, name: '', img: '', type: '' };
+  // The Books & Scrolls selection and the recipe-item editor's draft (issue 1721).
+  const recipeItem = createRecipeItemModel({
+    store: () => store,
+    services: () => services,
+    viewState: () => $viewState,
+    selectedSystemId: () => selectedSystemId,
+    recipeItemDefinitions: () => recipeItemDefinitions,
+    visibilityMode: () => craftingVisibilityMode,
+    worldItemOptions: () => worldItemOptions,
+    navRail: () => navRail,
+    setWorldItemOptions: (options) => {
+      worldItemOptions = options;
+    },
+    setActiveView: (view) => {
+      activeView = view;
+    },
+    afterTruthyResult,
+    confirmRouteExit,
   });
-  // Recipes contained by the edited recipe item, and the pool that can still be added.
-  const recipeItemDraftRecipeIds = $derived(
-    new Set((recipeItemDraft?.recipeIds || []).map((id) => String(id)))
-  );
-  const recipeItemEditorLinkedRecipes = $derived(
-    recipeItemDraft
-      ? ($viewState.recipes || []).filter((recipe) =>
-          recipeItemDraftRecipeIds.has(String(recipe?.id))
-        )
-      : []
-  );
-  const recipeItemEditorAvailableRecipes = $derived(
-    recipeItemDraft
-      ? ($viewState.recipes || []).filter(
-          (recipe) => !recipeItemDraftRecipeIds.has(String(recipe?.id))
-        )
-      : []
-  );
   // ─────────────────────────────────────────────────────────────────────────────────────────
   // BREADCRUMB LEAVES: the SUBJECT of an editor, not the act of editing it (issue 1328).
   const crumbSubject = (name, key, fallback) => {
@@ -1718,7 +1679,7 @@
   // its own: it is a world item plus the recipes it contains.
   const recipeItemCrumb = $derived(
     crumbSubject(
-      recipeItemEditorLinkedItem?.name,
+      recipeItem.recipeItemEditorLinkedItem?.name,
       'FABRICATE.Admin.Manager.RecipeItem.EditBreadcrumb',
       'Edit recipe item'
     )
@@ -1936,12 +1897,6 @@
     return result;
   }
 
-  function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
-    const key = count === 1 ? keySingular : keyPlural;
-    const fallback = count === 1 ? fallbackSingular : fallbackPlural;
-    return `${count} ${text(key, fallback)}`;
-  }
-
   // The recipe editor's header subline: "<category> · <resolution mode>".
   function recipeEditSubtitle() {
     const category = getRecipeCategoryLabel(
@@ -1987,25 +1942,15 @@
     );
   }
 
-  // The titlebar's right-hand status line.
+  // The title bar's status line: no selection draws none.
+  const titlebarModeLabel = $derived(
+    selectedSystem ? resolutionModeLabel(selectedSystem.resolutionMode) : ''
+  );
   const titlebarOutcomeTierCount = $derived(
     selectedSystem?.resolutionMode === 'routedByCheck'
       ? routedOutcomeTierCount(selectedSystem?.craftingCheck?.routed)
       : 0
   );
-
-  function titlebarStatusLabel() {
-    const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
-    if (titlebarOutcomeTierCount <= 0) return mode;
-    const tiers = formatCount(
-      'FABRICATE.Admin.Manager.Titlebar.OutcomeTier',
-      'outcome tier',
-      'FABRICATE.Admin.Manager.Titlebar.OutcomeTiers',
-      'outcome tiers',
-      titlebarOutcomeTierCount
-    );
-    return `${mode} · ${tiers}`;
-  }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     // `checks` is RETAINED as a redirect to the first available child (issue 1096), so existing
@@ -2277,16 +2222,15 @@
     },
     'recipe-item-edit': {
       active: () => activeView === 'recipe-item-edit',
-      isDirty: () => recipeItemEditDirty === true,
+      isDirty: () => recipeItem.recipeItemEditDirty === true,
       confirm: () => store.confirmDiscardDirtyRecipeItemDraft?.(),
       finish: async (action) => {
         if (action === 'cancel' || action === false) return false;
         if (action === 'save') {
-          const saved = await saveRecipeItemDraft();
+          const saved = await recipeItem.saveRecipeItemDraft();
           return saved !== false;
         }
-        recipeItemDraft = cloneRecipeItemDraft(recipeItemDraftBaseline);
-        recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(recipeItemDraftBaseline);
+        recipeItem.discard();
         return true;
       },
     },
@@ -3901,168 +3845,10 @@
     openCraftingSection('recipes');
   }
 
-  // ---- Books & Scrolls surface handlers (issue 511, PR-B redesign) ----------
-  // Select a recipe item row (opens the ItemPageInspector aside).
-  function selectRecipeItem(recipeItemId) {
-    selectedRecipeItemId = recipeItemId;
-  }
-
-  // The ItemPageInspector quick-limit toggle emits a boolean; turn it into the right caps patch for
-  // the active visibility mode (live-apply, no draft).
-  function toggleRecipeItemQuickLimit(recipeItemId, limited) {
-    const patch =
-      craftingVisibilityMode === 'item'
-        ? { item: { limitUses: limited === true, maxUses: 1 } }
-        : {
-            learn: { limitLearning: limited === true, learnScope: 'perInstance', learnsAllowed: 1 },
-          };
-    store.updateRecipeItemCaps?.(recipeItemId, patch);
-  }
-
-  // Deep PLAIN clone for the recipe-item draft + baseline.
-  function cloneRecipeItemDraft(source) {
-    return source ? JSON.parse(JSON.stringify(source)) : null;
-  }
-
-  function recipeItemSourceSnapshot(source) {
-    const uuid = String(source?.originItemUuid || '');
-    if (!uuid) return null;
-    return {
-      uuid,
-      name: source?.resolvedName || source?.name || '',
-      img: source?.resolvedImg || source?.img || '',
-      type: source?.derivedType || source?.type || '',
-      description: source?.description || '',
-    };
-  }
-
-  // Recursively deep-merge a partial patch into the recipe-item draft.
-  function deepMergeDraft(base, patch) {
-    const result = { ...(base || {}) };
-    for (const [key, value] of Object.entries(patch || {})) {
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        result[key] = deepMergeDraft(result[key], value);
-      } else {
-        result[key] = value;
-      }
-    }
-    return result;
-  }
-
-  function patchRecipeItemDraft(patch) {
-    if (!recipeItemDraft || !patch) return;
-    recipeItemDraft = deepMergeDraft(recipeItemDraft, patch);
-  }
-
-  // Open the full-window recipe-item editor for a definition (recipe-item-edit route).
-  function editRecipeItem(recipeItemId) {
-    afterTruthyResult(confirmRouteExit('recipe-item-edit'), () => {
-      selectedRecipeItemId = recipeItemId;
-      recipeItemEditSaving = false;
-      recipeItemSaveFailed = false;
-      recipeItemActiveTab = 'overview';
-      const source = (recipeItemDefinitions || []).find((def) => def.id === recipeItemId) || null;
-      recipeItemDraft = cloneRecipeItemDraft(source);
-      recipeItemDraftBaseline = cloneRecipeItemDraft(source);
-      recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(source);
-      activeView = 'recipe-item-edit';
-      navRail.expandGroup('crafting');
-      Promise.resolve(services?.getWorldItemOptions?.()).then((options) => {
-        worldItemOptions = options || [];
-      });
-    });
-  }
-
-  function clearRecipeItemDraft() {
-    recipeItemDraft = null;
-    recipeItemDraftBaseline = null;
-    recipeItemLinkedSourceSnapshot = null;
-    recipeItemSaveFailed = false;
-  }
-
-  // Commit the staged recipe-item draft in a single updateRecipeItemDefinition call (via the
-  // store's saveRecipeItem wrapper).
-  async function saveRecipeItemDraft() {
-    if (recipeItemEditSaving) return false;
-    if (!recipeItemDraft?.id) return false;
-    recipeItemEditSaving = true;
-    recipeItemSaveFailed = false;
-    try {
-      const result = await store.saveRecipeItem?.(recipeItemDraft.id, {
-        enabled: recipeItemDraft.enabled !== false,
-        originItemUuid: recipeItemDraft.originItemUuid ?? null,
-        recipeIds: Array.isArray(recipeItemDraft.recipeIds) ? recipeItemDraft.recipeIds : [],
-        caps: recipeItemDraft.caps || {},
-      });
-      if (result === false) {
-        recipeItemSaveFailed = true;
-        return false;
-      }
-      recipeItemDraftBaseline = cloneRecipeItemDraft(recipeItemDraft);
-      activeView = 'books-scrolls';
-      return result;
-    } catch {
-      recipeItemSaveFailed = true;
-      return false;
-    } finally {
-      recipeItemEditSaving = false;
-    }
-  }
-
-  async function deleteRecipeItemFromEdit() {
-    if (!recipeItemDraft?.id || recipeItemEditSaving) return;
-    const result = await store.deleteRecipeItemDefinition?.(recipeItemDraft.id);
-    if (result === false) return; // cancelled or failed → stay in the editor
-    clearRecipeItemDraft();
-    activeView = 'books-scrolls';
-  }
-
   function backToBooksScrolls() {
     afterTruthyResult(confirmRouteExit('books-scrolls'), () => {
       activeView = 'books-scrolls';
     });
-  }
-
-  // Link / unlink the linked world item behind the edited recipe item (staged).
-  async function linkRecipeItemSource(uuid) {
-    if (!uuid) return false;
-    const source = await services?.resolveToolSource?.(uuid);
-    if (!source) return false;
-    recipeItemLinkedSourceSnapshot = { ...source, uuid: source.uuid || uuid };
-    patchRecipeItemDraft({ originItemUuid: source.uuid || uuid });
-    return true;
-  }
-
-  function unlinkRecipeItemSource() {
-    recipeItemLinkedSourceSnapshot = null;
-    patchRecipeItemDraft({ originItemUuid: null });
-  }
-
-  // Add / remove a recipe on the edited book.
-  function linkRecipeToItem(recipeId) {
-    if (!recipeItemDraft?.id || !recipeId) return;
-    // Function-local scratch: the draft is patched with the spread array below, so the Set
-    // never reaches state.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const next = new Set((recipeItemDraft.recipeIds || []).map((id) => String(id)));
-    next.add(String(recipeId));
-    patchRecipeItemDraft({ recipeIds: [...next] });
-  }
-
-  function unlinkRecipeFromItem(recipeId) {
-    if (!recipeItemDraft?.id || !recipeId) return;
-    const next = (recipeItemDraft.recipeIds || [])
-      .map((id) => String(id))
-      .filter((id) => id !== String(recipeId));
-    patchRecipeItemDraft({ recipeIds: next });
-  }
-
-  // Create a recipe item from a dropped world/compendium Item (issue 844).
-  async function dropRecipeItem(uuid) {
-    if (!uuid) return;
-    const created = await store.addRecipeItemFromUuid?.(selectedSystemId, uuid);
-    const newId = typeof created === 'string' ? created : created?.item?.id || created?.id;
-    if (newId) editRecipeItem(newId);
   }
 
   function copyComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
@@ -4282,43 +4068,12 @@
   data-world-travel-tab={worldTravelTabAttribute}
   data-world-rules-tab={isWorldRulesRoute ? worldRulesTab : undefined}
 >
-  <!--
-    The manager titlebar: a thin identity strip above the header, on the tool routes too (issue 1373).
-  -->
-  <div
-    class="manager-titlebar"
-    data-manager-titlebar
-    aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}
-  >
-    {#if premiumInstalled}
-      <span
-        class="manager-titlebar-badge"
-        data-manager-titlebar-premium
-        title={text(
-          'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
-          'Fabricate Premium is installed and connected'
-        )}
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
-          'Fabricate Premium is installed and connected'
-        )}>{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
-      >
-    {/if}
-    {#if selectedSystem}
-      <span
-        class="manager-titlebar-status"
-        data-manager-titlebar-status
-        title={titlebarStatusLabel()}
-        aria-label={text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}
-      >
-        <!-- The reference marks this line with an INFORMATION glyph, not a die. What follows
-             it is a statement about how the selected system resolves, which a d20 reads as a
-             dice-roll control rather than as a caption (issue 1373). -->
-        <i class="fas fa-circle-info manager-titlebar-status-icon" aria-hidden="true"></i>
-        <span class="manager-titlebar-status-text">{titlebarStatusLabel()}</span>
-      </span>
-    {/if}
-  </div>
+  <ManagerTitleBar
+    {text}
+    {premiumInstalled}
+    modeLabel={titlebarModeLabel}
+    outcomeTierCount={titlebarOutcomeTierCount}
+  />
 
   <ManagerPageHeader
     {header}
@@ -4415,12 +4170,12 @@
     {selectedRecipeId}
     {deleteRecipeFromEdit}
     {saveRecipeDraft}
-    {recipeItemDraft}
-    {recipeItemEditDirty}
-    {recipeItemEditSaving}
-    {canSaveRecipeItemEdit}
-    {deleteRecipeItemFromEdit}
-    {saveRecipeItemDraft}
+    recipeItemDraft={recipeItem.recipeItemDraft}
+    recipeItemEditDirty={recipeItem.recipeItemEditDirty}
+    recipeItemEditSaving={recipeItem.recipeItemEditSaving}
+    canSaveRecipeItemEdit={recipeItem.canSaveRecipeItemEdit}
+    deleteRecipeItemFromEdit={recipeItem.deleteRecipeItemFromEdit}
+    saveRecipeItemDraft={recipeItem.saveRecipeItemDraft}
     {openComponentAddFromCatalogue}
     {componentEditCombinedDirty}
     {componentEditSaving}
@@ -5240,10 +4995,10 @@
       <BooksScrollsView
         recipeItems={recipeItemDefinitions}
         visibilityMode={craftingVisibilityMode}
-        {selectedRecipeItemId}
-        onSelectRecipeItem={(id) => selectRecipeItem(id)}
-        onOpenRecipeItem={(id) => editRecipeItem(id)}
-        onDropRecipeItem={(uuid) => dropRecipeItem(uuid)}
+        selectedRecipeItemId={recipeItem.selectedRecipeItemId}
+        onSelectRecipeItem={(id) => recipeItem.selectRecipeItem(id)}
+        onOpenRecipeItem={(id) => recipeItem.editRecipeItem(id)}
+        onDropRecipeItem={(uuid) => recipeItem.dropRecipeItem(uuid)}
         dropEnabled={!!selectedSystemId}
         onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
       />
@@ -5261,21 +5016,21 @@
       />
     {:else if currentView === 'recipe-item-edit' && selectedSystem}
       <RecipeItemEditor
-        recipeItem={recipeItemDraft}
-        linkedItem={recipeItemEditorLinkedItem}
-        linkedRecipes={recipeItemEditorLinkedRecipes}
-        availableRecipes={recipeItemEditorAvailableRecipes}
+        recipeItem={recipeItem.recipeItemDraft}
+        linkedItem={recipeItem.recipeItemEditorLinkedItem}
+        linkedRecipes={recipeItem.recipeItemEditorLinkedRecipes}
+        availableRecipes={recipeItem.recipeItemEditorAvailableRecipes}
         characterPrerequisites={selectedCharacterPrerequisites}
         visibilityMode={craftingVisibilityMode}
-        activeTab={recipeItemActiveTab}
-        saveFailed={recipeItemSaveFailed}
-        onSelectTab={(tab) => (recipeItemActiveTab = tab)}
-        onPatch={(patch) => patchRecipeItemDraft(patch)}
-        onLinkItem={(uuid) => linkRecipeItemSource(uuid)}
-        onUnlinkItem={() => unlinkRecipeItemSource()}
+        activeTab={recipeItem.recipeItemActiveTab}
+        saveFailed={recipeItem.recipeItemSaveFailed}
+        onSelectTab={(tab) => (recipeItem.recipeItemActiveTab = tab)}
+        onPatch={(patch) => recipeItem.patchRecipeItemDraft(patch)}
+        onLinkItem={(uuid) => recipeItem.linkRecipeItemSource(uuid)}
+        onUnlinkItem={() => recipeItem.unlinkRecipeItemSource()}
         onCopyItemUuid={(uuid) => copyComponentSource(uuid)}
-        onLinkRecipe={(id) => linkRecipeToItem(id)}
-        onRemoveRecipe={(id) => unlinkRecipeFromItem(id)}
+        onLinkRecipe={(id) => recipeItem.linkRecipeToItem(id)}
+        onRemoveRecipe={(id) => recipeItem.unlinkRecipeFromItem(id)}
       />
     {:else if currentView === 'recipes'}
       <RecipesBrowserView
@@ -5853,11 +5608,11 @@
           />
         {:else if currentView === 'books-scrolls'}
           <ItemPageInspector
-            item={selectedRecipeItem}
+            item={recipeItem.selectedRecipeItem}
             visibilityMode={craftingVisibilityMode}
-            onOpenRecipeItem={(id) => editRecipeItem(id)}
+            onOpenRecipeItem={(id) => recipeItem.editRecipeItem(id)}
             onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
-            onToggleQuickLimit={(id, limited) => toggleRecipeItemQuickLimit(id, limited)}
+            onToggleQuickLimit={(id, limited) => recipeItem.toggleRecipeItemQuickLimit(id, limited)}
           />
         {:else}
           <SystemBrowserInspector

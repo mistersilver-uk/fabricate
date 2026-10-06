@@ -288,6 +288,146 @@ const RAIL_CENSUS = Object.freeze({
       "+ 5 i aria-hidden=\"true\" class=\"fas fa-sliders\"",
       "+ 5 span class=\"manager-nav-label\" | Settings",
     ],
+    "the Gathering group locked open on one of its own child routes": [
+      "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
+      "+ 3 button aria-disabled=\"false\" aria-label=\"Return to System Library\" class=\"manager-scope-return \" title=\"Return to System Library\" type=\"button\"",
+      "- 2 div class=\"manager-nav-group \"",
+      "- 3 button aria-expanded=\"false\" class=\"manager-nav-button manager-nav-parent\" id=\"manager-nav-gathering\" type=\"button\"",
+      "+ 2 div class=\"manager-nav-group is-expanded\"",
+      "+ 3 button aria-current=\"page\" aria-expanded=\"true\" class=\"manager-nav-button manager-nav-parent\" id=\"manager-nav-gathering\" type=\"button\"",
+      "- 3 button aria-controls=\"manager-gathering-submenu\" aria-disabled=\"false\" aria-expanded=\"false\" aria-label=\"Expand gathering menu\" class=\"manager-nav-toggle\" type=\"button\"",
+      "- 4 i aria-hidden=\"true\" class=\"fas fa-chevron-down\"",
+      "+ 3 button aria-controls=\"manager-gathering-submenu\" aria-disabled=\"true\" aria-expanded=\"true\" aria-label=\"Collapse gathering menu\" class=\"manager-nav-toggle\" disabled=\"\" title=\"This section stays open while you are on one of its pages.\" type=\"button\"",
+      "+ 4 i aria-hidden=\"true\" class=\"fas fa-chevron-up\"",
+      "+ 3 div aria-label=\"Gathering sections\" class=\"manager-nav-submenu\" id=\"manager-gathering-submenu\"",
+      "+ 4 button aria-current=\"page\" class=\"manager-nav-subitem is-active\" id=\"manager-gathering-nav-environments\" type=\"button\"",
+      "+ 5 i aria-hidden=\"true\" class=\"fas fa-seedling\"",
+      "+ 5 span class=\"manager-nav-label\" | Environments",
+      "+ 5 span class=\"manager-nav-count\" | 2",
+      "+ 4 button class=\"manager-nav-subitem \" id=\"manager-gathering-nav-tasks\" type=\"button\"",
+      "+ 5 i aria-hidden=\"true\" class=\"fas fa-list-check\"",
+      "+ 5 span class=\"manager-nav-label\" | Tasks",
+      "+ 5 span class=\"manager-nav-count\" | 3",
+      "+ 4 button class=\"manager-nav-subitem \" id=\"manager-gathering-nav-encounters\" type=\"button\"",
+      "+ 5 i aria-hidden=\"true\" class=\"fas fa-masks-theater\"",
+      "+ 5 span class=\"manager-nav-label\" | Events",
+      "+ 5 span class=\"manager-nav-count\" | 0",
+      "+ 4 button class=\"manager-nav-subitem \" id=\"manager-gathering-nav-settings\" type=\"button\"",
+      "+ 5 i aria-hidden=\"true\" class=\"fas fa-sliders\"",
+      "+ 5 span class=\"manager-nav-label\" | Settings",
+    ],
+    "the Travel group locked open on its Realms route": [
+      "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
+      "+ 3 button aria-disabled=\"false\" aria-label=\"Return to System Library\" class=\"manager-scope-return \" title=\"Return to System Library\" type=\"button\"",
+      "- 3 div class=\"manager-nav-group manager-world-travel-group \" data-world-travel-section=\"\"",
+      "- 4 button aria-controls=\"manager-travel-submenu\" aria-expanded=\"false\" aria-label=\"Travel\" class=\"manager-nav-button manager-nav-parent manager-world-nav-item \" data-world-nav-item=\"travel\" id=\"manager-world-nav-travel\" type=\"button\"",
+      "+ 3 div class=\"manager-nav-group manager-world-travel-group is-expanded\" data-world-travel-section=\"\"",
+      "+ 4 button aria-controls=\"manager-travel-submenu\" aria-current=\"page\" aria-expanded=\"true\" aria-label=\"Travel\" class=\"manager-nav-button manager-nav-parent manager-world-nav-item is-active\" data-world-nav-item=\"travel\" id=\"manager-world-nav-travel\" type=\"button\"",
+      "- 4 button aria-controls=\"manager-travel-submenu\" aria-disabled=\"false\" aria-expanded=\"false\" aria-label=\"Expand Travel\" class=\"manager-nav-toggle\" data-world-travel-toggle=\"\" id=\"manager-travel-toggle\" type=\"button\"",
+      "- 5 i aria-hidden=\"true\" class=\"fas fa-chevron-down\"",
+      "+ 4 button aria-controls=\"manager-travel-submenu\" aria-disabled=\"true\" aria-expanded=\"true\" aria-label=\"Collapse Travel\" class=\"manager-nav-toggle\" data-world-travel-toggle=\"\" disabled=\"\" id=\"manager-travel-toggle\" title=\"This section stays open while you are on one of its pages.\" type=\"button\"",
+      "+ 5 i aria-hidden=\"true\" class=\"fas fa-chevron-up\"",
+      "+ 4 div aria-label=\"Travel destinations\" class=\"manager-nav-submenu\" data-world-travel-submenu=\"\" id=\"manager-travel-submenu\"",
+      "+ 5 button aria-current=\"page\" class=\"manager-nav-subitem is-active\" data-world-travel-item=\"realms\" id=\"manager-travel-nav-realms\" type=\"button\"",
+      "+ 6 i aria-hidden=\"true\" class=\"fas fa-mountain-sun\"",
+      "+ 6 span class=\"manager-nav-label\" | Realms",
+      "+ 5 button class=\"manager-nav-subitem \" data-world-travel-item=\"map\" id=\"manager-travel-nav-map\" type=\"button\"",
+      "+ 6 i aria-hidden=\"true\" class=\"fas fa-map-location-dot\"",
+      "+ 6 span class=\"manager-nav-label\" | Map Region Links",
+    ],
+    "the Rules group locked open on its Currency route, with Travel opened beside it": [
+      "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
+      "+ 3 button aria-disabled=\"false\" aria-label=\"Return to System Library\" class=\"manager-scope-return \" title=\"Return to System Library\" type=\"button\"",
+      "- 3 div class=\"manager-nav-group manager-world-travel-group \" data-world-travel-section=\"\"",
+      "- 4 button aria-controls=\"manager-travel-submenu\" aria-expanded=\"false\" aria-label=\"Travel\" class=\"manager-nav-button manager-nav-parent manager-world-nav-item \" data-world-nav-item=\"travel\" id=\"manager-world-nav-travel\" type=\"button\"",
+      "+ 3 div class=\"manager-nav-group manager-world-travel-group is-expanded\" data-world-travel-section=\"\"",
+      "+ 4 button aria-controls=\"manager-travel-submenu\" aria-expanded=\"true\" aria-label=\"Travel\" class=\"manager-nav-button manager-nav-parent manager-world-nav-item \" data-world-nav-item=\"travel\" id=\"manager-world-nav-travel\" type=\"button\"",
+      "- 4 button aria-controls=\"manager-travel-submenu\" aria-disabled=\"false\" aria-expanded=\"false\" aria-label=\"Expand Travel\" class=\"manager-nav-toggle\" data-world-travel-toggle=\"\" id=\"manager-travel-toggle\" type=\"button\"",
+      "- 5 i aria-hidden=\"true\" class=\"fas fa-chevron-down\"",
+      "- 3 div class=\"manager-nav-group manager-world-rules-group \" data-world-rules-section=\"\"",
+      "- 4 button aria-controls=\"manager-rules-submenu\" aria-expanded=\"false\" aria-label=\"Rules & Resources\" class=\"manager-nav-button manager-nav-parent manager-world-nav-item \" data-world-nav-item=\"rules\" id=\"manager-world-nav-rules\" type=\"button\"",
+      "+ 4 button aria-controls=\"manager-travel-submenu\" aria-disabled=\"false\" aria-expanded=\"true\" aria-label=\"Collapse Travel\" class=\"manager-nav-toggle\" data-world-travel-toggle=\"\" id=\"manager-travel-toggle\" type=\"button\"",
+      "+ 5 i aria-hidden=\"true\" class=\"fas fa-chevron-up\"",
+      "+ 4 div aria-label=\"Travel destinations\" class=\"manager-nav-submenu\" data-world-travel-submenu=\"\" id=\"manager-travel-submenu\"",
+      "+ 5 button class=\"manager-nav-subitem \" data-world-travel-item=\"realms\" id=\"manager-travel-nav-realms\" type=\"button\"",
+      "+ 6 i aria-hidden=\"true\" class=\"fas fa-mountain-sun\"",
+      "+ 6 span class=\"manager-nav-label\" | Realms",
+      "+ 5 button class=\"manager-nav-subitem \" data-world-travel-item=\"map\" id=\"manager-travel-nav-map\" type=\"button\"",
+      "+ 6 i aria-hidden=\"true\" class=\"fas fa-map-location-dot\"",
+      "+ 6 span class=\"manager-nav-label\" | Map Region Links",
+      "+ 3 div class=\"manager-nav-group manager-world-rules-group is-expanded\" data-world-rules-section=\"\"",
+      "+ 4 button aria-controls=\"manager-rules-submenu\" aria-current=\"page\" aria-expanded=\"true\" aria-label=\"Rules & Resources\" class=\"manager-nav-button manager-nav-parent manager-world-nav-item is-active\" data-world-nav-item=\"rules\" id=\"manager-world-nav-rules\" type=\"button\"",
+      "- 4 button aria-controls=\"manager-rules-submenu\" aria-disabled=\"false\" aria-expanded=\"false\" aria-label=\"Expand Rules & Resources\" class=\"manager-nav-toggle\" data-world-rules-toggle=\"\" id=\"manager-rules-toggle\" type=\"button\"",
+      "- 5 i aria-hidden=\"true\" class=\"fas fa-chevron-down\"",
+      "+ 4 button aria-controls=\"manager-rules-submenu\" aria-disabled=\"true\" aria-expanded=\"true\" aria-label=\"Collapse Rules & Resources\" class=\"manager-nav-toggle\" data-world-rules-toggle=\"\" disabled=\"\" id=\"manager-rules-toggle\" title=\"This section stays open while you are on one of its pages.\" type=\"button\"",
+      "+ 5 i aria-hidden=\"true\" class=\"fas fa-chevron-up\"",
+      "+ 4 div aria-label=\"Rules & Resources\" class=\"manager-nav-submenu\" data-world-rules-submenu=\"\" id=\"manager-rules-submenu\"",
+      "+ 5 button aria-current=\"page\" class=\"manager-nav-subitem is-active\" data-world-rules-item=\"currency\" id=\"manager-rules-nav-currency\" type=\"button\"",
+      "+ 6 i aria-hidden=\"true\" class=\"fas fa-coins\"",
+      "+ 6 span class=\"manager-nav-label\" | Currency",
+      "+ 5 button class=\"manager-nav-subitem \" data-world-rules-item=\"prerequisites\" id=\"manager-rules-nav-prerequisites\" type=\"button\"",
+      "+ 6 i aria-hidden=\"true\" class=\"fas fa-user-shield\"",
+      "+ 6 span class=\"manager-nav-label\" | Character prerequisites",
+      "+ 5 button class=\"manager-nav-subitem \" data-world-rules-item=\"modifiers\" id=\"manager-rules-nav-modifiers\" type=\"button\"",
+      "+ 6 i aria-hidden=\"true\" class=\"fas fa-user-gear\"",
+      "+ 6 span class=\"manager-nav-label\" | Modifiers",
+    ],
+    "a world catalogue leaf on its own route": [
+      "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
+      "+ 3 button aria-disabled=\"false\" aria-label=\"Return to System Library\" class=\"manager-scope-return \" title=\"Return to System Library\" type=\"button\"",
+      "- 3 button aria-label=\"Component catalogue\" class=\"manager-nav-button manager-world-nav-item \" data-world-nav-item=\"component-catalogue\" id=\"manager-world-nav-component-catalogue\" type=\"button\"",
+      "+ 3 button aria-current=\"page\" aria-label=\"Component catalogue\" class=\"manager-nav-button manager-world-nav-item is-active\" data-world-nav-item=\"component-catalogue\" id=\"manager-world-nav-component-catalogue\" type=\"button\"",
+    ],
+    "the Parties leaf on its own route": [
+      "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
+      "+ 3 button aria-disabled=\"false\" aria-label=\"Return to System Library\" class=\"manager-scope-return \" title=\"Return to System Library\" type=\"button\"",
+      "- 3 button aria-label=\"Parties\" class=\"manager-nav-button manager-world-nav-item \" data-world-nav-item=\"parties\" id=\"manager-world-nav-parties\" type=\"button\"",
+      "+ 3 button aria-current=\"page\" aria-label=\"Parties\" class=\"manager-nav-button manager-world-nav-item is-active\" data-world-nav-item=\"parties\" id=\"manager-world-nav-parties\" type=\"button\"",
+    ],
+    "System Overview current, with a validation warning and a Tool": [
+      "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
+      "+ 3 button aria-disabled=\"false\" aria-label=\"Return to System Library\" class=\"manager-scope-return \" title=\"Return to System Library\" type=\"button\"",
+      "- 2 button class=\"manager-nav-button \" data-nav-system-edit=\"\" id=\"manager-nav-system-overview\" type=\"button\"",
+      "+ 2 button aria-current=\"page\" class=\"manager-nav-button is-active\" data-nav-system-edit=\"\" id=\"manager-nav-system-overview\" type=\"button\"",
+      "+ 3 span aria-label=\"Open validation issues\" class=\"manager-nav-count\" | 1",
+      "+ 3 span class=\"manager-nav-count\" | 1",
+      "- 4 span class=\"manager-nav-count\" | 0",
+      "+ 4 span class=\"manager-nav-count\" | 1",
+    ],
+    "Essences and Gathering switched off for the system": [
+      "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
+      "+ 3 button aria-disabled=\"false\" aria-label=\"Return to System Library\" class=\"manager-scope-return \" title=\"Return to System Library\" type=\"button\"",
+      "- 2 button class=\"manager-nav-button \" id=\"manager-nav-tags\" type=\"button\"",
+      "+ 2 button aria-current=\"page\" class=\"manager-nav-button is-active\" id=\"manager-nav-tags\" type=\"button\"",
+      "- 2 button class=\"manager-nav-button \" id=\"manager-nav-essence-rules\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-mortar-pestle\"",
+      "- 3 span class=\"manager-nav-label\" | Essence Rules",
+      "- 3 span class=\"manager-nav-count\" | 2",
+      "- 2 div class=\"manager-nav-group \"",
+      "- 3 button aria-expanded=\"false\" class=\"manager-nav-button manager-nav-parent\" id=\"manager-nav-gathering\" type=\"button\"",
+      "- 4 i aria-hidden=\"true\" class=\"fas fa-seedling\"",
+      "- 4 span class=\"manager-nav-label\" | Gathering",
+      "- 4 span class=\"manager-nav-count\" | 5",
+      "- 3 button aria-controls=\"manager-gathering-submenu\" aria-disabled=\"false\" aria-expanded=\"false\" aria-label=\"Expand gathering menu\" class=\"manager-nav-toggle\" type=\"button\"",
+      "- 4 i aria-hidden=\"true\" class=\"fas fa-chevron-down\"",
+    ],
+    "a system leaf on its own route, with experimental features off": [
+      "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
+      "+ 3 button aria-disabled=\"false\" aria-label=\"Return to System Library\" class=\"manager-scope-return \" title=\"Return to System Library\" type=\"button\"",
+      "- 2 button class=\"manager-nav-button \" id=\"manager-nav-component-rules\" type=\"button\"",
+      "+ 2 button aria-current=\"page\" class=\"manager-nav-button is-active\" id=\"manager-nav-component-rules\" type=\"button\"",
+      "- 2 button class=\"manager-nav-button\" disabled=\"\" id=\"manager-nav-graph\" title=\"Graph is planned for a future release.\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-project-diagram\"",
+      "- 3 span class=\"manager-nav-label\" | Graph",
+      "- 3 span class=\"manager-nav-planned\" | Soon",
+      "- 3 div class=\"manager-nav-group manager-world-downtime-group \" data-world-downtime-section=\"\"",
+      "- 4 button aria-controls=\"manager-downtime-submenu\" aria-expanded=\"false\" aria-label=\"Downtime\" class=\"manager-nav-button manager-nav-parent manager-world-nav-item \" data-world-nav-item=\"downtime\" id=\"manager-world-nav-downtime\" title=\"Unlock Downtime Studio with Fabricate Premium\" type=\"button\"",
+      "- 5 i aria-hidden=\"true\" class=\"fas fa-hourglass-half\"",
+      "- 5 span class=\"manager-nav-label\" | Downtime",
+      "- 5 span class=\"manager-nav-premium \" data-world-nav-premium=\"\" data-world-nav-premium-state=\"preview\" | PREMIUM",
+      "- 4 button aria-controls=\"manager-downtime-submenu\" aria-disabled=\"false\" aria-expanded=\"false\" aria-label=\"Expand Downtime\" class=\"manager-nav-toggle\" data-world-downtime-toggle=\"\" id=\"manager-downtime-toggle\" type=\"button\"",
+      "- 5 i aria-hidden=\"true\" class=\"fas fa-chevron-down\"",
+    ],
   },
   /* rail-census:end */
 });
@@ -315,6 +455,9 @@ export function registerRailCases() {
     mountManager();
 
     assertHook(target, '.manager-titlebar[data-manager-titlebar]');
+    const titlebar = target.querySelector('.manager-titlebar');
+    assert.equal(target.querySelectorAll('.manager-titlebar').length, 1, 'the shell draws one titlebar');
+    assert.equal(titlebar.previousElementSibling, null, 'and nothing the shell draws precedes it');
     assertHook(target, '[data-manager-titlebar-status]', 'the titlebar reports the resolution');
     assert.ok(
       target.querySelector('[data-manager-titlebar-status]').getAttribute('title')?.length > 0,
@@ -329,6 +472,36 @@ export function registerRailCases() {
     ]) {
       assertNoHook(target, gone, `${gone} was removed from the page header and must stay gone`);
     }
+  });
+
+  // The shell derives the mode and the tier count; ManagerTitleBar only formats them (issue 1777).
+  it('summarises a routed-by-check selection with its outcome tiers in the titlebar', () => {
+    useShippedLocalization();
+    mountManager([], {
+      alchemyResolutionMode: 'routedByCheck',
+      craftingCheck: { routed: { type: 'fixed', fixedOutcomes: [{ id: 'great' }, { id: 'fair' }] } },
+    });
+    assert.equal(
+      target.querySelector('[data-manager-titlebar-status]').textContent.trim(),
+      'Routed by check · 2 outcome tiers'
+    );
+  });
+
+  it('counts no outcome tiers for a selection that does not route by check', () => {
+    useShippedLocalization();
+    mountManager([], {
+      craftingCheck: { routed: { type: 'fixed', fixedOutcomes: [{ id: 'great' }, { id: 'fair' }] } },
+    });
+    const status = target.querySelector('[data-manager-titlebar-status]').textContent.trim();
+    assert.ok(status.length > 0, 'the selection still reports its resolution');
+    assert.ok(!status.includes('outcome tier'), 'leftover routed tiers are not counted: ' + status);
+  });
+
+  it('draws no titlebar status line without a selected system', () => {
+    useShippedLocalization();
+    mountManager([], { selected: false });
+    assertHook(target, '.manager-titlebar[data-manager-titlebar]');
+    assertNoHook(target, '[data-manager-titlebar-status]', 'no selection, no resolution summary');
   });
 
   it('labels the rail section, in shipped copy', () => {
@@ -1360,10 +1533,20 @@ export function registerRailCases() {
   });
 
   // The rail's assistive-technology contract lives in attribute values that no screenshot renders.
-  // The five states are its reachable shapes: 31 `{#if}`/`{#each}` blocks over 154 element sites
-  // mean a single literal would freeze exactly one of them. The Downtime submenu is reached by no
-  // state here and is pinned by `tests/components/manager-downtime-mounted.js` instead.
-  it('emits the same rail DOM, attribute for attribute, in each of its five states', async () => {
+  // The states are its reachable shapes: every group open on one of its own routes and every leaf
+  // kind current, so each row's active, current, count and lock attributes are pinned by value
+  // (issue 1777). The Downtime submenu is pinned by `tests/components/manager-downtime-mounted.js`.
+  it('emits the same rail DOM, attribute for attribute, in each of its states', async () => {
+    const openAfter = (storeOptions, ...presses) => async () => {
+      mountManager([], { gatheringRealmsEnabled: true, ...storeOptions });
+      for (const press of presses) {
+        press().click();
+        for (let index = 0; index < 8; index += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+      }
+    };
+    const withExperimental = { experimentalFeaturesEnabled: true };
     const CENSUS_STATES = {
       [CENSUS_BASE_STATE]: () => {
         mountManager([], { gatheringRealmsEnabled: true, experimentalFeaturesEnabled: true });
@@ -1398,6 +1581,47 @@ export function registerRailCases() {
         await tick();
         flushSync();
       },
+      'the Gathering group locked open on one of its own child routes': openAfter(
+        withExperimental,
+        () => navButton('Gathering')
+      ),
+      'the Travel group locked open on its Realms route': openAfter(withExperimental, () =>
+        worldTravelItem('travel')
+      ),
+      'the Rules group locked open on its Currency route, with Travel opened beside it': openAfter(
+        withExperimental,
+        () => worldNavItem('rules'),
+        () => target.querySelector('#manager-travel-toggle')
+      ),
+      'a world catalogue leaf on its own route': openAfter(withExperimental, () =>
+        worldNavItem('component-catalogue')
+      ),
+      'the Parties leaf on its own route': openAfter(withExperimental, () =>
+        worldNavItem('parties')
+      ),
+      'System Overview current, with a validation warning and a Tool': openAfter(
+        {
+          ...withExperimental,
+          systemValidation: {
+            issues: [],
+            counts: { critical: 0, warning: 1, info: 0, blockers: 0 },
+            blocksSystem: false,
+          },
+          gatheringLibraryTools: [{ id: 'tool-pickaxe', label: 'Pickaxe', enabled: true }],
+        },
+        () => navButton('System Overview')
+      ),
+      'Essences and Gathering switched off for the system': openAfter(
+        {
+          ...withExperimental,
+          selectedFeatures: { itemTags: true, recipeCategories: true, salvage: true },
+        },
+        () => navButton('Tags & Categories')
+      ),
+      'a system leaf on its own route, with experimental features off': openAfter(
+        { experimentalFeaturesEnabled: false },
+        () => navButton('Component Rules')
+      ),
     };
 
     const censuses = {};

@@ -469,7 +469,7 @@ export const CASES = Object.freeze([
     expectSelector:
       '[data-inventory-salvage-body="routed"]' +
       ':has(.salvage-dc[data-inventory-salvage-dc="11"]:text-is("DC 11"))' +
-      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-threshold="16"] .manager-chip)' +
+      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] .manager-chip[data-inventory-outcome-threshold="16"])' +
       ':not(:has([data-inventory-outcome-band]))',
     kinds: ['player', 'inventory'],
     sourceMatches: [
@@ -494,7 +494,7 @@ export const CASES = Object.freeze([
       '[data-inventory-salvage-body="routed"]:not(:has([data-inventory-salvage-dc]))' +
       ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-band="6+"])' +
       ':has([data-inventory-salvage-outcome="rw-salv-standard"] [data-inventory-outcome-band="1–5"])' +
-      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="0"] .manager-chip.is-danger)',
+      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] .manager-chip.is-danger[data-inventory-outcome-band="0"])',
     kinds: ['player', 'inventory'],
     sourceMatches: [
       ...SALVAGE_TARGET_SOURCES,
@@ -519,7 +519,7 @@ export const CASES = Object.freeze([
       '[data-inventory-salvage-body="routed"]' +
       ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="−4 – 0"])' +
       ':has([data-inventory-salvage-outcome="rw-salv-ruined"] + [data-inventory-salvage-outcome="count-botch"]' +
-      ' [data-inventory-outcome-band="<−4"] .manager-chip)',
+      ' .manager-chip[data-inventory-outcome-band="<−4"])',
     kinds: ['player', 'inventory'],
     sourceMatches: [
       ...SALVAGE_TARGET_SOURCES,
@@ -549,6 +549,31 @@ export const CASES = Object.freeze([
       /^src\/ui\/presenters\/InventoryListingBuilder\.js$/,
       // `netRange` spaces the negative-ended tier's dash.
       /^src\/systems\/runJournalOutcomeBands\.js$/,
+    ],
+  }),
+  // Issue 1644: after a routed salvage of the slag, the shared ladder marks the one tier it reached.
+  playerCase({
+    id: 'player-salvage-routed-reached',
+    label: 'Player app — Routed salvage after its roll, the reached tier marked "Your roll"',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', dialog: 'open' },
+    steps: [
+      { selector: '[data-inventory-search]', fill: 'Ruined Slag' },
+      { selector: CARD_BUTTON('lab-runework:rw-slag') },
+      { selector: '[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-salvage-action]' },
+      { selector: `${SINGLE_SALVAGE_PROMPT} button[type="submit"]` },
+      { selector: '[data-outcome-rolled="true"]', scroll: true },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"]' +
+      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"][data-outcome-rolled="true"]' +
+      ' .manager-chip[data-inventory-outcome-your-roll])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      ...SALVAGE_TARGET_SOURCES,
+      /^src\/ui\/svelte\/stores\/inventorySalvageExecution/,
     ],
   }),
   playerCase({

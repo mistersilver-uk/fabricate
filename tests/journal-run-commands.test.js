@@ -2264,6 +2264,7 @@ describe('journal run command protocol', () => {
     data = { ...UNDER_DATA, targetTerms: [{ kind: 'anchor', value: 14, path: '@x' }] },
     success = true,
     handoff = false,
+    outcomeId = null,
   } = {}) => {
     const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
     const { service } = commandHarness({
@@ -2289,7 +2290,12 @@ describe('journal run command protocol', () => {
             visibility: { rollMode, secret },
             ...(handoff && { rollHandoff: { serializedRoll: { formula: '3d6', total: 9 } } }),
           }),
-          execute: async () => ({ success: true, runId: run.id, runRevision: 4 }),
+          execute: async () => ({
+            success: true,
+            runId: run.id,
+            runRevision: 4,
+            ...(outcomeId && { checkResult: { data: { outcomeId } } }),
+          }),
           ...(entitled !== null && {
             authorizeRollHandoff: async () => {
               if (entitled === 'throws') throw new Error('lookup failed');
@@ -2314,6 +2320,23 @@ describe('journal run command protocol', () => {
     assert.deepEqual(visible.check.visibility, { rollMode: 'publicroll', secret: false });
     assert.doesNotMatch(JSON.stringify(visible.check), /@x|path/, 'the projection is an allowlist');
     assert.ok(!Object.hasOwn(await evidenceReply({ secret: true }), 'check'), 'a secret reply carries no evidence');
+  });
+
+  // Issue 1644: the crafting detail marks the tier a shown roll routed through.
+  it('hands a shown crafting roll its routed outcome id, and a hidden one none', async () => {
+    const outcome = (reply) => reply.checkResult?.data?.outcomeId;
+    assert.equal(outcome(await evidenceReply({ outcomeId: 'tier-fine' })), 'tier-fine');
+    for (const [label, options] of [
+      ['secret', { secret: true }],
+      ['blind', { rollMode: 'blindroll' }],
+      ['blind, with its private roll handed back', { rollMode: 'blindroll', handoff: true }],
+      ['unentitled', { entitled: false }],
+      ['unrolled', { required: false }],
+    ]) {
+      const reply = await evidenceReply({ ...options, outcomeId: 'tier-fine' });
+      assert.equal(reply.success, true, `${label}: the command still succeeds`);
+      assert.ok(!Object.hasOwn(reply, 'checkResult'), `${label}: no outcome id`);
+    }
   });
 
   it('hands a blind roll no evidence, and the roller its own private roll (R8)', async () => {

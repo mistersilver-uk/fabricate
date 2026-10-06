@@ -11,6 +11,7 @@
 <script>
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import GatheringModifierEditor from './GatheringModifierEditor.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../../gatheringImageDefaults.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -104,7 +105,7 @@
     </div>
   </div>
 {:else if selectedEvent && !editing}
-  <section class="fabricate-card" data-gathering-event-inspector>
+  <InspectorCard data-gathering-event-inspector="">
     <div class="manager-inspector-title-row is-hero-large">
       <img
         class="manager-recipe-preview"
@@ -136,9 +137,9 @@
       {truncateDescription(selectedEvent.description) ||
         text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
     </p>
-  </section>
+  </InspectorCard>
 
-  <section class="fabricate-card">
+  <InspectorCard>
     <h3 class="manager-card-title">
       {text('FABRICATE.Admin.Manager.Environment.Events.Details', 'Event details')}
     </h3>
@@ -182,9 +183,9 @@
         >
       </div>
     </div>
-  </section>
+  </InspectorCard>
 
-  <section class="fabricate-card manager-event-environment-usage-card" data-event-environment-usage>
+  <InspectorCard class="manager-event-environment-usage-card" data-event-environment-usage="">
     <h3 class="manager-card-title">
       {text(
         'FABRICATE.Admin.Manager.Environment.Events.UsedInEnvironmentsCard',
@@ -214,7 +215,7 @@
         {/each}
       </div>
     {/if}
-  </section>
+  </InspectorCard>
 {:else if !editing}
   <EmptyState
     fill

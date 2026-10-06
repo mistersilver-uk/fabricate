@@ -232,11 +232,11 @@
         selected,
         candidates,
         disabled: !editable || busy,
-        // Only an UNSTARTED stage reaches the requirement rail at all, and only an unstarted
-        // stage has a selection left to repair.
+        // Only an unstarted stage reaches this rail, and only it has a selection left to repair.
         stale: !selected && (requirement?.selectedItemId != null || !requirement?.option),
         poolsRequired: essenceRequirements.length,
         poolsMet: essenceRequirements.filter((entry) => entry?.satisfied === true).length,
+        poolsStarted: essenceRequirements.filter((entry) => Number(entry?.delivered) > 0).length,
       };
     })
   );

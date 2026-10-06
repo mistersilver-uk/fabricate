@@ -20,15 +20,16 @@
   Once the roll resolves, the tier it MATCHED is marked "Your roll" — read from the run
   record's `checkResult.data.outcomeId`, the engine's own record of which tier it routed
   through, so the marker cannot disagree with the award. Before a roll — and on a
-  runless salvage, which records nothing — no tier is marked.
+  runless salvage, which records nothing — no tier is marked. The tiers are the shared
+  `OutcomeLadder` (issue 1644), each figure its band chip and each result a list row, and every
+  `data-inventory-*` hook rides that ladder's per-item props.
 -->
 <script>
-  import Medallion from '../../../../components/Medallion.svelte';
   import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
-  import Chip from '../../../../components/Chip.svelte';
   import EmptyState from '../../../../components/EmptyState.svelte';
   import Kicker from '../../../../components/Kicker.svelte';
+  import OutcomeLadder from '../../../../components/OutcomeLadder.svelte';
 
   let { salvage = null, result = null } = $props();
 
@@ -50,11 +51,40 @@
       result.rollValue < below
     );
   });
-  const isRolled = (outcome) =>
-    botchRolled
-      ? outcome.id === 'count-botch'
-      : rolledOutcomeId !== null && outcome.id === rolledOutcomeId;
-  const figureTone = (outcome) => (outcome.success ? 'neutral' : 'danger');
+  const reachedId = $derived(botchRolled ? 'count-botch' : rolledOutcomeId);
+
+  /** The tier's figure: the presenter's band, else a relative tier's `Reached at` threshold. */
+  function figure(outcome) {
+    if (outcome.band) {
+      return { band: outcome.band, bandProps: { 'data-inventory-outcome-band': outcome.band } };
+    }
+    if (outcome.threshold === null || outcome.threshold === undefined) return {};
+    return {
+      band: localize('FABRICATE.App.Inventory.Salvage.ReachedAt', { threshold: outcome.threshold }),
+      bandProps: { 'data-inventory-outcome-threshold': String(outcome.threshold) },
+    };
+  }
+
+  const tiers = $derived(
+    outcomes.map((outcome, index) => ({
+      id: outcome.id ?? String(index),
+      name: outcome.name,
+      fail: !outcome.success,
+      ...figure(outcome),
+      props: {
+        'data-inventory-salvage-outcome': outcome.id ?? String(index),
+        'data-outcome-success': outcome.success,
+      },
+      reachedProps: { 'data-inventory-outcome-your-roll': '' },
+      yields: outcome.results.map((entry, resultIndex) => ({
+        id: entry.id ?? entry.componentId ?? resultIndex,
+        name: entry.name,
+        ...resolveCraftingArt(entry.img ?? ''),
+        quantity: `×${entry.quantity}`,
+        props: { 'data-inventory-salvage-result': entry.componentId },
+      })),
+    }))
+  );
 </script>
 
 <div
@@ -89,68 +119,15 @@
   {#if outcomes.length === 0}
     <EmptyState note hint={localize('FABRICATE.App.Inventory.Salvage.NoOutcomes')} />
   {:else}
-    <ul class="salvage-outcome-list" data-inventory-salvage-outcomes>
-      {#each outcomes as outcome, index (outcome.id ?? index)}
-        {@const rolled = isRolled(outcome)}
-        <li
-          class="salvage-outcome"
-          class:is-success={outcome.success}
-          class:is-rolled={rolled}
-          data-inventory-salvage-outcome={outcome.id ?? String(index)}
-          data-outcome-success={outcome.success}
-          data-outcome-rolled={rolled ? 'true' : undefined}
-        >
-          <div class="salvage-outcome-head">
-            <span class="salvage-outcome-name">{outcome.name}</span>
-            {#if rolled}
-              <span class="salvage-outcome-rolled" data-inventory-outcome-your-roll>
-                <Chip tone="accent" icon="fas fa-circle"
-                  >{localize('FABRICATE.App.Inventory.Salvage.YourRoll')}</Chip
-                >
-              </span>
-            {/if}
-            {#if outcome.band}
-              <!-- The presenter's band: a fixed tier's [start, end] or a count's net successes. -->
-              <span class="salvage-outcome-threshold" data-inventory-outcome-band={outcome.band}>
-                <Chip density="list" mono tone={figureTone(outcome)}>{outcome.band}</Chip>
-              </span>
-            {:else if outcome.threshold !== null}
-              <span
-                class="salvage-outcome-threshold"
-                data-inventory-outcome-threshold={String(outcome.threshold)}
-              >
-                <Chip density="list" mono tone={figureTone(outcome)}
-                  >{localize('FABRICATE.App.Inventory.Salvage.ReachedAt', {
-                    threshold: outcome.threshold,
-                  })}</Chip
-                >
-              </span>
-            {/if}
-          </div>
-          {#if outcome.results.length > 0}
-            <ul class="salvage-outcome-results">
-              {#each outcome.results as entry, resultIndex (entry.id ?? entry.componentId ?? resultIndex)}
-                <li
-                  class="salvage-outcome-result"
-                  data-inventory-salvage-result={entry.componentId}
-                >
-                  <!-- The shared tile through `resolveCraftingArt`, not a raw <img>: missing
-                       art gets the house fallback rather than a broken-image glyph. -->
-                  <Medallion {...resolveCraftingArt(entry.img ?? '')} alt="" size={14} />
-                  <span class="salvage-outcome-result-name">{entry.name}</span>
-                  <span class="salvage-outcome-result-qty">×{entry.quantity}</span>
-                </li>
-              {/each}
-            </ul>
-          {:else}
-            <EmptyState
-              note
-              hint={localize('FABRICATE.App.Inventory.Salvage.OutcomeAwardsNothing')}
-            />
-          {/if}
-        </li>
-      {/each}
-    </ul>
+    <OutcomeLadder
+      {tiers}
+      emptyTierText={localize('FABRICATE.App.Inventory.Salvage.OutcomeAwardsNothing')}
+      {reachedId}
+      reachedLabel={localize('FABRICATE.App.Inventory.Salvage.YourRoll')}
+      successLabel={localize('FABRICATE.Check.Evidence.Success')}
+      failureLabel={localize('FABRICATE.Check.Evidence.Failure')}
+      data-inventory-salvage-outcomes
+    />
   {/if}
 </div>
 
@@ -189,100 +166,6 @@
     font-size: 8.5px;
     font-weight: 700;
     letter-spacing: 0;
-    color: var(--fab-text-secondary);
-  }
-
-  .salvage-outcome-list {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin: 0;
-    padding: 0;
-  }
-
-  .salvage-outcome {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface-soft);
-  }
-
-  .salvage-outcome.is-success {
-    border-color: var(--fab-success-border);
-  }
-
-  /* The tier the roll actually matched. Two signals, never colour alone: the accent
-     ramp AND the "Your roll" tag. */
-  .salvage-outcome.is-rolled {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-  }
-
-  /* A positioning wrapper only — the shared `Chip` inside owns the ramp and type. */
-  .salvage-outcome-rolled {
-    display: inline-flex;
-    flex: 0 0 auto;
-  }
-
-  .salvage-outcome-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fab-space-2);
-  }
-
-  /* Takes the slack so the "Your roll" tag and the threshold stay pinned right, and a
-     long authored tier name truncates rather than pushing them out of the tile. */
-  .salvage-outcome-name {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  /* A positioning wrapper only: the shared `Chip` inside owns the figure's type and ramp, as in
-     the Journal's `OutcomeLadder` (issue 2137). */
-  .salvage-outcome-threshold {
-    display: inline-flex;
-    flex: 0 0 auto;
-  }
-
-  .salvage-outcome-results {
-    list-style: none;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 0;
-    padding: 0;
-  }
-
-  .salvage-outcome-result {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 2px 8px;
-    border: 1px solid var(--fab-border);
-    border-radius: 999px;
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
-    font-size: 11px;
-  }
-
-  .salvage-outcome-result-name {
-    font-weight: 600;
-  }
-
-  .salvage-outcome-result-qty {
-    font-family: var(--fab-font-mono);
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
     color: var(--fab-text-secondary);
   }
 </style>

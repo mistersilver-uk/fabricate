@@ -22,7 +22,9 @@ import {
 } from './manager-mounted-shared.js';
 import {
   assertSelectHasResolvedName,
+  assertSelectPanelNamedByTrigger,
   chooseSelectOption,
+  chooseSelectOptionByKeyboard,
   closeSelectPanel,
   openSelectPanel,
   selectOptionLabels,
@@ -343,57 +345,136 @@ export function registerEnvironmentsCases() {
     }
   });
 
-  // The rules leaf's own controls (issue 1707 phase 2). Every one of the ten selects and both
-  // steppers write through one `onUpdate` prop; before this case nothing anywhere changed one, so
-  // dropping the prop rendered the whole column inert and shipped green.
-  it('persists a Gathering Rules select, and the stepper the chosen mode reveals', async () => {
-    const calls = [];
+  /** Mount the manager on Gathering > Settings and return the Gathering Rules card. */
+  async function mountRulesCard(calls, store = createStore(calls)) {
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
-      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+      props: { store, services: { openCurrentAdmin: () => {} } },
     });
     flushSync();
-
     navButton('Gathering').click();
     await tick();
     flushSync();
     gatheringSubitem('Settings').click();
     await tick();
     flushSync();
-
     const card = target.querySelector('.manager-inspector [data-gathering-inspector-rules]');
     assert.ok(Boolean(card), 'the settings tab renders the Gathering Rules card in the inspector');
+    return card;
+  }
+
+  // The rules leaf's own controls (issue 1707 phase 2). Every one of the ten selects and both
+  // steppers write through one `onUpdate` prop; before this case nothing anywhere changed one, so
+  // dropping the prop rendered the whole column inert and shipped green. Each trigger's name is
+  // the caption that labelled its native `<select>`, title then description (issue 1777).
+  it('persists every Gathering Rules select, and the stepper the chosen mode reveals', async () => {
+    const calls = [];
+    const card = await mountRulesCard(calls);
+    assert.equal(card.querySelectorAll('select').length, 0, 'no native select is left');
     assert.ok(
       Boolean(card.querySelector('.manager-rule-copy')),
       'each rule row stacks its description beside the icon'
     );
-    const scope = card.querySelector('#manager-gathering-rule-reveal-scope');
-    scope.value = 'party';
-    scope.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.deepEqual(
-      calls.findLast((call) => call[0] === 'updateGatheringRules'),
-      ['updateGatheringRules', 'alchemy', { revealScope: 'party' }],
-      'the select writes its own field for the selected system, and only that field'
-    );
-
-    assert.ok(!card.querySelector('[data-gathering-rule-stepper="rewardLimit"]'));
-    const rewards = card.querySelector('#manager-gathering-rule-rewards');
-    rewards.value = 'limitedDrops';
-    rewards.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.deepEqual(
-      calls.findLast((call) => call[0] === 'updateGatheringRules'),
-      ['updateGatheringRules', 'alchemy', { rewardSelectionMode: 'limitedDrops' }],
-      'the rewards select writes the mode that reveals the limit stepper'
-    );
+    const rows = [
+      [
+        'rewards',
+        'rewardSelectionMode',
+        'limitedDrops',
+        'Rewards',
+        'Choose how rewards are granted.',
+      ],
+      [
+        'drop-modifier-mode',
+        'dropModifierMode',
+        'multiplicative',
+        'Modifier mode',
+        'Choose how all drop and event modifiers (character, weather, time of day, biome) adjust a chance. This applies system-wide and cannot be overridden per modifier.',
+      ],
+      [
+        'events',
+        'eventSelectionMode',
+        'highestRankedDrop',
+        'Events',
+        'Choose how matching events are applied after a gathering roll.',
+      ],
+      [
+        'outcome',
+        'eventPolicy',
+        'failureWithEvent',
+        'Event outcome',
+        'Decide whether rolling an event still allows the gathering attempt to succeed.',
+      ],
+      [
+        'event-visibility',
+        'eventVisibility',
+        'full',
+        'Event visibility',
+        'Control how much event information players see.',
+      ],
+      [
+        'tool-breakage',
+        'toolBreakagePolicy',
+        'successDespiteBreak',
+        'Tool breakage outcome',
+        'Decide whether a broken tool fails the gathering attempt or only reports the breakage.',
+      ],
+      [
+        'biome-aggregation',
+        'biomeModifierAggregation',
+        'dominant',
+        'Biome modifiers',
+        'Decide how multiple matching biome modifiers combine into one drop-rate adjustment.',
+      ],
+      [
+        'blind-gate',
+        'blindCandidateGate',
+        'allMatching',
+        'Blind candidate gate',
+        'In blind mode, choose whether the generic gather only resolves to tasks the character can attempt, or to any matching task.',
+      ],
+      [
+        'reveal-policy',
+        'revealPolicy',
+        'onAttempt',
+        'Blind reveal',
+        'Decide whether a blind task is revealed to the player after they attempt it.',
+      ],
+      [
+        'reveal-scope',
+        'revealScope',
+        'party',
+        'Reveal scope',
+        'Who learns the revealed task: just the actor, the controlling user, the party, or everyone.',
+      ],
+    ];
+    assert.equal(card.querySelectorAll('.fabricate-select-trigger').length, rows.length);
+    for (const [id, field, value, title, description] of rows) {
+      const trigger = `#manager-gathering-rule-${id}`;
+      assert.equal(
+        assertSelectHasResolvedName(target, trigger),
+        `${title} ${description}`,
+        `${field} keeps the name its native select's label gave it`
+      );
+      assert.equal(
+        assertSelectPanelNamedByTrigger(target, trigger),
+        `manager-gathering-rule-${id}-caption`,
+        `${field} names its trigger and its panel by the row's stable caption id`
+      );
+      chooseSelectOption(target, trigger, value);
+      await tick();
+      flushSync();
+      assert.deepEqual(
+        calls.findLast((call) => call[0] === 'updateGatheringRules'),
+        ['updateGatheringRules', 'alchemy', { [field]: value }],
+        `${field} writes its own field for the selected system, and only that field`
+      );
+    }
 
     const stepper = card.querySelector('[data-gathering-rule-stepper="rewardLimit"]');
     assert.ok(Boolean(stepper), 'choosing the limited mode reveals the reward-limit stepper');
+    assert.ok(!card.querySelector('[data-gathering-rule-stepper="eventLimit"]'));
     [...stepper.querySelectorAll('button')]
       .find((button) => button.getAttribute('aria-label') === 'Increase reward limit')
       .click();
@@ -403,6 +484,66 @@ export function registerEnvironmentsCases() {
       calls.findLast((call) => call[0] === 'updateGatheringRules'),
       ['updateGatheringRules', 'alchemy', { rewardLimit: 2 }],
       'the revealed stepper writes the limit itself through the same one prop'
+    );
+  });
+
+  // An unset field shows its default, the trigger's title carries the whole chosen label the
+  // trigger may ellipsise, and the caption's click focuses the trigger without opening it.
+  it('shows each Gathering Rules value, titles it in full, and focuses it from its caption', async () => {
+    await mountRulesCard([]);
+    for (const [id, shown] of [
+      ['rewards', 'Highest ranked successful drop'],
+      ['drop-modifier-mode', 'Additive (percentage points)'],
+      ['events', 'All triggered events'],
+      ['outcome', 'Gathering succeeds'],
+      ['event-visibility', 'Encounter chance'],
+      ['tool-breakage', 'Attempt fails on break'],
+      ['biome-aggregation', 'Strongest of each'],
+      ['blind-gate', 'Only attemptable tasks'],
+      ['reveal-policy', 'Never reveal'],
+      ['reveal-scope', 'Actor'],
+    ]) {
+      assert.equal(selectTriggerText(target, `#manager-gathering-rule-${id}`), shown, id);
+    }
+    const rewards = target.querySelector('#manager-gathering-rule-rewards');
+    assert.equal(rewards.getAttribute('title'), 'Highest ranked successful drop');
+
+    target.querySelector('#manager-gathering-rule-rewards-caption').click();
+    flushSync();
+    assert.ok(rewards.ownerDocument.activeElement === rewards, 'the caption focuses its trigger');
+    assert.equal(rewards.getAttribute('aria-expanded'), 'false', 'and opens nothing');
+  });
+
+  it('reads and writes each Gathering Rules limit through its own field', async () => {
+    const calls = [];
+    const store = createStore(calls);
+    await mountRulesCard(calls, store);
+    chooseSelectOption(target, '#manager-gathering-rule-rewards', 'limitedDrops');
+    chooseSelectOption(target, '#manager-gathering-rule-events', 'limitedDrops');
+    store.updateGatheringRules('alchemy', { rewardLimit: 4, eventLimit: 7 });
+    await tick();
+    flushSync();
+    const stepper = (rule) =>
+      target.querySelector(`.manager-inspector [data-gathering-rule-stepper="${rule}"]`);
+    assert.equal(stepper('rewardLimit').querySelector('[data-stepper-input]').value, '4');
+    assert.equal(stepper('eventLimit').querySelector('[data-stepper-input]').value, '7');
+    [...stepper('eventLimit').querySelectorAll('button')]
+      .find((button) => button.getAttribute('aria-label') === 'Increase event limit')
+      .click();
+    await tick();
+    flushSync();
+    assert.deepEqual(calls.at(-1), ['updateGatheringRules', 'alchemy', { eventLimit: 8 }]);
+  });
+
+  it('picks a Gathering Rules select from the keyboard and hands focus back to its trigger', async () => {
+    const calls = [];
+    await mountRulesCard(calls);
+    const writes = () => calls.filter((call) => call[0] === 'updateGatheringRules').length;
+    await chooseSelectOptionByKeyboard(target, '#manager-gathering-rule-reveal-scope', 'global');
+    assert.equal(writes(), 1, 'Escape wrote nothing; Enter wrote once');
+    assert.deepEqual(
+      calls.findLast((call) => call[0] === 'updateGatheringRules'),
+      ['updateGatheringRules', 'alchemy', { revealScope: 'global' }]
     );
   });
 
@@ -960,9 +1101,14 @@ export function registerEnvironmentsCases() {
     assert.equal(target.querySelector('[data-gathering-task-matching-logic]'), null);
     assert.ok(target.textContent.includes('Drop chance'));
     assert.equal(target.querySelector('.manager-task-card-header .manager-drop-count'), null);
-    assert.ok(target.querySelector('.manager-task-drop-footer [data-gathering-task-drop-count]'));
+    // The count is the drop table's own caption since issue 1782, beside its heading.
+    assert.equal(
+      target.querySelector('[data-gathering-task-drops-table] caption .fabricate-data-table-count')
+        ?.textContent,
+      String(target.querySelectorAll('tr[data-gathering-task-drop-id]').length)
+    );
     const dropColumnHeaders = Array.from(
-      target.querySelectorAll('[data-gathering-task-drops-table] [role="columnheader"]')
+      target.querySelectorAll('[data-gathering-task-drops-table] th[scope="col"]')
     ).map((node) => node.textContent.trim());
     assert.ok(dropColumnHeaders.includes('Count'));
     assert.ok(
@@ -1909,18 +2055,22 @@ export function registerEnvironmentsCases() {
           'Decide whether rolling an event still allows the gathering attempt to succeed.'
         )
     );
-    const rewardsSelect = target.querySelector('#manager-gathering-rule-rewards');
-    const eventsSelect = target.querySelector('#manager-gathering-rule-events');
+    // Each list is read open and shut again, so the next one opened is the only panel.
+    const ruleLabels = (id) => {
+      const labels = selectOptionLabels(target, `#manager-gathering-rule-${id}`);
+      closeSelectPanel(target, `#manager-gathering-rule-${id}`);
+      return labels;
+    };
+    assert.deepEqual(ruleLabels('rewards'), [
+      'Highest ranked successful drop',
+      'All successful drops',
+      'Limit successful drops',
+    ]);
     assert.deepEqual(
-      Array.from(rewardsSelect.options).map((option) => option.textContent.trim()),
-      ['Highest ranked successful drop', 'All successful drops', 'Limit successful drops']
+      ruleLabels('events'),
+      ['Highest ranked triggered event', 'All triggered events', 'Limit triggered events'],
+      'the events select offers the event wording, never the drop wording'
     );
-    assert.deepEqual(
-      Array.from(eventsSelect.options).map((option) => option.textContent.trim()),
-      ['Highest ranked triggered event', 'All triggered events', 'Limit triggered events']
-    );
-    assert.equal(eventsSelect.textContent.includes('Highest ranked successful drop'), false);
-    assert.equal(eventsSelect.textContent.includes('All successful drops'), false);
     assert.ok(target.textContent.includes('Gathering succeeds'));
     assert.ok(target.querySelector('.manager-inspector [data-gathering-inspector-rules]'));
     assert.equal(
@@ -1930,26 +2080,25 @@ export function registerEnvironmentsCases() {
       'Rules'
     );
     assert.equal(
-      target.querySelectorAll('.manager-inspector [data-gathering-inspector-rules] select').length,
+      target.querySelectorAll(
+        ':scope .manager-inspector [data-gathering-inspector-rules] .fabricate-select-trigger'
+      ).length,
       10
     );
-    const dropModifierModeSelect = target.querySelector(
-      '#manager-gathering-rule-drop-modifier-mode'
-    );
-    assert.ok(dropModifierModeSelect, 'drop modifier mode select renders in the rules inspector');
     assert.deepEqual(
-      Array.from(dropModifierModeSelect.options).map((option) => option.value),
-      ['additive', 'multiplicative']
+      selectOptionValues(target, '#manager-gathering-rule-drop-modifier-mode'),
+      ['additive', 'multiplicative'],
+      'drop modifier mode select renders in the rules inspector'
     );
+    closeSelectPanel(target, '#manager-gathering-rule-drop-modifier-mode');
+    assert.deepEqual(ruleLabels('drop-modifier-mode'), [
+      'Additive (percentage points)',
+      'Multiplicative (scale by percentage)',
+    ]);
     assert.deepEqual(
-      Array.from(dropModifierModeSelect.options).map((option) => option.textContent.trim()),
-      ['Additive (percentage points)', 'Multiplicative (scale by percentage)']
-    );
-    const eventVisibilitySelect = target.querySelector('#manager-gathering-rule-event-visibility');
-    assert.ok(eventVisibilitySelect, 'event visibility select renders in the rules inspector');
-    assert.deepEqual(
-      Array.from(eventVisibilitySelect.options).map((option) => option.textContent.trim()),
-      ['Danger level only', 'Encounter chance', 'Full details']
+      ruleLabels('event-visibility'),
+      ['Danger level only', 'Encounter chance', 'Full details'],
+      'event visibility select renders in the rules inspector'
     );
     assert.equal(target.querySelector('.manager-inspector [data-gathering-rule-stepper]'), null);
     assert.equal(
@@ -3574,11 +3723,112 @@ export function registerEnvironmentsCases() {
         'the reference row renders the one shared bounds row'
       );
       assert.ok(
-        Boolean(ref.querySelector('.manager-character-modifier-operator-select select')),
+        Boolean(
+          ref.querySelector(
+            ':scope .manager-character-modifier-operator-select .fabricate-select-trigger'
+          )
+        ),
         'the reference row renders its operator select'
       );
     });
+
+    // The condition picker and the operator are `<Select>`s (issue 1777): each keeps the name its
+    // visually hidden caption gave the native select, through an id stemmed on `idPrefix`.
+    it(`picks the ${subject}'s condition and operator through their named Selects`, async () => {
+      const shell = modifierEditorShell(subject);
+      const writes = [];
+      const root = mountModifierEditor({
+        ...shell.props,
+        gatheringConditionAvailableOptions: () => [
+          { id: 'forest', label: 'Forest' },
+          { id: 'cavern', label: 'Crystal Cavern' },
+          { id: 'marsh' },
+        ],
+        modifierPickerSelection: () => 'forest',
+        rowCharacterModifiers: () => [{ id: 'ref-1', modifierId: 'mod-training', operator: '+' }],
+        onSelectModifierPickerOption: (kind, value) => {
+          writes.push(['condition', kind, value]);
+        },
+        onUpdateCharacterModifier: (id, patch) => {
+          writes.push(['operator', id, patch]);
+        },
+      });
+      const stem = shell.props.idPrefix;
+      const picker = `[data-gathering-${subject}-condition-modifier-picker="biome"] .fabricate-select-trigger`;
+      const operator = `[data-gathering-${subject}-character-modifier-ref="ref-1"] .fabricate-select-trigger`;
+      assert.equal(assertSelectHasResolvedName(root, picker), 'Condition');
+      assert.equal(
+        assertSelectPanelNamedByTrigger(root, picker),
+        `${stem}-biome-condition-picker-caption`
+      );
+      assert.equal(assertSelectHasResolvedName(root, operator), 'Operator');
+      assert.equal(
+        assertSelectPanelNamedByTrigger(root, operator),
+        `${stem}-character-modifier-ref-1-operator-caption`
+      );
+
+      assert.deepEqual(
+        selectOptionLabels(root, picker),
+        ['Forest', 'Crystal Cavern', 'marsh'],
+        'each condition shows its label, and its id only when it has none'
+      );
+      closeSelectPanel(root, picker);
+      assert.equal(selectTriggerText(root, operator), 'Positive', 'the ref`s own sign is shown');
+
+      chooseSelectOption(root, picker, 'cavern');
+      chooseSelectOption(root, operator, '-');
+      assert.deepEqual(writes, [
+        ['condition', 'biome', 'cavern'],
+        ['operator', 'ref-1', { operator: '-' }],
+      ]);
+      await chooseSelectOptionByKeyboard(root, operator, '-');
+      assert.deepEqual(writes.at(-1), ['operator', 'ref-1', { operator: '-' }]);
+      assert.equal(writes.length, 3, 'Escape wrote nothing; Enter wrote once');
+    });
   }
+
+  // The expression override is a `Field` label, so its caption names and focuses the input.
+  it('names and writes the character-modifier expression override through its Field', () => {
+    const shell = modifierEditorShell('drop');
+    const writes = [];
+    const root = mountModifierEditor({
+      ...shell.props,
+      rowCharacterModifiers: () => [
+        { id: 'ref-1', modifierId: 'mod-training', operator: '+', expressionOverride: '@a' },
+      ],
+      characterModifierIsCustomized: () => true,
+      onUpdateCharacterModifier: (id, patch) => {
+        writes.push([id, patch]);
+      },
+    });
+    const id = `${shell.props.idPrefix}-character-modifier-ref-1-expression`;
+    const input = root.querySelector(`[id="${id}"]`);
+    assert.equal(input.value, '@a');
+    const caption = root.querySelector(`label.fabricate-field[for="${id}"]`);
+    assert.ok(Boolean(caption), 'a Field label points at the input');
+    assert.equal(caption.textContent.trim(), 'Expression', 'and names it');
+    input.value = '@b';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    assert.deepEqual(writes, [['ref-1', { expressionOverride: '@b' }]]);
+  });
+
+  // The one disabled state of the thirteen converted selects: nothing left to attach (issue 1777).
+  it('disables the condition picker, with its reason, once every condition is attached', () => {
+    const shell = modifierEditorShell('drop');
+    const root = mountModifierEditor({
+      ...shell.props,
+      gatheringConditionAvailableOptions: () => [],
+    });
+    const trigger = root.querySelector(
+      ':scope [data-gathering-drop-condition-modifier-picker="biome"] .fabricate-select-trigger'
+    );
+    assert.equal(trigger.disabled, true, 'the trigger is off');
+    assert.equal(trigger.getAttribute('data-tooltip'), 'All conditions already added.');
+    trigger.click();
+    flushSync();
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false', 'and it opens no list');
+  });
 
   // The forward crosses TWO boundaries now (leaf -> panel); pin it at the leaf too, not only at
   // the panel the loop above mounts directly (issue 1707 phase 2 review).
@@ -3600,6 +3850,45 @@ export function registerEnvironmentsCases() {
       );
     });
   }
+
+  // The rate and count editors are `Field` labels: each caption wraps and names its control, and
+  // the rate's slider writes `dropRate` for the selected drop (issue 1777).
+  it('writes the drop rate and names both drop editors through their Field labels', () => {
+    const shell = modifierEditorShell('drop', []);
+    const writes = [];
+    mounted = mount(GatheringTaskInspectorComponent, {
+      target: applicationRootTarget(),
+      props: {
+        ...shell.props,
+        editing: true,
+        task: { id: 'task-1' },
+        editingTask: { resolutionMode: 'd100' },
+        selectedDrop: { id: 'drop-1', dropRate: 40, quantity: 2 },
+        gatheringDropRateValue: (drop) => drop.dropRate,
+        gatheringDropCountValue: (drop) => drop.quantity,
+        onUpdateDrop: (id, patch) => {
+          writes.push([id, patch]);
+        },
+        characterModifierSearchTerm: '',
+      },
+    });
+    flushSync();
+    const rate = target.querySelector('[data-gathering-drop-inspector-rate]');
+    const count = target.querySelector('[data-gathering-drop-inspector-count]');
+    for (const [field, caption, label] of [
+      [rate, 'Drop chance', 'Drop chance percent'],
+      [count, 'Count', 'Count'],
+    ]) {
+      assert.equal(field.tagName, 'LABEL', `${caption}: the Field host is the label`);
+      assert.equal(field.querySelector(':scope > span').textContent.trim(), caption);
+      assert.equal(field.querySelector('input').getAttribute('aria-label'), label);
+    }
+    const range = rate.querySelector('input[type="range"]');
+    range.value = '55';
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    assert.deepEqual(writes.at(-1), ['drop-1', { dropRate: 55 }]);
+  });
 
   it('searches the drop panel through GatheringTaskInspector, the leaf that owns it', async () => {
     const shell = modifierEditorShell('drop', []);

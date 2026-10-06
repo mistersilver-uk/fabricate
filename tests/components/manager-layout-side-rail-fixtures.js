@@ -269,7 +269,7 @@ function sideRailMarkup(route, { width, height, collapsed }) {
     `<style>@layer modules { ${css} }</style>${SCOPED_CSS}` +
     `<div class="fabricate" style="width:${width}px;height:${height}px">` +
     `<div class="fabricate-manager" ${route.rootAttributes}>` +
-    '<div class="manager-titlebar">titlebar</div><div class="manager-header">header</div>' +
+    '<div class="manager-titlebar">titlebar</div><div class="fabricate-page-header manager-header">header</div>' +
     `<div class="${bodyClass}">${RAIL}${route.main}</div></div></div>`
   );
 }
