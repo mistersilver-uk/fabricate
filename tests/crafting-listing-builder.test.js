@@ -1012,6 +1012,45 @@ describe('CraftingListingBuilder — outcome tiers', () => {
     assert.deepEqual(ruined.awardedResults, []);
   });
 
+  // A success tier whose roll routes to no group awards nothing too, and still never shares the
+  // failure tier's row: the success flag is part of the collapse key (issue 1644).
+  it('keeps a success tier awarding nothing apart from an earlier failure tier', () => {
+    const system = makeSystem({
+      resolutionMode: 'routedByCheck',
+      components: [{ id: 'c2', name: 'Steel Sword', img: 'icons/steel.webp' }],
+      craftingCheck: {
+        simple: {},
+        routed: {
+          rollFormula: '1d20',
+          type: 'fixed',
+          fixedOutcomes: [
+            { id: 't-ruined', name: 'Ruined', success: false },
+            { id: 't-lucky', name: 'Lucky', success: true },
+            { id: 't-master', name: 'Masterwork', success: true },
+          ],
+        },
+        progressive: {},
+      },
+    });
+    const recipe = makeRecipe({
+      resultGroups: [
+        { id: 'g-steel', name: 'Steel', checkOutcomeIds: ['t-master'], results: [{ componentId: 'c2', quantity: 1 }] },
+        { id: 'g-none', name: 'None', checkOutcomeIds: ['t-elsewhere'], results: [{ componentId: 'c2', quantity: 2 }] },
+      ],
+    });
+    const { recipe: model } = buildOne({ system, entries: [{ recipe, access: { reason: 'ok' } }] });
+    const [ruined, lucky] = model.outcomeTiers;
+    assert.deepEqual(lucky.awardedResults, [], 'the lucky tier routes to nothing');
+    assert.deepEqual(
+      model.outcomeTiers.slice(0, 2).map((tier) => [tier.ids, tier.success]),
+      [
+        [['t-ruined'], false],
+        [['t-lucky'], true],
+      ]
+    );
+    assert.equal(ruined.awardedResults.length, 0);
+  });
+
   it('collapses multiple no-award (failure) tiers into a single entry', () => {
     const system = makeSystem({
       resolutionMode: 'routedByCheck',
