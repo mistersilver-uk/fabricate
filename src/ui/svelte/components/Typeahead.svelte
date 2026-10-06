@@ -104,6 +104,7 @@
       <button
         type="button"
         class={`fabricate-typeahead-option ${optionClass}`}
+        data-keyboard-focus="true"
         {...optionHook(item)}
         {...combo.option(index)}
       >
