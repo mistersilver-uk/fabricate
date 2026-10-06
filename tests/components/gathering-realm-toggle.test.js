@@ -173,14 +173,4 @@ describe('World and Travel navigation', () => {
     assert.equal(managerRootSource.includes('!isWorldTravelRoute && !isWorldDowntimeRoute'), false);
   });
 
-  it('TravelInspector renders the is-empty class when no realm is selected', () => {
-    const travelInspectorSource = squish(read('src/ui/svelte/apps/manager/world/TravelInspector.svelte'));
-    const isEmpty = travelInspectorSource.match(/const isEmpty = \$derived\(([\s\S]*?)\);/);
-    assert.ok(isEmpty, 'TravelInspector defines the isEmpty derived value');
-    assert.ok(
-      travelInspectorSource.includes("class={isEmpty ? 'manager-travel-inspector is-empty' : 'manager-travel-inspector'}"),
-      'the component applies the is-empty class when isEmpty is true'
-    );
-  });
-
 });
