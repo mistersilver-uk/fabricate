@@ -6,7 +6,8 @@
   import Medallion from './Medallion.svelte';
 
   const MARK_SIZES = new Set([22, 26, 30, 38]);
-  // The control's own attributes: an `openProps` key naming one is dropped, so the row's win.
+  // The control's own attributes: an `openProps` key naming one, or any click handler, is
+  // dropped, so the row's win.
   const OWNED_KEYS = new Set([
     'type',
     'role',
@@ -67,7 +68,11 @@
       .join(' ') || undefined
   );
   const passed = $derived(
-    Object.fromEntries(Object.entries(openProps ?? {}).filter(([key]) => !OWNED_KEYS.has(key)))
+    Object.fromEntries(
+      Object.entries(openProps ?? {}).filter(
+        ([key]) => !OWNED_KEYS.has(key) && !/^onclick/i.test(key)
+      )
+    )
   );
   const pressed = $derived(selected == null ? undefined : String(selected === true));
 
@@ -85,7 +90,7 @@
 </script>
 
 {#snippet content()}
-  {#if leading}{@render leading()}
+  {#if leading}<span class="fabricate-list-row-leading">{@render leading()}</span>
   {:else if mark === 38}<Medallion {art} {icon} {tint} alt="" size={38} />
   {:else if mark === 30}<Medallion {art} {icon} {tint} alt="" size={30} />
   {:else if mark === 26}<Medallion {art} {icon} {tint} alt="" size={26} />
@@ -145,6 +150,7 @@
   {:else}
     {@render content()}
   {/if}
-  {#if trailing}{@render trailing()}{/if}
+  {#if trailing && form}<span class="fabricate-list-row-trailing">{@render trailing()}</span>
+  {:else if trailing}{@render trailing()}{/if}
   {#if aside}<div class="fabricate-list-row-aside" id={`${uid}-aside`}>{@render aside()}</div>{/if}
 </div>

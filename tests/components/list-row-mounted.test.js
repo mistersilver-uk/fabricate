@@ -7,7 +7,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import postcssScss from 'postcss-scss';
+
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
+import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -175,35 +178,34 @@ const DENSE_CSS = [
   '}',
 ].join('\n');
 
-/** The classes the dense matrix emits on the row and its own children. */
-const DENSE_CLASSES = new Set([
-  'fabricate-list-row',
-  'fabricate-list-row-name',
-  'fabricate-list-row-detail',
-  'fabricate-list-row-quantity',
-  'is-positive',
-  'is-muted',
-  'is-truncated',
-]);
-
 const SHEET_PATH = resolve(repoRoot, 'styles/fabricate.css');
 const SHEET = readFileSync(SHEET_PATH, 'utf8').replaceAll('\r\n', '\n');
 
-/** Every sheet rule's selector list that names the row family, comments stripped. */
-const familySelectors = (sheet) =>
-  sheet
-    .replaceAll(/\/\*[\s\S]*?\*\//g, '')
-    .split('}')
-    .flatMap((block) => {
-      const selector = block.slice(0, block.indexOf('{')).trim();
-      if (!selector.includes('.fabricate-list-row')) return [];
-      return selector.split(',').map((part) => part.trim());
-    });
+/** Dynamic states and pseudo-elements, stripped so a selector is matched as the element it paints. */
+const DYNAMIC_PARTS =
+  /::?(?:after|before|hover|focus-visible|focus-within|focus|active|enabled|disabled)\b/g;
 
-/** A selector the dense matrix could match: every class it names is one a dense row emits. */
-const reachesDense = (selector) =>
-  [...selector.matchAll(/\.([\w-]+)/g)].every(([, name]) => DENSE_CLASSES.has(name)) &&
-  !/\[|:has\(/.test(selector);
+/** Every selector naming the row family, inside at-rules too, its dynamic parts stripped. */
+function familySelectors(sheet) {
+  const found = [];
+  postcssScss.parse(sheet).walkRules((rule) => {
+    for (const selector of rule.selectors) {
+      if (!/fabricate-list-row|data-list-row/.test(selector)) continue;
+      found.push(selector.replaceAll(DYNAMIC_PARTS, '').replaceAll(/:not\(\s*\)/g, ''));
+    }
+  });
+  return found;
+}
+
+/** One rule per shape a class-only reading of the sheet let through (issue 1778, review round 1). */
+const BYPASSES = Object.freeze([
+  '.fabricate-list-row:not(.is-form) { padding: 0; }',
+  "[data-list-row='dense'] { padding: 0; }",
+  '.fabricate-list-row .fab-medallion { width: 30px; }',
+  '@container (min-width: 1px) { .fabricate-list-row.is-muted { border-style: solid; } }',
+  '@media (min-width: 1px) { .fabricate-list-row:hover { opacity: 0.5; } }',
+  '.fabricate-list-row:has(> .fabricate-list-row-name) { gap: 0; }',
+]);
 
 describe('ListRow dense form is unchanged (issue 1778)', () => {
   before(() => harness.setup());
@@ -224,17 +226,38 @@ describe('ListRow dense form is unchanged (issue 1778)', () => {
     assert.equal(SHEET.indexOf(DENSE_CSS), SHEET.lastIndexOf(DENSE_CSS), 'and written once');
   });
 
-  it('adds no rule outside the pinned block that a dense row could match', () => {
-    const reaching = familySelectors(SHEET.replace(DENSE_CSS, '')).filter(reachesDense);
-    assert.deepEqual(reaching, [], 'a new rule must name a class or state the dense row never has');
-    assert.ok(reachesDense('.fabricate-list-row.is-muted'), 'the probe recognises a dense rule');
-    assert.ok(!reachesDense('.fabricate-list-row.is-card'), 'and a form-only one');
+  it('adds no rule outside the pinned block that matches any element of a dense row', async () => {
+    const sheet = familySelectors(SHEET.replace(DENSE_CSS, ''));
+    const probes = BYPASSES.map(familySelectors);
+    const formOnly = familySelectors('.fabricate-list-row.is-card { gap: 0; }');
+    const reached = new Set();
+    for (const [, props] of DENSE_MATRIX) {
+      const target = await harness.mount(props);
+      const row = target.querySelector('[data-list-row]');
+      const elements = [row, ...row.querySelectorAll('*')];
+      for (const selector of [...sheet, ...probes.flat(), ...formOnly]) {
+        if (elements.some((element) => element.matches(selector))) reached.add(selector);
+      }
+      harness.remount();
+    }
+    assert.ok(sheet.length > 0, 'the sheet names the row family');
+    assert.deepEqual(
+      sheet.filter((selector) => reached.has(selector)),
+      [],
+      'a new rule must name a class or state the dense row never has'
+    );
+    for (const [index, selectors] of probes.entries()) {
+      assert.ok(
+        selectors.length > 0 && selectors.every((selector) => reached.has(selector)),
+        `the guard sees ${BYPASSES[index]}`
+      );
+    }
+    assert.ok(
+      formOnly.every((selector) => !reached.has(selector)),
+      'and passes a form-only rule'
+    );
   });
 });
-
-/** Content a native button may not hold: flow and grouping elements, and widget roles. */
-const NON_PHRASING = 'div, p, ul, ol, li, section, table, h1, h2, h3, h4, h5, h6, meter, progress';
-const BLOCK_ROLES = '[role="meter"], [role="group"], [role="progressbar"], [role="list"]';
 
 /** A row with every region filled, so each assertion below is over the full form. */
 function fullRow(overrides = {}) {
@@ -255,41 +278,64 @@ const controlOf = (target) => target.querySelector('.fabricate-list-row-open');
 
 /** The declarations of the one sheet rule whose selector list names `selector`, as a map. */
 function declarationsFor(selector) {
-  const blocks = SHEET.replaceAll(/\/\*[\s\S]*?\*\//g, '').split('}');
-  const matching = blocks.filter((block) =>
-    block
-      .slice(0, block.indexOf('{'))
-      .split(',')
-      .some((part) => part.trim() === selector)
-  );
-  assert.equal(matching.length, 1, `one rule names ${selector}`);
-  const body = matching[0].slice(matching[0].indexOf('{') + 1);
-  return new Map(
-    body
-      .split(';')
-      .map((line) => line.split(':').map((part) => part.trim()))
-      .filter(([property]) => property)
-  );
+  const rules = [];
+  postcssScss.parse(SHEET).walkRules((rule) => {
+    if (rule.selectors.includes(selector)) rules.push(rule);
+  });
+  assert.equal(rules.length, 1, `one rule names ${selector}`);
+  const declarations = new Map();
+  rules[0].walkDecls(({ prop, value }) => declarations.set(prop, value));
+  return declarations;
 }
 
-describe('ListRow selectable form stacking, as the sheet declares it (issue 1778)', () => {
+describe('ListRow selectable form, as the sheet declares it (issue 1778)', () => {
   it('stacks the overlay above the aside and below the content and trailing controls', () => {
     const overlay = declarationsFor('.fabricate-list-row > button.fabricate-list-row-open::after');
     const content = declarationsFor('.fabricate-list-row > .fabricate-list-row-open > *');
-    const trailing = declarationsFor(
-      '.fabricate-list-row.is-form > :not(.fabricate-list-row-open):not(.fabricate-list-row-aside)'
-    );
+    const trailing = declarationsFor('.fabricate-list-row > .fabricate-list-row-trailing');
     const aside = declarationsFor('.fabricate-list-row > .fabricate-list-row-aside');
     const root = declarationsFor('.fabricate-list-row.is-form');
     assert.equal(root.get('position'), 'relative', 'the overlay is placed against the root');
     assert.equal(root.get('isolation'), 'isolate', 'and its layers stay inside the row');
+    assert.equal(overlay.get('content'), "''", 'the overlay is drawn at all');
     assert.equal(overlay.get('position'), 'absolute');
+    assert.equal(overlay.get('inset'), '-1px', 'and covers the whole row, its border included');
     const layer = (rule) => Number(rule.get('z-index'));
     assert.ok(layer(aside) < layer(overlay), 'a click on the aside lands on the control');
     for (const above of [content, trailing]) {
       assert.ok(layer(above) > layer(overlay), 'content and trailing controls sit above it');
       assert.equal(above.get('pointer-events'), 'auto', "undoing core's `button > *` rule");
     }
+  });
+
+  it('insets the dense selectable row so four Active runs share the Journal with four Finished', () => {
+    const root = declarationsFor('.fabricate-list-row.is-form');
+    assert.deepEqual(
+      [root.get('padding'), root.get('row-gap')],
+      ['var(--fab-space-1) var(--fab-space-2)', 'var(--fab-space-1)'],
+      "a timed run row measures 63.9px here, and 75.9px at the dense specimen's space-2/space-3 " +
+        'inset and space-2 gap, against the 64px each of four Active rows has'
+    );
+  });
+
+  it('rings a focused row on its overlay, inside the row, and never on the button itself', () => {
+    const own = declarationsFor('.fabricate-list-row > .fabricate-list-row-open:focus-visible');
+    const ring = declarationsFor(
+      '.fabricate-list-row > .fabricate-list-row-open:focus-visible::after'
+    );
+    assert.equal(own.get('outline'), 'none', "the button's own ring would hug its content");
+    assert.deepEqual(
+      [ring.get('inset'), ring.get('outline'), ring.get('outline-offset')],
+      ['0', '2px solid var(--fab-accent)', '-2px'],
+      "drawn inside the row's edge, where a scrolling list cannot clip it"
+    );
+  });
+
+  it('draws the selected edge from the pressed state alone', () => {
+    const edge = declarationsFor(
+      ".fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true'])"
+    );
+    assert.equal(edge.get('border-color'), 'var(--fab-accent-border)');
   });
 });
 
@@ -307,7 +353,7 @@ describe('ListRow selectable form (issue 1778)', () => {
     assert.equal(control.getAttribute('type'), 'button');
     assert.equal(control.getAttribute('data-keyboard-focus'), 'true');
     assert.ok(!row.querySelector(':scope button button'), 'no control nests another');
-    const blocks = [...control.querySelectorAll(`${NON_PHRASING}, ${BLOCK_ROLES}`)];
+    const blocks = [...control.querySelectorAll(NON_PHRASING_CONTENT)];
     assert.deepEqual(
       blocks.map((node) => node.tagName.toLowerCase()),
       [],
@@ -319,7 +365,12 @@ describe('ListRow selectable form (issue 1778)', () => {
     const aside = row.querySelector('.fabricate-list-row-aside');
     assert.ok(aside?.querySelector('[role="meter"]'), 'the meter sits in the aside');
     assert.equal(aside.parentElement, row, 'the aside is a child of the root');
-    assert.ok(!control.contains(row.querySelector('.probe-trailing')), 'trailing sits beside it');
+    const trailing = row.querySelector('.probe-trailing').parentElement;
+    assert.ok(
+      trailing.matches('.fabricate-list-row-trailing'),
+      "trailing sits in the row's wrapper"
+    );
+    assert.equal(trailing.parentElement, row, 'beside the control');
     assert.ok(row.classList.contains('is-form'), 'the root carries the form class');
     assert.equal(row.querySelector('.fab-medallion').style.width, '30px', 'the 30px rung');
   });
@@ -364,7 +415,11 @@ describe('ListRow selectable form (issue 1778)', () => {
         type: 'submit',
         'aria-pressed': 'mixed',
         'data-keyboard-focus': 'false',
+        disabled: true,
         onclick: () => {
+          siteClicks += 1;
+        },
+        onclickcapture: () => {
           siteClicks += 1;
         },
         'data-run-id': 'r1',
@@ -381,6 +436,7 @@ describe('ListRow selectable form (issue 1778)', () => {
     assert.equal(control.getAttribute('type'), 'button');
     assert.equal(control.getAttribute('aria-pressed'), 'true', 'the pressed state is the row’s');
     assert.equal(control.getAttribute('data-keyboard-focus'), 'true');
+    assert.ok(!control.disabled, "nor disable it; `disabled` is the row's own prop");
     assert.equal(control.getAttribute('data-run-id'), 'r1', 'a hook passes through');
     assert.equal(control.getAttribute('title'), 'Open the run');
     control.click();
@@ -450,16 +506,29 @@ describe('ListRow selectable form (issue 1778)', () => {
   });
 
   it('renders an inert div for openProps alone, and no wrapper with neither', async () => {
+    let clicks = 0;
     const inert = await harness.mount(
       fullRow({
-        openProps: { class: 'site-static', role: 'button', tabindex: '0', onclick: () => {} },
+        openProps: {
+          class: 'site-static',
+          role: 'button',
+          tabindex: '0',
+          'aria-pressed': 'true',
+          'data-keyboard-focus': 'true',
+          onclick: () => {
+            clicks += 1;
+          },
+        },
       })
     );
     const wrapper = controlOf(inert);
     assert.equal(wrapper.tagName, 'DIV');
     assert.ok(wrapper.classList.contains('site-static'));
-    assert.ok(!wrapper.hasAttribute('role') && !wrapper.hasAttribute('tabindex'));
-    assert.ok(!wrapper.hasAttribute('aria-pressed'));
+    for (const owned of ['role', 'tabindex', 'aria-pressed', 'data-keyboard-focus']) {
+      assert.ok(!wrapper.hasAttribute(owned), `the inert wrapper drops ${owned}`);
+    }
+    wrapper.click();
+    assert.equal(clicks, 0, 'and the click handler');
     assert.equal(inert.querySelectorAll('button').length, 1, 'only the trailing button remains');
     harness.remount();
     const bare = await harness.mount(fullRow({ trailing: null }));
@@ -503,7 +572,10 @@ describe('ListRow selectable form (issue 1778)', () => {
     for (const name of ['is-form', 'is-default', 'is-card', 'is-danger']) {
       assert.ok(row.classList.contains(name), name);
     }
-    assert.ok(row.querySelector('.probe-leading'), 'the leading snippet renders');
+    assert.ok(
+      row.querySelector('.probe-leading')?.parentElement.matches('.fabricate-list-row-leading'),
+      "the leading snippet renders in the row's own wrapper"
+    );
     assert.ok(!row.querySelector('.fab-medallion'), 'in place of the mark');
     assert.ok(row.querySelector('.fabricate-list-row-name.site-name'), 'the site name class');
   });
