@@ -11,7 +11,7 @@ nav_order: 2
 
 The selected crafting system's Gathering Tasks are managed from the Gathering **Tasks** tab.
 The task browser supports search, status/biome/availability filters, paging, row selection, enable toggles, duplicate and delete actions, and a right-side inspector with availability, a matching-environment count, and drop summaries.
-The row **Edit** action opens the Gathering Task editor, which splits identity, availability, drop rules, and per-drop modifier tuning across three tabs.
+The row **Edit** action opens the Gathering Task editor, which splits identity, availability, drop rules, and per-drop modifier tuning across four tabs.
 See [Editor tabs](#editor-tabs).
 
 {% include screenshot.html case="manager-gathering-task-editor-normal" caption="The Gathering Task editor, opened from the task browser, on its Overview tab." %}
@@ -49,25 +49,55 @@ See [Events]({% link gathering/events.md %}).
 
 ## Editor tabs
 
-The Gathering Task editor has three tabs: **Overview**, **Requirements** and **Results**.
+The Gathering Task editor has four tabs: **Overview**, **Requirements**, **Results** and **Validation**.
 The tab bar stays fixed while the selected tab's panel scrolls.
 The editor opens on Overview, and returns to it when you open a different task.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Tab              | What lives there                                                                                                                                       |
-| :--------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Overview**     | Task identity, the **Gathering resolution** card, and the nodes card. A legacy Progressive task also shows a warning here.                              |
-| **Requirements** | Availability, stamina, the check modifier, the check override and **Required tools**.                                                                   |
-| **Results**      | The result sets (or, for a d100 task, the component browser and the Drops table) and the notices about them. A d100 task's selected-drop rail appears only here. |
+| Tab              | What lives there                                                                                                                                                  |
+| :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**     | Task identity, the **Gathering resolution** card, and the nodes card. A legacy Progressive task also shows a warning here.                                         |
+| **Requirements** | Availability, stamina, the check modifier, the check override and **Required tools**.                                                                              |
+| **Results**      | The result sets (or, for a d100 task, the component browser and the Drops table) and the notices about them. A d100 task's selected-drop rail appears only here.  |
+| **Validation**   | The readiness rows for the whole task, grouped by Overview and Results, with a verdict that says whether the task can be saved.                                    |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-Overview and Requirements use the full width of the window.
+Overview, Requirements and Validation use the full width of the window.
+So does Results on a `straight` (**Direct**) or `routed` (**Check**) task.
 
-The Results tab carries marks when something needs attention.
-A danger mark shows while the results have errors that block saving, such as "1 result issue blocks save".
-An amber mark shows for each of the two drop-stack warnings: no outcome tiers defined for routing, and several drop rows using the same component under a rule that may award only one.
+### The Validation tab
+
+The Validation tab lists a row for each check the task passes or fails, so you can see why **Save** is disabled.
+The rows are grouped under **Overview** (the task name) and **Results** (drop rules and result sets, plus the outcome-tier and reward-rule checks when they apply).
+A check that does not apply to the task's mode draws no row.
+Requirements has no checks, so it draws no group.
+
+A row that blocks saving carries the status word "Blocks save".
+The verdict at the top then reads "Cannot be saved", and **Save** stays disabled until every blocking row is cleared.
+These rows block saving:
+
+- A task with no name.
+- A drop rule that is incomplete.
+- Result sets that are incomplete.
+
+A row that only warns lets the task save.
+The verdict then reads "Saves with warnings".
+These rows warn:
+
+- A `routed` (**Check**) task whose gathering check defines no outcome tiers.
+- A d100 task with the same component on more than one drop row, when the system's reward rule may award only one of them.
+
+When every row passes, the verdict says that every check passes and the task is ready to save.
+
+Each failing row has a **View** action.
+It opens the tab that holds the problem and focuses the field that fixes it: the name input on Overview for a missing name, or the Results panel for a result problem.
+
+The Validation tab itself carries a red count of blocking rows and an amber count of warnings, so you can see from any tab whether the task can be saved.
+The Results tab no longer carries issue marks.
+Instead, when Results holds rows that block saving, a notice on the Results tab shows how many there are, with a **Review in Validation** action that opens the Validation tab.
+The Results tab still shows the notices for the two warnings above.
 
 A legacy Progressive task keeps its own results, so its Results tab shows an empty state titled "Results are not authored here".
 It points you to the **Gathering resolution** card on Overview, where you can choose another mode to author results.

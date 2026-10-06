@@ -544,6 +544,9 @@ export default [
       // `page.evaluate` bodies driving `game`, `Actor` and the rendered DOM.
       'scripts/lib/foundryPerfScenarios.js',
       'scripts/foundry-perf-run.mjs',
+      // The Primitive Lab smoke and parity oracle (issue 1487): readiness waits and DOM reads.
+      'scripts/primitive-lab-smoke.mjs',
+      'scripts/primitive-lab-parity.mjs',
       // The smoke walk's page primitives and its scenario modules (issue #1692), which is where
       // those bodies now live. The rest of `scripts/foundry-smoke/` — the profile, the context, the
       // registry, the loop and the cleanup — is deliberately excluded: it holds no in-page body.

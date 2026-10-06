@@ -3,6 +3,8 @@
 // `promptSelectCraftingSystem` below is that injected picker, and is the one Foundry-touching
 // function here.
 
+import { warnWorldRegistrationFailure } from './svelte/util/importFolderGroups.js';
+
 // The right-clicked entry's `data-pack`, named so the live runtime key is one visibly-diffed source.
 export const PACK_DATASET_KEY = 'pack';
 
@@ -69,6 +71,7 @@ export function buildCompendiumImportContextOption({
           count: result.sourceFallbacks.length
         }));
       }
+      warnWorldRegistrationFailure(result, { notify, localize });
     }
   };
 }

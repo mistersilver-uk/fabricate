@@ -1992,16 +1992,17 @@ describe('CraftingSystemManager source contract', () => {
     ],
   });
 
-  // The editor is three tabs over one panel (issue 1522), and the drop table is the row itself
+  // The editor is four tabs over one panel (issue 1522), and the drop table is the row itself
   // rather than a row plus a responsive duplicate of every one of its labels.
-  defineStructureContract('authors a gathering task across three tabs', GATHERING_TASK_EDIT, {
+  defineStructureContract('authors a gathering task across four tabs', GATHERING_TASK_EDIT, {
     renders: [
       'GatheringTaskEditorTabs',
       'GatheringTaskOverviewTab',
       'GatheringTaskRequirementsTab',
       'GatheringTaskResultsTab',
+      'GatheringTaskValidationTab',
     ],
-    names: ['pageSize', 'showRewardRuleNotice'],
+    names: ['pageSize', 'readiness'],
     writes: ['data-gathering-task-editor', 'data-gathering-task-panel'],
   });
   defineStructureContract('draws the task identity on Overview', taskPart('OverviewTab'), {

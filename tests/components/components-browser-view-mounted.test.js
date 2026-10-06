@@ -894,6 +894,22 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     );
   });
 
+  it('and the card states no sharing for a component this system alone holds', async () => {
+    // Issue 2218: `coal` is held by Forge alone, `ingot` by Forge and Alchemy.
+    const noteOf = (root) =>
+      root.querySelector('.manager-component-shared-identity-note').textContent.trim();
+
+    assert.equal(
+      noteOf(await mountCoal()),
+      'Name, art and description are authored in the world catalogue.'
+    );
+    inspector.remount();
+    assert.match(
+      noteOf(await mountCoal({ worldEntry: entry('ingot') })),
+      /shared with 1 other system\.$/
+    );
+  });
+
   it('withholds that card for a component the world corpus does not hold', async () => {
     // The negative control for the assertion above: without it.
     const root = await mountCoal({ worldEntry: null });

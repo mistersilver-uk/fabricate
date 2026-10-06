@@ -166,7 +166,7 @@ export const SIDE_RAIL_ROUTES = Object.freeze([
   },
   {
     id: 'gathering-task-edit',
-    rootAttributes: 'data-manager-view="gathering-task-edit" data-gathering-task-layout="results"',
+    rootAttributes: 'data-manager-view="gathering-task-edit" data-gathering-task-layout="full"',
     main: gatheringTaskEditor(),
     owner: { wide: '.manager-editor-tab-panel' },
   },

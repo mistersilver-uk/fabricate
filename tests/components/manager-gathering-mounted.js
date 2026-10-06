@@ -11,12 +11,14 @@ import {
 // Issue 1504: a converted control is a shared `<Select>`.
 import { chooseSelectOption, selectTriggerText } from '../helpers/select-control.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import {
   createManagerQueries,
   headerSaveButton,
   setInputValue,
 } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
+import { railCounts } from '../helpers/validationSurfaceReadings.js';
 import {
   booksScrollsFixtures,
   assertDropComponentCellKeyboardPath,
@@ -677,7 +679,7 @@ export function registerGatheringCases() {
     for (const tab of ['overview', 'requirements']) {
       await openTaskTab(tab);
       assert.equal(selectedTab(), tab, `${tab} opens`);
-      assert.equal(manager().dataset.gatheringTaskLayout, 'results', `${tab} is full width`);
+      assert.equal(manager().dataset.gatheringTaskLayout, 'full', `${tab} is full width`);
       assert.ok(!target.querySelector('aside.manager-inspector'), `${tab} draws no rail`);
     }
     await openTaskTab('results');
@@ -834,6 +836,136 @@ export function registerGatheringCases() {
     await openTaskTab('requirements');
     assert.equal(trigger().getAttribute('aria-expanded'), 'false', 'and it is shut on return');
     assert.ok(!document.querySelector('[data-gathering-task-availability-option]'));
+  });
+
+  // The Validation tab reads the header Save's own evaluation (issue 1522): its errors are the
+  // blocking rows, and the warnings are the draft's.
+  const validationRows = () =>
+    [...target.querySelectorAll(':scope [data-gathering-task-validation-check]')].map((row) => [
+      row.dataset.gatheringTaskValidationCheck,
+      /\bis-(pass|warn|block)\b/.exec(row.className)?.[1],
+    ]);
+  const validationMarks = () =>
+    [
+      ...target.querySelectorAll(
+        ':scope [data-gathering-task-tab="validation"] [data-gathering-task-tab-badge]'
+      ),
+    ].map((mark) => [mark.dataset.badgeTone, mark.textContent.trim()]);
+  const verdict = () =>
+    target.querySelector(':scope .manager-recipe-rail-summary-title').textContent.trim();
+  const NO_TIERS_CHECK = {
+    routed: { type: 'relative', relativeOutcomes: [], fixedOutcomes: [] },
+  };
+  const NAME_OR_RESULT_ERRORS = (task) => {
+    const nameErrors = String(task?.name ?? '').trim() ? [] : ['Task name is required'];
+    const resultErrors = ['Task check tier "Rich" requires exactly one matching result group'];
+    return { valid: false, errors: [...nameErrors, ...resultErrors], nameErrors, resultErrors };
+  };
+
+  it('warns, without blocking, of a routed task under a check with no tiers', async () => {
+    await openTasks({ taskResolutionMode: 'routed', gatheringCraftingCheck: NO_TIERS_CHECK });
+    await openEditor('task', 'task-herbs');
+    await openTaskTab('validation');
+    assert.deepEqual(validationRows(), [
+      ['name', 'pass'],
+      ['results', 'pass'],
+      ['routedTiers', 'warn'],
+    ]);
+    assert.deepEqual(railCounts(target), { passing: 2, warnings: 1, blocking: 0 });
+    assert.deepEqual(validationMarks(), [['warning', '1']], 'the badge agrees with the counts');
+    assert.equal(verdict(), 'Saves with warnings');
+  });
+
+  it('blocks Save on one blocking row per error, and says the task cannot be saved', async () => {
+    await openTasks({
+      taskResolutionMode: 'routed',
+      gatheringTaskValidation: NAME_OR_RESULT_ERRORS,
+    });
+    await openEditor('task', 'task-herbs');
+    setInputValue(target.querySelector('[data-gathering-task-field="description"]'), 'Changed');
+    await settleRouteExit();
+    assert.ok(headerSaveButton(target).disabled, 'the header Save reads the same evaluation');
+    await openTaskTab('validation');
+    // The surface lifts the blocking row; the store double's check has no tiers, so one warns.
+    assert.deepEqual(validationRows(), [
+      ['name', 'pass'],
+      ['result-1', 'block'],
+      ['routedTiers', 'warn'],
+    ]);
+    assert.deepEqual(railCounts(target), { passing: 1, warnings: 1, blocking: 1 });
+    assert.deepEqual(validationMarks(), [
+      ['danger', '1'],
+      ['warning', '1'],
+    ]);
+    assert.equal(verdict(), 'Cannot be saved');
+    assert.equal(
+      target
+        .querySelector(':scope [data-gathering-task-validation-check="result-1"] .manager-recipe-val-pill')
+        .textContent.trim(),
+      'Blocks save',
+      'the blocking pill names the Save gate'
+    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'full');
+    assert.ok(!target.querySelector('aside.manager-inspector'), 'Validation is full width');
+  });
+
+  it('sends each failing row to its control or its panel, and says where focus landed', async () => {
+    await openTasks({ taskResolutionMode: 'routed', gatheringTaskValidation: NAME_OR_RESULT_ERRORS });
+    await openEditor('task', 'task-herbs');
+    setInputValue(target.querySelector('[data-gathering-task-field="name"]'), '');
+    await settleRouteExit();
+    const announcement = async () => {
+      await new Promise((done) => setTimeout(done, ANNOUNCE_AFTER_FOCUS_MS + 40));
+      flushSync();
+      return target.querySelector('[data-gathering-task-issue-announcement]').textContent.trim();
+    };
+    const view = async (row) => {
+      await openTaskTab('validation');
+      target
+        .querySelector(`[data-gathering-task-validation-check="${row}"] [data-gathering-task-validation-view]`)
+        .click();
+      await settleRouteExit();
+      await settleRouteExit();
+    };
+
+    await view('name');
+    const name = target.querySelector('[data-gathering-task-field="name"]');
+    assert.ok(document.activeElement === name, 'the name row reaches the name input');
+    assert.equal(await announcement(), 'Overview — Name');
+
+    await view('result-1');
+    const panel = target.querySelector('[data-gathering-task-panel="results"]');
+    assert.ok(Boolean(panel), 'a result row opens Results');
+    assert.ok(document.activeElement === panel, 'and, naming no control, lands on its panel');
+    assert.equal(await announcement(), 'Results');
+  });
+
+  it('counts the Results errors in a notice whose action opens Validation', async () => {
+    await openTasks({ taskResolutionMode: 'routed', gatheringTaskValidation: NAME_OR_RESULT_ERRORS });
+    await openEditor('task', 'task-herbs');
+    for (const tab of ['overview', 'requirements', 'validation']) {
+      await openTaskTab(tab);
+      const stray = target.querySelector(':scope [data-gathering-task-results-validation]');
+      assert.ok(!stray, `the Results notice stays on Results, not on ${tab}`);
+    }
+    await openTaskTab('results');
+    const notice =target.querySelector(':scope [data-notice-position="page"] [data-gathering-task-results-validation]');
+    assert.match(notice.textContent, /1 result issue blocks save/);
+    notice.querySelector('button').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('[data-gathering-task-tab][aria-selected="true"]').dataset.gatheringTaskTab,
+      'validation'
+    );
+    assert.ok(Boolean(target.querySelector('[data-gathering-task-validation]')));
+  });
+
+  it('keeps a d100 task`s Validation tab full width', async () => {
+    await openTasks();
+    await openEditor('task', 'task-herbs');
+    await openTaskTab('validation');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'full');
+    assert.ok(!target.querySelector('aside.manager-inspector'), 'no drop rail on Validation');
   });
 
   it('shows the economy cards the system economy turns on', async () => {
@@ -1030,12 +1162,12 @@ export function registerGatheringCases() {
       !target.querySelector('.manager-inspector'),
       'Direct suppresses the entire unused inspector'
     );
-    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'results');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'full');
     assert.ok(
       target
         .querySelector('[data-gathering-task-results-validation]')
-        ?.textContent.includes('Direct mode requires exactly one non-empty result group'),
-      'the blocking reason is rendered beside Direct results'
+        ?.textContent.includes('1 result issue blocks save'),
+      'the blocking count is rendered beside straight results'
     );
     assert.ok(
       !target.querySelector('[data-gathering-task-drop-inspector]'),
@@ -1054,7 +1186,7 @@ export function registerGatheringCases() {
       !target.querySelector('.manager-inspector'),
       'Check suppresses the entire unused inspector'
     );
-    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'results');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'full');
     assert.deepEqual(
       Array.from(target.querySelectorAll('[data-gathering-routed-tier-status]')).map((row) => [
         row.dataset.gatheringRoutedTierStatus,

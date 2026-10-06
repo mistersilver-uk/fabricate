@@ -17,7 +17,7 @@
 
   Invariants:
   - Two `<header>` elements under no wrapper, so the shell's own children are unchanged — pinned
-    by the 38-state DOM census in `tests/components/manager-header-mounted.js`.
+    by the DOM census in `tests/components/manager-header-mounted.js`.
   - The identity heading is keyed on `header.headingVariant` alone; the order the eight variants
     are tested in is stated once, in `headerModel.svelte.js`.
 -->

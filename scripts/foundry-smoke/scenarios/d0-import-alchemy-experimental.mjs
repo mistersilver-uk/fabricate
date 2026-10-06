@@ -15,6 +15,9 @@ import {
   settleManagerNav,
 } from '../pageOps/pageLifecycle.mjs';
 
+// A hang guard, not a pacing guess: the step waits on the import's own promise.
+const IMPORT_SETTLE_CEILING_MS = 180_000;
+
 export default {
   id: 'import-alchemy-experimental',
   phase: 'phase-D0',
@@ -90,6 +93,18 @@ export default {
         await page.waitForTimeout(300);
       }
 
+      // Hold the import's own promise: under load it can outlast any fixed wait, and a teardown
+      // that closes the manager mid-import used to throw out of the landed import.
+      await page.evaluate(() => {
+        const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
+        const importSystem = store?.importSystem;
+        if (typeof importSystem !== 'function') throw new Error('the manager store has no import');
+        store.importSystem = (...args) => {
+          // eslint-disable-next-line unicorn/no-global-object-property-assignment -- a page handle the step awaits and deletes.
+          globalThis.__fabricateSmokeImport = importSystem(...args);
+          return globalThis.__fabricateSmokeImport;
+        };
+      });
       // Open the real import file-picker dialog (file-import icon is unique to it).
       await page
         .locator('.fabricate-manager button.fabricate-button:has(i.fa-file-import)')
@@ -117,8 +132,26 @@ export default {
       // Since issue 877 the report is a Svelte modal portaled INTO the manager window
       // (the shared `Modal` chrome the folder-mapping step below also uses), not
       // a separate DialogV2 application.
+      const outcome = await page.evaluate(async (ceiling) => {
+        const ran = globalThis.__fabricateSmokeImport;
+        delete globalThis.__fabricateSmokeImport;
+        if (!ran) return { error: 'the Import button never started an import' };
+        const hung = new Promise((resolve) => {
+          setTimeout(
+            () => resolve({ error: `the import had not settled after ${ceiling}ms` }),
+            ceiling
+          );
+        });
+        const settled = ran.then(
+          (content) => ({ reported: content !== null }),
+          (error) => ({ error: `the import threw: ${error?.message ?? error}` })
+        );
+        return await Promise.race([settled, hung]);
+      }, IMPORT_SETTLE_CEILING_MS);
+      if (outcome.error) throw new Error(outcome.error);
+      if (!outcome.reported) throw new Error('the import settled with no report to show');
       const reportDialog = page.locator('.fabricate-manager [data-import-report]').first();
-      await reportDialog.waitFor({ state: 'visible', timeout: 15_000 });
+      await reportDialog.waitFor({ state: 'visible', timeout: 5000 });
       // Prove the "needs attention" grouped cards rendered (the reported source item).
       await reportDialog
         .locator('[data-import-report-group]')

@@ -1,9 +1,6 @@
 /** Phase E's first half: the shared app, the inventory and salvage captures, the gathering states and the Crafting tab; it returns the app-shell locator the second half continues against. */
 
-import {
-  assertProgressiveStageListSound,
-  handleRollPromptIfPresent,
-} from '../pageOps/managerViews.mjs';
+import { assertProgressiveStageListSound, answerRollPrompt } from '../pageOps/managerViews.mjs';
 import {
   assertNoScreenshotOverlays,
   assertPointerTarget,
@@ -380,13 +377,14 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     await captureCurrentPlayerGathering(label);
   }
 
-  async function clickReadyGatheringAttempt() {
+  // `prompts` is by construction: an immediate (d100) gather opens the interactive roll prompt,
+  // and a timed one only starts its waiting run.
+  async function clickReadyGatheringAttempt({ prompts }) {
     await appShell
       .locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]')
       .first()
       .click();
-    // An immediate (d100) attempt opens the interactive roll prompt: capture it and click Roll.
-    await handleRollPromptIfPresent(ctx, 'player-gathering-roll-prompt');
+    if (prompts) await answerRollPrompt(ctx, 'player-gathering-roll-prompt');
     // The attempt keeps a ready button disabled until its listing reload lands, and that reload
     // re-keys the task rows; selecting a row before it settles races a detached element.
     await page.waitForFunction(
@@ -426,7 +424,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-task-ready',
     });
-    await clickReadyGatheringAttempt();
+    await clickReadyGatheringAttempt({ prompts: true });
     await captureSelectedGatheringTask({
       environment: 'Verdant Meadow',
       task: 'Gather Meadow Herbs',
@@ -444,7 +442,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       blocked: false,
       label: 'player-gathering-timed-ready',
     });
-    await clickReadyGatheringAttempt();
+    await clickReadyGatheringAttempt({ prompts: false });
     await captureSelectedGatheringTask({
       environment: 'Timed Orchard',
       task: 'Tend Slow Bloom',
@@ -584,11 +582,10 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         .locator('[data-crafting-craft][data-crafting-craft-disabled="false"]')
         .first();
       if ((await craftButton.count()) > 0) {
-        await craftButton.click().catch(() => {});
-        // A UI craft now opens the interactive roll prompt: capture it, then
-        // click Roll so the run summary resolves and the overlay clears. The prompt can open several
-        // seconds after the click once a full D0 walk has loaded the world.
-        await handleRollPromptIfPresent(ctx, 'player-crafting-roll-prompt', { timeout: 15_000 });
+        await craftButton.click();
+        // A UI craft of this checked recipe opens the interactive roll prompt: capture it, then
+        // click Roll so the run summary resolves and the overlay clears.
+        await answerRollPrompt(ctx, 'player-crafting-roll-prompt');
         await appShell
           .locator('[data-crafting-run-summary]')
           .first()
@@ -765,9 +762,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             [...document.querySelectorAll('#fabricate-app [data-essence-meter]')].map((node) => ({
               essenceId: node.dataset.essenceMeter,
               state: node.dataset.essenceMeterState,
-              ratio: String(
-                node.querySelector('.essence-pool-meter-ratio')?.textContent ?? ''
-              ).trim(),
+              ratio: String(node.querySelector('[data-essence-total]')?.textContent ?? '').trim(),
             }))
           );
         // Container-level wait: the rail's slot row, not a particular tile. An over-specific
@@ -917,15 +912,16 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             `Shared pool was ${JSON.stringify(sharedMeters)}, expected one met and one part-delivered meter`
           );
         }
-        // Issue 917 re-point: the chip's class is `.essence-contribution`
-        // (`EssenceContribution.svelte`) — `.essence-pool-contribution` never existed and
-        // always counted zero.
-        const duskContributions = await appShell
-          .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal") .essence-contribution')
-          .count();
+        // Issue 1644: the shared pool states a carrier's yield as one reading, `+N <essence>` per
+        // pool it funds, so the dual carrier's row must name two contributions.
+        const duskReading = await appShell
+          .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal")')
+          .first()
+          .textContent();
+        const duskContributions = (String(duskReading).match(/\+\d/g) ?? []).length;
         if (duskContributions < 2) {
           throw new Error(
-            `Dual carrier showed ${duskContributions} contribution chips, expected one per essence it funds`
+            `Dual carrier stated ${duskContributions} contributions, expected one per essence it funds`
           );
         }
         await assertNoScreenshotOverlays(page);

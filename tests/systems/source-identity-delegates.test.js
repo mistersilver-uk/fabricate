@@ -165,7 +165,7 @@ function flaggedPackSourceWorld() {
 }
 
 /** An owned copy whose name matches a recipe-item definition only after case folding —
- * `normalizeMatchName` (`SourceIdentityService.js`) lowercases before comparing. */
+ * `normalizeMatchName` (`src/utils/sourceUuid.js`) lowercases before comparing. */
 function caseFoldedRepointWorld() {
   const copy = makeDocument({
     uuid: 'Actor.hero.Item.scroll',
@@ -668,7 +668,7 @@ describe('two more surviving mutants, killed without a src/ change', () => {
     assert.equal(
       summary.repointed,
       1,
-      'normalizeMatchName lowercases before comparing (SourceIdentityService.js)'
+      'normalizeMatchName lowercases before comparing (src/utils/sourceUuid.js)'
     );
     assert.equal(
       harness.fixtures.copy.flags.fabricate.fabricate.roles.sys1.recipeItemDefinitionId,

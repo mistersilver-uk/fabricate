@@ -28,6 +28,12 @@
       labelKey: 'FABRICATE.Admin.Manager.Environment.Tasks.Tabs.Results',
       label: 'Results',
     },
+    {
+      id: 'validation',
+      icon: 'fas fa-clipboard-check',
+      labelKey: 'FABRICATE.Admin.Manager.Environment.Tasks.Tabs.Validation',
+      label: 'Validation',
+    },
   ];
 </script>
 

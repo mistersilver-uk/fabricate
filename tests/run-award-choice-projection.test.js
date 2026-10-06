@@ -17,6 +17,7 @@ import {
   interrupt,
   lore,
   pickGroup,
+  unclaimableGroup,
 } from './helpers/choiceGroupWorld.js';
 
 /**
@@ -212,6 +213,51 @@ test('1773 PR4: an unclaimable alternative and the stage hold come through the f
     ['componentMissing', null]
   );
   assert.equal(run.actions.disabledReason, 'awardChoicePending', 'the coin still holds the stage');
+});
+
+test('1773 PR4: a pick with nothing claimable holds no stage and blocks nothing', async () => {
+  const { built, blocks } = await craftWithGroup(unclaimableGroup(), {
+    midRun: true,
+    stageCount: 2,
+    act: async (world) => {
+      await world.execute();
+      const owed = world.run();
+      return {
+        built: listing(world),
+        blocks: world.engine._awardChoices().blocks(owed, world.actor),
+      };
+    },
+  });
+  assert.equal(blocks, false, 'the engine’s own predicate finds nothing claimable');
+  const run = built.activeRuns.find((entry) => entry.awardChoices?.length > 0);
+  assert.ok(run, 'the unsettled pick is still listed');
+  assert.notEqual(run.actions.disabledReason, 'awardChoicePending', 'so it holds no stage');
+});
+
+test('1773 PR4: the engine’s owed-pick predicate judges claimability against the run’s actor', async () => {
+  const { blocks } = await craftWithGroup(pickGroup(), {
+    stageCount: 2,
+    act: async (world) => {
+      await world.execute();
+      return { blocks: world.engine._awardChoices().blocks(world.run(), world.actor) };
+    },
+  });
+  assert.equal(blocks, true, 'a claimable coin and gem are owed to the actor');
+});
+
+test('1773 PR4: a recipe the actor already knows is no owed pick for that actor', async () => {
+  const { blocks } = await craftWithGroup(pickGroup({ alternatives: [lore] }), {
+    midRun: true,
+    stageCount: 2,
+    act: async (world) => {
+      await world.execute();
+      world.actor._source.flags.fabricate = {
+        fabricate: { learnedRecipes: { 'historical-recipe': { learnedAt: 1, granted: true } } },
+      };
+      return { blocks: world.engine._awardChoices().blocks(world.run(), world.actor) };
+    },
+  });
+  assert.equal(blocks, false, 'the only alternative is already known by the run’s actor');
 });
 
 test('1773 PR4: a taught recipe this viewer may not read is named as one not learned', async () => {

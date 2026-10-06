@@ -59,12 +59,41 @@ export function installFoundryStubs() {
 }
 
 /**
+ * A settings seam for one scope setting: `value` is what is persisted, read back as JSON would
+ * return it; `writes` holds every payload written; `rejectNext(error)` fails the next write, which
+ * then persists nothing.
+ */
+export function makeScopeSettings(value) {
+  const settings = {
+    value,
+    writes: [],
+    rejection: null,
+    rejectNext(error) {
+      settings.rejection = error;
+    },
+    getSetting: () => settings.value,
+    setSetting: async (_key, next) => {
+      if (settings.rejection) {
+        const error = settings.rejection;
+        settings.rejection = null;
+        throw error;
+      }
+      settings.value = JSON.parse(JSON.stringify(next));
+      settings.writes.push(settings.value);
+    },
+  };
+  return settings;
+}
+
+/**
  * Build ONE in-memory world scope store, exactly as `worldScopeStores.js` composes the real one but
  * without importing `src/config/settings.js` (which drags `src/ui/theme.js` in).
  *
  * @param {unknown} value The persisted payload.
+ * @param {ReturnType<typeof makeScopeSettings>} [settings] A seam from `makeScopeSettings`, whose
+ *   own `value` then stands for `value`; without one the store reads `value` and discards writes.
  */
-export function makeScopeStore(entityType, value) {
+export function makeScopeStore(entityType, value, settings = null) {
   const config = {
     components: {
       defaults: normalizeComponentWorldDefaults,
@@ -75,8 +104,8 @@ export function makeScopeStore(entityType, value) {
   }[entityType];
   const store = createScopedDefinitionStore({
     settingKey: entityType,
-    getSetting: () => value,
-    setSetting: async () => {},
+    getSetting: settings ? settings.getSetting : () => value,
+    setSetting: settings ? settings.setSetting : async () => {},
     normalizeDefaults: config.defaults,
     normalizeMemberships: config.members,
     normalizeExtras:

@@ -4,7 +4,7 @@ import { join, resolve, sep } from 'node:path';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 
-import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
+import { missingChromeMessage, resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const chromeCache = resolveChromeCache(repoRoot);
@@ -86,10 +86,37 @@ function stripGlobalCssImport() {
   };
 }
 
+const CHROME_STATUS_PATH = '/@primitive-lab/chrome-status';
+
+/**
+ * Serve the harvest status and `missingChromeMessage()` as data, because that message reads the
+ * filesystem and cannot run in the page. The Primitive Lab still probes the stylesheet itself.
+ */
+function chromeStatusEndpoint() {
+  return {
+    name: 'view-lab-chrome-status',
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        if ((request.url ?? '').split('?', 1)[0] !== CHROME_STATUS_PATH) return next();
+        response.setHeader('Content-Type', 'application/json; charset=utf-8');
+        response.setHeader('Cache-Control', 'no-store');
+        response.end(
+          JSON.stringify({
+            available: Boolean(chromeCache),
+            version: chromeCache?.version ?? null,
+            message: chromeCache ? null : missingChromeMessage(repoRoot),
+          })
+        );
+      });
+    },
+  };
+}
+
 export default defineConfig({
   root: repoRoot,
   plugins: [
     stripGlobalCssImport(),
+    chromeStatusEndpoint(),
     svelte(),
     staticMount('/@foundry-chrome/', chromeCache?.dir ?? null, 'Harvested Foundry window chrome'),
     staticMount('/@foundry-system/dnd5e/', existsSync(dnd5eRoot) ? dnd5eRoot : null, 'The dnd5e system tree'),
@@ -97,6 +124,12 @@ export default defineConfig({
     // BROWSER resolves `@import ... layer(...)`.
     staticMount('/@fabricate-styles/', join(repoRoot, 'styles'), 'The Fabricate stylesheet'),
     staticMount('/@view-lab/', resolve(import.meta.dirname), 'The View Lab cascade shim'),
+    // The design library served raw for the Primitive Lab, never through Vite's HTML transform.
+    staticMount(
+      '/@design-library/',
+      join(repoRoot, 'openspec', 'specs', 'design-system'),
+      'The design system library'
+    ),
     // Foundry serves its core art at /icons/; Fabricate's default images reference it that way.
     staticMount('/icons/', chromeCache ? join(chromeCache.dir, 'icons') : null, 'Foundry core icons'),
   ],
@@ -117,5 +150,6 @@ export default defineConfig({
       ],
     },
   },
-  optimizeDeps: { entries: ['tests/view-lab/mount.js'] },
+  // Both pages' entries, so neither pays the optimiser's cold pre-bundle on first navigation.
+  optimizeDeps: { entries: ['tests/view-lab/mount.js', 'tests/view-lab/primitives/mount.js'] },
 });

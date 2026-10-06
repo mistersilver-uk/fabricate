@@ -53,9 +53,10 @@
     },
   ];
 
-  // The caption ids the default-environment picker is named and described by (issue 1510).
+  // The caption ids the name input and the default-environment picker are named by (issue 1510).
   const instanceId = $props.id();
   const captionIds = {
+    name: `${instanceId}-name`,
     defaultEnvironment: `${instanceId}-default-environment`,
     defaultEnvironmentHint: `${instanceId}-default-environment-hint`,
   };
@@ -145,9 +146,13 @@
 
     <div class="manager-task-identity-fields">
       <Field as="label">
-        <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Name', 'Name')}</span>
+        <span id={captionIds.name}
+          >{text('FABRICATE.Admin.Manager.Environment.Tasks.Name', 'Name')}</span
+        >
         <input
+          aria-labelledby={captionIds.name}
           data-gathering-task-field="name"
+          data-validation-target="gathering-task-name"
           value={task.name || ''}
           oninput={(event) => onUpdateTask({ name: event.currentTarget.value })}
         />

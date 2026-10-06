@@ -7255,7 +7255,7 @@
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body,
-.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"]
+.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"]
   .manager-body {
   grid-template-columns: 220px minmax(0, 1fr);
 }
@@ -7277,7 +7277,7 @@
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed,
-.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"]
+.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"]
   .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr);
 }
@@ -10410,10 +10410,36 @@
 
 /* THE GOLD BADGE CHIP, stated once (issues 1185, 1304, 1515). */
 .fabricate-manager .manager-titlebar-badge,
-.fabricate-manager .manager-nav-premium {
+.fabricate-manager .manager-nav-premium,
+.fabricate-manager .manager-premium-icons-ad-badge {
   color: var(--fab-on-badge-gold);
   background: var(--fab-badge-gold);
   font-weight: 700;
+}
+
+/* The Premium advert's six icon tiles (issue 2220). The images live here, beside the module's other bundled assets, so no icon is ever offered as Item art; the tile itself is `ManagerPremiumIconsAd.svelte`'s. */
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-stone {
+  background-image: url("../assets/premium/relic-stone.webp");
+}
+
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-blood {
+  background-image: url("../assets/premium/relic-blood.webp");
+}
+
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-entropy {
+  background-image: url("../assets/premium/relic-entropy.webp");
+}
+
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-verdant {
+  background-image: url("../assets/premium/relic-verdant.webp");
+}
+
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-catalyst {
+  background-image: url("../assets/premium/relic-catalyst.webp");
+}
+
+.fabricate-manager .manager-premium-icons-ad-icon.is-relic-formula {
+  background-image: url("../assets/premium/relic-formula.webp");
 }
 
 /* THE SAME CHIP, MUTED — the rail's Downtime marker once a companion holds the surface (issue 1185). */
@@ -13453,7 +13479,7 @@
   .fabricate-manager[data-manager-view="knowledge"] .manager-body,
   .fabricate-manager[data-manager-view="component-edit"] .manager-body,
   .fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
-  .fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"]
+  .fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"]
     .manager-body,
   .fabricate-manager[data-manager-view="world-currency"] .manager-body,
   .fabricate-manager[data-manager-view="world-prerequisites"] .manager-body,
@@ -13593,7 +13619,7 @@
 .fabricate-manager[data-manager-view="world-downtime"] .manager-rail,
 .fabricate-manager[data-manager-view="component-edit"] .manager-rail,
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-rail,
-.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"]
+.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="full"]
   .manager-rail,
 .fabricate-manager[data-manager-view="world-currency"] .manager-rail,
 .fabricate-manager[data-manager-view="world-prerequisites"] .manager-rail,

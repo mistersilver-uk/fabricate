@@ -117,7 +117,7 @@ test('the gathering task editor`s tab bar holds still between Overview and a d10
         id: 'gathering-task-edit',
         rootAttributes: results
           ? 'data-manager-view="gathering-task-edit"'
-          : 'data-manager-view="gathering-task-edit" data-gathering-task-layout="results"',
+          : 'data-manager-view="gathering-task-edit" data-gathering-task-layout="full"',
         main: gatheringTaskEditor({ results }),
         owner: { wide: '.manager-editor-tab-panel' },
       },

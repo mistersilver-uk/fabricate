@@ -4,18 +4,8 @@
  */
 import { getItemMatchUuids } from '../../../../utils/sourceReferenceUnion.js';
 
-/** Fails closed: an absent parser, a throw and an unreadable answer all count as embedded. */
-export function isEmbeddedItemUuid(uuid, parseUuid) {
-  if (typeof parseUuid !== 'function') return true;
-  // V13.351 throws a TypeError at `uuid.startsWith` for a truthy non-string; V14.365 returns null.
-  try {
-    const parsed = parseUuid(uuid);
-    if (!parsed || typeof parsed !== 'object') return true;
-    return Number(parsed.embedded?.length) > 0;
-  } catch {
-    return true;
-  }
-}
+// The embedded-uuid rule is shared with component import, which asks it of an unresolved uuid.
+export { isEmbeddedItemUuid } from '../../../../utils/sourceReferenceUnion.js';
 
 /** The entry whose source-reference union already names `uuid`, or `null`. */
 export function entryForSourceItem(entries, uuid) {
