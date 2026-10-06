@@ -8493,6 +8493,7 @@
         "ReplaceFailed": "Failed to replace component source.",
         "SourceFallbackWarning": "The original source link for {name} is broken ({brokenUuid}). Fabricate used the live item UUID instead: {fallbackUuid}.",
         "SourceFallbackSummary": "{count} imported items had broken original source links. Fabricate used their live item UUIDs instead.",
+        "WorldCatalogueNotUpdated": "The items were imported, but the world Component catalogue could not be updated. Import them again to add them to it.",
         "SourceUnlinked": "Unlinked component source.",
         "UnlinkFailed": "Failed to unlink component source.",
         "SourceNotFound": "The linked source item could not be opened.",
