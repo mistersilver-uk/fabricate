@@ -133,10 +133,20 @@ globalThis.foundry = {
   utils: { randomID: () => `random-${++idCounter}`, getProperty: () => undefined },
 };
 globalThis.game = { user: { isGM: true } };
+const TEMPLATE_UUID = 'Compendium.kit.templates.Item.blank';
+const SCROLL_UUIDS = ['Item.scroll-fire', 'Item.scroll-frost', 'Item.scroll-storm'];
 const RESOLVED = {
   'Item.a': { documentName: 'Item', name: 'Iron', img: 'iron.png' },
   'Item.b': { documentName: 'Item', name: 'Sage', img: 'sage.png' },
   'Item.c': { documentName: 'Item', name: 'Cog', img: 'cog.png' },
+  // Issue 2217: three scrolls built from one template entry, each renamed into a different Item.
+  [TEMPLATE_UUID]: { documentName: 'Item', name: 'Blank Scroll', img: 'scroll.png' },
+  ...Object.fromEntries(
+    SCROLL_UUIDS.map((uuid) => [
+      uuid,
+      { documentName: 'Item', name: `Scroll ${uuid}`, _stats: { compendiumSource: TEMPLATE_UUID } },
+    ])
+  ),
 };
 globalThis.fromUuid = async (uuid) => RESOLVED[uuid] || null;
 
@@ -204,6 +214,34 @@ test('a decision with no category and no tags still imports but applies nothing'
   const component = manager.getSystem('sys1').components[0];
   assert.equal(component.category, 'general');
   assert.deepEqual(component.tags, []);
+});
+
+test('a folder of three derivatives of one compendium entry imports three components', async () => {
+  const manager = buildManager();
+  const decisions = [{ itemUuids: SCROLL_UUIDS, category: '', addTags: [] }];
+
+  const first = await applyFolderImportDecisions(manager, 'sys1', decisions);
+  assert.deepEqual(
+    { added: first.added, updated: first.updated, skipped: first.skipped },
+    { added: 3, updated: 0, skipped: 0 }
+  );
+  const components = manager.getSystem('sys1').components;
+  assert.deepEqual(
+    components.map((component) => component.registeredItemUuid),
+    SCROLL_UUIDS
+  );
+  assert.ok(
+    components.every(
+      (component) =>
+        component.originItemUuid !== TEMPLATE_UUID &&
+        !component.aliasItemUuids.includes(TEMPLATE_UUID)
+    ),
+    'no imported component claims the shared template entry'
+  );
+
+  const second = await applyFolderImportDecisions(manager, 'sys1', decisions);
+  assert.equal(second.skipped, 3, 'importing the folder again changes nothing');
+  assert.equal(manager.getSystem('sys1').components.length, 3);
 });
 
 // (c) write amplification (issue 1086). `save()` replaces the WHOLE `craftingSystems` world setting

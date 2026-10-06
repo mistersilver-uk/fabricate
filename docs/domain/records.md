@@ -66,6 +66,7 @@ A component's `componentId` was historically both a within-system identity and t
 Issue 570 then made `CraftingSystemExporter.prepareForImport(…, 'copy')` regenerate every component id and remap every within-payload component reference, closing the copy-import id-collision residual.
 Component ids remain per-system-unique only (independently-authored systems and worlds that copy-imported before issue 570 can still share ids), so `componentId`'s within-system identity role and the `roles[systemId]` scoping stay load-bearing.
 When import sees a broken recorded compendium/source UUID, the component uses the live dropped Item UUID as its primary source and keeps the broken UUID in `aliasItemUuids`.
+The exception is importing again an Item whose own uuid a component already claims without that compendium source: the import adds no alias and reports no fallback, and replace-source is not excepted.
 
 Canonical mapping: `_normalizeComponent()` in `CraftingSystemManager`, `normalizeComponent` in `src/systems/normalize/components.js`, `system.components`
 

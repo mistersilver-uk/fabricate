@@ -21,25 +21,19 @@ import {
 import { chooseSelectOption } from './selectControl.mjs';
 
 /**
- * A UI-triggered craft / immediate-d100 gather now opens the interactive roll prompt (Fabricate's
- * shared modal, `.manager-modal[data-roll-prompt]`). A caller that knows the prompt opens passes a
- * longer `timeout`; the default keeps a prompt-less path cheap.
+ * Answer the roll prompt an action is known to open: capture it, then click Roll. Whether a prompt
+ * opens is the caller's to state, never inferred from a short wait, because under load a prompt
+ * can mount long after any guess and leave its action blocked. `timeout` is only a hang guard.
  */
-export async function handleRollPromptIfPresent(ctx, label, { timeout = 2500 } = {}) {
+export async function answerRollPrompt(ctx, label, { timeout = 60_000 } = {}) {
   const { page, screenshot } = ctx;
   const dialog = page.locator('.manager-modal[data-roll-prompt]').first();
-  try {
-    await dialog.waitFor({ state: 'visible', timeout });
-  } catch {
-    return false;
-  }
+  await dialog.waitFor({ state: 'visible', timeout });
   await screenshot(page, label);
   // Roll is the form's only submit button, and it rolls normally. A text match found the roll-mode
   // Select's "Public roll" trigger first and opened it instead, leaving the prompt standing.
-  const rollBtn = dialog.locator('button[type="submit"]').first();
-  await rollBtn.click().catch(() => {});
-  await dialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
-  return true;
+  await dialog.locator('button[type="submit"]').first().click();
+  await dialog.waitFor({ state: 'detached', timeout: 10_000 });
 }
 
 /**

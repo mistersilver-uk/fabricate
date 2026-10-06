@@ -2061,9 +2061,9 @@ describe('UI PR screenshot evidence', () => {
       emitted.add(match[1]);
     }
     // Issue 855: the interactive crafting-check roll prompt routes through
-    // handleRollPromptIfPresent(page, '<label>'), which forwards `label` to screenshot() as a
+    // answerRollPrompt(ctx, '<label>'), which forwards `label` to screenshot() as a
     // variable — so the literal lives in the helper CALL, not in a screenshot() call.
-    for (const match of harness.matchAll(/handleRollPromptIfPresent\(\s*ctx\s*,\s*'([^']+)'/g)) {
+    for (const match of harness.matchAll(/answerRollPrompt\(\s*ctx\s*,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     }
