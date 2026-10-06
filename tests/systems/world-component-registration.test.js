@@ -135,6 +135,8 @@ describe('sourceReferenceKey', () => {
       'Library.world.scrolls.Item.fire',
       'Compendium.world.scrolls.JournalEntry.fire',
       'Compendium.world.scrolls.Actor.hero.Item.fire',
+      'Compendium.world.scrolls.Item.fire.ActiveEffect.fx',
+      'Compendium.world.scrolls.Item',
     ]) {
       assert.equal(sourceReferenceKey(kept), kept);
     }
@@ -325,6 +327,35 @@ describe('adoption across the calls of one run', () => {
     run.registrations.push({ systemId: OTHER_SYSTEM, componentId: 'comp-ash', added: true });
 
     assert.equal(adoptedWorldComponentId({ ...run, systemId: SYSTEM, record }), 'comp-ash');
+  });
+
+  it('keeps the registrations of one run out of another run over the same roster', () => {
+    const rows = { [OTHER_SYSTEM]: [row('comp-ash', 'Item.ash')], [SYSTEM]: [] };
+    const shared = { entities: [], rowsOf: (systemId) => rows[systemId], systemId: SYSTEM, record };
+    const runA = [{ systemId: OTHER_SYSTEM, componentId: 'comp-ash', added: true }];
+    const runB = [];
+
+    assert.equal(adoptedWorldComponentId({ ...shared, registrations: runA }), 'comp-ash');
+    assert.equal(adoptedWorldComponentId({ ...shared, registrations: runB }), null);
+  });
+
+  it('and the second run still sees a registration it records after the first run has', () => {
+    const rows = { [OTHER_SYSTEM]: [row('comp-ash', 'Item.ash')], [SYSTEM]: [] };
+    const shared = { entities: [], rowsOf: (systemId) => rows[systemId], systemId: SYSTEM };
+    const runA = [{ systemId: OTHER_SYSTEM, componentId: 'comp-ash', added: true }];
+    const runB = [];
+    const moss = { registeredItemUuid: 'Item.moss' };
+    assert.equal(adoptedWorldComponentId({ ...shared, registrations: runA, record }), 'comp-ash');
+    assert.equal(adoptedWorldComponentId({ ...shared, registrations: runB, record: moss }), null);
+
+    rows[OTHER_SYSTEM].push(row('comp-moss', 'Item.moss'));
+    runB.push({ systemId: OTHER_SYSTEM, componentId: 'comp-moss', added: true });
+
+    assert.equal(
+      adoptedWorldComponentId({ ...shared, registrations: runB, record: moss }),
+      'comp-moss'
+    );
+    assert.equal(adoptedWorldComponentId({ ...shared, registrations: runA, record: moss }), null);
   });
 
   it('reads the roster again once the store has published a new one', () => {

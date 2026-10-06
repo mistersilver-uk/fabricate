@@ -145,7 +145,11 @@ function world({ scope, systems = [{ id: FORGE }], store: withStore = true } = {
     manager.systems.set(system.id, manager._normalizeSystem({ name: system.id, ...system }));
   }
   manager.initialized = true;
-  const corpus = { rejection: null, persisted: asStored([...manager.systems.values()]) };
+  const corpus = {
+    rejection: null,
+    reads: 0,
+    persisted: asStored([...manager.systems.values()]),
+  };
   const persistedIds = (systemId) =>
     (corpus.persisted.find((system) => system.id === systemId)?.components ?? []).map(
       (component) => component.id
@@ -155,6 +159,7 @@ function world({ scope, systems = [{ id: FORGE }], store: withStore = true } = {
     settings: {
       get: (_namespace, key) => {
         if (corpus.unreadable) throw new Error('the setting cannot be read');
+        if (key === 'craftingSystems') corpus.reads += 1;
         return key === 'craftingSystems' ? corpus.persisted : undefined;
       },
       set: async (_namespace, key, value) => {
@@ -680,6 +685,22 @@ describe('a row the craftingSystems setting does not hold is never registered', 
     assert.deepEqual(Object.keys(result), ['item', 'action', 'sourceFallbacks']);
     assert.deepEqual(events, ['craftingSystems']);
     assert.deepEqual(membershipKeys(), []);
+  });
+
+  it('one flush reads the persisted craftingSystems setting once, however many rows it registers', async () => {
+    const { manager, corpus, entityIds } = world();
+    const registrations = [];
+    for (const id of ['ash', 'salt', 'moss']) {
+      await manager.addItemFromUuid(FORGE, worldItem(id).uuid, { persist: false, registrations });
+    }
+    await manager.save();
+    corpus.reads = 0;
+
+    const flushed = await manager.flushWorldComponentRegistrations(registrations);
+
+    assert.deepEqual(flushed, { registered: 3, error: null });
+    assert.equal(entityIds().length, 3);
+    assert.equal(corpus.reads, 1);
   });
 
   it('two overlapping runs over one system leave no membership for a row not yet saved', async () => {
