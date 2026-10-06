@@ -36,6 +36,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/RuleSentence.svelte',
     'src/ui/svelte/components/RuleRow.svelte',
+    // The character-modifier search is the shared typeahead over the search field (issue 1782).
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/Typeahead.svelte',
     EDITOR_PATH,
   ],
   componentPath: EDITOR_PATH,

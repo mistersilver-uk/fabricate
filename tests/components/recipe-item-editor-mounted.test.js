@@ -115,6 +115,8 @@ const harness = createMountedComponentHarness({
     // The Contents tab's membership is a `SetPicker` over the searchable popover (issue 1782).
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
     'src/ui/svelte/components/SetPicker.svelte',
+    // The Limits tab's two typeaheads (issue 1782).
+    'src/ui/svelte/components/Typeahead.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
     // THE validation surface and the push-button its View rows render (issue 1444). The
     // Validation tab hands the surface its checks and renders no markup itself, so omitting

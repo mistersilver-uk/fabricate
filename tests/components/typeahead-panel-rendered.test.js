@@ -84,16 +84,16 @@ const FAMILIES = Object.freeze([
     surface: 'Required Knowledge, under the recipe-item tab panel',
     clip: '.manager-editor-tab-panel',
     input: '[data-recipe-item-required-knowledge-search]',
-    field: '.manager-tag-search',
-    panel: '.manager-tag-suggestions',
+    field: '.fabricate-search',
+    panel: '.fabricate-typeahead-list',
   }),
   Object.freeze({
     name: 'prerequisite',
     surface: 'Learning prerequisites, under the recipe-item tab panel',
     clip: '.manager-editor-tab-panel',
     input: '[data-recipe-item-character-prereq-search]',
-    field: '.manager-tag-search',
-    panel: '.manager-tag-suggestions',
+    field: '.fabricate-search',
+    panel: '.fabricate-typeahead-list',
   }),
   Object.freeze({
     name: 'modifier',
@@ -101,7 +101,7 @@ const FAMILIES = Object.freeze([
     clip: '.manager-drop-inspector-scroll',
     input: '[data-gathering-drop-character-modifier-search] input',
     field: '',
-    panel: '.manager-tag-suggestions',
+    panel: '.fabricate-typeahead-list',
   }),
   Object.freeze({
     name: 'task',
@@ -112,7 +112,7 @@ const FAMILIES = Object.freeze([
     resize: Object.freeze({ edge: 'scroller', viewport: NARROWER }),
     input: '[data-gathering-component-tag-search] input',
     field: '.manager-task-component-tag-search',
-    panel: '.manager-tag-suggestions',
+    panel: '.fabricate-typeahead-list',
   }),
 ]);
 

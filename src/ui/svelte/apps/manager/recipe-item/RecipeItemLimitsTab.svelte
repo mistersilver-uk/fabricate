@@ -29,8 +29,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
-  import { typeaheadPanel } from '../../../actions/typeaheadPanel.js';
-  import { createTypeaheadCombobox } from '../../../util/typeaheadCombobox.svelte.js';
+  import Typeahead from '../../../components/Typeahead.svelte';
 
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
 
@@ -192,18 +191,15 @@
     return prerequisiteIds.map((id) => byId.get(String(id))).filter(Boolean);
   });
   let requiredKnowledgeSearch = $state('');
-  const normalizedRequiredKnowledgeSearch = $derived(
-    (requiredKnowledgeSearch || '').trim().toLowerCase()
-  );
-  const requiredKnowledgeSuggestions = $derived(
-    normalizedRequiredKnowledgeSearch
-      ? prerequisiteOptions.filter(
-          (option) =>
-            !prerequisiteIds.includes(option.id) &&
-            option.name.toLowerCase().includes(normalizedRequiredKnowledgeSearch)
-        )
-      : []
-  );
+  function requiredKnowledgeSuggestions(query) {
+    const needle = String(query || '')
+      .trim()
+      .toLowerCase();
+    if (!needle) return [];
+    return prerequisiteOptions.filter(
+      (option) => !prerequisiteIds.includes(option.id) && option.name.toLowerCase().includes(needle)
+    );
+  }
   function addRequiredKnowledge(id) {
     const value = String(id || '');
     if (!value || prerequisiteIds.includes(value)) return;
@@ -229,18 +225,17 @@
     (characterPrerequisites || []).filter((p) => !characterPrerequisiteIds.includes(p.id))
   );
   let characterPrereqSearch = $state('');
-  const normalizedCharacterPrereqSearch = $derived(
-    (characterPrereqSearch || '').trim().toLowerCase()
-  );
-  const characterPrereqSuggestions = $derived(
-    normalizedCharacterPrereqSearch
-      ? availableCharacterPrerequisites.filter((p) =>
-          String(p.name || '')
-            .toLowerCase()
-            .includes(normalizedCharacterPrereqSearch)
-        )
-      : []
-  );
+  function characterPrereqSuggestions(query) {
+    const needle = String(query || '')
+      .trim()
+      .toLowerCase();
+    if (!needle) return [];
+    return availableCharacterPrerequisites.filter((p) =>
+      String(p.name || '')
+        .toLowerCase()
+        .includes(needle)
+    );
+  }
   function addCharacterPrerequisite(id) {
     const value = String(id || '');
     if (!value || characterPrerequisiteIds.includes(value)) return;
@@ -252,28 +247,6 @@
       characterPrerequisiteIds: characterPrerequisiteIds.filter((value) => value !== id),
     });
   }
-
-  // Both lists float through the shared seam; the figures are `.manager-tag-suggestions`' own.
-  const TAG_LIST = {
-    component: 'RecipeItemLimitsTab',
-    anchor: '.manager-tag-search',
-    maxHeightCap: 148,
-    rows: { pitch: 30, gap: 2, chrome: 10 },
-  };
-  const knowledgeSearch = createTypeaheadCombobox({
-    ...TAG_LIST,
-    query: () => requiredKnowledgeSearch,
-    setQuery: (value) => (requiredKnowledgeSearch = value),
-    count: () => requiredKnowledgeSuggestions.length,
-    onChoose: (index) => addRequiredKnowledge(requiredKnowledgeSuggestions[index].id),
-  });
-  const prereqSearch = createTypeaheadCombobox({
-    ...TAG_LIST,
-    query: () => characterPrereqSearch,
-    setQuery: (value) => (characterPrereqSearch = value),
-    count: () => characterPrereqSuggestions.length,
-    onChoose: (index) => addCharacterPrerequisite(characterPrereqSuggestions[index].id),
-  });
 </script>
 
 <section
@@ -554,43 +527,21 @@
                     data-recipe-item-required-knowledge-empty
                   />
                 {:else}
-                  <div class="manager-tag-search">
-                    <input
-                      type="search"
-                      class="manager-recipe-item-prereq-search"
-                      data-recipe-item-required-knowledge-search
-                      value={requiredKnowledgeSearch}
-                      placeholder={text(
-                        'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeSearch',
-                        'Search recipes…'
-                      )}
-                      aria-labelledby="recipe-item-required-knowledge-label"
-                      {...knowledgeSearch.field}
-                    />
-                    {#if knowledgeSearch.listed}
-                      <div
-                        class="manager-tag-suggestions"
-                        aria-label={text(
-                          'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledge',
-                          'Required Knowledge'
-                        )}
-                        {...knowledgeSearch.list}
-                        use:typeaheadPanel={knowledgeSearch.panel}
-                      >
-                        {#each requiredKnowledgeSuggestions as option, index (option.id)}
-                          <button
-                            type="button"
-                            class="manager-tag-suggestion"
-                            data-recipe-item-required-knowledge-option={option.id}
-                            {...knowledgeSearch.option(index)}
-                          >
-                            <i class="fas fa-scroll" aria-hidden="true"></i>
-                            <span>{option.name}</span>
-                          </button>
-                        {/each}
-                      </div>
-                    {/if}
-                  </div>
+                  <Typeahead
+                    class="manager-recipe-item-prereq-search"
+                    bind:query={requiredKnowledgeSearch}
+                    source={requiredKnowledgeSuggestions}
+                    itemLabel={(option) => option.name}
+                    itemIcon={() => 'fas fa-scroll'}
+                    onChoose={(option) => addRequiredKnowledge(option.id)}
+                    placeholder={text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeSearch',
+                      'Search recipes…'
+                    )}
+                    ariaLabelledBy="recipe-item-required-knowledge-label"
+                    inputProps={{ 'data-recipe-item-required-knowledge-search': '' }}
+                    optionDataAttr="data-recipe-item-required-knowledge-option"
+                  />
                 {/if}
                 {#if selectedRequiredKnowledge.length > 0}
                   <div class="manager-selected-tag-row" role="list">
@@ -649,43 +600,21 @@
                     data-recipe-item-character-prereq-empty
                   />
                 {:else}
-                  <div class="manager-tag-search">
-                    <input
-                      type="search"
-                      class="manager-recipe-item-prereq-search"
-                      data-recipe-item-character-prereq-search
-                      value={characterPrereqSearch}
-                      placeholder={text(
-                        'FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisitesSearch',
-                        'Search prerequisites…'
-                      )}
-                      aria-labelledby="recipe-item-character-prereqs-label"
-                      {...prereqSearch.field}
-                    />
-                    {#if prereqSearch.listed}
-                      <div
-                        class="manager-tag-suggestions"
-                        aria-label={text(
-                          'FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisites',
-                          'Learning prerequisites'
-                        )}
-                        {...prereqSearch.list}
-                        use:typeaheadPanel={prereqSearch.panel}
-                      >
-                        {#each characterPrereqSuggestions as prereq, index (prereq.id)}
-                          <button
-                            type="button"
-                            class="manager-tag-suggestion"
-                            data-recipe-item-character-prereq-option={prereq.id}
-                            {...prereqSearch.option(index)}
-                          >
-                            <i class={prereq.icon || 'fas fa-user-check'} aria-hidden="true"></i>
-                            <span>{prereq.name}</span>
-                          </button>
-                        {/each}
-                      </div>
-                    {/if}
-                  </div>
+                  <Typeahead
+                    class="manager-recipe-item-prereq-search"
+                    bind:query={characterPrereqSearch}
+                    source={characterPrereqSuggestions}
+                    itemLabel={(prereq) => prereq.name}
+                    itemIcon={(prereq) => prereq.icon || 'fas fa-user-check'}
+                    onChoose={(prereq) => addCharacterPrerequisite(prereq.id)}
+                    placeholder={text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisitesSearch',
+                      'Search prerequisites…'
+                    )}
+                    ariaLabelledBy="recipe-item-character-prereqs-label"
+                    inputProps={{ 'data-recipe-item-character-prereq-search': '' }}
+                    optionDataAttr="data-recipe-item-character-prereq-option"
+                  />
                 {/if}
                 {#if selectedCharacterPrerequisites.length > 0}
                   <div
@@ -764,14 +693,10 @@
     line-height: 1.4;
   }
 
-  /* The search fills its column, overriding the global toolbar-oriented width band, and
-     `flex: 0 0 auto` stops the global `flex: 1 1 210px` growing it vertically inside the
-     column, which would push the pill row to the bottom. */
-  .manager-recipe-item-prereq-column :global(.manager-tag-search) {
-    flex: 0 0 auto;
-    max-width: none;
+  /* `flex: none`: in this column the search's `flex: 1 1 260px` basis would be its height. */
+  .manager-recipe-item-prereq-column :global(.manager-recipe-item-prereq-search) {
+    flex: none;
     min-width: 0;
-    width: 100%;
   }
 
   /* Stack the two columns when the editor body itself is narrow. Keyed to the
@@ -802,10 +727,6 @@
     border: 1px solid var(--fab-accent-border);
     border-radius: 11px;
     background: var(--fab-surface-soft);
-    /* Not `overflow: hidden`: the typeahead suggestions dropdown is absolutely
-       positioned near the panel's bottom edge and must be allowed to escape it
-       (a clip can't be beaten by z-index). Children have transparent backgrounds,
-       so the rounded corners still read cleanly. */
     overflow: visible;
   }
 
@@ -879,10 +800,6 @@
     display: inline-flex;
     align-items: center;
     gap: var(--fab-space-2);
-  }
-
-  .manager-recipe-item-stepper.is-disabled {
-    opacity: 0.4;
   }
 
   .manager-recipe-item-stepper-button {

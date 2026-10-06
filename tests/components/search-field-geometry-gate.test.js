@@ -48,12 +48,20 @@ function literalClassOf(tag) {
   return /^\{\s*(["'])([^"'{}]*)\1\s*\}/.exec(value)?.[2] ?? null;
 }
 
-/** `fabricate-search` plus every class a call site hands `<SearchField class>`, and the non-literal tags. */
+/** A primitive composing the field forwards its callers' classes, so its own tags are read there. */
+const COMPOSERS = Object.freeze({
+  'src/ui/svelte/components/Typeahead.svelte': { tag: 'Typeahead', root: 'fabricate-typeahead' },
+});
+
+/** `fabricate-search` plus every class a call site hands the field, and the non-literal tags. */
 function searchRoots() {
-  const roots = new Set(['fabricate-search']);
+  const roots = new Set(['fabricate-search', ...Object.values(COMPOSERS).map(({ root }) => root)]);
+  const tags = ['SearchField', ...Object.values(COMPOSERS).map(({ tag }) => tag)];
   const nonLiteral = [];
   for (const [file, source] of Object.entries(sources)) {
-    for (const tag of openingTagsNamed(source, 'SearchField')) {
+    for (const tag of tags.flatMap((name) =>
+      COMPOSERS[file] ? [] : openingTagsNamed(source, name)
+    )) {
       const literal = literalClassOf(tag);
       if (literal === null) nonLiteral.push(`${file}: ${tag.replaceAll(/\s+/g, ' ')}`);
       for (const token of (literal ?? '').split(/\s+/)) if (token) roots.add(token);
@@ -257,9 +265,6 @@ const COMPACT_SITE_BOXES = Object.freeze({
   'manager-component-entry-systems-search': { input: 30, inputRadius: '7px' },
   'manager-task-drop-controls': { paddingLeft: '36px' },
   'manager-task-component-browser-controls': { paddingLeft: '36px' },
-  // The editor's (0,6,1) input padding outranks the search's 34px, so the glyph sits over the
-  // placeholder; that defect is the Typeahead change's to fix, and pinned here until it does.
-  'manager-gathering-task-edit-view': { paddingLeft: '8px' },
 });
 
 /** The box a compact probe must measure: the shipped box, or the one its site's rule states. */

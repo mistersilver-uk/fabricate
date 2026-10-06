@@ -34,6 +34,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
+    // Both fields are the shared typeahead, whose field is the search (issue 1782).
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/Typeahead.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',

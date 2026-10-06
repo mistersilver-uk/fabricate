@@ -1612,6 +1612,15 @@ export function registerGatheringCases() {
       'the list floats in the application root rather than inside the browser card'
     );
     assert.equal(tagList.querySelector('[role="option"]').getAttribute('tabindex'), '-1');
+    tagSearch.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+    );
+    flushSync();
+    assert.equal(
+      tagSearch.getAttribute('aria-activedescendant'),
+      tagList.querySelector('[role="option"]').id,
+      'the field names its active option rather than moving focus to it'
+    );
     Array.from(target.querySelectorAll('[data-gathering-component-tag-suggestion]'))
       .find((button) => button.textContent.includes('herb'))
       .click();

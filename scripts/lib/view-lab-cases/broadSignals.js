@@ -65,6 +65,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-drops-ranked-narrow',
     'player-crafting-results-choice-group',
   ]),
+  // The typeahead (issue 1782): the limits tab's two 38px fields, and each site's open list.
+  'src/ui/svelte/components/Typeahead.svelte': Object.freeze([
+    'manager-recipe-item-limits',
+    'manager-recipe-item-limits-suggestions',
+    'manager-gathering-task-component-tag-suggestions',
+    'manager-gathering-task-drop-modifier-suggestions',
+  ]),
   // The log list (issue 1782): the Finished list with a failed entry open, and a cancelled one open.
   'src/ui/svelte/components/LogList.svelte': Object.freeze([
     'fabricate-journal-lifecycle-finished-failure',

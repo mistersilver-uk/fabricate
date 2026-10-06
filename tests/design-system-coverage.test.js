@@ -466,6 +466,7 @@ const RE_ROOTED_ROWS = [
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
+  'src/ui/svelte/components/Typeahead.svelte',
 ];
 
 /** The gate that PROVES a family is not application-rooted, read for its component paths only. */
@@ -629,6 +630,8 @@ const BUILT_BY_1782 = [
   'DataTable',
   // Restyled to the specimen rather than built, by maintainer ruling 2 (2026-09-19).
   'Search',
+  // Born shipped, never `target`: the one shared type-to-search control the maintainer named.
+  'Typeahead',
 ];
 
 /** Names issue 1782 merged away, which must be no entry and must be on the ruled-out register. */
