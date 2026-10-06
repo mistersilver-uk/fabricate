@@ -39,7 +39,12 @@ The caller owns entitlement, localization and actual-versus-preview meaning; a m
 The supported read-only API is `name`, `art`, `icon`, `tint`, `quantity`, `detail`, `tone`, `muted` and the optional `trailing` snippet.
 The opt-in `truncateName` form MUST keep name and detail on one ellipsized line, retaining their complete DOM text and title text; the default MUST continue wrapping.
 The host MAY arrange dense rows in a four-column `minmax(0, 1fr)` grid without changing their 22px image/name/quantity anatomy.
-The broader browse, selection, loading and error forms remain targets in the library.
+ListRow MAY also draw a selectable form, at `density` dense or default and `layout` row or card.
+With `onOpen`, the row's content MUST be one native button holding phrasing content only and carrying `data-keyboard-focus`, and that button is pressed only while `selected` is given and true.
+The button is named by the item's name followed by each state the row shows only visually.
+Its `trailing` controls MUST sit beside the button, and block content sits in its `aside`, beside the button as well.
+With neither `onOpen` nor `openProps` nor any other prop of the selectable form, the dense output MUST be unchanged.
+Its loading and error forms remain targets in the library.
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 
 Pagination's opt-in `density="compact"` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.
