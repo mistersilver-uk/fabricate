@@ -105,9 +105,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StageBars.svelte',
     component('StageNav'),
     component('StageCard'),
-    component('ListRow'),
+    'src/ui/svelte/components/ListRow.svelte',
     component('YieldScale'),
-    component('OutcomeLadder'),
+    'src/ui/svelte/components/OutcomeLadder.svelte',
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
@@ -1887,6 +1887,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
         assert.match(preview.textContent, /Setback/);
         assert.match(preview.textContent, /No items/);
         assert.ok(preview.querySelector('[data-outcome-ladder]'));
+        assert.ok(preview.querySelector('[data-outcome-status]'), 'its status glyphs are named');
       } else if (presentation === 'progressive') {
         assert.ok(!preview.querySelector('[data-outcome-ladder], [data-yield-scale]'));
         assert.match(preview.textContent, /budget/i);
@@ -2416,8 +2417,12 @@ describe('Journal versioned lifecycle (mounted)', () => {
       const mounted = await mountState(state);
       const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
       assert.equal(mounted.store.selectedRun.gatheringYield.mode, mode);
-      if (mode === 'routed') assert.ok(mounted.target.querySelector('[data-outcome-ladder]'));
-      else assert.ok(mounted.target.querySelector('[data-yield-scale]'));
+      if (mode === 'routed') {
+        assert.ok(mounted.target.querySelector('[data-outcome-ladder]'));
+        assert.ok(mounted.target.querySelector(':scope [data-outcome-ladder] [data-outcome-status]'));
+      } else {
+        assert.ok(mounted.target.querySelector('[data-yield-scale]'));
+      }
       assert.equal(mounted.target.querySelectorAll('[data-yield-cut]').length, 0);
 
       mounted.target.querySelector('[data-run-action="primary"]').click();

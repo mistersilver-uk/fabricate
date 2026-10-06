@@ -6,7 +6,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 implements the dense read-only image/name/quantity form for HistoricalRunDetail and StageCard, with OutcomeLadder and YieldScale adopting the same row. Medallion supplies the 22px art. The opt-in truncateName form retains full name/detail DOM and title text while the Journal host arranges four columns. The broader browse, selection, loading and error forms remain targets; the supported display API is recorded in the library. Rendered acceptance remains pending."
+      "why": "Issue 1648 implements the dense read-only image/name/quantity form for HistoricalRunDetail and StageCard, with OutcomeLadder and YieldScale adopting the same row. Medallion supplies the 22px art. The opt-in truncateName form retains full name/detail DOM and title text while the Journal host arranges four columns. Issue 1644 adds a root `class` and rest spread, after the class, so a caller's `data-*` hook reaches the row. The broader browse, selection, loading and error forms remain targets; the supported display API is recorded in the library. Rendered acceptance remains pending."
     },
     {
       "path": "src/ui/svelte/components/EssencePool.svelte",
@@ -31,6 +31,14 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "Issue 1648 promotes the specified scale on RunDetail and HistoricalRunDetail. Default shared previews and explicit shared history retain one cut. The approved opt-in rollModel perRow/unknown forms omit that cut; labels.evidence presents independently recorded row fields, and null outcomes remain neutral. Historical quantities are individually attributable actual awards; unmatched receipts remain separate once. The components path selects broad evidence; rendered acceptance remains pending."
+    },
+    {
+      "path": "src/ui/svelte/components/OutcomeLadder.svelte",
+      "library": "<OutcomeLadder>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1644 promotes the routed ladder on three importers: the Journal's previews (`apps/journal/RunDetail.svelte`), crafting's routed-by-check tiers (`apps/crafting/detail/OutcomeTierTable.svelte`) and salvage's routed body (`apps/inventory/detail/salvage/SalvageRoutedBody.svelte`). `reachedId` and `reachedLabel` mark the one tier a successful roll routed through, the band is optional, and each tier, band chip, pill and yield takes per-item `props`. Measured on its override frames, four figures disagree with the drawn specimen: the head glyph (14px against 10px), the band (a list-density Chip against bare mono text), the yields (40px ListRow rows against 24px wrapping chips) and the kicker (9px subtle against `k-kicker`). It stays target, and the planned-migrations table records all four for the geometry sweep."
     },
     {
       "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
@@ -791,15 +799,6 @@
         "src/ui/svelte/apps/journal/RunDetail.svelte"
       ],
       "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Measured at issue 1644 on `fabricate-journal-lifecycle-past-stage` and `-future-stage`, it matches its canonical spec, and its library specimen reads `shipped`."
-    },
-    {
-      "path": "src/ui/svelte/components/OutcomeLadder.svelte",
-      "library": "<OutcomeLadder>",
-      "evidence": "broad",
-      "callers": [
-        "src/ui/svelte/apps/journal/RunDetail.svelte"
-      ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
     },
     {
       "path": "src/ui/svelte/components/StageBars.svelte",

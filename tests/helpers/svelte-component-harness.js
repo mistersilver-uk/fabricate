@@ -566,6 +566,9 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // are already listed, so omitting this HANGS every mounted crafting suite.
   'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
+  // The shared ladder the table above adapts, and the row each award draws (issue 1644).
+  'src/ui/svelte/components/OutcomeLadder.svelte',
+  'src/ui/svelte/components/ListRow.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
   // Issue 1773: the one award pill the three above render.
   'src/ui/svelte/apps/crafting/detail/AwardPill.svelte',

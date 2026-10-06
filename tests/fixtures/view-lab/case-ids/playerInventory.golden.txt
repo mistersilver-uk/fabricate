@@ -18,6 +18,7 @@ player-salvage-routed-dc
 player-salvage-count-routed
 player-salvage-count-routed-botch
 player-salvage-fixed-routed
+player-salvage-routed-reached
 player-salvage-misconfigured
 player-inventory-bulk-mixed
 player-inventory-bulk-mixed-narrow

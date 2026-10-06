@@ -63,6 +63,9 @@ How the roll maps to a tier depends on whether the check's tiers are relative or
 
 {% include screenshot.html case="player-crafting-routed-by-check" caption="The same recipe as a player sees it, listing the outcomes the roll can land in." %}
 
+Once you have crafted with a successful roll, the tier your roll reached is marked **Your roll**.
+A failed roll marks no tier, and a roll you could not see (a secret or blind roll) marks none either.
+
 See [Relative and fixed tiers]({% link checks/crafting.md %}#relative-and-fixed-tiers) for the difference.
 
 With relative tiers, the base difficulty comes from the recipe's selected tier, or from a dynamic difficulty if you set one up, the same way a simple check resolves its difficulty.
