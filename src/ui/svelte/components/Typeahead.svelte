@@ -16,7 +16,6 @@
     onChoose,
     itemLabel,
     itemIcon = undefined,
-    itemKey = (item) => item?.id ?? item,
     label = '',
     ariaLabel = '',
     ariaLabelledBy = '',
@@ -58,13 +57,24 @@
     },
   });
 
+  // The holder's handlers are spread after `inputProps`, so a caller's own never runs.
+  const holderHandlers = Object.keys(combo.field).filter((key) => key.startsWith('on'));
+  $effect(() => {
+    const dropped = holderHandlers.filter((key) => inputProps?.[key] !== undefined);
+    if (dropped.length === 0) return;
+    console.warn(
+      `Fabricate | Typeahead: ${dropped.join(', ')} in \`inputProps\` never runs, because the ` +
+        "holder's own handler replaces it. Act on the query through `bind:query` or `onChoose`."
+    );
+  });
+
   // The list takes the field's name, by the same route.
   const listName = $derived(
     ariaLabelledBy ? { 'aria-labelledby': ariaLabelledBy } : { 'aria-label': label || ariaLabel }
   );
 
   function optionHook(item) {
-    return optionDataAttr ? { [optionDataAttr]: String(itemKey(item)) } : {};
+    return optionDataAttr ? { [optionDataAttr]: String(item?.id ?? item) } : {};
   }
 </script>
 
@@ -89,12 +99,11 @@
     {...combo.list}
     use:typeaheadPanel={combo.panel}
   >
-    {#each items as item, index (`${index}:${itemKey(item)}`)}
+    {#each items as item, index (`${index}:${item?.id ?? item}`)}
       {@const glyph = itemIcon?.(item)}
       <button
         type="button"
         class={`fabricate-typeahead-option ${optionClass}`}
-        data-keyboard-focus="true"
         {...optionHook(item)}
         {...combo.option(index)}
       >

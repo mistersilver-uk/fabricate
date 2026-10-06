@@ -86,6 +86,22 @@ function focus(input, kind = 'focus') {
 const listbox = (root) => root.querySelector('[role="listbox"]');
 const options = (root) => [...root.querySelectorAll('[role="option"]')];
 
+/** Every `console.warn` naming `Typeahead` raised while `run` mounts. */
+async function typeaheadWarningsDuring(run) {
+  const original = console.warn;
+  const seen = [];
+  console.warn = (...args) => {
+    seen.push(args.join(' '));
+  };
+  try {
+    await run();
+    flushSync();
+  } finally {
+    console.warn = original;
+  }
+  return seen.filter((message) => message.includes('Typeahead'));
+}
+
 describe('Typeahead keeps the typeahead holder contract', () => {
   it('is a combobox naming its active option by aria-activedescendant, whose options never take focus', async () => {
     const { root, input } = await mountTypeahead();
@@ -186,6 +202,61 @@ describe('Typeahead keeps the typeahead holder contract', () => {
     );
   });
 
+  it('wraps the arrows: ArrowUp from none lands on the last, and each end wraps to the other', async () => {
+    const { input } = await mountTypeahead();
+    focus(input);
+    type(input, 'iron');
+    const active = () => input.getAttribute('aria-activedescendant') ?? '';
+    press(input, 'ArrowUp');
+    assert.ok(active().endsWith('-option-1'), `ArrowUp from none lands on the last: ${active()}`);
+    press(input, 'ArrowDown');
+    assert.ok(active().endsWith('-option-0'), 'ArrowDown wraps from the last to the first');
+    press(input, 'ArrowUp');
+    assert.ok(active().endsWith('-option-1'), 'ArrowUp wraps from the first to the last');
+  });
+
+  it('takes End at a caret already at the end, and Home at a caret at the start', async () => {
+    const { input } = await mountTypeahead();
+    focus(input);
+    type(input, 'iron');
+    input.setSelectionRange(4, 4);
+    assert.equal(press(input, 'End').defaultPrevented, true);
+    assert.ok(input.getAttribute('aria-activedescendant').endsWith('-option-1'), 'End: the last');
+    input.setSelectionRange(0, 0);
+    assert.equal(press(input, 'Home').defaultPrevented, true);
+    assert.ok(input.getAttribute('aria-activedescendant').endsWith('-option-0'), 'Home: the first');
+  });
+
+  it('never consumes Tab, even with an option active', async () => {
+    const { input } = await mountTypeahead();
+    focus(input);
+    type(input, 'iron');
+    press(input, 'ArrowDown');
+    assert.equal(press(input, 'Tab').defaultPrevented, false, 'Tab leaves the field');
+  });
+
+  it('leaves no option active after a commit, under the unchanged query', async () => {
+    const { input, chosen } = await mountTypeahead();
+    focus(input);
+    type(input, 'iron');
+    press(input, 'ArrowDown');
+    press(input, 'Enter');
+    assert.deepEqual(chosen, [['iron-ingot', 0]]);
+    assert.ok(!input.hasAttribute('aria-activedescendant'), 'a second Enter has nothing to commit');
+  });
+
+  it('gives two typeaheads two list ids', async () => {
+    const first = await mountTypeahead();
+    focus(first.input);
+    type(first.input, 'iron');
+    const id = listbox(first.root).id;
+    harness.remount();
+    const second = await mountTypeahead();
+    focus(second.input);
+    type(second.input, 'iron');
+    assert.notEqual(listbox(second.root).id, id);
+  });
+
   it('is dismissed by a press outside it until the query changes', async () => {
     const { root, input } = await mountTypeahead();
     focus(input);
@@ -284,6 +355,37 @@ describe('Typeahead carries its caller’s hooks to the part each names', () => 
     assert.ok(ingot.querySelector(':scope > i.fa-cube'), 'an item with a glyph draws it');
     assert.ok(!ore.querySelector('i'), 'an item without one draws none');
     assert.equal(ore.textContent.trim(), 'Iron ore');
+  });
+
+  it('draws the magnifier when the caller names no glyph', async () => {
+    const { root } = await mountTypeahead();
+    assert.ok(root.querySelector('.fabricate-typeahead > i.fas.fa-search'));
+  });
+
+  it('writes the holder contract over a colliding inputProps key', async () => {
+    const { input } = await mountTypeahead({
+      inputProps: { role: 'textbox', 'aria-expanded': 'true' },
+    });
+    assert.equal(input.getAttribute('role'), 'combobox');
+    assert.equal(input.getAttribute('aria-expanded'), 'false');
+  });
+
+  it('warns when inputProps carries a handler the holder replaces, and only then', async () => {
+    const warned = await typeaheadWarningsDuring(() =>
+      mountTypeahead({ inputProps: { oninput: () => {}, onkeydown: () => {} } })
+    );
+    assert.equal(warned.length, 1, warned.join('\n'));
+    assert.match(warned[0], /oninput, onkeydown in `inputProps` never runs/);
+    harness.remount();
+    const quiet = await typeaheadWarningsDuring(() =>
+      mountTypeahead({ inputProps: { 'data-input-hook': '' } })
+    );
+    assert.deepEqual(quiet, []);
+  });
+
+  it('says nothing at rest, even with an emptyLabel', async () => {
+    const { root } = await mountTypeahead({ emptyLabel: 'No materials match' });
+    assert.ok(!root.querySelector('.fabricate-typeahead-list'), 'no panel at rest');
   });
 
   it('says emptyLabel in the panel when the query matches nothing, and is silent without one', async () => {

@@ -772,11 +772,11 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <div><h5>Svelte API</h5><ul>
         <li class="k-hint"><b>SHIPPED</b> &mdash; read from <code>Typeahead.svelte</code>&rsquo;s <code>$props()</code> at issue 1782.</li>
         <li><b>query</b> <span class="req">bindable</span> &middot; <b>source</b>(query) &mdash; the suggestions for a query</li>
-        <li><b>onChoose</b>(item, index) <span class="req">required</span> &middot; <b>itemLabel</b>(item) <span class="req">required</span> &middot; <b>itemIcon</b>(item) &middot; <b>itemKey</b>(item) = its <code>id</code></li>
+        <li><b>onChoose</b>(item, index) <span class="req">required</span> &middot; <b>itemLabel</b>(item) <span class="req">required</span> &middot; <b>itemIcon</b>(item)</li>
         <li><b>label</b> | <b>ariaLabel</b> | <b>ariaLabelledBy</b> &mdash; exactly one; names the field and the list</li>
         <li><b>placeholder</b> &middot; <b>emptyLabel</b> &mdash; the panel&rsquo;s one quiet line when a query matches nothing</li>
         <li><b>density</b> default | compact &middot; <b>icon</b> &mdash; passed to the field</li>
-        <li><b>inputProps</b> &mdash; the input&rsquo;s attributes, under the holder&rsquo;s own</li>
+        <li><b>inputProps</b> &mdash; the input&rsquo;s attributes, under the holder&rsquo;s own; a holder handler passed here is dropped with a warning</li>
         <li><b>listClass</b> &middot; <b>listProps</b> &middot; <b>listMaxHeight</b> = 148 &middot; <b>optionClass</b> &middot; <b>optionHeight</b> = 28 &middot; <b>optionDataAttr</b></li>
         <li><b>class</b> &middot; a rest spread on the field&rsquo;s root</li>
       </ul></div>
