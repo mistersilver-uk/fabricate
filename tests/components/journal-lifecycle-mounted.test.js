@@ -1622,6 +1622,29 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(begin().disabled, true);
   });
 
+  it('keeps the list open on an arrow choice and closes it onto the slot tile on activation', async () => {
+    const mounted = await mountState('waiting-open-choice');
+    const tile = () => mounted.target.querySelector(':scope [data-slot-id="metal"] button');
+    const list = () =>
+      mounted.target.querySelector(':scope [data-slot-row] [data-choice-options="metal"]');
+    tile().click();
+    flushSync();
+    const radios = [...list().querySelectorAll('[role="radio"]:not(:disabled)')];
+    assert.ok(radios.length > 1, 'the open slot offers more than one candidate');
+    const start = radios.find((radio) => radio.tabIndex === 0);
+    start.focus();
+    start.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settleAction();
+    assert.ok(list(), 'an arrow choice leaves the list open');
+    const focused = globalThis.document.activeElement;
+    assert.ok(focused !== start && list().contains(focused), 'focus moves to the next candidate');
+    assert.equal(focused.getAttribute('aria-checked'), 'true', 'and that candidate is checked');
+    focused.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settleAction();
+    assert.ok(!list(), 'activation closes the list');
+    assert.ok(globalThis.document.activeElement === tile(), 'focus returns to the slot tile');
+  });
+
   it('states confirmed receipt rows, uncertainty and unstarted effects with strict redaction', async () => {
     for (const visible of [true, false]) {
       const mounted = await mountState('recovery-required', {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
+import { chromium } from 'playwright';
 import { createRawSnippet } from 'svelte';
 
 import { createMountedComponentHarness, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
@@ -650,6 +651,132 @@ describe('run primitives mounted behavior', () => {
       'with nothing chosen the first offered candidate is the tab stop'
     );
     choiceListHarness.remount();
+
+    const chalkChosen = await mountBinderChoices([], 'chalk');
+    assert.deepEqual(
+      [...chalkChosen.querySelectorAll('[role="radio"]')].map((radio) => radio.getAttribute('tabindex')),
+      ['-1', '0', '-1', '-1'],
+      'the checked candidate is the tab stop'
+    );
+    choiceListHarness.remount();
+  });
+
+  // [held, claimed, needed] per candidate: spare is held less claimed.
+  const fluxStock = { full: [3, 1, 3], spare: [2, 1, 1], exact: [1, 0, 1], refused: [5, 0, 1] };
+  function mountFluxChoices(chosen) {
+    return choiceListHarness.mount({
+      slotId: 'flux',
+      options: Object.entries(fluxStock).map(([id, stock]) => ({
+        id,
+        label: `${id} flux`,
+        needed: stock[2],
+        reason: id === 'exact' ? 'kept for the forge' : undefined,
+        disabled: id === 'refused',
+      })),
+      selectedId: 'full',
+      held: (id) => fluxStock[id][0],
+      claimed: (id) => fluxStock[id][1],
+      onChoose: (...args) => {
+        chosen.push(args);
+      },
+      candidateReading: ({ held, claimed, spare, needed }) => `${held}/${claimed}/${spare}/${needed}`,
+    });
+  }
+
+  it('locks a candidate only when its spare falls below the need, and keeps the tab stop offered', async () => {
+    const target = await mountFluxChoices([]);
+    const [full, spare, exact, refused] = target.querySelectorAll('[role="radio"]');
+    assert.deepEqual(
+      [full, spare, exact, refused].map((radio) => radio.disabled),
+      [true, false, false, true],
+      'two spare of three needed is locked; one spare of one needed is offered; a refusal locks'
+    );
+    assert.equal(target.querySelector(`[id="${full.getAttribute('aria-describedby')}"]`).textContent, '3/1/2/3');
+    assert.deepEqual(
+      [full, spare, exact, refused].map((radio) => radio.getAttribute('tabindex')),
+      ['-1', '0', '-1', '-1'],
+      'a checked candidate claimed elsewhere passes the tab stop to the first offered one'
+    );
+    assert.ok(!exact.classList.contains('is-short'), 'held exactly the need is met');
+    assert.ok(!exact.hasAttribute('aria-describedby'));
+    assert.equal(exact.getAttribute('title'), 'kept for the forge', "the caller's reason is the title");
+    assert.ok(!spare.hasAttribute('title'));
+    choiceListHarness.remount();
+  });
+
+  it('marks an arrow choice as arrow-originated and consumes only the keys it models', async () => {
+    const chosen = [];
+    const target = await mountFluxChoices(chosen);
+    const [, spare, exact] = target.querySelectorAll('[role="radio"]');
+    const press = (radio, key) =>
+      radio.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    assert.equal(press(spare, 'ArrowUp'), false, 'an arrow is consumed');
+    assert.deepEqual(chosen.at(-1), ['flux', 'exact', { via: 'arrow' }], 'ArrowUp wraps to the last offered');
+    assert.equal(press(exact, 'Enter'), false, 'Enter is consumed');
+    assert.deepEqual(chosen.at(-1), ['flux', 'exact'], 'activation carries no arrow origin');
+    exact.click();
+    assert.deepEqual(chosen.at(-1), ['flux', 'exact']);
+    const count = chosen.length;
+    assert.equal(press(exact, 'Tab'), true, 'a key outside the model is left to the browser');
+    assert.equal(chosen.length, count);
+    choiceListHarness.remount();
+  });
+
+  it('truncates a long name inside its list, inks a locked candidate disabled and keeps a short reading', async () => {
+    const stock = { long: [4, 0], locked: [2, 2], short: [0, 0] };
+    const target = await choiceListHarness.mount({
+      slotId: 'binder',
+      options: [
+        { id: 'long', label: 'Everburning Salamander Scale of the Ninth Furnace, Twice Tempered' },
+        { id: 'locked', label: 'Duskglass', icon: 'fas fa-flask' },
+        { id: 'short', label: 'Bone Ash', icon: 'fas fa-bone' },
+      ],
+      needed: 1,
+      held: (id) => stock[id][0],
+      claimed: (id) => stock[id][1],
+      candidateReading: ({ held, needed }) => `${held} held · needs ${needed}`,
+    });
+    const styles = [...globalThis.document.head.querySelectorAll('style')].map((node) => node.textContent);
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
+        <style>${readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8')}</style>
+        <style>${styles.join('\n')}</style></head>
+        <body><div class="fabricate fabricate-app" data-fabricate-theme="fabricate">
+        <div data-rail style="width:200px">${target.innerHTML}</div>
+        <span data-probe style="color:var(--fab-text-disabled)"></span></div></body></html>`);
+      const measured = await page.evaluate(() => {
+        const part = (id, selector) => document.querySelector(`[data-choice-id="${id}"] ${selector}`);
+        const name = part('long', '.fab-choice-option-name');
+        const style = (element) => getComputedStyle(element);
+        const right = (selector) => document.querySelector(selector).getBoundingClientRect().right;
+        return {
+          // Against the width the caller gives, not the list, which could grow with its content.
+          overflow: Math.max(right('[data-choice-id="long"]'), right('.fab-choice-option-list')) - right('[data-rail]'),
+          truncated: name.scrollWidth > name.clientWidth,
+          textOverflow: style(name).textOverflow,
+          disabledInk: style(document.querySelector('[data-probe]')).color,
+          locked: [part('locked', '.fab-choice-option-name'), part('locked', '.fab-medallion')].map(
+            (element) => style(element).color
+          ),
+          short: [
+            document.querySelector('[data-choice-id="short"]'),
+            part('short', '.fab-medallion'),
+            part('short', '.fab-choice-option-name'),
+            part('short', '.fab-choice-option-reading'),
+          ].map((element) => style(element).opacity),
+        };
+      });
+      assert.ok(measured.overflow <= 0, `the long candidate stays inside its rail (${measured.overflow}px over)`);
+      assert.ok(measured.truncated, 'the long name is cut');
+      assert.equal(measured.textOverflow, 'ellipsis');
+      assert.deepEqual(measured.locked, [measured.disabledInk, measured.disabledInk], 'name and glyph');
+      assert.deepEqual(measured.short, ['1', '0.6', '0.6', '1'], 'the short reading keeps full opacity');
+    } finally {
+      await browser.close();
+      choiceListHarness.remount();
+    }
   });
 
   it('uses one stage allocation for every essence threshold and states overshoot below sources', async () => {

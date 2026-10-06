@@ -1,7 +1,8 @@
-<!-- ratchet-exempt(design-system): promoted on its second importer at issue 1644; its icon chip, disabled ink and hint line still disagree with the specimen, carried to issue 1523 -->
+<!-- ratchet-exempt(design-system): promoted on its second importer at issue 1644; its icon chip, hint line and a short candidate's undimmed reading still disagree with the specimen, carried to issue 1523 -->
 <!--
   One open slot's candidates: a single-select radiogroup with a roving tab stop, whose arrows,
-  Home and End move both focus and the choice. Stock is caller-owned and choosing consumes none.
+  Home and End move both focus and the choice, passing `{ via: 'arrow' }` as `onChoose`'s third
+  argument so a caller can keep the list open. Stock is caller-owned and choosing consumes none.
   A candidate is disabled only when it is held but the stage claims it elsewhere; one held short
   of the need is dimmed, still offered, and described by its reading. `option.disabled` is the
   caller's own refusal. The rest spread lands on the root.
@@ -81,7 +82,7 @@
     const next = offered.length > 0 ? nextOffered(event.key, index) : -1;
     if (next < 0) return;
     event.preventDefault();
-    onChoose(slotId, rows[next].option.id);
+    onChoose(slotId, rows[next].option.id, { via: 'arrow' });
     event.currentTarget.parentElement.querySelectorAll('[role="radio"]')[next]?.focus();
   }
 </script>
@@ -162,6 +163,7 @@
     display: inline-flex;
     box-sizing: border-box;
     align-items: center;
+    max-width: 100%;
     height: 44px;
     min-height: 44px;
     gap: var(--fab-space-2);
@@ -178,14 +180,21 @@
     background: var(--fab-accent-soft);
   }
 
-  /* Dimmed and still offered (design-system spec, "A player chooses the item"). */
-  .fab-choice-option.is-short,
+  /* Dimmed and still offered (design-system spec, "A player chooses the item"); the reading keeps
+     full opacity so its danger ink clears 4.5:1 (issue 1523 records the specimen difference). */
+  .fab-choice-option.is-short > :global(.fab-medallion),
+  .fab-choice-option.is-short .fab-choice-option-name,
   .fab-choice-option:disabled {
     opacity: 0.6;
   }
 
   .fab-choice-option:disabled {
     cursor: default;
+  }
+
+  .fab-choice-option:disabled > :global(.fab-medallion),
+  .fab-choice-option:disabled .fab-choice-option-name {
+    color: var(--fab-text-disabled);
   }
 
   .fab-choice-option-copy {
