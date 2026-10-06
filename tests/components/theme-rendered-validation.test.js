@@ -186,7 +186,7 @@ function bulkBookPickCard() {
 function managerFixture(theme, width, height) {
   return themePage(theme, width, height, `
     <section class="fabricate fabricate-manager surface-root" data-fabricate-theme="${theme}" data-manager-view="systems" data-surface-backdrop>
-      <header class="manager-header" data-region data-boundary>
+      <header class="fabricate-page-header manager-header" data-region data-boundary>
         <div class="manager-heading">
           <h1 class="manager-title preview-title" data-contrast-surface>Fabricate Theme Validation Surface With Long Localized Title</h1>
           <p class="manager-subtitle preview-copy">Checks buttons, tags, toggles, text, focus rings, and fixed app-width layout.</p>
@@ -475,7 +475,7 @@ function liveUpdateFixture(origin) {
       </head>
       <body>
         <section id="mounted-surface" class="fabricate fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="systems">
-          <header class="manager-header"><h1 class="manager-title">Mounted Fabricate Surface</h1><button class="fabricate-button fab-manager-button is-primary">Action</button></header>
+          <header class="fabricate-page-header manager-header"><h1 class="manager-title">Mounted Fabricate Surface</h1><button class="fabricate-button fab-manager-button is-primary">Action</button></header>
           <div class="manager-body">
             <nav class="manager-rail"><button class="manager-nav-button is-active">Systems</button></nav>
             <main class="manager-main"><div class="fabricate-filter-bar"><span class="manager-chip manager-selected-tag-pill">Live theme</span></div></main>

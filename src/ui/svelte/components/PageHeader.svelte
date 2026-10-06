@@ -23,6 +23,8 @@
     ...rest
   } = $props();
 
+  const classes = $derived(['fabricate-page-header', extraClass]);
+
   const CRUMB_ATTRIBUTE = /^(?:data-|aria-|title$)/u;
 
   /** The crumb keys forwarded to its element: hooks, ARIA and a `title`, never the model's own. */
@@ -30,7 +32,7 @@
     Object.fromEntries(Object.entries(crumb).filter(([key]) => CRUMB_ATTRIBUTE.test(key)));
 </script>
 
-<header class={['fabricate-page-header', extraClass]} {...rest}>
+<header class={classes} {...rest}>
   <div class="manager-heading">
     {#if breadcrumbs.length > 0}
       <nav
