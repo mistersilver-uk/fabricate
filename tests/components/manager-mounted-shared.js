@@ -144,8 +144,9 @@ export function assertNoHook(container, hook, message) {
 /**
  * The gathering drop row's component cell is the row's keyboard path (issue 1512), and BOTH of its
  * branches must carry it: a new drop row is born empty, so an `is-empty` branch left a `<div>` makes
- * every new row keyboard-unselectable. `aria-selected` stays on the `role="row"` above, and the
- * button carries no `aria-pressed` — one selection state, one carrier.
+ * every new row keyboard-unselectable. Since issue 1782 the row is a `DataTable` `<tr>`: the cell is
+ * its row header, the row takes no focus and no `aria-selected`, and the button states the
+ * selection as `aria-current` rather than `aria-pressed`.
  *
  * @param {Element} row The `[data-gathering-task-drop-id]` element.
  * @param {{empty: boolean, label: string}} expected The branch and the button's accessible name.
@@ -153,7 +154,11 @@ export function assertNoHook(container, hook, message) {
 export function assertDropComponentCellKeyboardPath(row, expected) {
   const cell = row.querySelector('[data-gathering-task-drop-component-cell]');
   assert.ok(Boolean(cell), 'the drop row renders a component cell');
-  assert.equal(cell.getAttribute('role'), 'cell', 'which is a cell of the drop table');
+  assert.equal(
+    cell.closest('th')?.getAttribute('scope'),
+    'row',
+    'which is the row header of the drop table'
+  );
   const button = cell.querySelector('button');
   assert.ok(Boolean(button), 'and the cell`s control is a real <button>, not a focusable <div>');
   assert.equal(
@@ -164,7 +169,12 @@ export function assertDropComponentCellKeyboardPath(row, expected) {
   assert.equal(button.getAttribute('aria-label'), expected.label, 'named for its own branch');
   assert.ok(
     !button.hasAttribute('aria-pressed'),
-    'and states no pressed state: the row above carries `aria-selected`, which is the one carrier'
+    'and states no pressed state: the selected row is the current one, not a pressed toggle'
+  );
+  assert.equal(
+    button.getAttribute('aria-current'),
+    row.classList.contains('is-selected') ? 'true' : null,
+    'the button is current exactly while its row is the selected one'
   );
   assert.ok(
     button.classList.contains(
@@ -173,7 +183,11 @@ export function assertDropComponentCellKeyboardPath(row, expected) {
     `the ${expected.empty ? 'empty' : 'filled'} branch renders its own variant class`
   );
   assert.equal(button.classList.contains('is-empty'), expected.empty, 'and marks the empty branch');
-  assert.ok(row.hasAttribute('aria-selected'), 'the ROW is where selection state lives');
+  assert.equal(row.tagName, 'TR', 'the drop row is a table row');
+  assert.ok(
+    !row.hasAttribute('aria-selected') && !row.hasAttribute('tabindex'),
+    'the row takes no focus and no aria-selected; its is-selected class is the visual carrier'
+  );
 }
 
 /**

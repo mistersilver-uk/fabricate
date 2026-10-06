@@ -550,6 +550,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // The check card is a strip of current values (issue 1521).
   'src/ui/svelte/components/InfoStrip.svelte',
   'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
+  // Its essence, tool and output groups' table (issue 1782).
+  'src/ui/svelte/components/DataTable.svelte',
   // IoTable is the requirement surface's composition root (issue 917) and renders these; the
   // rail renders the shared chooser, which draws the shared slot tile.
   'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',

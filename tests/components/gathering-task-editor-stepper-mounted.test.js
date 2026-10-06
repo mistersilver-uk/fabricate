@@ -21,6 +21,7 @@ import {
   selectTriggerText,
 } from '../helpers/select-control.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { dispatchDrop } from '../helpers/dropPayloads.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   GATHERING_TASK_EDITOR_COMPILED_MODULES,
@@ -1339,7 +1340,7 @@ describe('the Results tab`s notices and authoring (issue 1522)', () => {
     search.value = 'Ash';
     search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     await view.sync();
-    assert.equal(count('.manager-gathering-task-drop-row'), 3, 'the drop table');
+    assert.equal(count('tr[data-gathering-task-drop-id]'), 3, 'the drop table');
 
     await next('[data-gathering-task-component-browser]');
     await harness.setProps({ itemCards: cards.slice(0, 3) });
@@ -1384,6 +1385,214 @@ describe('the Results tab`s notices and authoring (issue 1522)', () => {
       ],
       ['select', 'drop-b'],
     ]);
+  });
+
+  // The drop rules are a `DataTable` (issue 1782): a rank is the row's place in the whole list.
+  const twelveRanked = () =>
+    mountControlled({
+      task: {
+        ...taskFixture(),
+        dropRows: Array.from({ length: 12 }, (_, index) =>
+          row(`drop-${index + 1}`, { name: index === 10 ? 'Ashen Bloom' : `Moss ${index + 1}` })
+        ),
+      },
+      activeTab: 'results',
+      resolutionMode: 'd100',
+      rewardRules: { rewardSelectionMode: 'highestRankedDrop' },
+    });
+  const ranks = (root) =>
+    [...root.querySelectorAll('[data-gathering-task-drop-rank]')].map((rank) =>
+      rank.textContent.trim()
+    );
+  const searchDrops = async (view, term) => {
+    const search = view.root.querySelector(':scope input[aria-label="Search drop rules"]');
+    search.value = term;
+    search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await view.sync();
+  };
+
+  it('ranks a drop by its place in the whole list, on a later page and through a search', async () => {
+    const view = await twelveRanked();
+    chooseSelectOption(view.root, '.manager-task-drops-card [data-pagination-size]', 10);
+    await view.sync();
+    assert.equal(ranks(view.root).length, 10, 'ten rows a page');
+    await view.press('.manager-task-drops-card [data-pagination-next]');
+    assert.deepEqual(ranks(view.root), ['#11', '#12'], 'page 2 opens at the eleventh rank');
+
+    await searchDrops(view, 'ashen');
+    assert.deepEqual(ranks(view.root), ['#11'], 'a filtered row keeps its rank in the whole list');
+  });
+
+  it('says no drop rule matches a search that finds none, and clearing it returns the rows', async () => {
+    const view = await twelveRanked();
+    await searchDrops(view, 'nothing like this');
+    const table = view.root.querySelector('[data-gathering-task-drops-table]');
+    assert.equal(table.querySelectorAll('tr[data-gathering-task-drop-id]').length, 0);
+    assert.match(table.querySelector('tbody').textContent, /No drop rules match/);
+    assert.ok(!table.querySelector('thead'), 'no column head above no rows');
+
+    await searchDrops(view, '');
+    assert.equal(table.querySelectorAll('tr[data-gathering-task-drop-id]').length, 5);
+    assert.deepEqual(ranks(view.root), ['#1', '#2', '#3', '#4', '#5']);
+  });
+
+  const countOf = (root) =>
+    root.querySelector(':scope [data-gathering-task-drops-table] .fabricate-data-table-count').textContent;
+
+  it('counts the rules a search finds, not every rule nor the page', async () => {
+    const view = await twelveRanked();
+    assert.equal(countOf(view.root), '12', 'every rule, though a page shows five');
+    await searchDrops(view, 'ashen');
+    assert.equal(countOf(view.root), '1');
+    await searchDrops(view, 'nothing like this');
+    assert.equal(countOf(view.root), '0');
+  });
+
+  it('disables move-down only on the last rule of the whole list, on a page and through a search', async () => {
+    const view = await twelveRanked();
+    const downs = () =>
+      [...view.root.querySelectorAll('tr[data-gathering-task-drop-id]')].map((tr) => [
+        tr.querySelector('[data-gathering-task-drop-rank]').textContent.trim(),
+        tr.querySelector('[data-gathering-task-drop-move="down"]').disabled,
+      ]);
+    assert.deepEqual(downs().at(-1), ['#5', false], 'the last row of page 1 still moves down');
+    await searchDrops(view, 'moss 1');
+    assert.deepEqual(downs(), [
+      ['#1', false],
+      ['#10', false],
+      ['#12', true],
+    ]);
+  });
+
+  it('opens a new page size at the first page', async () => {
+    const view = await twelveRanked();
+    await view.press('.manager-task-drops-card [data-pagination-next]');
+    assert.deepEqual(ranks(view.root), ['#6', '#7', '#8', '#9', '#10']);
+    chooseSelectOption(view.root, '.manager-task-drops-card [data-pagination-size]', 10);
+    await view.sync();
+    assert.deepEqual(ranks(view.root).slice(0, 2), ['#1', '#2']);
+    assert.equal(ranks(view.root).length, 10);
+  });
+
+  // Decision 5: a page the list no longer reaches returns to the FIRST page, not the previous one.
+  it('returns to the first page when the rules left exactly fill it, or end before the page', async () => {
+    const named = (count) =>
+      Array.from({ length: count }, (_, index) =>
+        row(`drop-${index + 1}`, { name: index < 5 ? `Ash ${index + 1}` : `Moss ${index + 1}` })
+      );
+    const view = await mountControlled({
+      task: { ...taskFixture(), dropRows: named(12) },
+      activeTab: 'results',
+      resolutionMode: 'd100',
+      rewardRules: { rewardSelectionMode: 'highestRankedDrop' },
+    });
+    // The host's task is set here directly: `view.sync` would restore the twelve.
+    let rules = named(12);
+    const show = () => harness.setProps({ task: { ...taskFixture(), dropRows: rules } });
+    const keep = (count) => {
+      rules = named(count);
+      return show();
+    };
+    const next = () => {
+      view.root.querySelector(':scope .manager-task-drops-card [data-pagination-next]').click();
+      return show();
+    };
+    const FIRST_PAGE = ['#1', '#2', '#3', '#4', '#5'];
+
+    await next();
+    await next();
+    assert.deepEqual(ranks(view.root), ['#11', '#12'], 'precondition: the third page');
+    await keep(8);
+    assert.deepEqual(ranks(view.root), FIRST_PAGE, 'eight rules: page 1, not page 2');
+
+    await keep(6);
+    await next();
+    assert.deepEqual(ranks(view.root), ['#6'], 'precondition: the second page');
+    await keep(5);
+    assert.deepEqual(ranks(view.root), FIRST_PAGE, 'five rules fill page 1 exactly');
+
+    await keep(10);
+    await next();
+    const search = view.root.querySelector(':scope input[aria-label="Search drop rules"]');
+    search.value = 'ash';
+    search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await show();
+    assert.deepEqual(ranks(view.root), FIRST_PAGE, 'and a search that finds exactly five');
+  });
+
+  it('finds a rule by its managed component`s name or its item, ignoring the spaces around a term', async () => {
+    const view = await mountControlled({
+      task: {
+        ...taskFixture(),
+        dropRows: [
+          row('drop-ash', { name: 'Ashen Bloom' }),
+          row('drop-managed', { componentId: 'c7' }),
+          row('drop-item', { componentId: '', itemUuid: 'Item.glowcap' }),
+        ],
+      },
+      activeTab: 'results',
+      resolutionMode: 'd100',
+      managedItemOptions: [{ id: 'c7', name: 'Nightshade' }],
+    });
+    const ids = () =>
+      [...view.root.querySelectorAll('tr[data-gathering-task-drop-id]')].map(
+        (tr) => tr.dataset.gatheringTaskDropId
+      );
+    for (const [term, expected] of [
+      ['nightsh', ['drop-managed']],
+      ['glowcap', ['drop-item']],
+      ['  ashen  ', ['drop-ash']],
+    ]) {
+      await searchDrops(view, term);
+      assert.deepEqual(ids(), expected, `"${term}"`);
+    }
+  });
+
+  it('keeps each row a drop zone onto its own rule after the rows are replaced', async () => {
+    const imports = [];
+    const view = await mountControlled({
+      task: { ...taskFixture(), dropRows: [row('drop-a'), row('drop-b')] },
+      activeTab: 'results',
+      resolutionMode: 'd100',
+      onImportDrop: (rowId, data) => {
+        imports.push([rowId, data.uuid]);
+      },
+    });
+    await harness.setProps({
+      task: { ...view.task(), dropRows: view.task().dropRows.map((drop) => ({ ...drop })) },
+    });
+    const zone = view.root.querySelector('tr[data-gathering-task-drop-zone="drop-b"]');
+    assert.ok(Boolean(zone), 'the row itself is the drop zone');
+    dispatchDrop(zone, { type: 'Item', uuid: 'Item.imported' });
+    assert.deepEqual(imports, [['drop-b', 'Item.imported']]);
+  });
+
+  // Focus entering a row selects it (issue 1782); a click inside one of its controls is no second pick.
+  it('selects a row once as focus enters its controls, never again from their clicks', async () => {
+    const view = await mountControlled({
+      task: { ...taskFixture(), dropRows: [row('drop-a'), row('drop-b'), row('drop-c')] },
+      activeTab: 'results',
+      resolutionMode: 'd100',
+      rewardRules: { rewardSelectionMode: 'highestRankedDrop' },
+    });
+    const rowB = view.root.querySelector('[data-gathering-task-drop-id="drop-b"]');
+    for (const selector of [
+      'input[aria-label="Quantity"]',
+      'input[type="range"]',
+      'input[type="number"]',
+      '[data-gathering-task-drop-move="up"]',
+      '[data-gathering-task-drop-move="down"]',
+    ]) {
+      view.calls.length = 0;
+      const control = rowB.querySelector(selector);
+      control.dispatchEvent(new globalThis.FocusEvent('focusin', { bubbles: true }));
+      control.click();
+      assert.deepEqual(
+        view.calls.filter(([name]) => name === 'select'),
+        [['select', 'drop-b']],
+        `${selector} selects its row once`
+      );
+    }
   });
 
   it('forwards the description, the respawn expression and the stamina modifier list', async () => {

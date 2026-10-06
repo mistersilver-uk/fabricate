@@ -235,7 +235,7 @@ const GATHERING_TASK_PARTS = Object.freeze(
     'ResultsTab',
     'ComponentBrowserCard',
     'DropsCard',
-    'DropRow',
+    'DropCell',
     'Card',
   ].map(taskPart)
 );
@@ -2044,29 +2044,31 @@ describe('CraftingSystemManager source contract', () => {
       'manager-task-component-card-grip',
     ],
   });
+  // A `DataTable` since issue 1782: each row is a drop target through the table's row action.
   defineStructureContract('tables the drop rules', taskPart('DropsCard'), {
-    renders: ['GatheringTaskDropRow'],
-    writes: ['data-gathering-task-drops-table', 'data-gathering-task-drop-count'],
-    spellsExactly: ['manager-task-drop-controls', 'manager-task-drop-footer'],
+    renders: ['DataTable', 'GatheringTaskDropCell'],
+    names: ['dragDrop', 'dropZone'],
+    callsWith: [['onImportDrop', 'rowId']],
+    writes: ['data-gathering-task-drops-table', 'data-gathering-add-drop'],
+    spellsExactly: ['manager-task-drop-controls', 'data-gathering-task-drop-id'],
   });
-  defineStructureContract('draws a drop rule as one row', taskPart('DropRow'), {
+  defineStructureContract('draws each cell of a drop rule', taskPart('DropCell'), {
     renders: ['ChanceSlider'],
     names: [
-      'dragDrop',
       'dropRateTierColor',
       'onDropComponentMouseDown',
       'onQuantityInput',
       'onQuantityKeydown',
     ],
     calls: ['onClearDropComponent', 'dropRateTierClass'],
-    callsWith: [['onImportDrop', 'row']],
     writes: [
       'data-gathering-task-drop-component-cell',
       'data-gathering-task-drop-chance-cell',
       'oncontextmenu',
+      'aria-current',
     ],
     attributes: [['inputmode', 'numeric']],
-    spells: ['manager-drop-cell', 'manager-drop-component-cell', 'manager-drop-quantity-cell'],
+    spells: ['manager-drop-component-cell', 'manager-drop-quantity-cell'],
     spellsExactly: [
       'manager-drop-modifier-pill',
       'manager-drop-modifier-list',
@@ -2099,10 +2101,10 @@ describe('CraftingSystemManager source contract', () => {
   // resets the row's identity and enables it.
   defineStructureContract(
     'resets a drop row identity when a managed component lands on it',
-    { file: taskPart('DropRow'), fn: 'handleDropZoneDrop' },
+    { file: taskPart('DropsCard'), fn: 'handleDropZoneDrop' },
     {
       compares: ['FabricateManagedComponent'],
-      callsWith: [['onUpdateDrop', 'row']],
+      callsWith: [['onUpdateDrop', 'rowId']],
       reads: ['data.componentId'],
       keys: ['componentId', 'itemUuid', 'systemItemId', 'name', 'enabled'],
     }

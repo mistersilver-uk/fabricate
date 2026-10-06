@@ -31,7 +31,7 @@ const CLASS_PROPS = Object.freeze([
 ]);
 
 /**
- * Twenty-three shared primitives, each with the namespace roots it writes and the class family it owns.
+ * Twenty-four shared primitives, each with the namespace roots it writes and the class family it owns.
  */
 const PRIMITIVES = Object.freeze([
   Object.freeze({
@@ -670,6 +670,33 @@ const PRIMITIVES = Object.freeze([
     writtenFloor: 14,
     familyFloor: 28,
     ownedFloor: 25,
+    mirrored: Object.freeze([]),
+  }),
+  Object.freeze({
+    // `DataTable` (issue 1782), born at the primitive: the drop rules' retired column grid, rooted at
+    // `.fabricate-manager` under `manager-gathering-task-drop-*`, became the rules the table writes.
+    name: 'DataTable',
+    components: Object.freeze(['src/ui/svelte/components/DataTable.svelte']),
+    roots: Object.freeze(['fabricate-data-table']),
+    family: String.raw`fabricate-data-table[\w-]*`,
+    namespacedFamily: true,
+    anchors: Object.freeze([
+      'fabricate-data-table',
+      'fabricate-data-table-scroll',
+      'fabricate-data-table-table',
+      'fabricate-data-table-caption',
+      'fabricate-data-table-heading',
+      'fabricate-data-table-count',
+      'fabricate-data-table-search',
+      'fabricate-data-table-head',
+      'fabricate-data-table-row',
+      'fabricate-data-table-cell',
+    ]),
+    composesClasses: true,
+    // Measured at this commit: 15 written, 26 family selectors, 26 owned.
+    writtenFloor: 13,
+    familyFloor: 24,
+    ownedFloor: 24,
     mirrored: Object.freeze([]),
   }),
 ]);
