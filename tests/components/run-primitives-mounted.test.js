@@ -564,7 +564,7 @@ describe('run primitives mounted behavior', () => {
     assert.equal(radiantMeter.getAttribute('aria-labelledby'), head.id, 'and names the meter');
     assert.ok(!radiantMeter.querySelector('.visually-hidden'), 'no second copy of the name');
     assert.equal(radiantMeter.getAttribute('aria-valuetext'), '4 of 4', 'the caller words the reading');
-    const overshoot = target.querySelector('[data-essence-overshoot]');
+    const overshoot = target.querySelector('.fab-essence-overshoots');
     assert.match(overshoot.textContent, /shadow channelled is 1 over/u);
     assert.ok(
       target.querySelector('[data-essence-sources]').compareDocumentPosition(overshoot) & 4,
@@ -582,6 +582,71 @@ describe('run primitives mounted behavior', () => {
       'the bindable allocation updates before the callback returns control'
     );
     expectGeometry('EssencePool', '.fab-essence-pool', [/border-radius:\s*9px/u, /padding:\s*var\(--fab-space-3\)/u]);
+  });
+
+  // Issue 1644: crafting's adapter opts into `capAtHeld`; the Journal keeps the freeze-when-met cap.
+  it('caps at held stock on request, passes per-item hooks through and reports the new count', async () => {
+    const steps = [];
+    const props = (capAtHeld) => ({
+      thresholds: [
+        {
+          essence: 'fire',
+          amount: 2,
+          props: { 'data-meter': 'fire' },
+          sources: [{ id: 'ember', label: 'Ember', props: { 'data-carrier': 'ember' }, inputProps: { 'data-allocation': 'ember' } }],
+        },
+      ],
+      allocation: { ember: 1 },
+      yield: () => 2,
+      spare: () => 2,
+      held: () => 3,
+      capAtHeld,
+      onStep: (...args) => {
+        steps.push(args);
+      },
+      incrementLabel: () => 'More ember',
+    });
+    const capped = await essenceHarness.mount(props(true));
+    assert.equal(capped.querySelector('[data-meter="fire"]').dataset.essenceThreshold, 'fire');
+    const input = capped.querySelector(':scope [data-carrier="ember"][data-essence-source="ember"] [data-allocation="ember"]');
+    assert.equal(input.getAttribute('max'), '3', 'a met pool still steps up to the held count');
+    capped.querySelector('[aria-label="More ember"]').click();
+    await flushRender();
+    assert.deepEqual(steps, [['ember', 1, 2]]);
+    essenceHarness.remount();
+
+    const journal = await essenceHarness.mount(props(false));
+    assert.equal(journal.querySelector('[data-allocation="ember"]').getAttribute('max'), '1', 'met freezes it');
+    essenceHarness.remount();
+  });
+
+  it('caps an unmet pool at the held count, not at allocation plus spare', async () => {
+    const target = await essenceHarness.mount({
+      thresholds: [
+        { essence: 'fire', amount: 10, sources: [{ id: 'ember', label: 'Ember', inputProps: { 'data-allocation': 'ember' } }] },
+      ],
+      allocation: { ember: 1 },
+      yield: () => 1,
+      spare: () => 2,
+      held: () => 5,
+      capAtHeld: true,
+    });
+    assert.equal(target.querySelector('[data-allocation="ember"]').getAttribute('max'), '5');
+    essenceHarness.remount();
+  });
+
+  it('adds fractional requirements for one essence before comparing', async () => {
+    const target = await essenceHarness.mount({
+      thresholds: [
+        { essence: 'fire', amount: 0.1, sources: [{ id: 'ember', label: 'Ember' }] },
+        { essence: 'fire', amount: 0.2, sources: [{ id: 'ember', label: 'Ember' }] },
+      ],
+      allocation: { ember: 3 },
+      yield: () => 0.1,
+    });
+    assert.equal(target.querySelector('[data-essence-total="fire"]').textContent.trim(), '0.3 / 0.3');
+    assert.ok(target.querySelector('[data-essence-total="fire"]').classList.contains('is-met'));
+    essenceHarness.remount();
   });
 
   it('renders progress separately from a five-number viewed-stage window', async () => {

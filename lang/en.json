@@ -1040,7 +1040,6 @@
           "YourSelection": "Your selection",
           "Owned": "You own {count}.",
           "Contribution": "{amount} {name}",
-          "MeterLabel": "{name} delivered",
           "MeterValue": "{delivered} of {need}",
           "Overshoot": "{essence}: {amount} more than required",
           "Allocate": "Units of {name} to spend",
