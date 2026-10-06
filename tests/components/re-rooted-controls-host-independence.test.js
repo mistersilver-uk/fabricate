@@ -596,7 +596,7 @@ const FLOOR_RULE_SELECTOR = '.fabricate-button, .fabricate-icon-button';
 
 /** The issue-1508 families' font floor, as the browser serialises its prelude. */
 const FAMILY_FONT_FLOOR_MEMBERS = Object.freeze([
-  '.fabricate-field :is(input, select, textarea)',
+  '.fabricate-field :is(input, textarea)',
   '.fabricate-search input',
   '.fabricate-slider input',
   // AND THE TAB STRIP'S (issue 1509). Its root is a `<div role="tablist">` and the control it
@@ -2527,7 +2527,7 @@ async function measureNegativeControls(css) {
 
 /** The blocks issues 1508 and 1509 ADD that can move a resting measurement. */
 const ADDED_BLOCKS = Object.freeze([
-  '.fabricate-field :is(input, select, textarea),\n.fabricate-search input,\n' +
+  '.fabricate-field :is(input, textarea),\n.fabricate-search input,\n' +
     '.fabricate-slider input,\n.fabricate-tabs button {\n  font: inherit;\n}',
   '.fabricate-toggle {\n  font: inherit;\n}',
   '.fabricate-field input[type="text"],\n.fabricate-field input[type="url"],\n' +
@@ -2677,7 +2677,7 @@ test('the option-card family declares no font floor of its own', async () => {
       [],
       '`.fabricate-option-cards` types a bare element, which is a font FLOOR. This family must ' +
         'not declare one: its root element is `Field`s fieldset and carries `fabricate-field` ' +
-        'too, so `.fabricate-field :is(input, select, textarea)` already floors every input in ' +
+        'too, so `.fabricate-field :is(input, textarea)` already floors every input in ' +
         'the group at the same (0,1,1) rank. A second floor restates a property rather than ' +
         'establishing one, and whichever of the two came later would win on source order alone.'
     );
@@ -2694,7 +2694,7 @@ test('the option-card family declares no font floor of its own', async () => {
     assert.ok(
       !named.test(floorGroup[0].selectorText),
       '`.fabricate-option-cards` has joined the shared font-floor group. It must not: the same '+
-        'group already carries `.fabricate-field :is(input, select, textarea)`, which reaches '+
+        'group already carries `.fabricate-field :is(input, textarea)`, which reaches '+
         'this family`s radios through the root the two families share.'
     );
   } finally {
@@ -2704,7 +2704,7 @@ test('the option-card family declares no font floor of its own', async () => {
 
 test('the option-card radio takes its type from the field floor it shares a root with', async () => {
   // THE NEGATIVE CONTROL FOR THE REFUSAL ABOVE, and it is a perturbation rather than an argument:
-  const FIELD_FLOOR_MEMBER = '.fabricate-field :is(input, select, textarea),\n';
+  const FIELD_FLOOR_MEMBER = '.fabricate-field :is(input, textarea),\n';
   assert.equal(
     sheet.split(FIELD_FLOOR_MEMBER).length - 1,
     1,

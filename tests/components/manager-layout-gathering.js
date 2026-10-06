@@ -186,10 +186,8 @@ test('manager gathering rules inspector stacks descriptions above normal-weight 
   const ruleCopyBlock = blockFor('.fabricate-manager .manager-rule-copy');
   const ruleCopyDescriptionBlock = blockFor('.fabricate-manager .manager-rule-copy span');
   const ruleFieldBlock = blockFor('.fabricate-manager .manager-rule-field');
-  // Was a two-selector rule that also painted `.manager-rule-stepper input`. That field is
-  // the shared `Stepper` now (issue 1050) and brings its own chrome, so the rule is the
-  // `<select>` alone.
-  const ruleInputBlock = blockFor('.fabricate-manager .manager-rule-field select');
+  // The rule's control is the shared `<Select>` (issue 1777), so the rule is its trigger's skin.
+  const ruleTriggerBlock = blockFor('.fabricate-manager .manager-rule-field .fabricate-select-trigger');
 
   assert.ok(
     ruleRowBlock.includes('grid-template-columns: 34px minmax(0, 1fr);'),
@@ -212,8 +210,8 @@ test('manager gathering rules inspector stacks descriptions above normal-weight 
     'rule field text should not force bold select text'
   );
   assert.ok(
-    ruleInputBlock.includes('font-weight: 400;'),
-    'rule select and input text should not inherit bold labels'
+    ruleTriggerBlock.includes('width: 100%;') && !ruleTriggerBlock.includes('height'),
+    'rule selects fill the description column at the form rung, with no retired 36px pin'
   );
   assert.equal(
     css.includes('.fabricate-manager .manager-gathering-settings-summary'),
@@ -583,7 +581,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   const dropModifierOverflowBlock = blockFor('.fabricate-manager .manager-drop-modifier-overflow');
   const dropEditorInputBlock = blockFor(
-    '.fabricate-manager .manager-drop-editor-card :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]))'
+    '.fabricate-manager .manager-drop-editor-card input:not([type="checkbox"]):not([type="radio"]):not([type="range"])'
   );
   const dropEditorValuesBlock = blockFor('.fabricate-manager .manager-drop-editor-values');
   const dropEditorRatePercentBlock = blockFor(
@@ -633,10 +631,10 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-drop-inspector-stack .fabricate-search input'
   );
   const dropInspectorCharacterFieldBlock = blockFor(
-    '.fabricate-manager .manager-character-modifier-row-card .fabricate-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]))'
+    '.fabricate-manager .manager-character-modifier-row-card .fabricate-field input:not([type="checkbox"]):not([type="radio"]):not([type="range"])'
   );
   const dropInspectorCharacterOperatorBlock = blockFor(
-    '.fabricate-manager .manager-character-modifier-operator-select select'
+    '.fabricate-manager .manager-character-modifier-operator-select.is-negative .fabricate-select-trigger'
   );
   const dropEditorActionsBlock = blockFor('.fabricate-manager .manager-drop-editor-actions');
   const dropInspectorStackBlock = blockFor('.fabricate-manager .manager-drop-inspector-stack');
@@ -1085,7 +1083,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     dropEditorInputBlock.includes('height: 28px;') &&
       dropEditorInputBlock.includes('min-height: 28px;') &&
       dropEditorInputBlock.includes('padding: var(--fab-space-2xs) var(--fab-space-2);'),
-    'selected drop inspector generic inputs and selects should use compact 28px right-sidebar geometry'
+    'selected drop inspector generic inputs should use compact 28px right-sidebar geometry'
   );
   assert.ok(
     dropEditorValuesBlock.includes('grid-template-columns: minmax(0, 1fr) 72px;') &&
@@ -1205,10 +1203,9 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'selected drop inspector character modifier fields should override shared 36px field height'
   );
   assert.ok(
-    dropInspectorCharacterOperatorBlock.includes('height: 28px;') &&
-      dropInspectorCharacterOperatorBlock.includes('min-height: 28px;') &&
-      dropInspectorCharacterOperatorBlock.includes('padding: 0 var(--fab-space-chip);'),
-    'selected drop inspector character modifier operator select should keep compact 28px height'
+    dropInspectorCharacterOperatorBlock.includes('border-color: var(--fab-danger-border);') &&
+      dropInspectorCharacterOperatorBlock.includes('color: var(--fab-danger-text);'),
+    'the operator select carries the sign tone on the inline trigger itself'
   );
   assert.ok(
     dropEditorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));') &&
@@ -2060,5 +2057,49 @@ test('World Travel Map Region Links rows and empty state sit on the 12px browse 
         assert.ok(near(pane.bottom, main.bottom), `${at}: the pane fills .manager-main to its foot`);
       }
     }
+  }
+});
+// The operator's sign tone is a border on its trigger, which outranks the Select family's focus
+// border; keyboard focus must still repaint it in the accent (issue 1777, WCAG 2.4.7).
+test('the character-modifier operator keeps a visible keyboard focus over its sign tone', async () => {
+  const context = await openLayoutContext({ viewport: { width: 420, height: 200 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style>` +
+        '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
+        '<span data-accent style="border:1px solid var(--fab-accent-border)"></span>' +
+        ['is-positive', 'is-negative']
+          .map(
+            (tone) =>
+              `<div class="fabricate-picker manager-travel-picker fabricate-select ` +
+              `manager-character-modifier-operator-select ${tone}">` +
+              `<button type="button" data-tone="${tone}" ` +
+              'class="fabricate-select-trigger fabricate-select-trigger-inline">Sign</button></div>'
+          )
+          .join('') +
+        '</div>'
+    );
+    const accent = await page.evaluate(
+      () => getComputedStyle(document.querySelector('[data-accent]')).borderTopColor
+    );
+    const border = (tone) =>
+      page.evaluate(
+        (selector) => getComputedStyle(document.querySelector(selector)).borderTopColor,
+        `[data-tone="${tone}"]`
+      );
+    for (const tone of ['is-positive', 'is-negative']) {
+      const rest = await border(tone);
+      assert.notEqual(rest, accent, `${tone}: the resting trigger carries its tone, not the accent`);
+      await page.keyboard.press('Tab');
+      assert.equal(
+        await page.evaluate(() => document.activeElement?.dataset.tone),
+        tone,
+        `${tone}: Tab lands on the trigger, so the state below is keyboard focus`
+      );
+      assert.equal(await border(tone), accent, `${tone}: keyboard focus repaints the border`);
+    }
+  } finally {
+    await context.close();
   }
 });

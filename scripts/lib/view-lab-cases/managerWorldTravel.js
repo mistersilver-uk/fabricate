@@ -287,6 +287,32 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
+  // A Gathering Rules select open (issue 1777): the rewards rule, the card's first row, so the
+  // ticked list drops below its trigger inside the inspector rail.
+  managerCase({
+    id: 'manager-gathering-rules-select-open',
+    label: 'Manager — Gathering rules rewards list open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      { selector: '#manager-gathering-rule-rewards' },
+    ],
+    expectView: 'environments',
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked' +
+      ' [data-popover-option="limitedDrops"] .fabricate-select-label',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringRulesInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
   // The conditions card's current-value list (issue 1510), pinned at a 1024 window: the settings
   // grid restacks to one column there, so the trigger fills the card far past the `form` rung's
   // 340px panel ceiling and the frame shows the panel matching the trigger's width under the call

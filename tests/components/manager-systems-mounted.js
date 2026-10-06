@@ -9,9 +9,13 @@ import { CURRENCY_MACRO_KEYS } from '../../src/systems/currencyProfile.js';
 // Issue 1504: a converted control is a shared `<Select>`.
 import {
   assertSelectHasResolvedName,
+  assertSelectPanelNamedByTrigger,
   chooseSelectOption,
+  chooseSelectOptionByKeyboard,
+  closeSelectPanel,
   selectOptionLabels,
   selectOptionValues,
+  selectTriggerText,
 } from '../helpers/select-control.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import {
@@ -216,21 +220,64 @@ export function registerSystemsCases() {
     assert.ok(card.textContent.includes('Global conditions'));
     assert.ok(card.textContent.includes('Current time of day'));
     assert.ok(card.textContent.includes('Current weather'));
-    assert.deepEqual(
-      Array.from(card.querySelectorAll('[data-systems-gathering-condition="weather"] option')).map(
-        (option) => option.textContent
-      ),
-      ['Clear Sky', 'Storm Rain']
+    // Each shortcut is a `<Select>` named by its caption's stable id (issue 1777).
+    const weather = '[data-systems-gathering-condition="weather"] .fabricate-select-trigger';
+    assert.equal(card.querySelectorAll('select').length, 0, 'no native select is left');
+    assert.deepEqual(selectOptionLabels(target, weather), ['Clear Sky', 'Storm Rain']);
+    closeSelectPanel(target, weather);
+    for (const [kind, name] of [
+      ['timeOfDay', 'Current time of day'],
+      ['weather', 'Current weather'],
+    ]) {
+      const trigger = `[data-systems-gathering-condition="${kind}"] .fabricate-select-trigger`;
+      assert.equal(assertSelectHasResolvedName(target, trigger), name, `${kind} keeps its name`);
+      assert.equal(
+        assertSelectPanelNamedByTrigger(target, trigger),
+        `manager-system-condition-${kind}-caption`
+      );
+    }
+
+    const timeOfDay = '[data-systems-gathering-condition="timeOfDay"] .fabricate-select-trigger';
+    assert.equal(selectTriggerText(target, weather), 'Clear Sky', 'each shows its current value');
+    assert.equal(selectTriggerText(target, timeOfDay), 'High Day');
+    assert.equal(target.querySelector(weather).getAttribute('title'), 'Clear Sky');
+    target.querySelector('#manager-system-condition-weather-caption').click();
+    flushSync();
+    assert.ok(
+      document.activeElement === target.querySelector(weather),
+      'the caption focuses its trigger'
     );
 
-    const weatherSelect = card.querySelector('[data-systems-gathering-condition="weather"] select');
-    weatherSelect.value = 'heavy-rain';
-    weatherSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    flushSync();
-
+    chooseSelectOption(target, weather, 'heavy-rain');
+    chooseSelectOption(target, timeOfDay, 'night');
     assert.deepEqual(
-      calls.find((call) => call[0] === 'updateGatheringConditions'),
-      ['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }]
+      calls.filter((call) => call[0] === 'updateGatheringConditions'),
+      [
+        ['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }],
+        ['updateGatheringConditions', { timeOfDay: 'night', systemId: 'alchemy' }],
+      ],
+      'each shortcut writes its own condition'
+    );
+  });
+
+  it('picks a Systems Library condition shortcut from the keyboard', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    await chooseSelectOptionByKeyboard(
+      target,
+      '[data-systems-gathering-condition="weather"] .fabricate-select-trigger',
+      'heavy-rain'
+    );
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'updateGatheringConditions'),
+      [['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }]],
+      'Escape wrote nothing; Enter wrote once'
     );
   });
 

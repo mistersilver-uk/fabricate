@@ -1812,15 +1812,15 @@ describe('CraftingSystemManager source contract', () => {
   // its copy, its event-specific drop label and its two limit steppers are that leaf's own.
   defineStructureContract('draws the gathering rules inspector', GATHERING_RULES_INSPECTOR, {
     writes: ['data-gathering-inspector-rules'],
+    // The two limits are one shared component (issue 1050), which the rule table names by field
+    // since its selects render through `Select` (issue 1777).
     spellsExactly: [
       'manager-rule-copy',
       'FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop',
+      'rewardLimit',
+      'eventLimit',
     ],
-    // The two limits are one shared component now (issue 1050).
-    attributes: [
-      ['rule', 'rewardLimit'],
-      ['rule', 'eventLimit'],
-    ],
+    renders: ['GatheringRuleLimitStepper', 'Select'],
   });
 
   // The rail's own states moved with the branch chain (issue 1707 phase 3): the placeholder hook

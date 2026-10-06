@@ -12,6 +12,7 @@
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import Field from '../../../components/Field.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import GatheringModifierEditor from './GatheringModifierEditor.svelte';
   import Button from '../../../components/Button.svelte';
@@ -266,9 +267,10 @@
         <div class="manager-drop-inspector-scroll">
           <InspectorCard class="manager-drop-editor-card">
             <div class="manager-drop-editor-values">
-              <label
-                class="fabricate-field manager-drop-rate-editor"
-                data-gathering-drop-inspector-rate
+              <Field
+                as="label"
+                class="manager-drop-rate-editor"
+                data-gathering-drop-inspector-rate=""
               >
                 <span
                   >{text(
@@ -294,11 +296,12 @@
                   stopPropagation={true}
                   onChange={(dropRate) => onUpdateDrop(selectedDrop.id, { dropRate })}
                 />
-              </label>
+              </Field>
 
-              <label
-                class="fabricate-field manager-drop-count-editor"
-                data-gathering-drop-inspector-count
+              <Field
+                as="label"
+                class="manager-drop-count-editor"
+                data-gathering-drop-inspector-count=""
               >
                 <span
                   >{text(
@@ -319,7 +322,7 @@
                   onblur={(event) => onDropCountBlur(selectedDrop, event)}
                   onkeydown={(event) => onDropCountKeydown(selectedDrop, event)}
                 />
-              </label>
+              </Field>
             </div>
           </InspectorCard>
 

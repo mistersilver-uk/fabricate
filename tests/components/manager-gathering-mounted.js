@@ -2903,7 +2903,7 @@ export function registerGatheringCases() {
     );
 
     biomeCard
-      .querySelector('[data-gathering-drop-condition-modifier-picker="biome"] button')
+      .querySelector('[data-gathering-drop-condition-modifier-picker="biome"] .fabricate-icon-button')
       .click();
     await settleSaveAttempt();
 
@@ -3143,8 +3143,10 @@ export function registerGatheringCases() {
       const picker = () =>
         card().querySelector(`[data-gathering-${subject}-condition-modifier-picker="timeOfDay"]`);
       const rows = () => [...card().querySelectorAll(`[data-gathering-${subject}-modifier-id]`)];
+      const add = () => picker().querySelector('.fabricate-icon-button');
+      const trigger = `[data-gathering-${subject}-condition-modifier-picker="timeOfDay"] .fabricate-select-trigger`;
 
-      picker().querySelector('button').click();
+      add().click();
       await settleSaveAttempt();
       assert.deepEqual(
         rows().map((row) => row.textContent.includes('First Light')),
@@ -3152,11 +3154,9 @@ export function registerGatheringCases() {
         'the add control attaches the option the picker reconciled to'
       );
 
-      const select = picker().querySelector('select');
-      select.value = 'night';
-      select.dispatchEvent(new Event('change', { bubbles: true }));
+      chooseSelectOption(target, trigger, 'night');
       await settleSaveAttempt();
-      picker().querySelector('button').click();
+      add().click();
       await settleSaveAttempt();
       const night = rows().find((row) => row.textContent.includes('Deep Night'));
       assert.ok(Boolean(night), 'a picked option is the one the add control attaches');
@@ -3168,10 +3168,9 @@ export function registerGatheringCases() {
         .querySelector('input')
         .dispatchEvent(new globalThis.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
       await settleSaveAttempt();
-      picker().querySelector('select').value = 'day';
-      picker().querySelector('select').dispatchEvent(new Event('change', { bubbles: true }));
+      chooseSelectOption(target, trigger, 'day');
       await settleSaveAttempt();
-      picker().querySelector('button').click();
+      add().click();
       await settleSaveAttempt();
       const row = (name) => rows().find((entry) => entry.textContent.includes(name));
       setInputValue(row('High Day').querySelector('input'), '-3');
@@ -3200,7 +3199,10 @@ export function registerGatheringCases() {
       await removeRow('High Day');
       assert.ok(focused(row('Deep Night').querySelector('input')), 'the last falls back to the previous');
       await removeRow('Deep Night');
-      assert.ok(focused(picker().querySelector('select')), 'the only one hands focus to the picker');
+      assert.ok(
+        focused(picker().querySelector('.fabricate-select-trigger')),
+        'the only one hands focus to the picker'
+      );
     });
 
     it(`edits the ${subject}'s Modifier Library reference through the shell's writers`, async () => {
@@ -3227,9 +3229,11 @@ export function registerGatheringCases() {
         'the override is on'
       );
       assert.equal(overrideLabel().textContent.trim(), 'Overridden', 'the switch names the override');
-      const operator = ref().querySelector('.manager-character-modifier-operator-select select');
-      operator.value = '+';
-      operator.dispatchEvent(new Event('change', { bubbles: true }));
+      chooseSelectOption(
+        target,
+        `[data-gathering-${subject}-character-modifier-ref="ref-1"] .manager-character-modifier-operator-select .fabricate-select-trigger`,
+        '+'
+      );
       await settleSaveAttempt();
       assert.ok(ref().querySelector('.manager-character-modifier-operator-select.is-positive'));
 

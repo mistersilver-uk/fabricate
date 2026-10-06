@@ -27,10 +27,10 @@
   - `fieldset` is a member of the set rather than an allowlisted exception: its one caller,
     `RadioCardGroup.svelte`, renders a `<legend>`, holds a radio group, and forwards `disabled`,
     which only a `<fieldset>` applies to its descendants.
-  - Its `font: inherit` floor is written at `.fabricate-field :is(input, select, textarea)`, its
-    element-typed chrome is a second rule, its focus pair excludes `select`, and it writes no scoped
-    `<style>` — all four for the reasons the class-family requirement states. Widening the floor
-    instead would re-type the radios, ranges and steppers that rule deliberately excludes.
+  - Its `font: inherit` floor is written at `.fabricate-field :is(input, textarea)`, its
+    element-typed chrome is a second rule, and it writes no scoped `<style>` — all three for the
+    reasons the class-family requirement states; a select inside it is `Select`, which types its
+    own trigger. Widening the floor would re-type the radios, ranges and steppers it excludes.
 -->
 <script>
   let { as = undefined, class: extraClass = '', children = undefined, ...rest } = $props();

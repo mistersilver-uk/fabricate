@@ -299,7 +299,7 @@ test('manager inspector count labels wrap without truncation', () => {
     '.fabricate-manager .manager-condition-shortcut-label'
   );
   const conditionShortcutSelectBlock = blockFor(
-    '.fabricate-manager .manager-condition-shortcut select'
+    '.fabricate-manager .manager-condition-shortcut .fabricate-select-trigger'
   );
 
   assert.ok(
@@ -375,8 +375,9 @@ test('manager inspector count labels wrap without truncation', () => {
     'condition shortcut labels should align icons and text'
   );
   assert.ok(
-    conditionShortcutSelectBlock.includes('font-weight: 400;'),
-    'condition shortcut select text should not inherit bold label weight'
+    conditionShortcutSelectBlock.includes('width: 100%;') &&
+      !conditionShortcutSelectBlock.includes('height'),
+    'condition shortcut selects fill the field at the form rung, with no retired 36px pin'
   );
 });
 
