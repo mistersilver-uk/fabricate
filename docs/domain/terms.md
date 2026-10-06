@@ -194,6 +194,7 @@ A slot is **fixed** when its group authors exactly one option, a **choice** when
 Slot state is `met` / `partial` / `short`, and the rail keeps at most one slot's chooser open at a time.
 An unchosen choice slot is `partial`, a to-do rather than an error, and its tile is drawn open; a chosen choice that falls short is `short`; a partly delivered essence is `partial` and paints the slot tile's own partial face, on the warning ground rather than the danger one, in the crafting rail and the Journal alike.
 A short alternative is dimmed but still offered, and its shortfall is stated in words beside it.
+A candidate is **claimed elsewhere** when it is held in full but the stock the stage's other fundable requirements claim leaves its **spare** (held less claimed) below the need; it is the only reason a candidate is disabled, apart from a pending selection command.
 The shared requirement chooser draws every slot as a slot tile, and the crafting rail is its adopter.
 
 Canonical mapping: `IngredientGroup`, `requirementSlots.js`, `RequirementChooser.svelte`, `SlotTile.svelte`, `SlotRow.svelte`, `RequirementRail.svelte`

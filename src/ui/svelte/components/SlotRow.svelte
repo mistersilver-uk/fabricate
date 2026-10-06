@@ -1,5 +1,6 @@
 <!-- A requirement row composes fixed or selectable material evidence supplied by its caller. -->
 <script>
+  import { focusWhenEnabled } from '../util/focusWhenEnabled.js';
   import ChoiceOptionList from './ChoiceOptionList.svelte';
   import SlotTile from './SlotTile.svelte';
 
@@ -66,13 +67,19 @@
     onOpen(next);
   }
 
-  function choose(slotId, componentId) {
+  let root;
+  // An arrow moves the choice and keeps the list open; activation closes it onto its slot tile.
+  function choose(slotId, componentId, how) {
     onChoose(slotId, componentId);
+    if (how?.via === 'arrow') return;
     openSlot = '';
+    const tiles = [...root.querySelectorAll('[data-slot-id]')];
+    const tile = tiles.find((entry) => entry.dataset.slotId === slotId);
+    focusWhenEnabled(tile?.querySelector('button'));
   }
 </script>
 
-<div class="fab-slot-row" data-slot-row>
+<div class="fab-slot-row" data-slot-row bind:this={root}>
   {#if label || hint}
     <div class="fab-slot-row-heading">
       {#if label}<span class="fab-slot-row-kicker">{label}</span>{/if}

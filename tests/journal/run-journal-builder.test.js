@@ -2902,6 +2902,36 @@ test('two stale singleton groups can be repaired incrementally without replacing
   assert.equal(contested.success, false);
 });
 
+test('a candidate is measured against the stage remainder the held stock can fund', () => {
+  const option = (id, quantity = 1) => ({ quantity, match: { type: 'component', componentId: id } });
+  const project = (groups, stock) => {
+    const set = new IngredientSet({ id: 'remainder', ingredientGroups: groups });
+    const actor = { ...ACTOR, isOwner: true, items: Object.entries(stock).map(([id, quantity]) => ({
+      id, uuid: `Actor.actor-1.Item.${id}`, name: id, system: { quantity },
+    })) };
+    const plan = { selectedIngredientSetId: set.id, ingredientOptionOverrides: { pick: { optionIndex: 0 } } };
+    const raw = activeSingleStepRun({ lifecycleVersion: 1, steps: [{ stepId: 's0', selectionPlan: plan }] });
+    const recipe = { ...SINGLE_STEP_RECIPE, getExecutionSteps: () => [{ id: 's0', ingredientSets: [set] }] };
+    return makeBuilder({ active: [raw], recipe,
+      ingredientMatchesItem: (_recipe, ingredient, item) => ingredient.match.componentId === item.id,
+    }).buildListing({ actor, viewer: PLAYER }).activeRuns[0].currentStep.selectionAvailability;
+  };
+  const fuel = { id: 'fuel', options: [option('coal', 2)] };
+
+  // The fixed rivet claims the only iron even though no coal is held at all.
+  const claimed = project([{ id: 'pick', options: [option('iron')] }, { id: 'rivet', options: [option('iron')] }, fuel], { iron: 1 });
+  assert.equal(claimed.success, false);
+  assert.deepEqual(claimed.choices[0].options[0].candidates.map(({ claimed: units, available }) => [units, available]), [[1, false]]);
+
+  // Another group that can take copper instead leaves the iron unclaimed, and the coal locks nothing.
+  const flexible = project([{ id: 'pick', options: [option('iron'), option('tin')] },
+    { id: 'metal', options: [option('iron'), option('copper')] }, fuel], { iron: 1, copper: 1 });
+  assert.equal(flexible.success, false);
+  const [iron, tin] = flexible.choices[0].options;
+  assert.deepEqual([iron.available, iron.held, iron.candidates[0].claimed, iron.candidates[0].available], [true, 1, 0, true]);
+  assert.deepEqual([tin.available, tin.held, tin.candidates], [false, 0, []], 'an unheld option reads none held');
+});
+
 test('same run id across native run types remains collision-free while same-type duplicates are dropped', () => {
   const duplicateId = 'shared-id';
   const listing = makeBuilder({
@@ -3210,7 +3240,7 @@ test('current-step availability delegates material choices and shared essence al
       system.components.find((component) => component.id === componentId) ?? null,
   }).buildListing({ actor, viewer: PLAYER }).activeRuns[0].currentStep;
 
-  assert.equal(calls.length, 5, 'selected plan, three authored options and one pinned held-item candidate use the canonical resolver');
+  assert.equal(calls.length, 7, 'selected plan, one remainder per group, three authored options and one pinned held-item candidate use the canonical resolver');
   assert.equal(calls[0].items[0], held);
   assert.deepEqual(calls[0].options.essenceAllocation, { 'Item.ember': 2 });
   assert.equal(calls[0].options.resolveItemEssences(held).fire, 1);
@@ -3255,6 +3285,7 @@ test('current-step availability delegates material choices and shared essence al
                 available: true,
               },
             ],
+            held: 3,
           },
           {
             index: 1,
@@ -3267,6 +3298,7 @@ test('current-step availability delegates material choices and shared essence al
             need: 1,
             available: false,
             candidates: [],
+            held: 0,
           },
         ],
       },
@@ -3314,6 +3346,7 @@ test('current-step availability delegates material choices and shared essence al
           need: 2,
           available: true,
           candidates: [],
+          held: 0,
         },
       },
     ],

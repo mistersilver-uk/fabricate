@@ -44,8 +44,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-essence-shopping',
     'player-crafting-pick-for-me',
   ]),
+  // Issue 1644: the Journal's open slot, and the crafting held-stack picker that adapts it.
   'src/ui/svelte/components/ChoiceOptionList.svelte': Object.freeze([
     'fabricate-journal-lifecycle-waiting-open-choice',
+    'player-crafting-stack-picker',
   ]),
   // The Journal's shared essence stage and, since issue 1644, crafting's pool.
   'src/ui/svelte/components/EssencePool.svelte': Object.freeze([
