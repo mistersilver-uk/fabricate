@@ -1,12 +1,11 @@
 <!-- Svelte 5 runes mode -->
 <!--
   GatheringTaskDrops renders the right-column "What you might find" section for
-  the selected task: the award-mode and event hints, the drops as one shared
-  `YieldScale` in AUTHORED row order (issue 1644), and one `RowDisclosure` beneath
+  the selected task: the reward-selection and event hints, the drops as one shared
+  `YieldScale` in authored row order (issue 1644), and one `RowDisclosure` beneath
   the scale that opens every drop's modifier breakdown, each headed by its drop.
 
-  Authored order, never chance order: every award mode selects by authored rank, so a
-  re-sort would misstate which find a single award goes to. Each chance is the row's figure.
+  Reward selection takes rows by authored rank, so the list never re-sorts by chance.
 
   Data comes from `services.getGatheringDropBreakdown` (resolved lazily by the
   parent for the selected task); `breakdown` is
@@ -78,6 +77,7 @@
   const breakdownLabel = localize('FABRICATE.App.Gathering.Detail.ChanceBreakdown');
   const instanceId = $props.id();
   const regionId = `fab-drop-breakdown-${instanceId}`;
+  const labelId = `${regionId}-label`;
   let breakdownOpen = $state(false);
 </script>
 
@@ -122,10 +122,12 @@
 
     <YieldScale {entries} order="authored" labels={scaleLabels} />
 
-    <!-- ONE labelled row whose chevron sits BESIDE the label, never inside a button (issue 1644). -->
+    <!-- One labelled row, its chevron beside the label rather than inside a button. -->
     <div class="gathering-task-drops-breakdown" data-gathering-drops-breakdown>
-      <span class="gathering-task-drops-breakdown-label" data-gathering-drops-breakdown-label
-        >{breakdownLabel}</span
+      <span
+        class="gathering-task-drops-breakdown-label"
+        id={labelId}
+        data-gathering-drops-breakdown-label>{breakdownLabel}</span
       >
       <RowDisclosure
         expanded={breakdownOpen}
@@ -136,7 +138,12 @@
       />
     </div>
     {#if breakdownOpen}
-      <div class="gathering-task-drops-breakdown-region" id={regionId}>
+      <div
+        class="gathering-task-drops-breakdown-region"
+        id={regionId}
+        role="group"
+        aria-labelledby={labelId}
+      >
         {#each entries as entry (entry.id)}
           <GatheringDropModifiers drop={entry.drop} name={entry.name} />
         {/each}

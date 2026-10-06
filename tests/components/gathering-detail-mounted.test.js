@@ -678,7 +678,20 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     );
   });
 
-  // Issue 1644: award modes select by AUTHORED rank, so the preview never re-sorts by chance.
+  // Issue 1644: reward selection is by authored order, so the preview never re-sorts by chance.
+  const DETAIL_TEXT = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8')).FABRICATE
+    .App.Gathering.Detail;
+  const REWARD_HINTS = {
+    allDrops: ['AwardModeAll', /^Every successful find is awarded\.$/u],
+    highestRankedDrop: [
+      'AwardModeHighest',
+      /priority order: the first successful find on the list/u,
+    ],
+    limitedDrops: [
+      'AwardModeLimited',
+      /priority order: the first \{x\} successful finds on the list/u,
+    ],
+  };
   for (const awardMode of ['allDrops', 'highestRankedDrop', 'limitedDrops']) {
     it(`keeps the drops in authored row order under ${awardMode}, each chance its own figure`, async () => {
       const { services } = makeServices(listing([environment()]), scrambledBreakdown(awardMode));
@@ -698,6 +711,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
         ['10%', '90%', '45%']
       );
       assert.ok(!target.querySelector('[data-yield-cut]'), 'a preview draws no cut');
+
+      const [hintKey, english] = REWARD_HINTS[awardMode];
+      const hints = target.querySelector('[data-gathering-drops-hints]').textContent;
+      assert.ok(hints.includes(`FABRICATE.App.Gathering.Detail.${hintKey}`), `the ${hintKey} hint`);
+      assert.match(DETAIL_TEXT[hintKey], english, 'whose English states how the list is read');
     });
   }
 
@@ -743,6 +761,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const region = target.querySelector(`[id="${toggle.getAttribute('aria-controls')}"]`);
     assert.ok(Boolean(region), 'aria-controls resolves to the region it opened');
     assert.ok(!scale.contains(region) && !toggle.contains(region), 'beside them, not inside');
+    assert.equal(region.getAttribute('role'), 'group', 'the region is a named group');
+    assert.ok(
+      target.querySelector(`[id="${region.getAttribute('aria-labelledby')}"]`) === label,
+      'named by the visible label beside its disclosure'
+    );
     const bodies = [...region.querySelectorAll('[data-gathering-drop-modifiers]')];
     assert.deepEqual(
       bodies.map((body) => body.querySelector('[data-gathering-drop-modifiers-name]').textContent),
