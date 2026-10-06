@@ -122,7 +122,8 @@ World:
   An import NEVER SEEDS a scope the destination has not already seeded, so an unmigrated destination's three settings stay absent and it behaves exactly as the previous schema does.
 - `fabricate.migrationVersion`
 - `fabricate.theme` for the active Fabricate UI theme preset (`Fabricate` by default, plus `Mythwright`, `Ironblood Forge`, `Hearth & Herb`, `Starglass Arcana`, and the fixed Foundry-inspired `Foundry Native` preset)
-- `fabricate.experimentalFeatures` gates experimental Fabricate surfaces still in development, currently the recipe graph placeholder and the GM Manager's world `Downtime` surface (no longer the crafting authoring group, which is always available), disabled by default
+- `fabricate.experimentalFeatures` gates experimental Fabricate surfaces still in development, currently the recipe graph placeholder, the GM Manager's world `Downtime` surface and the GM Manager's Premium crafting-icons advert (no longer the crafting authoring group, which is always available), disabled by default
+- `fabricate.premiumIconsAdDismissed` — whether a GM has dismissed the GM Manager's Premium crafting-icons advert for this world (`Boolean`, default `false`; written `true` only by the advert's dismiss control)
 - `fabricate.recipeItemFlagStampVersion` (one-shot flag-stamp version)
 - `fabricate.componentFlagStampVersion` (one-shot flag-stamp version)
 - `fabricate.toolFlagStampVersion` (one-shot flag-stamp version)

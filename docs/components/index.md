@@ -22,6 +22,14 @@ The **Component Rules** screen, inside a crafting system, holds what that compon
 That is its category, its tags, its essences, its salvage setup and its progressive difficulty.
 Two more pages sit beneath this one: [Complications]({% link components/complications.md %}), the consequences a component can fire when a progressive result produces it, and [Salvage]({% link components/salvage.md %}), what it yields when it is broken back down.
 
+{: .note }
+> While Fabricate's **Experimental Features** setting is on and Fabricate Premium is not installed, the header of both screens below can show a dismissable Fabricate Premium advert for crafting icons.
+> Closing it hides it in your Manager window at once.
+> Fabricate also tries to save that dismissal for the whole world, which hides it for every GM the next time they open the Manager.
+> If that save does not go through, for example because your account cannot change world settings, the advert returns the next time you open the Manager.
+> There is no control to bring it back once the world-wide dismissal is saved.
+> The advert does not appear while Fabricate Premium is installed.
+
 ## The world Component catalogue
 
 Open the Crafting System Manager and choose **Component catalogue** in the World section of the rail.

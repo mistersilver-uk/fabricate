@@ -1874,7 +1874,7 @@
       },
       "ExperimentalFeatures": {
         "Name": "Experimental Features",
-        "Hint": "Shows experimental Fabricate surfaces that are still in development for this world — currently the recipe graph in the crafting manager. The crafting authoring tools are always available and are not gated by this switch. Disabled by default."
+        "Hint": "Shows experimental Fabricate surfaces that are still in development for this world — currently the recipe graph in the crafting manager, World > Downtime, and the Premium crafting-icons advert on the component screens. The crafting authoring tools are always available and are not gated by this switch. Disabled by default."
       },
       "PlayerCharacterActorTypes": {
         "Name": "Player Character Actor Types",
@@ -2746,6 +2746,14 @@
           "Status": "Selected system resolution",
           "OutcomeTier": "outcome tier",
           "OutcomeTiers": "outcome tiers"
+        },
+        "PremiumIconsAd": {
+          "Title": "Crafting icons",
+          "Badge": "PREMIUM",
+          "Subline": "For components and essences, with Downtime",
+          "GetPremium": "Get Premium",
+          "GetPremiumHint": "Opens Fabricate Premium on Patreon in a new tab",
+          "Hide": "Hide Premium suggestion"
         },
         "Crafting": {
           "CraftingTabs": {
@@ -7565,6 +7573,7 @@
         },
         "Scoped": {
           "ComponentCatalogueTitle": "Component catalogue",
+          "ComponentCatalogueActions": "Component catalogue actions",
           "ComponentCatalogueSubtitle": "One component per source item — identity only. Crafting behaviour lives in each system's own component rules.",
           "ComponentEntryTitle": "Component entry",
           "ComponentEntrySubtitle": "Identity, the world category and tags, and a row per crafting system that has this Component.",

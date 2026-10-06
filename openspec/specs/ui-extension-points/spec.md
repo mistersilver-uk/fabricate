@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the UI extension points: the GM Manager's downtime preview and premium extension, and the player window's navigation extension.
+Define the UI extension points — the GM Manager's downtime preview and premium extension, and the player window's navigation extension — and the GM Manager's one Core-owned Premium advert outside the Downtime route.
 Sibling UI surfaces and the cross-cutting UI rules are indexed by the Surface Map in `ui-integration/spec.md`.
 
 ## Downtime Preview and Premium Extension
@@ -214,7 +214,7 @@ The route exists to host the premium Downtime Studio; both seams the Studio need
 Every requirement in this subsection is removed when the Studio releases; nothing here states a permanent rule about premium surfaces or about extension seams.
 
 - **The whole world `Downtime` rail group renders only while `fabricate.experimentalFeatures` is enabled**: the parent row, its disclosure toggle, its submenu, and therefore every premium signal that rides them — the parent row's `PREMIUM` badge, each sub-item's padlock, and the submenu's `PREMIUM PREVIEW` callout.
-  Nothing outside that group names Downtime, so nothing outside it is gated.
+  Nothing outside that group names Downtime except the Premium crafting-icons advert, which carries its own temporary gate (§Premium Crafting Icons Advert); nothing else outside the group is gated.
 - **The Manager title bar's premium badge is NOT gated**, because it is not a Downtime signal: it states that a companion module is registered at all, reads the union of both registries' claimed surface ids, and stays correct for a companion whose only surface is a player-window one.
   A companion that has registered while the gate is shut still lights it.
 - **The route is unreachable, not merely unlinked.**
@@ -236,6 +236,24 @@ Every requirement in this subsection is removed when the Studio releases; nothin
 - **The gate reaches the player window too, and its player half is stated in §Player Navigation Extension, Experimental gate.**
   The setting is world-scoped, so one GM opt-in governs both windows: while it is off, neither a GM's `World > Downtime` route nor a player's companion `downtime` tabs are shown, and a world that opts in gets both.
   The two halves are enforced independently and their mechanics differ — the player window has no route of its own to make unreachable, no premium signal to withhold, and no route-exit guard to honour — so neither section's requirements may be read onto the other.
+
+## Premium Crafting Icons Advert
+
+- **The GM Manager shows one Premium advert, the crafting-icons advert, in the page header's action group of exactly two screens: the world Component catalogue (`world-components`) and the system Component Rules list (`components`).**
+  It is not rendered on the world Component entry, the Component Rules editor, or any other route.
+  On Component Rules it leads the group, before `Add from catalogue`; on the world Component catalogue, whose group is otherwise not rendered, it is the group's only content.
+- It shows six Premium crafting icons, a `PREMIUM` badge in the Manager title bar badge's gold treatment, one line of copy, an external `Get Premium` link and a dismiss control.
+  The link is §Downtime Preview and Premium Extension's Patreon call to action — the same URL, `_blank`, `rel="noopener noreferrer"` — and, unlike that call to action, the advert carries raster imagery, because the icons are the product it advertises.
+- It renders only while all three hold: `fabricate.experimentalFeatures` is enabled; no provider is registered in either extension registry, which is the predicate the Manager title bar's `PREMIUM` badge reads; and the world setting `fabricate.premiumIconsAdDismissed` is not `true`.
+  A provider registered while the Manager is open hides it at once.
+- **Its experimental gate is TEMPORARY and tied to Fabricate Premium being unreleased**, as §Downtime Preview and Premium Extension, Experimental gate, is, and it is removed with that gate.
+- Dismissing it writes `fabricate.premiumIconsAdDismissed` as `true` for the world, so it is hidden for every GM of that world on both screens; a GM whose Manager is already open stops seeing it the next time that GM opens the Manager.
+  It is hidden in the dismissing GM's Manager the moment the GM dismisses it, on both screens, until that Manager closes, whether or not the write succeeds; a refused write is logged and raises nothing, so the advert returns the next time the Manager opens.
+  Fabricate offers no control that clears the setting, and the setting silences this advert only.
+- It is the first thing in the header to give way: it compacts, then disappears, as the Manager narrows, and never wraps the action group or crowds the page title.
+  It is full at a Manager width of 1180px and above, compact — three icons and no line of copy — from 980px, and not shown below 980px, so the page heading keeps at least 320px.
+- Its icons are bundled at 68px, about twice the 30px tile they fill, are referenced only by the module stylesheet, and are never offered as Item, component or essence art.
+- The advert is GM Manager only: §Player Navigation Extension's "no premium signal in any state" rule is unchanged.
 
 ## Player Navigation Extension
 

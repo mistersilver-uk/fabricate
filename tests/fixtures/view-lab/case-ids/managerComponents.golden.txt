@@ -1,4 +1,6 @@
 manager-components-normal
+manager-components-premium-ad-dismissed
+manager-components-premium-ad-compact
 manager-components-essence-chips
 manager-components-essence-filter-list
 manager-component-edit-inheriting
