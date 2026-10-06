@@ -1,7 +1,7 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { defineStructureContract } from '../helpers/structureContract.js';
@@ -171,5 +171,31 @@ describe('World and Travel navigation', () => {
     // `.manager-travel-inspector` through the root, and the card is pinned by count in
     // `inspector-card-source-contract.test.js`.
     assert.equal(managerRootSource.includes('!isWorldTravelRoute && !isWorldDowntimeRoute'), false);
+  });
+
+  it('TravelInspector renders the is-empty class when no realm is selected', () => {
+    const travelInspectorSource = squish(read('src/ui/svelte/apps/manager/world/TravelInspector.svelte'));
+    const isEmpty = travelInspectorSource.match(/const isEmpty = \$derived\(([\s\S]*?)\);/);
+    assert.ok(isEmpty, 'TravelInspector defines the isEmpty derived value');
+    assert.ok(
+      travelInspectorSource.includes("class={isEmpty ? 'manager-travel-inspector is-empty' : 'manager-travel-inspector'}"),
+      'the component applies the is-empty class when isEmpty is true'
+    );
+  });
+
+  it('StatusToggle renders the manager-status-toggle-label element', () => {
+    const statusToggleSource = read('src/ui/svelte/components/StatusToggle.svelte');
+    assert.ok(
+      statusToggleSource.includes('class="manager-status-toggle-label"'),
+      'StatusToggle renders the label with the manager-status-toggle-label class'
+    );
+  });
+
+  it('IconButton can carry the is-danger class for delete actions', () => {
+    const iconButtonSource = read('src/ui/svelte/components/IconButton.svelte');
+    assert.ok(
+      iconButtonSource.includes('class: extraClass'),
+      'IconButton passes through the extraClass prop'
+    );
   });
 });

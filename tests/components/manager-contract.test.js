@@ -1802,7 +1802,7 @@ describe('CraftingSystemManager source contract', () => {
     writes: ['data-systems-gathering-conditions', 'data-systems-gathering-condition'],
   });
 
-  // The positive control for every `spellsNo` card shell above: the token the reader can find,
+  // The positive control for every `spellsNo: ['fabricate-card']` row: the token the reader can find,
   // in the one component that writes it since issue 1777.
   defineStructureContract('spells the card shell class in the primitive', INSPECTOR_CARD, {
     spells: ['fabricate-card'],

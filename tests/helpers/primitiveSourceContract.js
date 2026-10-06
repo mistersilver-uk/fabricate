@@ -1,8 +1,8 @@
 /** The shared spine of a UI primitive's SOURCE CONTRACT (issues 1422, 1427) (issue 1505). */
 
 import assert from 'node:assert/strict';
-import test from 'node:test';
 import path from 'node:path';
+import test from 'node:test';
 
 import { collectSources, repoRoot, stripComments } from './sourceScan.js';
 import { withoutComments } from './stepperSourceContract.js';
@@ -230,6 +230,8 @@ export function defineSoleWriterClauses({ label, primitive, exemptions, componen
     );
   });
 
+  // Clause (b) restates the whole-file checks for native elements: the scan reads literal class
+  // tokens in lowercase native markup of .svelte files only.
   test(`no component but the primitive writes the ${label} contract on a native element`, () => {
     // Positive control: the scan flags the hand-rolled shape and leaves a component tag alone.
     for (const token of tokens) {
