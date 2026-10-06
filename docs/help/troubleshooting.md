@@ -524,9 +524,12 @@ Fabricate now tells a copy of an entry from something built from it by name: a c
 
 1. Open the Crafting Admin panel and find the merged component.
 2. Delete that component.
-3. Import the items again, by dropping them or by using the bulk import.
-   Each one now creates its own component.
-4. Re-add the component to any recipes that used the merged one.
+3. Open the **Component catalogue** in the World section of the Crafting System Manager and delete the merged component's entry there too.
+   The entry can only be deleted once no crafting system holds the component.
+   If you leave it, one of the items you import adopts it and the others are left without a catalogue entry.
+4. Import the items again, by dropping them or by using the bulk import.
+   Each one now creates its own component and its own catalogue entry.
+5. Re-add the component to any recipes that used the merged one.
 
 {: .note }
 > **Repair Item Data does not un-merge a component.**
@@ -541,6 +544,32 @@ Fabricate now tells a copy of an entry from something built from it by name: a c
 
 **See also:** [Adding Components]({% link components/index.md %}#adding-components) covers importing items.
 [Repairing Item Data](#repairing-item-data) covers the maintenance action for copies players already hold.
+
+---
+
+## An Imported Component Has No Catalogue Entry
+
+**Symptom:** A component you imported into a crafting system does not appear in the world Component catalogue, or its rules editor says its name, image, and description are the system's own.
+<!-- markdownlint-disable-next-line markdownlint-sentences-per-line -->
+You may also have seen the warning "The items were imported, but the world Component catalogue could not be updated. Import them again to add them to it."
+
+**Cause:** Importing an item now also creates a world component that the system holds.
+A component imported before that was added has none.
+The same is true when the catalogue could not be written during an import, which is what the warning reports.
+
+**Fix:** Import the items again, by dropping them, importing the folder or pack, or using the Compendium Directory action.
+Each component without a catalogue entry gets one, and keeps all of its own values.
+
+**Things to know:**
+
+- If the item already has a world component under a different component, typically because another system imported it first, the older component is left without one.
+  Linking it would mean renumbering a component that recipes already reference.
+  Delete the other world component in the catalogue once no system holds it, then import again.
+- In a world where several systems hold the same item, import again in each system that already holds it before importing it into a new one.
+  Then they all share one world component.
+- An item that belongs to an actor is imported but never becomes a world component.
+
+**See also:** [Imports also create world components]({% link components/index.md %}#imports-also-create-world-components) and [Importing again and its limit]({% link components/index.md %}#importing-again-and-its-limit).
 
 ---
 
