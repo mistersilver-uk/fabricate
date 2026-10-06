@@ -1152,13 +1152,13 @@
   cursor: default;
 }
 
-/* The manager titlebar — a thin identity strip above the header, shared by every manager screen (issues 643, 1185). Padding is the AppTitleBar specimen's inline 12/16; its off-scale 9px gap snaps to 8 (issue 1777). */
+/* The manager titlebar — a thin identity strip above the header, shared by every manager screen (issues 643, 1185). */
 .fabricate-manager .manager-titlebar {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
-  padding: var(--fab-space-3) var(--fab-space-4);
+  padding: var(--fab-space-2) var(--fab-space-4);
   border-bottom: 1px solid var(--fab-border);
   background: var(--fab-bg-0);
 }
