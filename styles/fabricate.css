@@ -10777,10 +10777,9 @@
   text-align: center;
 }
 
-/* The select fills its field at the 36px the native select stood, under the `form` rung's 38 (issue 1777). */
+/* The select fills its field; the native select's retired 36px box takes the `form` rung's 38 (issue 1777). */
 .fabricate-manager .manager-condition-shortcut .fabricate-select-trigger {
   width: 100%;
-  min-height: 36px;
 }
 
 /* THE FAMILY'S BARE-ELEMENT TYPE BASELINE, and it is a FLOOR rather than an override (issue 1502). */
@@ -13110,10 +13109,9 @@
   font-weight: 400;
 }
 
-/* The rule's `<Select>` fills the description column at the 36px the native select stood, under the `form` rung's 38 (issue 1777). */
+/* The rule's `<Select>` fills the description column; the native select's retired 36px box takes the `form` rung's 38 (issue 1777). */
 .fabricate-manager .manager-rule-field .fabricate-select-trigger {
   width: 100%;
-  min-height: 36px;
 }
 
 /* PLACEMENT only, now that the control itself is the shared `Stepper`. The limit field is a SIBLING of its `.manager-rule-row` inside the rules `.fab-stack`, not a child of it, so `padding-left` is what lines it up under the description column: the row's icon track is 34px plus its 8px gap. */

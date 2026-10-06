@@ -375,8 +375,8 @@ test('manager inspector count labels wrap without truncation', () => {
   );
   assert.ok(
     conditionShortcutSelectBlock.includes('width: 100%;') &&
-      conditionShortcutSelectBlock.includes('min-height: 36px;'),
-    'condition shortcut selects fill the field at the 36px box the native select stood'
+      !conditionShortcutSelectBlock.includes('height'),
+    'condition shortcut selects fill the field at the form rung, with no retired 36px pin'
   );
 });
 

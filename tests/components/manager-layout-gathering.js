@@ -210,8 +210,8 @@ test('manager gathering rules inspector stacks descriptions above normal-weight 
     'rule field text should not force bold select text'
   );
   assert.ok(
-    ruleTriggerBlock.includes('width: 100%;') && ruleTriggerBlock.includes('min-height: 36px;'),
-    'rule selects fill the description column at the 36px box the native select stood'
+    ruleTriggerBlock.includes('width: 100%;') && !ruleTriggerBlock.includes('height'),
+    'rule selects fill the description column at the form rung, with no retired 36px pin'
   );
   assert.equal(
     css.includes('.fabricate-manager .manager-gathering-settings-summary'),
