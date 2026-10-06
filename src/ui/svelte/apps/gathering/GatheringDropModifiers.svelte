@@ -73,7 +73,7 @@
 </script>
 
 <div class="gathering-task-drop-modifiers" data-gathering-drop-modifiers>
-  <Kicker as="p" data-gathering-drop-modifiers-name>{name}</Kicker>
+  <Kicker as="p" data-gathering-drop-modifiers-name="">{name}</Kicker>
   <ul class="gathering-task-drop-modifier-list">
     <li class="gathering-task-drop-modifier is-base">
       <span class="gathering-task-drop-modifier-label"

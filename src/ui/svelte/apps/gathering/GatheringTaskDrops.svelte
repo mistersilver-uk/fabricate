@@ -131,7 +131,7 @@
         expanded={breakdownOpen}
         controls={breakdownOpen ? regionId : ''}
         ariaLabel={breakdownLabel}
-        data-gathering-drops-disclosure
+        data-gathering-drops-disclosure=""
         onToggle={(next) => (breakdownOpen = next)}
       />
     </div>
