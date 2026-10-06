@@ -1589,4 +1589,33 @@ export function registerToolsCases() {
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
   });
+
+  // The selected ids, typed: a click event reaching `selectSystem` is the defect issue 1777 fixed,
+  // and an object is never serialised into an assertion message (a DOM event OOMs the diff).
+  const selectedSystemIds = (calls) =>
+    calls.filter((call) => call[0] === 'selectSystem').map((call) => String(call[1]));
+
+  it('routes the Tool editor’s root crumb with the system id, not the click', async () => {
+    const calls = await mountToolRoute();
+    await openFixtureToolEditor(calls);
+    const before = selectedSystemIds(calls).length;
+    target.querySelector('[data-tool-editor-open-systems]').click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+    assert.deepEqual(selectedSystemIds(calls).slice(before), ['alchemy']);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
+  });
+
+  it('routes the Tool library’s system crumb to that system’s editor', async () => {
+    const calls = await mountToolRoute();
+    const before = selectedSystemIds(calls).length;
+    const trail = ':scope .manager-tools-context-header .manager-breadcrumbs';
+    target.querySelector(`${trail} button:nth-of-type(2)`).click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+    assert.deepEqual(selectedSystemIds(calls).slice(before), ['alchemy']);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
+  });
 }
