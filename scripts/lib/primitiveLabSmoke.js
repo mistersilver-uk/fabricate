@@ -175,3 +175,29 @@ export async function startLabServer(root) {
   }
   return { baseUrl: resolved.replace(/\/$/, ''), close: () => server.close() };
 }
+
+/**
+ * Compare the iframe sizes read when the page published ready with the sizes read a moment later.
+ * Ready means every specimen is at its final size, so any iframe that moved afterwards was
+ * published before a corrective resize.
+ *
+ * @param {{specimen: string, width: number, height: number}[]} atReady Sizes at ready.
+ * @param {{specimen: string, width: number, height: number}[]} later Sizes read afterwards.
+ * @returns {string|null} The disagreement, or null when every iframe held its size.
+ */
+export function describeUnstableSizes(atReady, later) {
+  const moved = atReady
+    .map((before, index) => ({ before, after: later[index] }))
+    .filter(
+      ({ before, after }) =>
+        after === undefined || before.width !== after.width || before.height !== after.height
+    )
+    .map(
+      ({ before, after }) =>
+        `${before.specimen}: ${before.width}x${before.height} at ready, ` +
+        `${after ? `${after.width}x${after.height}` : 'gone'} after`
+    );
+  if (atReady.length !== later.length)
+    moved.push(`${atReady.length} iframes at ready, ${later.length} after`);
+  return moved.length === 0 ? null : moved.join('; ');
+}

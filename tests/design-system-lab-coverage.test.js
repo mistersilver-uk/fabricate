@@ -35,6 +35,7 @@ import {
 import { declaredPropNames, PROP_NAME } from './helpers/sveltePropsDeclaration.js';
 import { resolveSlots } from './view-lab/primitives/inject.js';
 import { normalize, specBlocks, unitsOf } from './view-lab/primitives/library.js';
+import { SPECIMEN_SNIPPET_NAMES } from './view-lab/primitives/specimenSnippets.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -237,7 +238,18 @@ test('the catalogue is alive and every row carries an address', () => {
   );
 
   for (const entry of CATALOGUE) {
-    const { spec, cap, draws, path: componentPath, props, content } = entry.row;
+    const {
+      spec,
+      cap,
+      draws,
+      path: componentPath,
+      props,
+      content,
+      snippets,
+      inset,
+      note,
+      slot,
+    } = entry.row;
     assert.ok(
       typeof spec === 'string' && spec.length > 0,
       `${where(entry)}: \`spec\` must be the library entry's heading, decoded and verbatim`
@@ -261,6 +273,28 @@ test('the catalogue is alive and every row carries an address', () => {
     assert.ok(
       content === undefined || Array.isArray(content),
       `${where(entry)}: \`content\` must be a node array, which \`LiveSpecimen.svelte\` iterates`
+    );
+    assert.ok(
+      snippets === undefined ||
+        (typeof snippets === 'object' &&
+          !Array.isArray(snippets) &&
+          snippets !== null &&
+          Object.entries(snippets).every(
+            ([name, nodes]) => SPECIMEN_SNIPPET_NAMES.includes(name) && Array.isArray(nodes)
+          )),
+      `${where(entry)}: \`snippets\` maps ${SPECIMEN_SNIPPET_NAMES.join(' or ')} to node arrays`
+    );
+    assert.ok(
+      inset === undefined || (Number.isFinite(inset) && inset > 0),
+      `${where(entry)}: \`inset\` is a positive number of CSS pixels`
+    );
+    assert.ok(
+      inset === undefined || slot === undefined,
+      `${where(entry)}: \`inset\` pads a default slot's wrapper and does nothing beside a boxed \`slot\``
+    );
+    assert.ok(
+      note === undefined || (typeof note === 'string' && note.length > 0),
+      `${where(entry)}: \`note\` is a non-empty string`
     );
   }
 });
@@ -352,6 +386,13 @@ test('every prop a catalogue row passes is a prop the component declares', () =>
         names.has(prop) || names.has(REST_PROP),
         `${where(entry)}: \`${prop}\` is not a prop ${entry.row.path} declares and it has no ` +
           `\`${REST_PROP}\`. Its props are: ${declared.join(', ')}. Svelte drops it silently.`
+      );
+    }
+    for (const name of Object.keys(entry.row.snippets ?? {})) {
+      assert.ok(
+        names.has(name),
+        `${where(entry)}: the row supplies the \`${name}\` snippet and ${entry.row.path} declares ` +
+          'no prop of that name to render it'
       );
     }
     if (entry.row.content === undefined) continue;

@@ -42,6 +42,11 @@ body:not(.pl-boxed) .pl-specimen {
   display: inline-block;
 }
 
+/* A block specimen in a block drawing's slot takes the iframe's width, which the page sizes. */
+body.pl-fill .pl-specimen {
+  display: block;
+}
+
 /*
  * Boxed slot: the window's box at the row's declared size, with production's position, containment
  * and manager surface, and without the border, radius, shadow and z-index of a floating window.
@@ -49,6 +54,9 @@ body:not(.pl-boxed) .pl-specimen {
 body.pl-boxed .application {
   inline-size: var(--pl-slot-inline-size, auto);
   block-size: var(--pl-slot-block-size, auto);
+  /* Core clamps a window to the viewport less the hotbar; the declared box is the window's size. */
+  min-height: 0;
+  max-height: none;
   position: relative;
   z-index: auto;
   border: 0;

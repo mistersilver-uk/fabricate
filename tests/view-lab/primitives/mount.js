@@ -10,8 +10,10 @@
  * because the smoke's `page.evaluate` reads only this top document, never a specimen's realm.
  */
 import { CATALOGUE } from './catalogue.js';
+import { MAX_APPLIED_RESIZES, createSizeGovernor, describeHost } from './hostLayout.js';
 import { resolveSlots } from './inject.js';
 import { LIVE_CLASS, PAGE_CLASS, readLibrary } from './library.js';
+import { readSlotBox } from './slot.js';
 import {
   SPECIMEN_ASSIGN,
   SPECIMEN_ERROR,
@@ -19,6 +21,7 @@ import {
   SPECIMEN_READY,
   SPECIMEN_RESIZE,
 } from './specimenProtocol.js';
+import { armReadyWatchdog } from './specimenWatchdog.js';
 
 const MOUNTED_ATTRIBUTE = 'data-primitive-lab-mounted';
 const READY_ATTRIBUTE = 'data-primitive-lab-ready';
@@ -29,6 +32,9 @@ const SPECIMEN_ATTRIBUTE = 'data-primitive-lab-specimen';
 
 /** Applied once an iframe's measured size has been read and applied. See `page.css`. */
 const SIZED_CLASS = 'pl-specimen-sized';
+
+/** Applied while a block specimen fills the replaced drawing's inline size. See `page.css`. */
+const FILL_CLASS = 'pl-specimen-fill';
 
 /** The query parameter that says how much of the catalogue to mount. */
 const MOUNT_PARAMETER = 'mount';
@@ -86,6 +92,12 @@ function publishReport({ mounted, problems }) {
   document.body.setAttribute(READY_ATTRIBUTE, '');
 }
 
+/** Re-publish the error attribute when a problem arrives after the page already reported ready. */
+function refreshProblems(problems) {
+  if (!document.body.hasAttribute(READY_ATTRIBUTE)) return;
+  document.body.setAttribute(ERROR_ATTRIBUTE, `${problems.length}: ${problems.join(' | ')}`);
+}
+
 /**
  * Accept no query or `?mount=all`, both of which mount every row, and refuse any other mode so a
  * partial request is never reported as the whole catalogue.
@@ -112,16 +124,74 @@ function renderLibrary(library) {
   while (library.body.firstChild) document.body.append(document.adoptNode(library.body.firstChild));
 }
 
-/** Apply a specimen's reported size to its `<iframe>`, and reveal it once sized. */
-function applySize(iframe, { width, height }) {
-  iframe.style.width = `${width}px`;
+/** When any iframe last took a new size, so ready can wait for the page to stop moving. */
+let lastSizeChange = 0;
+
+/** How long no iframe may change size before the page publishes ready. */
+const QUIET_MS = 300;
+
+/** The longest the page waits for quiet; a specimen still moving by then is the runaway cap's. */
+const QUIET_BUDGET_MS = 4000;
+
+/** Resolve once no applied size has changed for `QUIET_MS`, or the budget is spent. */
+async function whenSizesAreQuiet() {
+  const started = performance.now();
+  while (
+    performance.now() - lastSizeChange < QUIET_MS &&
+    performance.now() - started < QUIET_BUDGET_MS
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, QUIET_MS / 3));
+  }
+}
+
+/**
+ * Apply a specimen's reported size to its `<iframe>`, and reveal it once sized. A filling specimen
+ * takes the replaced drawing's inline size (`page.css`), so only its height is the report's.
+ */
+function applySize(iframe, { width, height, fill = false }, host) {
+  lastSizeChange = performance.now();
+  iframe.classList.toggle(FILL_CLASS, fill);
+  iframe.style.width = fill ? host.inlineSize : `${width}px`;
+  iframe.style.maxWidth = fill && host.maxInlineSize !== 'none' ? host.maxInlineSize : '';
   iframe.style.height = `${height}px`;
   iframe.classList.add(SIZED_CLASS);
 }
 
+/** Read the live drawing's facts for `describeHost`. */
+function readHostLayout(host) {
+  const parent = host.parentElement;
+  const parentStyle = getComputedStyle(parent);
+  const style = getComputedStyle(host);
+  return describeHost({
+    display: style.display,
+    maxWidth: style.maxWidth,
+    drawnWidth: host.getBoundingClientRect().width,
+    availableWidth:
+      parent.clientWidth -
+      Number.parseFloat(parentStyle.paddingLeft) -
+      Number.parseFloat(parentStyle.paddingRight),
+  });
+}
+
+/**
+ * Give a boxed row's iframe its declared box before the specimen lays out, because the box is
+ * the specimen's viewport: a fixed overlay centres in it and a popover flips and clamps against it.
+ */
+function presizeBoxedSlot(iframe, row) {
+  let box;
+  try {
+    box = readSlotBox(row);
+  } catch {
+    return; // The specimen reports the malformed declaration itself.
+  }
+  if (box?.width) iframe.style.width = `${box.width}px`;
+  if (box?.height) iframe.style.height = `${box.height}px`;
+}
+
 /**
  * Stand up one specimen: create its `<iframe>`, place it where the drawing stood, run the
- * `specimenProtocol.js` handshake, and resolve once it has settled.
+ * `specimenProtocol.js` handshake, and resolve once it has settled. The listener stays after
+ * MOUNTED, because every later RESIZE is the same specimen re-measured.
  *
  * @param {{host: Element, row: object}} slot One resolved slot.
  * @param {string[]} problems The collector.
@@ -133,6 +203,14 @@ function standUpSpecimen(slot, problems, results) {
   iframe.className = LIVE_CLASS;
   iframe.setAttribute(SPECIMEN_ATTRIBUTE, slot.row.path);
   iframe.title = `${slot.row.spec}: ${slot.row.path}`;
+  const host = readHostLayout(slot.host);
+  // Before READY, so the first report is measured at the width the specimen will keep.
+  if (host.presize) iframe.style.width = host.presize;
+  presizeBoxedSlot(iframe, slot.row);
+  const admit = createSizeGovernor();
+  const history = [];
+  let runaway = false;
+  let cancelWatchdog = () => {};
 
   const settled = new Promise((resolve) => {
     function onMessage(event) {
@@ -140,31 +218,55 @@ function standUpSpecimen(slot, problems, results) {
       if (event.source !== iframe.contentWindow) return;
       const data = event.data ?? {};
       if (data.type === SPECIMEN_READY) {
+        cancelWatchdog();
         iframe.contentWindow.postMessage(
-          { type: SPECIMEN_ASSIGN, row: slot.row },
+          { type: SPECIMEN_ASSIGN, row: slot.row, fill: host.fill },
           globalThis.location.origin
         );
         return;
       }
       if (data.type === SPECIMEN_MOUNTED) {
-        applySize(iframe, data);
+        admit(data, 'mounted');
+        applySize(iframe, data, host);
         results.mounted += 1;
-        globalThis.removeEventListener('message', onMessage);
         resolve();
         return;
       }
       if (data.type === SPECIMEN_RESIZE) {
-        applySize(iframe, data);
+        if (runaway) return;
+        const decision = admit(data, 'resize');
+        history.push(`${data.width}x${data.height}`);
+        if (decision === 'same') return;
+        if (decision === 'runaway') {
+          runaway = true;
+          problems.push(
+            `${slot.row.spec} / ${slot.row.path}: its size was still changing after ` +
+              `${MAX_APPLIED_RESIZES} re-measures (reports ${history.slice(-6).join(', ')}). ` +
+              'A height that follows its own iframe, such as `100vh` or `min-height: 100%`, ' +
+              'grows without bound here: give the row a `slot` box or fix the specimen.'
+          );
+          refreshProblems(problems);
+          return;
+        }
+        applySize(iframe, data, host);
         return;
       }
       if (data.type === SPECIMEN_ERROR) {
-        applySize(iframe, data);
+        applySize(iframe, data, host);
         problems.push(`${slot.row.spec} / ${slot.row.path}: ${data.message}`);
         globalThis.removeEventListener('message', onMessage);
         resolve();
       }
     }
     globalThis.addEventListener('message', onMessage);
+    cancelWatchdog = armReadyWatchdog(iframe, () => {
+      problems.push(
+        `${slot.row.spec} / ${slot.row.path}: its document never announced ready after loading. ` +
+          'A module it imports failed to compile or import; the dev server log names the file.'
+      );
+      globalThis.removeEventListener('message', onMessage);
+      resolve();
+    });
   });
 
   iframe.src = SPECIMEN_URL;
@@ -185,6 +287,8 @@ async function boot() {
   const results = { mounted: 0 };
   // Every specimen settles before the report is published.
   await Promise.all(slots.map((slot) => standUpSpecimen(slot, problems, results)));
+  // A late font or container query re-measures a specimen; ready must not precede that.
+  await whenSizesAreQuiet();
 
   publishReport({ mounted: results.mounted, problems });
 }
