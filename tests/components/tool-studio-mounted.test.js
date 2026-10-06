@@ -152,6 +152,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',
     // The failed-save notice at the editor's notice position (issue 1522).
     'src/ui/svelte/components/Notice.svelte',
+    // The editor's header (issue 1777).
+    'src/ui/svelte/components/PageHeader.svelte',
     'src/ui/svelte/apps/manager/ToolEditView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -333,27 +335,44 @@ describe('Tool Studio editor (mounted)', () => {
     const root = await harness.mount(
       props({
         systemName: 'The Herbalist',
-        onOpenSystems: () => {
-          navigation.push('systems');
+        // The argument count is recorded: the shell's `selectSystemAndShowBrowser(systemId)`
+        // must not receive a click event as its system id (issue 1777).
+        onOpenSystems: (...args) => {
+          navigation.push(['systems', args.length]);
         },
-        onOpenSystem: () => {
-          navigation.push('system');
+        onOpenSystem: (...args) => {
+          navigation.push(['system', args.length]);
         },
-        onOpenTools: () => {
-          navigation.push('tools');
+        onOpenTools: (...args) => {
+          navigation.push(['tools', args.length]);
         },
       })
     );
 
     assert.equal(root.querySelectorAll('[data-tool-editor-header]').length, 1);
-    assert.match(
-      root.querySelector('[data-tool-editor-header] .manager-breadcrumbs').textContent,
-      /Crafting Systems.*The Herbalist.*Tool Rules.*Smith's Hammer/
+    const header = root.querySelector('[data-tool-editor-header]');
+    assert.ok(header.classList.contains('fabricate-page-header'), 'drawn by PageHeader');
+    assert.deepEqual(
+      [...header.querySelectorAll('.manager-breadcrumbs > :not(i)')].map((crumb) => [
+        crumb.tagName.toLowerCase(),
+        crumb.textContent,
+      ]),
+      [
+        ['button', 'Crafting Systems'],
+        ['button', 'The Herbalist'],
+        ['button', 'Tool Rules'],
+        ['span', "Smith's Hammer"],
+      ],
+      'the whole trail, root to leaf'
     );
     root.querySelector('[data-tool-editor-open-systems]').click();
     root.querySelector('[data-tool-editor-open-system]').click();
     root.querySelector('[data-tool-editor-open-tools]').click();
-    assert.deepEqual(navigation, ['systems', 'system', 'tools']);
+    assert.deepEqual(navigation, [
+      ['systems', 0],
+      ['system', 0],
+      ['tools', 0],
+    ]);
     assert.match(root.querySelector('[data-tool-editor-image]').getAttribute('src'), /hammer/);
     // THE SUBTITLE STATES SCOPE, NOT THE LINK (issue 1373). `Linked game-world Item` is the
     // WORLD editor's subtitle and describes the one thing this screen cannot change.

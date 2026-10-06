@@ -13684,10 +13684,12 @@
   overflow: hidden;
 }
 
-/* THE EDITOR'S TITLE BAND SITS ON THE PANE'S OWN RUNG (issue 1373). */
+/* THE EDITOR'S TITLE BAND SITS ON THE PANE'S OWN RUNG (issue 1373). Two columns, so the trail spans both and the actions centre on the identity row beside them (issue 1777). */
 .fabricate-manager .manager-tool-edit-header {
   display: grid;
-  gap: var(--fab-space-2);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--fab-space-2) var(--fab-space-3);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-4) 10px;
   border-bottom: 1px solid var(--fab-border);
@@ -13696,8 +13698,15 @@
   grid-row: 1;
 }
 
+/* `PageHeader`'s heading block hands its trail and identity to the grid above. */
+.fabricate-manager .manager-tool-edit-header > .manager-heading {
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+  display: contents;
+}
+
 .fabricate-manager .manager-tool-edit-header .manager-breadcrumbs {
   min-width: 0;
+  grid-column: 1 / -1;
   overflow: hidden;
   font-size: 0.66rem;
   white-space: nowrap;
@@ -13707,14 +13716,6 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.fabricate-manager .manager-tool-edit-header-main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fab-space-3);
-  min-width: 0;
 }
 
 .fabricate-manager .manager-tool-edit-identity,
@@ -13727,7 +13728,6 @@
 }
 
 .fabricate-manager .manager-tool-edit-identity {
-  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -14793,18 +14793,23 @@
 }
 
 @container fabricate-manager (max-width: 680px) {
-  .fabricate-manager .manager-tool-edit-header,
-  .fabricate-manager .manager-tool-edit-header-main,
   .fabricate-manager .manager-tool-editor-card-heading,
   .fabricate-manager .manager-tool-authority-readonly {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .fabricate-manager .manager-tool-edit-header {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  /* The identity-to-actions step stays the 12px the stacked row had, over the grid's 8px. */
   .fabricate-manager .manager-tool-edit-actions {
     justify-content: flex-start;
     flex-wrap: wrap;
     width: 100%;
+    margin-top: var(--fab-space-1);
   }
 
   .fabricate-manager .manager-tool-edit-actions .fabricate-button {
