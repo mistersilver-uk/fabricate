@@ -346,12 +346,12 @@ export function registerEnvironmentsCases() {
   });
 
   /** Mount the manager on Gathering > Settings and return the Gathering Rules card. */
-  async function mountRulesCard(calls) {
+  async function mountRulesCard(calls, store = createStore(calls)) {
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
-      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+      props: { store, services: { openCurrentAdmin: () => {} } },
     });
     flushSync();
     navButton('Gathering').click();
@@ -485,6 +485,54 @@ export function registerEnvironmentsCases() {
       ['updateGatheringRules', 'alchemy', { rewardLimit: 2 }],
       'the revealed stepper writes the limit itself through the same one prop'
     );
+  });
+
+  // An unset field shows its default, the trigger's title carries the whole chosen label the
+  // trigger may ellipsise, and the caption's click focuses the trigger without opening it.
+  it('shows each Gathering Rules value, titles it in full, and focuses it from its caption', async () => {
+    await mountRulesCard([]);
+    for (const [id, shown] of [
+      ['rewards', 'Highest ranked successful drop'],
+      ['drop-modifier-mode', 'Additive (percentage points)'],
+      ['events', 'All triggered events'],
+      ['outcome', 'Gathering succeeds'],
+      ['event-visibility', 'Encounter chance'],
+      ['tool-breakage', 'Attempt fails on break'],
+      ['biome-aggregation', 'Strongest of each'],
+      ['blind-gate', 'Only attemptable tasks'],
+      ['reveal-policy', 'Never reveal'],
+      ['reveal-scope', 'Actor'],
+    ]) {
+      assert.equal(selectTriggerText(target, `#manager-gathering-rule-${id}`), shown, id);
+    }
+    const rewards = target.querySelector('#manager-gathering-rule-rewards');
+    assert.equal(rewards.getAttribute('title'), 'Highest ranked successful drop');
+
+    target.querySelector('#manager-gathering-rule-rewards-caption').click();
+    flushSync();
+    assert.ok(rewards.ownerDocument.activeElement === rewards, 'the caption focuses its trigger');
+    assert.equal(rewards.getAttribute('aria-expanded'), 'false', 'and opens nothing');
+  });
+
+  it('reads and writes each Gathering Rules limit through its own field', async () => {
+    const calls = [];
+    const store = createStore(calls);
+    await mountRulesCard(calls, store);
+    chooseSelectOption(target, '#manager-gathering-rule-rewards', 'limitedDrops');
+    chooseSelectOption(target, '#manager-gathering-rule-events', 'limitedDrops');
+    store.updateGatheringRules('alchemy', { rewardLimit: 4, eventLimit: 7 });
+    await tick();
+    flushSync();
+    const stepper = (rule) =>
+      target.querySelector(`.manager-inspector [data-gathering-rule-stepper="${rule}"]`);
+    assert.equal(stepper('rewardLimit').querySelector('[data-stepper-input]').value, '4');
+    assert.equal(stepper('eventLimit').querySelector('[data-stepper-input]').value, '7');
+    [...stepper('eventLimit').querySelectorAll('button')]
+      .find((button) => button.getAttribute('aria-label') === 'Increase event limit')
+      .click();
+    await tick();
+    flushSync();
+    assert.deepEqual(calls.at(-1), ['updateGatheringRules', 'alchemy', { eventLimit: 8 }]);
   });
 
   it('picks a Gathering Rules select from the keyboard and hands focus back to its trigger', async () => {
@@ -3694,6 +3742,7 @@ export function registerEnvironmentsCases() {
         gatheringConditionAvailableOptions: () => [
           { id: 'forest', label: 'Forest' },
           { id: 'cavern', label: 'Crystal Cavern' },
+          { id: 'marsh' },
         ],
         modifierPickerSelection: () => 'forest',
         rowCharacterModifiers: () => [{ id: 'ref-1', modifierId: 'mod-training', operator: '+' }],
@@ -3718,6 +3767,14 @@ export function registerEnvironmentsCases() {
         `${stem}-character-modifier-ref-1-operator-caption`
       );
 
+      assert.deepEqual(
+        selectOptionLabels(root, picker),
+        ['Forest', 'Crystal Cavern', 'marsh'],
+        'each condition shows its label, and its id only when it has none'
+      );
+      closeSelectPanel(root, picker);
+      assert.equal(selectTriggerText(root, operator), 'Positive', 'the ref`s own sign is shown');
+
       chooseSelectOption(root, picker, 'cavern');
       chooseSelectOption(root, operator, '-');
       assert.deepEqual(writes, [
@@ -3729,6 +3786,32 @@ export function registerEnvironmentsCases() {
       assert.equal(writes.length, 3, 'Escape wrote nothing; Enter wrote once');
     });
   }
+
+  // The expression override is a `Field` label, so its caption names and focuses the input.
+  it('names and writes the character-modifier expression override through its Field', () => {
+    const shell = modifierEditorShell('drop');
+    const writes = [];
+    const root = mountModifierEditor({
+      ...shell.props,
+      rowCharacterModifiers: () => [
+        { id: 'ref-1', modifierId: 'mod-training', operator: '+', expressionOverride: '@a' },
+      ],
+      characterModifierIsCustomized: () => true,
+      onUpdateCharacterModifier: (id, patch) => {
+        writes.push([id, patch]);
+      },
+    });
+    const id = `${shell.props.idPrefix}-character-modifier-ref-1-expression`;
+    const input = root.querySelector(`[id="${id}"]`);
+    assert.equal(input.value, '@a');
+    const caption = root.querySelector(`label.fabricate-field[for="${id}"]`);
+    assert.ok(Boolean(caption), 'a Field label points at the input');
+    assert.equal(caption.textContent.trim(), 'Expression', 'and names it');
+    input.value = '@b';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    assert.deepEqual(writes, [['ref-1', { expressionOverride: '@b' }]]);
+  });
 
   // The one disabled state of the thirteen converted selects: nothing left to attach (issue 1777).
   it('disables the condition picker, with its reason, once every condition is attached', () => {
@@ -3767,6 +3850,45 @@ export function registerEnvironmentsCases() {
       );
     });
   }
+
+  // The rate and count editors are `Field` labels: each caption wraps and names its control, and
+  // the rate's slider writes `dropRate` for the selected drop (issue 1777).
+  it('writes the drop rate and names both drop editors through their Field labels', () => {
+    const shell = modifierEditorShell('drop', []);
+    const writes = [];
+    mounted = mount(GatheringTaskInspectorComponent, {
+      target: applicationRootTarget(),
+      props: {
+        ...shell.props,
+        editing: true,
+        task: { id: 'task-1' },
+        editingTask: { resolutionMode: 'd100' },
+        selectedDrop: { id: 'drop-1', dropRate: 40, quantity: 2 },
+        gatheringDropRateValue: (drop) => drop.dropRate,
+        gatheringDropCountValue: (drop) => drop.quantity,
+        onUpdateDrop: (id, patch) => {
+          writes.push([id, patch]);
+        },
+        characterModifierSearchTerm: '',
+      },
+    });
+    flushSync();
+    const rate = target.querySelector('[data-gathering-drop-inspector-rate]');
+    const count = target.querySelector('[data-gathering-drop-inspector-count]');
+    for (const [field, caption, label] of [
+      [rate, 'Drop chance', 'Drop chance percent'],
+      [count, 'Count', 'Count'],
+    ]) {
+      assert.equal(field.tagName, 'LABEL', `${caption}: the Field host is the label`);
+      assert.equal(field.querySelector(':scope > span').textContent.trim(), caption);
+      assert.equal(field.querySelector('input').getAttribute('aria-label'), label);
+    }
+    const range = rate.querySelector('input[type="range"]');
+    range.value = '55';
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    assert.deepEqual(writes.at(-1), ['drop-1', { dropRate: 55 }]);
+  });
 
   it('searches the drop panel through GatheringTaskInspector, the leaf that owns it', async () => {
     const shell = modifierEditorShell('drop', []);

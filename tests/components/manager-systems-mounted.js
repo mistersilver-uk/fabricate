@@ -15,6 +15,7 @@ import {
   closeSelectPanel,
   selectOptionLabels,
   selectOptionValues,
+  selectTriggerText,
 } from '../helpers/select-control.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import {
@@ -236,10 +237,26 @@ export function registerSystemsCases() {
       );
     }
 
+    const timeOfDay = '[data-systems-gathering-condition="timeOfDay"] .fabricate-select-trigger';
+    assert.equal(selectTriggerText(target, weather), 'Clear Sky', 'each shows its current value');
+    assert.equal(selectTriggerText(target, timeOfDay), 'High Day');
+    assert.equal(target.querySelector(weather).getAttribute('title'), 'Clear Sky');
+    target.querySelector('#manager-system-condition-weather-caption').click();
+    flushSync();
+    assert.ok(
+      document.activeElement === target.querySelector(weather),
+      'the caption focuses its trigger'
+    );
+
     chooseSelectOption(target, weather, 'heavy-rain');
+    chooseSelectOption(target, timeOfDay, 'night');
     assert.deepEqual(
-      calls.find((call) => call[0] === 'updateGatheringConditions'),
-      ['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }]
+      calls.filter((call) => call[0] === 'updateGatheringConditions'),
+      [
+        ['updateGatheringConditions', { weather: 'heavy-rain', systemId: 'alchemy' }],
+        ['updateGatheringConditions', { timeOfDay: 'night', systemId: 'alchemy' }],
+      ],
+      'each shortcut writes its own condition'
     );
   });
 
