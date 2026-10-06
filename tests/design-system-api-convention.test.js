@@ -95,19 +95,19 @@ const EXCEPTIONS = Object.freeze([
     component: 'ChoiceOptionList',
     name: 'onChoose',
     fault: REGISTER_ONLY,
-    reason: 'a requirement chooser, the one family the convention gives `onChoose`',
+    reason: 'a requirement chooser, a family the convention gives `onChoose`',
   },
   {
     component: 'SlotRow',
     name: 'onChoose',
     fault: REGISTER_ONLY,
-    reason: 'a requirement chooser, the one family the convention gives `onChoose`',
+    reason: 'a requirement chooser, a family the convention gives `onChoose`',
   },
   {
     component: 'RequirementChooser',
     name: 'onChoose',
     fault: REGISTER_ONLY,
-    reason: 'a requirement chooser, the one family the convention gives `onChoose`',
+    reason: 'a requirement chooser, a family the convention gives `onChoose`',
   },
   {
     component: 'Typeahead',

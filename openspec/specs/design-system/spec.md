@@ -1012,7 +1012,7 @@ It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier 
 `Typeahead` is a trigger-less input whose list the query drives; each choice commits immediately, into a single slot, a filter, or one id appended to a short list the CALLER renders, and it owns no token run, no bound and no staging.
 `SetPicker` is a bounded trigger opening a staged panel committed on Apply, and its `choose` form exists only for the session control "Set membership is edited through a bounded, staged picker" exempts; a control that commits one choice into a single slot, a filter or a short list its caller renders is not a set picker.
 The deciding test is the widget and when the write lands, never how the control looks.
-A `Search` narrows a list already on screen and never commits a choice; a field that also commits a choice is a `Typeahead`.
+A `Search` narrows a list already on screen and never commits a choice; a field that also commits a choice is a typeahead combobox, which `Typeahead` implements save the requirement row's name cell.
 `Rail` is ONE SECTION of a right-hand inspector column, the library's inspector rail section: never the column itself, never the nav rail's `.manager-rail-block`, which carries the Rail Marker Family, and never `NavSidebar`'s `icon` variant.
 `DataTable` is for records compared down columns and `ListRow` for records scanned one at a time; a ladder of tiers is `OutcomeLadder`, never a table.
 `NavSidebar`'s variants are routed by shape, never by consumer, and its ARIA follows the variant.
@@ -1258,7 +1258,7 @@ A control that resembles the picker MUST be adjudicated against it by its WIDGET
 Three families have been adjudicated against it, and each verdict is recorded in `scripts/lib/designSystemPrimitives.json` with the measurement that produced it; two are NON-MEMBERS and the third is a MODE of this picker rather than a separate widget:
 
 - A TYPEAHEAD COMBOBOX is not a picker.
-Its one implementation is `Typeahead` (`src/ui/svelte/components/Typeahead.svelte`), whose field is the search field; the requirement row's name field keeps the holder contract below directly, because it is an inline name cell in a fixed-height row rather than a search shell.
+Its shared implementation is `Typeahead` (`src/ui/svelte/components/Typeahead.svelte`), whose field is the search field; the requirement row's name cell is the one other holder, keeping the holder contract below directly, because it is an inline name cell in a fixed-height row rather than a search shell.
 It has no trigger, its suggestion list hangs off an input whose expanded state is driven by the query rather than by a control, and it therefore has no closed state to open from.
 Being a non-member exempts it from the PICKER and from nothing else.
 Its suggestion list is a floating surface, so it is portalled to the nearest application root and positioned through the `anchoredPopover` action, directly beneath its field, sharing the field's left edge, at least as wide as the field, and flipped above it only where the root has no room below.
