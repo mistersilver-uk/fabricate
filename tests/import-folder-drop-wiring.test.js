@@ -14,6 +14,8 @@ import {
   warnWorldRegistrationFailure,
 } from '../src/ui/svelte/util/importFolderGroups.js';
 
+import { withProductionApplication } from './helpers/extension-composition-harness.js';
+
 // (a) divert decision table. Mirrors the branch STRUCTURE of
 // `SvelteCraftingSystemManagerApp.collectImportFolderGroups` (single-item / whole-pack / folder /
 // compendium-directory), delegating the actual grouping to the real collector + the real
@@ -485,7 +487,6 @@ test('warnWorldRegistrationFailure warns once for a result carrying the error, a
 
 /** Drive the production manager app's four import handlers over a manager whose scope write fails or not. */
 async function warningsFromAppHandlers(error) {
-  const { withProductionApplication } = await import('./helpers/extension-composition-harness.js');
   const flushed = { registered: 0, error };
   const withError = (result) => (error ? { ...result, worldRegistrationError: error } : result);
   const systemManager = {
