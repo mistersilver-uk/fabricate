@@ -2540,6 +2540,12 @@ export function registerDowntimeCases() {
         await mountBadgedDowntimeManager();
         await press(() => worldNavItem('downtime'));
       },
+      'the Core preview with its group open on a collapsed rail': async () => {
+        openCore();
+        await press(openToggle);
+        await press(railToggleControl);
+      },
+      'an unbadged companion with its group closed': () => mountBadgedDowntimeManager({ badges: {} }),
       'a badged companion with its group open on a collapsed rail': async () => {
         await mountBadgedDowntimeManager();
         await press(openToggle);

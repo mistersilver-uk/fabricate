@@ -384,6 +384,33 @@ const RAIL_CENSUS = Object.freeze({
       "- 3 button aria-label=\"Parties\" class=\"manager-nav-button manager-world-nav-item \" data-world-nav-item=\"parties\" id=\"manager-world-nav-parties\" type=\"button\"",
       "+ 3 button aria-current=\"page\" aria-label=\"Parties\" class=\"manager-nav-button manager-world-nav-item is-active\" data-world-nav-item=\"parties\" id=\"manager-world-nav-parties\" type=\"button\"",
     ],
+    "System Overview current, with a validation warning and a Tool": [
+      "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
+      "+ 3 button aria-disabled=\"false\" aria-label=\"Return to System Library\" class=\"manager-scope-return \" title=\"Return to System Library\" type=\"button\"",
+      "- 2 button class=\"manager-nav-button \" data-nav-system-edit=\"\" id=\"manager-nav-system-overview\" type=\"button\"",
+      "+ 2 button aria-current=\"page\" class=\"manager-nav-button is-active\" data-nav-system-edit=\"\" id=\"manager-nav-system-overview\" type=\"button\"",
+      "+ 3 span aria-label=\"Open validation issues\" class=\"manager-nav-count\" | 1",
+      "+ 3 span class=\"manager-nav-count\" | 1",
+      "- 4 span class=\"manager-nav-count\" | 0",
+      "+ 4 span class=\"manager-nav-count\" | 1",
+    ],
+    "Essences and Gathering switched off for the system": [
+      "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
+      "+ 3 button aria-disabled=\"false\" aria-label=\"Return to System Library\" class=\"manager-scope-return \" title=\"Return to System Library\" type=\"button\"",
+      "- 2 button class=\"manager-nav-button \" id=\"manager-nav-tags\" type=\"button\"",
+      "+ 2 button aria-current=\"page\" class=\"manager-nav-button is-active\" id=\"manager-nav-tags\" type=\"button\"",
+      "- 2 button class=\"manager-nav-button \" id=\"manager-nav-essence-rules\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-mortar-pestle\"",
+      "- 3 span class=\"manager-nav-label\" | Essence Rules",
+      "- 3 span class=\"manager-nav-count\" | 2",
+      "- 2 div class=\"manager-nav-group \"",
+      "- 3 button aria-expanded=\"false\" class=\"manager-nav-button manager-nav-parent\" id=\"manager-nav-gathering\" type=\"button\"",
+      "- 4 i aria-hidden=\"true\" class=\"fas fa-seedling\"",
+      "- 4 span class=\"manager-nav-label\" | Gathering",
+      "- 4 span class=\"manager-nav-count\" | 5",
+      "- 3 button aria-controls=\"manager-gathering-submenu\" aria-disabled=\"false\" aria-expanded=\"false\" aria-label=\"Expand gathering menu\" class=\"manager-nav-toggle\" type=\"button\"",
+      "- 4 i aria-hidden=\"true\" class=\"fas fa-chevron-down\"",
+    ],
     "a system leaf on its own route, with experimental features off": [
       "- 3 button aria-disabled=\"true\" aria-label=\"Return to System Library\" class=\"manager-scope-return is-disabled\" disabled=\"\" title=\"Return to System Library\" type=\"button\"",
       "+ 3 button aria-disabled=\"false\" aria-label=\"Return to System Library\" class=\"manager-scope-return \" title=\"Return to System Library\" type=\"button\"",
@@ -1571,6 +1598,25 @@ export function registerRailCases() {
       ),
       'the Parties leaf on its own route': openAfter(withExperimental, () =>
         worldNavItem('parties')
+      ),
+      'System Overview current, with a validation warning and a Tool': openAfter(
+        {
+          ...withExperimental,
+          systemValidation: {
+            issues: [],
+            counts: { critical: 0, warning: 1, info: 0, blockers: 0 },
+            blocksSystem: false,
+          },
+          gatheringLibraryTools: [{ id: 'tool-pickaxe', label: 'Pickaxe', enabled: true }],
+        },
+        () => navButton('System Overview')
+      ),
+      'Essences and Gathering switched off for the system': openAfter(
+        {
+          ...withExperimental,
+          selectedFeatures: { itemTags: true, recipeCategories: true, salvage: true },
+        },
+        () => navButton('Tags & Categories')
       ),
       'a system leaf on its own route, with experimental features off': openAfter(
         { experimentalFeaturesEnabled: false },
