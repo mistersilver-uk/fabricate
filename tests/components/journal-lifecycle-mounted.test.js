@@ -1516,6 +1516,29 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
   });
 
+  it('paints a partly delivered essence partial and an untouched one short', async () => {
+    const set = ingredientSet('partial-essence', [
+      { id: 'fire', options: [{ match: { type: 'essence', essenceId: 'fire', amount: 4 } }] },
+      { id: 'earth', options: [{ match: { type: 'essence', essenceId: 'earth', amount: 2 } }] },
+    ]);
+    const fixture = selectionFixture([set], {
+      selectedIngredientSetId: set.id,
+      ingredientEssenceAllocation: {
+        stepId: 'sm-r-horseshoe-step-1',
+        ingredientSetId: set.id,
+        allocation: { 'Item.iron-a': 1 },
+      },
+    });
+    fixture.builderOptions.resolveItemEssences = ({ item }) =>
+      item.componentId === 'iron' ? { fire: 2 } : {};
+    const mounted = await mountState('ready-single', fixture);
+    const paint = (groupId) =>
+      mounted.target.querySelector(`[data-slot-id="${groupId}"] .fab-slot-tile-shell`).dataset
+        .slotState;
+    assert.equal(paint('fire'), 'partial', 'two of four delivered is partial, never short');
+    assert.equal(paint('earth'), 'short', 'none delivered stays short');
+  });
+
   it('states confirmed receipt rows, uncertainty and unstarted effects with strict redaction', async () => {
     for (const visible of [true, false]) {
       const mounted = await mountState('recovery-required', {

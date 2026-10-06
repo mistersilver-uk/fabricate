@@ -103,6 +103,16 @@ function expectGeometry(name, selector, declarations) {
   }
 }
 
+const ESSENCE_SLOT = {
+  id: 'essence',
+  kind: 'essence',
+  label: 'Essence pool',
+  icon: 'fas fa-atom',
+  poolsMet: 1,
+  poolsRequired: 1,
+  poolsStarted: 1,
+};
+
 describe('run primitives mounted behavior', () => {
   before(async () => {
     for (const harness of harnesses) await harness.setup();
@@ -500,14 +510,45 @@ describe('run primitives mounted behavior', () => {
     slotRowHarness.remount();
 
     const locked = await slotRowHarness.mount({
-      requirements,
+      requirements: [...requirements, ESSENCE_SLOT],
       held,
       claimed,
       locked: true,
       slotLabel: (slot) => slot.label,
     });
-    assert.equal(locked.querySelectorAll(':scope [data-slot-id] [role="img"]').length, 2);
+    assert.equal(locked.querySelectorAll(':scope [data-slot-id] [role="img"]').length, 3);
     assert.ok(!locked.querySelector('button'), 'rolled slots expose no controls');
+  });
+
+  it('paints a partly delivered essence with the partial face, never short', async () => {
+    const essence = (id, poolsMet, poolsRequired, poolsStarted) => ({
+      ...ESSENCE_SLOT,
+      id,
+      poolsMet,
+      poolsRequired,
+      poolsStarted,
+      available: poolsMet >= poolsRequired,
+    });
+    const target = await slotRowHarness.mount({
+      requirements: [
+        essence('met', 1, 1, 1),
+        essence('started', 0, 1, 1),
+        // A caller that counts only met pools still paints one of two partial.
+        essence('one-of-two', 1, 2, undefined),
+        essence('untouched', 0, 1, 0),
+      ],
+      slotLabel: (slot) => slot.label,
+    });
+    const shells = [...target.querySelectorAll(':scope [data-slot-id] .fab-slot-tile-shell')];
+    assert.deepEqual(
+      shells.map((shell) => shell.dataset.slotState),
+      ['met', 'partial', 'partial', 'short']
+    );
+    for (const shell of shells.slice(1, 3)) {
+      const tile = shell.querySelector('.fab-slot-tile');
+      assert.ok(tile.classList.contains('is-partial') && !tile.classList.contains('is-short'));
+      assert.ok(shell.querySelector('.fab-slot-pip').classList.contains('is-ratio'));
+    }
   });
 
   it('uses one stage allocation for every essence threshold and states overshoot below sources', async () => {
