@@ -331,6 +331,59 @@ describe('RecipeItemLimitsTab (mounted)', () => {
     }
   });
 
+  /** Both typeaheads, each with a matching term and the caption its column names it by. */
+  const LIMITS_FIELDS = Object.freeze([
+    ['[data-recipe-item-required-knowledge-search]', 'alloy', 'Required Knowledge'],
+    ['[data-recipe-item-character-prereq-search]', 'expert', 'Learning prerequisites'],
+  ]);
+
+  function mountBothFields() {
+    return harness.mount({
+      recipeItem: learnDraft({ limitLearning: true }),
+      visibilityMode: 'knowledge',
+      linkedRecipes: [{ id: 'r1', name: 'Alloy Bronze' }],
+      characterPrerequisites: [{ id: 'p1', name: 'Expert', path: 'x', op: 'gte', value: 1 }],
+    });
+  }
+
+  function typeInto(field, term) {
+    field.dispatchEvent(new globalThis.FocusEvent('focus'));
+    field.value = term;
+    field.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    flushSync();
+  }
+
+  it('says "No matches" only while a query matches nothing (issue 1782)', async () => {
+    const root = await mountBothFields();
+    const note = () => root.querySelector('.fabricate-typeahead-list[role="status"]');
+    for (const [selector, term] of LIMITS_FIELDS) {
+      const field = root.querySelector(selector);
+      field.dispatchEvent(new globalThis.FocusEvent('focus'));
+      flushSync();
+      assert.ok(!note(), `${selector}: nothing is said at rest`);
+      typeInto(field, term);
+      assert.ok(!note() && root.querySelector('[role="listbox"]'), `${selector}: a match lists`);
+      typeInto(field, 'zzz');
+      assert.equal(note()?.textContent.trim(), 'No matches', `${selector}: a miss says so`);
+      assert.ok(!root.querySelector('[role="listbox"]'), `${selector}: and lists nothing`);
+      typeInto(field, '');
+      field.dispatchEvent(new globalThis.FocusEvent('blur'));
+      flushSync();
+    }
+  });
+
+  it('names each field and its list by its own column caption (issue 1782)', async () => {
+    const root = await mountBothFields();
+    for (const [selector, term, caption] of LIMITS_FIELDS) {
+      const field = root.querySelector(selector);
+      const id = field.getAttribute('aria-labelledby');
+      assert.equal(root.querySelector(`[id="${id}"]`)?.textContent.trim(), caption, selector);
+      typeInto(field, term);
+      assert.equal(root.querySelector('[role="listbox"]').getAttribute('aria-labelledby'), id);
+      typeInto(field, '');
+    }
+  });
+
   it('commits the active option on Enter, and nothing while none is active', async () => {
     const patches = [];
     const root = await harness.mount({

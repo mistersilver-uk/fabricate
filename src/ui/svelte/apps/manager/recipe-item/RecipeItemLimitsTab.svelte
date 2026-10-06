@@ -539,6 +539,10 @@
                       'Search recipes…'
                     )}
                     ariaLabelledBy="recipe-item-required-knowledge-label"
+                    emptyLabel={text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Limits.SearchNoMatches',
+                      'No matches'
+                    )}
                     inputProps={{ 'data-recipe-item-required-knowledge-search': '' }}
                     optionDataAttr="data-recipe-item-required-knowledge-option"
                   />
@@ -612,6 +616,10 @@
                       'Search prerequisites…'
                     )}
                     ariaLabelledBy="recipe-item-character-prereqs-label"
+                    emptyLabel={text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Limits.SearchNoMatches',
+                      'No matches'
+                    )}
                     inputProps={{ 'data-recipe-item-character-prereq-search': '' }}
                     optionDataAttr="data-recipe-item-character-prereq-option"
                   />
