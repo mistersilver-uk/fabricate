@@ -11,7 +11,10 @@ import {
   collectPackFolderGroups,
   hasRealFolderGroups,
   applyFolderImportDecisions,
+  warnWorldRegistrationFailure,
 } from '../src/ui/svelte/util/importFolderGroups.js';
+
+import { withProductionApplication } from './helpers/extension-composition-harness.js';
 
 // (a) divert decision table. Mirrors the branch STRUCTURE of
 // `SvelteCraftingSystemManagerApp.collectImportFolderGroups` (single-item / whole-pack / folder /
@@ -412,4 +415,152 @@ test('the app folder drop delegates to applyFolderImportDecisions and does not l
     1,
     'only the single-item drop may call addItemFromUuid directly'
   );
+});
+
+// (e) world-component registrations (issue 2218): the run owns one array, handed to every import
+// and flushed once after the run's write.
+
+const TWO_ITEMS = [{ itemUuids: ['Item.a', 'Item.b'], category: '', addTags: [] }];
+
+test('folder import commit — a manager with no registration flush stays a valid injection', async () => {
+  const mock = {
+    addItemFromUuid: async (_systemId, uuid) => ({ action: 'added', item: { id: `mock-${uuid}` } }),
+    applyBulkEditToComponents: async () => ({ updated: 0 }),
+  };
+
+  assert.deepEqual(await applyFolderImportDecisions(mock, 'sys1', TWO_ITEMS), {
+    added: 2,
+    updated: 0,
+    skipped: 0,
+    total: 2,
+    sourceFallbacks: [],
+  });
+});
+
+test('folder import commit — one registrations array reaches every import and is flushed once, after the write', async () => {
+  const log = [];
+  const arrays = new Set();
+  const mock = {
+    addItemFromUuid: async (_systemId, uuid, options) => {
+      arrays.add(options.registrations);
+      options.registrations.push(uuid);
+      return { action: 'added', item: { id: `mock-${uuid}` } };
+    },
+    applyBulkEditToComponents: async () => ({ updated: 0 }),
+    save: async () => {
+      log.push('save');
+    },
+    flushWorldComponentRegistrations: async (registrations) => {
+      log.push(['flush', [...registrations]]);
+      return { registered: registrations.length, error: null };
+    },
+  };
+
+  await applyFolderImportDecisions(mock, 'sys1', TWO_ITEMS);
+
+  assert.equal(arrays.size, 1, 'every import of the run records into the same array');
+  assert.deepEqual(log, ['save', ['flush', ['Item.a', 'Item.b']]]);
+});
+
+// (f) the registration warning (issue 2218): one per run, at each real import handler of the app.
+
+const WARNING_KEY = 'FABRICATE.Admin.Items.WorldCatalogueNotUpdated';
+
+test('warnWorldRegistrationFailure warns once for a result carrying the error, and not otherwise', () => {
+  const warned = [];
+  const io = {
+    notify: {
+      warn(message) {
+        warned.push(message);
+      },
+    },
+    localize: (key) => key,
+  };
+
+  warnWorldRegistrationFailure({ added: 1 }, io);
+  warnWorldRegistrationFailure(null, io);
+  assert.deepEqual(warned, []);
+
+  warnWorldRegistrationFailure({ added: 1, worldRegistrationError: new Error('refused') }, io);
+  assert.deepEqual(warned, [WARNING_KEY]);
+});
+
+/** Drive the production manager app's four import handlers over a manager whose scope write fails or not. */
+async function warningsFromAppHandlers(error) {
+  const flushed = { registered: 0, error };
+  const withError = (result) => (error ? { ...result, worldRegistrationError: error } : result);
+  const systemManager = {
+    addItemFromUuid: async (_systemId, uuid, options) =>
+      options?.registrations
+        ? { action: 'added', item: { id: uuid, name: uuid }, sourceFallbacks: [] }
+        : withError({ action: 'added', item: { id: uuid, name: uuid }, sourceFallbacks: [] }),
+    addItemsFromPack: async () =>
+      withError({ added: 1, updated: 0, skipped: 0, total: 1, sourceFallbacks: [] }),
+    applyBulkEditToComponents: async () => ({ updated: 0 }),
+    flushWorldComponentRegistrations: async () => flushed,
+  };
+  const warnedBy = {};
+  const originalUi = globalThis.ui;
+  await withProductionApplication(
+    {
+      modulePath: '/src/ui/SvelteCraftingSystemManagerApp.svelte.js',
+      exportName: 'SvelteCraftingSystemManagerApp',
+      ApplicationV2: class {},
+      hooks: { on: () => 1, off: () => {}, once: () => 1 },
+    },
+    async (app) => {
+      Object.assign(globalThis.game, {
+        fabricate: { getCraftingSystemManager: () => systemManager },
+        folders: new Map([
+          ['f1', { id: 'f1', name: 'Reagents', contents: [{ documentName: 'Item', uuid: 'Item.a' }] }],
+        ]),
+      });
+      app._services = {};
+      app._adminStore = {
+        selectedSystemId: { subscribe: (run) => (run('sys1'), () => {}) },
+        refresh: async () => {},
+      };
+      const { services } = app._prepareSvelteProps({});
+      const handlers = {
+        'single drop': () => services.importSingleManagedItemFromDrop({ type: 'Item', uuid: 'Item.a' }),
+        'pack drop': () => services.onDropItem({ type: 'Compendium', collection: 'world.reagents' }),
+        'folder drop': () => services.onDropItem({ type: 'Folder', id: 'f1' }),
+        'mapping commit': () => services.commitImportFolderMapping('sys1', [{ itemUuids: ['Item.a'] }]),
+      };
+      try {
+        for (const [name, run] of Object.entries(handlers)) {
+          const warned = [];
+          const warn = (message) => {
+            warned.push(message);
+          };
+          Object.assign(globalThis, {
+            ui: { notifications: { info: () => {}, warn, error: () => {} } },
+          });
+          await run();
+          warnedBy[name] = warned;
+        }
+      } finally {
+        Object.assign(globalThis, { ui: originalUi });
+      }
+    }
+  );
+  return warnedBy;
+}
+
+test('each import handler of the manager app warns once when the world catalogue could not be updated', async () => {
+  assert.deepEqual(await warningsFromAppHandlers(new Error('the scope write was refused')), {
+    'single drop': [WARNING_KEY],
+    'pack drop': [WARNING_KEY],
+    'folder drop': [WARNING_KEY],
+    'mapping commit': [WARNING_KEY],
+  });
+});
+
+test('and none of them warns when the registrations were written', async () => {
+  assert.deepEqual(await warningsFromAppHandlers(null), {
+    'single drop': [],
+    'pack drop': [],
+    'folder drop': [],
+    'mapping commit': [],
+  });
 });

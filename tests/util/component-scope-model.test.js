@@ -1,5 +1,6 @@
 /** The pure half of the world Component screens (issue 1371, epic 1357). */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
@@ -159,30 +160,64 @@ describe('the system-scope category note branches on the WORLD VALUE first', () 
 describe('the attribution sentence is clamped at zero', () => {
   // AC-13's pure half. The prototype's own `system` string is UNCLAMPED, so transcribing it
   // renders `shared with -1 other systems` for a component no system has adopted.
-  it('reads 0 other systems for a component with no membership record', () => {
-    for (const surface of ['list', 'editor']) {
-      const note = componentAttributionNote(
-        { surface, memberCount: 0, systemName: 'Forge' },
-        phrase
+  const noteFor = (surface, memberCount) =>
+    componentAttributionNote({ surface, memberCount, systemName: 'Forge' }, phrase);
+
+  it('states no sharing for a component held by one system, or by none', () => {
+    // Issue 2218: every imported component starts held by one system, so this is the default.
+    for (const memberCount of [1, 0]) {
+      assert.equal(
+        noteFor('list', memberCount),
+        'Name, art and description are authored in the world catalogue.'
       );
-      assert.match(note, /0 other systems/);
-      assert.ok(!note.includes('-1'), 'and never a negative count');
+      assert.equal(
+        noteFor('editor', memberCount),
+        'Name, image and description are authored in the world catalogue. Everything below belongs to Forge alone.'
+      );
     }
   });
 
   it('and 2 other systems for a component three systems hold', () => {
     // The positive control: with the count above zero the clamp is invisible, which is exactly
     // why the zero fixture is the criterion.
-    assert.match(
-      componentAttributionNote({ surface: 'list', memberCount: 3 }, phrase),
-      /2 other systems/
-    );
+    assert.match(noteFor('list', 3), /shared with 2 other systems\./);
+    assert.match(noteFor('editor', 3), /shared with 2 other systems\. .* belongs to Forge alone\./);
   });
 
   it('and pluralises the singular case rather than saying "1 other systems"', () => {
+    assert.match(noteFor('list', 2), /shared with 1 other system\./);
+    assert.match(noteFor('editor', 2), /shared with 1 other system\. .* belongs to Forge alone\./);
+  });
+
+  it('reads the same sentence from lang/en.json as from its fallback, on every surface and count', () => {
+    const lang = JSON.parse(readFileSync(new URL('../../lang/en.json', import.meta.url), 'utf8'));
+    const fill = (copy, data) =>
+      Object.entries(data ?? {}).reduce(
+        (text, [token, value]) => text.replaceAll(`{${token}}`, String(value)),
+        copy
+      );
+    const fromLang = (key, _fallback, data) =>
+      fill(
+        key.split('.').reduce((node, part) => node?.[part], lang),
+        data
+      );
+    for (const surface of ['editor', 'list', 'entry']) {
+      for (const memberCount of [0, 1, 2, 3, 5]) {
+        const args = { surface, memberCount, systemName: 'Forge' };
+        assert.equal(
+          componentAttributionNote(args, fromLang),
+          componentAttributionNote(args, phrase),
+          `${surface} at ${memberCount}`
+        );
+      }
+    }
+  });
+
+  it('and still counts the others past two', () => {
+    assert.match(noteFor('list', 5), /shared with 4 other systems\.$/);
     assert.match(
-      componentAttributionNote({ surface: 'list', memberCount: 2 }, phrase),
-      /1 other system\./
+      noteFor('editor', 5),
+      /shared with 4 other systems\. .* belongs to Forge alone\.$/
     );
   });
 

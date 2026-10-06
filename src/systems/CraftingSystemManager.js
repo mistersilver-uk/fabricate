@@ -56,7 +56,9 @@ import {
 } from './manager/deleteCascades.js';
 import {
   addItemFromUuid,
+  addItemsFromPack,
   addRecipeItemFromUuid,
+  flushImportRegistrations,
   itemSourcesCollaborators,
   migrateLegacyRecipeItems,
   refreshComponentMetadataForUpdatedItem,
@@ -272,6 +274,11 @@ export class CraftingSystemManager {
   /** The injected character-libraries store, given as the store or a lazy getter. */
   _resolveCharacterLibrariesStore() {
     return _resolveStoreSeam(this._characterLibrariesStore);
+  }
+
+  /** The world component scope store behind its seam, or `null` when none is readable. */
+  _resolveComponentScopeStore() {
+    return _resolveStoreSeam(this._componentScopeStore);
   }
 
   /** The Valid Id Basis for one system's reference pruning, `null` for each set not known to be
@@ -1499,50 +1506,15 @@ export class CraftingSystemManager {
     return replaceItemSource(itemSourcesCollaborators(this), systemId, itemId, itemUuid);
   }
 
-  /** Bulk-import all Item documents from a Foundry compendium pack into a crafting system,
-   * delegating to {@link addItemFromUuid}.
-   * @returns {Promise<{added: number, updated: number, skipped: number, total: number,
-   *   sourceFallbacks: Array<{itemName: string, brokenUuid: string, fallbackUuid: string}>}>} */
   async addItemsFromPack(systemId, packId) {
-    this._assertGM('bulk import from compendium');
-    const system = this.getSystem(systemId);
-    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+    return addItemsFromPack(itemSourcesCollaborators(this), systemId, packId);
+  }
 
-    const pack = game.packs.get(packId);
-    if (!pack) throw new Error(`Compendium pack not found: ${packId}`);
-
-    const documents = await pack.getDocuments();
-    const items = documents.filter((d) => d.documentName === 'Item');
-
-    // No `_primeEnricherCache` here (issue 800): `getDocuments()` already cached this pack, and
-    // intra-pack references are the common case, so per-item priming mostly hits the cache.
-    let added = 0;
-    let updated = 0;
-    let skipped = 0;
-    const sourceFallbacks = [];
-    // Items mutate memory only (`persist: false`) and the batch is flushed by one `save()` below
-    // (issue 1086); `dirty` keeps an all-skipped re-drop from writing.
-    let dirty = false;
-    try {
-      for (const item of items) {
-        const uuid = item.uuid || `Compendium.${packId}.${item.id}`;
-        const result = await this.addItemFromUuid(systemId, uuid, { persist: false });
-        if (result.action === 'added') {
-          added++;
-          dirty = true;
-        } else if (result.action === 'updated') {
-          updated++;
-          dirty = true;
-        } else skipped++;
-        if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
-      }
-    } finally {
-      // In `finally`, so items imported before a throw still persist; named, because every item
-      // went into this one system (issue 1078).
-      if (dirty) await this.save({ put: system, domains: COMPONENT_FACTS });
-    }
-
-    return { added, updated, skipped, total: items.length, sourceFallbacks };
+  /** Write the world-component registrations a batch owner collected through `addItemFromUuid`'s
+   * `registrations` option, in one `fabricate.componentScope` save, after its own save resolved.
+   * @returns {Promise<{registered: number, error: Error|null}>} */
+  async flushWorldComponentRegistrations(registrations) {
+    return flushImportRegistrations(itemSourcesCollaborators(this), registrations);
   }
 
   async refreshComponentMetadataForUpdatedItem(item, changes = {}) {

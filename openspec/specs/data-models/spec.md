@@ -1348,8 +1348,8 @@ This record PERMANENTLY retains `id`, `difficulty`, `complications` and the whol
 `essences` is the one field that gained a destination WITHOUT leaving: since `1.32.0` (issue 1371 r18-store, maintainer ruling M31) the WORLD default carries an `essences` section a system inherits unless it overrides, and this record's own map REMAINS the value an overriding system resolves — the read union answers an INHERITING system the world map and an OVERRIDING one this record, exactly as it does `category` (`### Component scope` requirement 2a).
 
 **"World Identity Snapshot" is NOT the `snapshot` this section already uses, and the two are easy to conflate over the very same three fields.**
-Requirement 9c below calls `name` and `img` "the one-hop snapshots", and requirement 9b REFRESHES the description copy from the linked source Item on two triggers — the exact opposite of "written by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
-SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYSTEM and is copied FROM THE LINKED SOURCE ITEM; the World Identity Snapshot is WORLD-SCOPE, is copied FROM THIS IN-SYSTEM RECORD by the `1.30.0` migration, feeds no display precedence, and is written by nothing thereafter.
+Requirement 9c below calls `name` and `img` "the one-hop snapshots", and requirement 9b REFRESHES the description copy from the linked source Item on two triggers — the exact opposite of "refreshed by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
+SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYSTEM and is copied FROM THE LINKED SOURCE ITEM; the World Identity Snapshot is WORLD-SCOPE, is copied FROM THIS IN-SYSTEM RECORD by the `1.30.0` migration and by the component import that registers it (requirement 12b), feeds no display precedence, and is REFRESHED by nothing thereafter: the world entry editors write it, and nothing copies it again from this record or from the linked source Item.
 
 ### Properties
 
@@ -1463,7 +1463,7 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     Each write replaces the entire setting and is replicated to every connected client, so a per-item write makes a bulk import quadratic in corpus size.
     The bound covers the per-folder category/tag set-apply as well as the item import: a mapping commit that imports across several folders still writes once in total, not once per folder.
     Batching must not change any per-item outcome: the same added / updated / skipped classification, the same counts, the same aggregated broken-source fallbacks, the same durable role-flag stamp on each source document, and the same overwrite-on-redrop application of a folder's mapping to already-present components.
-    A run that changes nothing in the corpus — every item already present and no mapping to apply — must write nothing at all.
+    A run that changes nothing in the corpus — every item already present and no mapping to apply — must write nothing to `craftingSystems`; whether it writes `fabricate.componentScope` is requirement 12c's.
     An item that fails part-way through a run must still surface its error to the caller, and the items imported before it must be carried by the run's single write rather than lost.
     A single-item import is its own batch of one and must persist immediately.
     The bound is on the number of PERSISTENCE OPERATIONS a run issues, not on the identity of the key it writes, so a backend that addresses records individually inherits it unchanged.
@@ -1472,6 +1472,18 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     A bare whole-corpus flush is explicitly NOT a violation of that half.
     A run that names nothing is telling the repository it does not know what moved, which is exactly what a deferred-persistence batch flushes with, and narrowing it would drop the in-place mutations such a batch relies on being flushed.
     What the whole-corpus flush costs is a COMPARISON rather than a write: it diffs every system's extracted records against the index, emitting no extra write and no extra replication.
+    12b.
+    A component import registers a World Component as `### Component scope` requirement 6 states.
+    12c.
+    A bulk import persists its registrations with a single `fabricate.componentScope` write, issued after its `craftingSystems` write and only when that write resolved or was not needed, and a run that registers nothing writes nothing to that setting.
+    A single-item import is its own batch of one here too: it writes its registration after its own `craftingSystems` write.
+    A caller that defers its `craftingSystems` write registers only through a registrations array it hands to `flushWorldComponentRegistrations` after that write; without one, the import registers and adopts nothing.
+    The registrations belong to the run that recorded them, and a registration is written only for a record the persisted `craftingSystems` setting holds, so a record a rejected or still-pending write left only in memory is registered by the import that next finds it persisted.
+    The residual is two overlapping runs over one system: when one run saves before the other flushes, the other registers the first run's freshly adopted record as one the system already held, so its membership keeps the record's own values instead of inheriting the world's.
+    A non-GM flush registers and writes nothing, and is answered rather than refused.
+    Each registration is decided again when the write is issued, against the scope as it then stands and the system's current records, so a record deleted in the meantime registers nothing and a scope edit made in the meantime survives.
+    A rejected `fabricate.componentScope` write is reported on the run's result as `worldRegistrationError`, the import handlers warn the GM once, and it never replaces an error the import is already raising.
+    It leaves an in-system record with no World Component, which the next import of that Item registers.
 13. `Component.category` defaults to `general`.
     Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
     A custom token is free text surfaced verbatim; only `general` is localized.
@@ -2172,6 +2184,7 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 >
 > **ALSO DELIVERED AT `1.30.0`** (epic 1357, PR 4): IMPORT/EXPORT of all three scopes, as three envelope slices at schema `6`, membership-filtered to the exported system.
 > The in-system arrays remain what an import BUILDS A SYSTEM FROM, for every field — the three slices populate the destination's world corpus and no import path reads them to build the system — and an import NEVER SEEDS a scope the destination has not already seeded, so an unmigrated destination behaves exactly as the previous schema does.
+> That rule binds the crafting-system envelope import; a component import, which brings Items into one system, is governed by `### Component scope` requirement 6.
 >
 > **STILL NOT LIVE**: the normalizer does NOT shed `components` / `essenceDefinitions` / `tools`, and it does not touch the five vocabulary keys at all.
 > **What `## CraftingSystem` REQUIREMENT 36's OWN RETIREMENT retires is the lifted identity FIELDS, plus the whole of `essenceDefinitions`; `components` and `tools` are NEVER shed** — they permanently retain fields the scope model has no destination for, and that requirement states which and why.
@@ -2461,6 +2474,7 @@ SystemMembershipRecord = {
 
     **THE FIRST GM-AUTHORED WORLD ENTITY FLIPS `isSeeded()`, AND THAT IS A BASIS INPUT.**
     Issue 1362 ships the first writer that is not the migration, so `isSeeded("entities")` can now become true on a world that has never been migrated: `worldScope.<type>.createEntity` persists the setting, and the write replicates to every client.
+    Component import is the second such writer (issue 2218): the first registration it writes seeds `fabricate.componentScope` on a world the migration never wrote, and it flips `isSeeded("entities")` on the same terms.
     The basis stays KNOWN-COMPLETE across that transition, and it is worth stating why rather than leaving a destructive-prune gate to be re-derived.
     The basis is the UNION of the world set with the system's SURVIVING legacy array, so the moment the world half starts vouching the legacy half has not stopped: a world that authors one component still carries every in-system component it had, and both id sets are in the basis.
     The predicate is PER SUB-KEY, so a component write cannot vouch for essences or tools — each entity type has its own setting and its own `isSeeded("entities")`.
@@ -2599,6 +2613,27 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    Still open, and still the tool family's follow-up: the tool family's `removeFromSystem` is the generic verb and has neither the cascade nor the ordering, and no verb here can report a compensation that itself fails.
    **AND THE ADD PATH ROLLS BACK THE RECORD IT WROTE.** A seed refused for a duplicate source reference removes the membership record THIS CALL wrote and reports `false`; a record authored earlier is left alone, so an unrelated collision cannot delete a GM's own membership.
    The refusal is reported rather than thrown, so a bulk apply continues through its remaining pairs.
+6. Every component-import path — single item, compendium pack, folder, the folder-mapping commit, the Compendium Directory action and `addItemFromUuid` — registers the component as a World Component the target system holds: a world entity carrying the component's identity and source link, and a membership record for `(component, system)` (issue 2218).
+   The in-system record's id is the world entity's id.
+   An Item embedded in an actor registers nothing, and an unresolvable uuid that addresses an embedded document registers nothing either.
+   Two records share a source when their source references intersect, and a pack Item's uuid is compared without its document-type segment, so the type-less spelling earlier bulk imports stored matches the document's own.
+   An id match alone binds nothing: a component whose id a world entity carries without sharing its source is left unregistered, because ids are not globally unique.
+   6a.
+   The membership record inherits every section, with two exceptions that apply only against a world default the World Component already carries: a record created for a component the system already held never changes what that component resolves, and a category the same run's folder mapping staged is kept rather than replaced by the world's.
+   For a component the system already held, each section the world default authors with a value different from the in-system record's is written as an override carrying the record's own value: `category` verbatim, and `essences` wherever the two normalized maps differ.
+   For a record the run added, a category other than the reserved `general` that differs from an authored world category is written as an override, and every other section inherits, as it does for a component added from the catalogue.
+   A World Component the import itself creates carries no world default, so its record inherits every section and resolves the in-system record's own values until a world default is authored.
+   6b.
+   An imported Item that shares a source reference with an existing World Component makes the target system adopt that World Component: the new in-system record takes the entity's id and no second entity is created.
+   The new record keeps the identity the import read from its Item and the entity keeps its stored one, so the two can differ from the start; `## Scoped Entity Definitions` requirement 15 answers the in-system record's and names the pair in its drift report.
+   The match is made before the new record's id is minted and takes the first sharing entity in roster order.
+   It reads the World Component's stored source link, which is not refreshed when a system re-points its own record.
+   Where the target system already holds a record under that id, nothing is written at world scope.
+   6c.
+   A component the import finds already present with no World Component gains one, created from the in-system record.
+   6d.
+   The exception to 6c is a component whose source reference a World Component under a different id already shares: it is left unregistered, because binding it would re-key a component that recipes, salvage results, gathering drop rows, tool links and owned-item identity flags may name, and an import re-keys nothing.
+   Its recovery is to delete the other World Component where no system holds it, then import again.
 
 ### Essence scope
 

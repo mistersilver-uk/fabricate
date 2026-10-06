@@ -5578,6 +5578,21 @@ test('a change confined to one rules-editor card selects every frame the editor 
   }
 });
 
+test('a change to the scoped component model selects the frames that draw its attribution note', () => {
+  // Issue 2218: the sentence is built in the model, so the rules editor callout and the list
+  // inspector's Shared identity card are photographed with the world catalogue.
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/apps/manager/scoped/componentScoped.js',
+  ]).map((viewCase) => viewCase.id);
+  for (const expected of [
+    'manager-component-edit-inheriting',
+    'manager-components-normal',
+    'world-component-catalogue',
+  ]) {
+    assert.ok(selected.includes(expected), `the model selects ${expected}`);
+  }
+});
+
 // The gathering task editor's tabs and cards (issue 1522): every file under `gathering-task/`.
 const GATHERING_TASK_EDITOR_VIEW = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
 const GATHERING_TASK_PART_DIR = 'src/ui/svelte/apps/manager/gathering-task/';

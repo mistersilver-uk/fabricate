@@ -317,10 +317,11 @@ Returns components for a system, optionally filtered by search text.
 The system object exposes components under two equivalent properties: `components` (primary) and `managedItems` (transitional alias).
 Both always refer to the same array.
 
-### addItemFromUuid(systemId, itemUuid)
+### addItemFromUuid(systemId, itemUuid, options)
 
 Adds a single Foundry Item document to the system as a component.
 GM only.
+The component is also registered as a world component in the world Component catalogue, held by this system, as described under [World component registration](#world-component-registration) below.
 
 Returns a result object that indicates whether the item was newly created, updated, or already up to date, so callers can show appropriate notifications.
 
@@ -347,17 +348,48 @@ A component can claim a full source-reference chain through `registeredItemUuid`
 |:----------|:-----|:------------|
 | `systemId` | `string` | System ID |
 | `itemUuid` | `string` | UUID of the Foundry item to add. Accepts both world item UUIDs (`Item.abc123`) and compendium item UUIDs (`Compendium.pack.id.itemId`). |
+| `options.persist` | `boolean` | Optional. Pass `false` to change the system in memory only, so a caller importing many items can save once itself. Defaults to `true`. |
+| `options.registrations` | `object[]` | Optional. An array the call records its world component registration into instead of writing it. Pass it with `persist: false`, then hand the same array to `flushWorldComponentRegistrations()` after your own save. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-**Returns:** `Promise<{ item: object, action: 'added' | 'updated' | 'skipped', sourceFallbacks: object[] }>`
+**Returns:** `Promise<{ item: object, action: 'added' | 'updated' | 'skipped', sourceFallbacks: object[], worldRegistrationError?: Error }>`
 
 - `item` is the component object (new or existing).
 - `action` is `"added"` if a new component was created, `"updated"` if an existing component's name/image/source references were refreshed, `"skipped"` if the claimed source chain was already current.
 - `sourceFallbacks` holds broken source-link fallback notices in the form `{ itemName, brokenUuid, fallbackUuid }`.
   It is empty when no fallback occurred, including when the Item was already registered by its own UUID.
+- `worldRegistrationError` is present only when the world Component catalogue could not be written.
+  The component is still in the system when it is set.
+  A call that was given a `registrations` array never sets it, because it writes nothing to the catalogue itself.
 
 **Throws:** `Error` if the system ID is not found, or if the UUID resolves to a non-Item document (such as an Actor or JournalEntry).
+
+#### World component registration
+
+Every import also registers the component as a world component the system holds, so it appears in the world Component catalogue.
+Only a GM client writes the catalogue.
+
+- A new component whose source an existing world component already shares adopts that world component.
+  The new component takes its id, no second world component is created, and the component follows any world category and world essence values that world component already carries until the system overrides them.
+  A category staged by a folder-mapping import is kept as the system's own override against a world category the adopted world component already carries.
+  If the system already holds a component under that id, nothing is written to the catalogue.
+- A new component that no world component shares registers a new one from the component's name, image, description and source.
+  A newly registered component carries no world category and no world essence values, so the system resolves its own values until they are authored.
+  A staged category is an ordinary value of the system, and a world category authored later replaces it in that system unless the system overrides it.
+- A component the import finds already present with no world component gains one, and it keeps every value it resolved before.
+- A component is left without one when the world component sharing its source has a different id from the component's own, typically because another system imported the item first.
+  Linking it would renumber a component that recipes, salvage results, gathering drops, tools and owned items may name.
+  To recover, check what uses the other system's component for that item, then remove it from every system that holds it, which rewrites the recipes that name it.
+  Then delete the other world component in the catalogue, which is only possible once no system holds it, and import again.
+  Where several systems hold the same item, import it again first in the systems that already hold it, because importing it into a new system first gives that system a world component the older components cannot adopt.
+- An Item that belongs to an actor is imported as before and registers nothing.
+- A call with `persist: false` and no `registrations` array registers nothing, because it has no way to flush after its own save.
+- With no catalogue available, the import behaves as it did before.
+
+The catalogue write follows the system write and is issued only after it succeeds.
+If the catalogue write fails, the import still resolves, and `worldRegistrationError` reports it.
+Importing the same items again registers them.
 
 ```javascript
 Hooks.once('fabricate.ready', async () => {
@@ -383,19 +415,23 @@ GM only.
 
 Each item is processed via `addItemFromUuid()`, so the same source-chain deduplication rules apply: items already registered by the same live UUID, or by a copy of the same compendium entry that keeps the entry's name, are updated or skipped in place, and only unclaimed source chains create new components.
 A pack item and a single drop of the same entry land on the same component.
+Every component is registered as a world component under the same rules as `addItemFromUuid()`.
+The whole run costs one write of the system and then one write of the world Component catalogue, and a run that registers nothing writes nothing to the catalogue.
 
 | Parameter | Type | Description |
 |:----------|:-----|:------------|
 | `systemId` | `string` | System ID |
 | `packId` | `string` | Compendium pack identifier in `"scope.name"` format (e.g. `"dnd5e.items"`) |
 
-**Returns:** `Promise<{ added: number, updated: number, skipped: number, total: number, sourceFallbacks: object[] }>`
+**Returns:** `Promise<{ added: number, updated: number, skipped: number, total: number, sourceFallbacks: object[], worldRegistrationError?: Error }>`
 
 - `added` is the number of items created as new components on this call.
 - `updated` is the number of items already registered whose name, image, or description was refreshed from the source.
 - `skipped` is the number of items already registered and already up to date, with no changes written.
 - `total` is the total number of Item documents found in the pack.
 - `sourceFallbacks` holds aggregated broken source-link fallback notices from imported items.
+- `worldRegistrationError` is present only when the world Component catalogue could not be written.
+  The imported components are still in the system.
 
 **Throws:** `Error` if the system ID or pack ID is not found.
 
@@ -417,6 +453,38 @@ Hooks.once('fabricate.ready', async () => {
 > You can also trigger bulk import from the UI by dragging a compendium pack header onto the **Items** tab drop zone in the Crafting Admin panel.
 > The same deduplication logic applies.
 > See [Bulk compendium pack drop]({% link components/index.md %}#bulk-compendium-pack-drop) for details.
+
+### flushWorldComponentRegistrations(registrations)
+
+Writes the world component registrations that a caller collected through the `registrations` option of `addItemFromUuid()`, in one write of the world Component catalogue.
+Call it after your own save of the system has resolved, and call it even when that save was not needed, because importing items that are already in the system can still register them.
+For a non-GM client it writes nothing and answers `{ registered: 0, error: null }` instead of throwing.
+
+| Parameter | Type | Description |
+|:----------|:-----|:------------|
+| `registrations` | `object[]` | The array you passed as `options.registrations`, and give each run its own array |
+
+**Returns:** `Promise<{ registered: number, error: Error | null }>`
+
+- `registered` is the number of components it registered.
+- `error` is the failure when the catalogue write was rejected, otherwise `null`.
+  It does not throw for that failure, so it is safe inside a `finally` block.
+
+It registers only components the saved system still holds, so a component whose save failed, or that was deleted in the meantime, is skipped.
+A run that has nothing to register writes nothing.
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const mgr = game.fabricate.getCraftingSystemManager();
+  const registrations = [];
+  for (const uuid of itemUuids) {
+    await mgr.addItemFromUuid('alchemy-system-id', uuid, { persist: false, registrations });
+  }
+  await mgr.save();
+  const { error } = await mgr.flushWorldComponentRegistrations(registrations);
+  if (error) ui.notifications.warn('The world Component catalogue could not be updated.');
+});
+```
 
 ### addToolFromUuid(systemId, itemUuid)
 

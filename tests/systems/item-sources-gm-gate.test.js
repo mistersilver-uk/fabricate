@@ -109,3 +109,42 @@ test('addItemFromUuid reaches _resolveImportedComponentSourceData through the ma
   await manager.addItemFromUuid('sys-gate', 'Item.new-1');
   assert.equal(calls, 1);
 });
+
+test('a non-GM flush of world registrations answers nothing registered, writes nothing and never throws', async () => {
+  const { makeScopeSettings, makeScopeStore } = await import('../helpers/worldScopeCorpus.js');
+  const settings = makeScopeSettings(undefined);
+  const manager = new CraftingSystemManager(
+    { getRecipes: () => [] },
+    { componentScopeStore: makeScopeStore('components', settings.value, settings) }
+  );
+  const system = gatedSystem(manager);
+  manager.systems.set('sys-gate', system);
+  // The persisted setting holds the row, so only the gate decides.
+  manager._repository = { readReplicatedSnapshot: () => [system] };
+  const registrations = [{ systemId: 'sys-gate', componentId: 'comp-1', added: false }];
+
+  globalThis.game.user.isGM = false;
+  assert.deepEqual(await manager.flushWorldComponentRegistrations(registrations), {
+    registered: 0,
+    error: null,
+  });
+  assert.equal(settings.writes.length, 0);
+
+  // A batch owner flushes in `finally`, so the gate must leave the import's own refusal standing.
+  const { applyFolderImportDecisions } =
+    await import('../../src/ui/svelte/util/importFolderGroups.js');
+  await assert.rejects(
+    applyFolderImportDecisions(manager, 'sys-gate', [{ itemUuids: ['Item.comp-2'] }]),
+    { message: 'GM permissions required: add component from uuid' }
+  );
+  await assert.rejects(manager.addItemsFromPack('sys-gate', 'world.any'), {
+    message: 'GM permissions required: bulk import from compendium',
+  });
+
+  globalThis.game.user.isGM = true;
+  assert.deepEqual(await manager.flushWorldComponentRegistrations(registrations), {
+    registered: 1,
+    error: null,
+  });
+  assert.equal(settings.writes.length, 1);
+});
