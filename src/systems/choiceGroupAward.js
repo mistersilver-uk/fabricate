@@ -225,6 +225,20 @@ export function holdsUnsettledAwardChoice(record) {
   return steps.some((step) => list(step?.pendingAwardChoices).some(isUnsettledChoice));
 }
 
+/**
+ * Whether `run` owes a pick with a claimable alternative, which the next stage's start and the
+ * world-time scan wait on. `unclaimable()` yields the settle's `member => reason | null` rule and is
+ * asked only of a run that owes a pick.
+ */
+export function owesClaimablePick(run, unclaimable) {
+  const owed = list(run?.steps).flatMap((step) =>
+    list(step?.pendingAwardChoices).filter(isUnsettledChoice)
+  );
+  if (owed.length === 0) return false;
+  const reason = unclaimable();
+  return owed.some((choice) => list(choice.alternatives).some((member) => reason(member) === null));
+}
+
 /** The `groupAwards` entry a settle appends: the player's picks as the group's selections. */
 export const pickedGroupAward = (choice, picks) => ({
   choiceId: choice.choiceId,

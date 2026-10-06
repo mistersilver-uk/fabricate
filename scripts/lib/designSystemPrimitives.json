@@ -22,7 +22,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io, including read-only content snippets for future alternatives and route/ladder output, extend its existing meaning; current-only body controls remain unchanged. The components path selects broad evidence; rendered acceptance remains pending."
+      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io, including read-only content snippets for future alternatives and route/ladder output, extend its existing meaning; current-only body controls remain unchanged. Measured at issue 1644 on its five override frames: radius, frames, numeral and tag match, but its 12px region inset is not the specimen's 48px indent, so it stays target with that disagreement recorded in the library's migrations table."
     },
     {
       "path": "src/ui/svelte/components/YieldScale.svelte",
@@ -478,7 +478,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 implements the library contract and adopts it in src/ui/svelte/apps/journal/RunCard.svelte and src/ui/svelte/apps/journal/RunDetail.svelte. Since issue 1782 it is `StageBars` under a run heading: its kicker and blocker are its own, and the bars, their group and their stage-named progress roles are `StageBars`'. Target status remains until the final state captures and comparison are accepted by the owner of its library block."
+      "why": "Issue 1648 implements the library contract and adopts it in src/ui/svelte/apps/journal/RunCard.svelte and src/ui/svelte/apps/journal/RunDetail.svelte. Since issue 1782 it is `StageBars` under a run heading: its kicker and blocker are its own, and the bars, their group and their stage-named progress roles are `StageBars`'. Measured at issue 1644 on `fabricate-journal-lifecycle-past-stage`: its tracks match, but its hand-rolled kicker is not the shipped `Kicker`, so it stays target with that disagreement recorded in the library's migrations table."
     },
     {
       "path": "src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte",
@@ -746,7 +746,7 @@
       "callers": [
         "src/ui/svelte/apps/journal/ActionsPanel.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar. Measured at issue 1644 on its three override frames and the switch's: height, radius, gap, order and the primary and Resume families match; the 36px switch, the hand-rolled kicker and the armed-cancel layout disagree, so its library specimen reads target with those recorded in the migrations table."
     },
     {
       "path": "src/ui/svelte/components/WorldClockChip.svelte",
@@ -755,7 +755,7 @@
       "callers": [
         "src/ui/svelte/apps/FabricateAppRoot.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal through Chip's opt-in clock presentation, which owns the 28px/r7 box and direct-child alignment. ONE independent importer, `src/ui/svelte/apps/FabricateAppRoot.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+      "why": "Issue 1648 implements the specified library component for the Journal through Chip's opt-in clock presentation, which owns the 28px/r7 box and direct-child alignment. ONE independent importer, `src/ui/svelte/apps/FabricateAppRoot.svelte`, is below the two-importer membership bar. Measured at issue 1644 on `fabricate-journal-lifecycle-ready-single`: the box, family and value match; its 11px glyph and its kicker disagree, so its library specimen reads target with those recorded in the migrations table."
     },
     {
       "path": "src/ui/svelte/components/SlotRow.svelte",
@@ -782,7 +782,7 @@
       "callers": [
         "src/ui/svelte/apps/journal/RunDetail.svelte"
       ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Measured at issue 1644 on `fabricate-journal-lifecycle-past-stage` and `-future-stage`, it matches its canonical spec, and its library specimen reads `shipped`."
     },
     {
       "path": "src/ui/svelte/components/OutcomeLadder.svelte",

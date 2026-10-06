@@ -11,6 +11,7 @@ export function journalLifecycleCases() {
     'ready-single',
     'legacy-armed',
     'waiting-auto-eligible',
+    'waiting-auto-completes',
     'waiting-open-choice',
     'stage-not-started',
     'awaiting-choice',
@@ -163,6 +164,11 @@ export function journalLifecycleCases() {
     kindTrigger,
   ];
   const steps = {
+    // Issue 1644: a run counting down sorts after the four ready ones, so its search stays applied.
+    'waiting-auto-completes': [
+      { selector: '[data-journal-search] input', fill: 'Cure a Salted Hide' },
+      { selector: '[data-run-id="lab-v1-waiting-auto-completes"]' },
+    ],
     // A paused run holds the choices it made (D-028), so its rail is inert and the walk stops at the pause.
     paused: [{ selector: '[data-run-action="pause"]' }],
     'waiting-open-choice': [{ selector: '[data-slot-row] button.fab-slot-tile' }],
@@ -244,6 +250,7 @@ export function journalLifecycleCases() {
   };
   const detail = '[data-journal-detail]';
   const primary = '[data-run-action="primary"]';
+  const bolt = '[data-run-completes-as-time-passes][role="img"]';
   const enabledPrimary = `${primary}:not(:disabled):not([aria-busy="true"])`;
   const has = (...selectors) => selectors.map((selector) => `:has(${selector})`).join('');
   const lacks = (...selectors) => selectors.map((selector) => `:not(:has(${selector}))`).join('');
@@ -300,6 +307,13 @@ export function journalLifecycleCases() {
         '[data-run-completion-switch] input[value="worldTime"]:checked',
         '[data-journal-summary-card="time"]',
         `${primary}:disabled`
+      ),
+    // Issue 1644: the one fixture the engine would finish unattended, so its row carries the named bolt.
+    'waiting-auto-completes':
+      '.journal-view-container' +
+      has(
+        `[data-run-id="lab-v1-waiting-auto-completes"] ${bolt} + [data-run-status="waiting"]`,
+        `${detail} [data-run-completion-switch] input[value="worldTime"]:checked`
       ),
     // An open requirement rail belongs to an unbegun stage (D-028), which offers the begin decision instead.
     'waiting-open-choice':
@@ -709,6 +723,13 @@ export function journalLifecycleCases() {
       expectTab: 'journal',
       expectSelector: expected[state],
       ...(pointerTargets[state] && { expectCenterHit: pointerTargets[state] }),
+      ...(state === 'waiting-auto-completes' && {
+        expectAttributes: ['aria-label', 'data-tooltip'].map((name) => ({
+          selector: `[data-run-id="lab-v1-waiting-auto-completes"] ${bolt}`,
+          name,
+          value: 'Finishes this stage as time passes',
+        })),
+      }),
       ...(state === 'filter-paused' && { expectCenterHit: steps[state].at(-1).selector }),
       ...(state === 'kind-toggles' && { expectCenterHit: kindTrigger.selector }),
       ...(state === 'kind-filter-open' && { expectCenterHit: kindOption('salvage') }),

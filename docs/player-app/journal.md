@@ -69,6 +69,13 @@ Where a run needs something from **you**, a second badge sits beside the status 
 - **Needs materials**, **Needs essences**, **Needs payment**, **Needs tools**.
   The stage is short of something you have to acquire.
 
+A small bolt before the status badge, labelled **Finishes this stage as time passes**, means the run's current stage will complete on its own once its wait is over.
+It shows only for a run that is set to complete as time passes, is not paused, and is still waiting on its time gate.
+It also needs the run to owe no reward pick and to have nothing that would stop it, such as missing materials, tools, or a player check.
+Crafting runs show it; gathering runs do not yet.
+A later stage may still stop and wait for you.
+For a crafting run with no check, a step completes on its own when the run is set to, and otherwise you can complete it by hand.
+
 You can sort the active list by **Soonest Ready** or by **Newest**.
 Soonest Ready puts the runs you can act on first, then the ones that will be ready soonest.
 

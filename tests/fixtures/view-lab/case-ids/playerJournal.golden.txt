@@ -27,6 +27,7 @@ fabricate-journal-blind-run-gm
 fabricate-journal-lifecycle-ready-single
 fabricate-journal-lifecycle-legacy-armed
 fabricate-journal-lifecycle-waiting-auto-eligible
+fabricate-journal-lifecycle-waiting-auto-completes
 fabricate-journal-lifecycle-waiting-open-choice
 fabricate-journal-lifecycle-stage-not-started
 fabricate-journal-lifecycle-awaiting-choice
