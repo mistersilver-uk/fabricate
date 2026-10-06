@@ -30,7 +30,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified scale on RunDetail and HistoricalRunDetail. Default shared previews and explicit shared history retain one cut. The approved opt-in rollModel perRow/unknown forms omit that cut; labels.evidence presents independently recorded row fields, and null outcomes remain neutral. Historical quantities are individually attributable actual awards; unmatched receipts remain separate once. The components path selects broad evidence; rendered acceptance remains pending."
+      "why": "Issue 1648 promotes the specified scale on RunDetail and HistoricalRunDetail. Default shared previews and explicit shared history retain one cut. The approved opt-in rollModel perRow/unknown forms omit that cut; labels.evidence presents independently recorded row fields, and null outcomes remain neutral. Historical quantities are individually attributable actual awards; unmatched receipts remain separate once. Issue 1644 adds `order`: `authored` keeps entry order and draws no cut, and the gathering find list (`apps/gathering/GatheringTaskDrops.svelte`) passes it because gathering reward selection is by authored order, so the scale has three importers. Measured on its override frames it stays `target`: the dense row, the quantity, the chance chip and the kicker disagree with the specimen and are an OPEN planned-migrations row for issue 1523's sweep. The components path selects broad evidence; its override adds the two gathering frames."
     },
     {
       "path": "src/ui/svelte/components/OutcomeLadder.svelte",
@@ -342,7 +342,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "The product's one horizontal fill bar: a LEAF that renders the track and a value-width fill and no `role`, because the accessible semantics differ per site. Issue 1782 puts the three instruments `library.html` splits it into over it, so its importers are `components/Meter.svelte`, `components/BandedBar.svelte` and `components/StageBars.svelte`, each owning the one role its reading needs, plus `apps/gathering/GatheringTaskDrops.svelte`'s per-drop chance track, which keeps the bare leaf because its summary is a button whose children are presentational. It corresponds to no single library entry by the library's own account, which is why it stays `target` with `library: null`. Its broad-signal override names the opened drop row, the one frame that draws the bare leaf."
+      "why": "The product's one horizontal fill bar: a LEAF that renders the track and a value-width fill and no `role`, because the accessible semantics differ per site. Issue 1782 puts the three instruments `library.html` splits it into over it, so its importers are `components/Meter.svelte`, `components/BandedBar.svelte` and `components/StageBars.svelte`, each owning the one role its reading needs; issue 1644 retired its fourth, `apps/gathering/GatheringTaskDrops.svelte`'s bare per-drop chance track, when the find list moved onto `YieldScale`. It corresponds to no single library entry by the library's own account, which is why it stays `target` with `library: null`. With no app caller left, its broad-signal override names one frame per instrument: the run detail's stage track, the crafting essence meter and the gathering chance bar."
     },
     {
       "path": "src/ui/svelte/components/IconButton.svelte",
