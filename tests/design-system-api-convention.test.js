@@ -154,6 +154,12 @@ const EXCEPTIONS = Object.freeze([
     reason: 'a function returning one row’s attributes, where `<part>Props` names a fixed object',
   },
   {
+    component: 'DataTable',
+    name: 'rowData',
+    fault: suffixed('Data'),
+    reason: 'a function returning one row’s attributes, where `<part>Props` names a fixed object',
+  },
+  {
     component: 'SearchablePopoverPanel',
     name: 'dialogNameAttribute',
     fault: suffixed('Attribute'),

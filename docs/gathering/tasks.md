@@ -99,6 +99,12 @@ The Results tab no longer carries issue marks.
 Instead, when Results holds rows that block saving, a notice on the Results tab shows how many there are, with a **Review in Validation** action that opens the Validation tab.
 The Results tab still shows the notices for the two warnings above.
 
+A d100 task's Drop rules card is a table.
+Its caption carries the heading, a count of rules and a search field.
+The columns are the rank (ranked mode only), the drop component, the drop chance (a slider and a number), the count and the modifiers.
+The page scrolls rather than the card, and the pager appears only when there are more rules than the smallest page size.
+Click a row, or tab into any control in it, to select that drop rule for the inspector rail.
+
 A legacy Progressive task keeps its own results, so its Results tab shows an empty state titled "Results are not authored here".
 It points you to the **Gathering resolution** card on Overview, where you can choose another mode to author results.
 
@@ -118,9 +124,10 @@ They only adjust an individual row's chance after the task already matches.
 Multiple rows can reference the same component with different quantities and chances.
 Each row rolls on its own before the system's Gathering Rules choose which rows are awarded.
 
-In the player Gathering window, each possible drop is shown as one row with its current chance.
-Selecting a drop's row opens a breakdown of what makes up that chance, such as its base rate and any weather, time of day, biome, or character modifier contributing to it.
-Selecting the row again closes the breakdown.
+In the player Gathering window, a task's possible drops are listed as rows in the order you authored them, each with its current chance.
+The order never changes with the chance, and a drop with no name of its own shows its component's name.
+Open the Chance breakdown beneath the list to see, for every drop, what makes up its chance, such as its base rate and any weather, time of day, biome, or character modifier contributing to it.
+Open it again to close it.
 
 Every drop row must point at a real reward, either a component from the system's component library or a resolvable world item.
 Fabricate rejects rows that point at a component or item that no longer exists, and rows with no target, before saving the task.

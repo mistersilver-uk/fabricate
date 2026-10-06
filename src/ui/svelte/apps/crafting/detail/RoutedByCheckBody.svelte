@@ -23,13 +23,18 @@
     // bodies; `{}` renders a read-only rail with no chooser.
     rail = {},
   } = $props();
+
+  // The engine's record of the tier a successful roll routed through; a failed roll marks none.
+  const reachedId = $derived(
+    rollResult?.success === true ? (rollResult?.checkResult?.data?.outcomeId ?? null) : null
+  );
 </script>
 
 <div data-recipe-mode="routedByCheck">
   <RecipeBodyShell {recipe} {selectedSetId} {rollResult} {onChoose}>
     {#snippet results()}
       <IoTable {craftability} result={null} {onChooseOption} {...rail} />
-      <OutcomeTierTable tiers={recipe?.outcomeTiers ?? []} />
+      <OutcomeTierTable tiers={recipe?.outcomeTiers ?? []} {reachedId} />
     {/snippet}
   </RecipeBodyShell>
 </div>

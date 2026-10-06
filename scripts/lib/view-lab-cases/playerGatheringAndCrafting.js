@@ -692,6 +692,8 @@ export const CASES = Object.freeze([
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-ridgemoss"] .gathering-task-summary' },
     ],
+    // Issue 1644: the find section states its one drop on the shared yield scale.
+    expectSelector: '[data-gathering-drops-state="ready"] [data-yield-scale] [data-yield-entry]',
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
   }),
@@ -731,21 +733,23 @@ export const CASES = Object.freeze([
   playerCase({
     id: 'player-gathering-drop-open',
     label: 'Player app — Gathering drop modifiers open',
-    // The only state that draws the repaired drop disclosure (issue 1512), on the world's five-row
-    // drop table, so one open row's breakdown shows against four collapsed siblings.
+    // The only state that draws the opened breakdown (issue 1644): the world's five-row drop table,
+    // authored with coal last although its chance is second, so the scale shows authored order.
     reaches: 'beyond',
     smokeLabels: [],
     query: { tab: 'gathering' },
     steps: [
       { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
       { selector: '.gathering-task-row[data-task-id="sm-task-prospect"] .gathering-task-summary' },
-      { selector: ':nth-match(.gathering-task-drop-summary, 1)', scroll: true },
+      { selector: '[data-gathering-drops-disclosure]', scroll: true },
       // A scroll step short-circuits before the driver's activation branch, so opening is its own.
-      { selector: ':nth-match(.gathering-task-drop-summary, 1)', press: 'Enter' },
+      { selector: '[data-gathering-drops-disclosure]', press: 'Enter' },
+      { selector: ':nth-match([data-gathering-drop-modifiers], 1)', scroll: true },
     ],
-    // The open row and the region it names, so a header that only flipped its attribute fails.
+    // The open disclosure and the breakdowns it names, so a toggle that only flipped its state fails.
     expectSelector:
-      '.gathering-task-drop:has(.gathering-task-drop-summary[aria-expanded="true"][aria-controls])' +
+      '[data-gathering-drops]' +
+      ':has([data-gathering-drops-disclosure][aria-expanded="true"][aria-controls])' +
       ' [data-gathering-drop-modifiers]',
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
@@ -939,15 +943,12 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' },
     ],
     expectTab: 'crafting',
+    // One shared-ladder tier drawing both rows (issue 1644).
     expectSelector:
       '[data-recipe-section="outcome-tiers"]' +
-      ' .crafting-tier-awards:has([data-award-kind="component"]):has([data-award-kind="currency"])',
+      ' [data-outcome-tier]:has([data-award-kind="component"]):has([data-award-kind="currency"])',
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      CRAFTING_SHARED,
-      CRAFTING_ROUTED_CHECK,
-      /^src\/ui\/svelte\/apps\/crafting\/detail\/AwardPill\.svelte$/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_ROUTED_CHECK],
   }),
   // The Crafting header withholds `Ready to craft` and leads the blocking callout with the authority's own reason.
   playerCase({
@@ -1037,6 +1038,30 @@ export const CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_ROUTED_CHECK,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+    ],
+  }),
+  // Issue 1644: after a live craft of the Runeblade, the tier its roll routed through is marked.
+  playerCase({
+    id: 'player-crafting-routed-reached',
+    label: 'Player app — Crafting routed by check after its roll, the reached tier marked',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Runeblade' },
+      { selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+      { selector: '[data-recipe-section="outcome-tiers"]', scroll: true },
+    ],
+    expectSelector:
+      '[data-recipe-section="outcome-tiers"]' +
+      ':has([data-outcome-tier="rw-masterwork"][data-outcome-rolled="true"] [data-outcome-reached])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_ROUTED_CHECK,
+      /^src\/systems\/(?:versionedCommandResults|journalRollFacts)\.js$/,
+      /^src\/systems\/CraftingEngine\.js$/,
     ],
   }),
   playerCase({

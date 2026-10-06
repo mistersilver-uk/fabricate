@@ -616,7 +616,7 @@ Where Fabricate could not record a merge against a character's in-progress runs,
 Finishing or cancelling those runs clears it.
 
 **See also:** [Essences]({% link essences/index.md %}#one-shared-essence-per-behaviour) covers what the shared record holds and what each crafting system keeps for itself.
-[Protecting Your Worlds]({% link technical/protecting-your-worlds.md %}#reversible-data-migrations) covers how Fabricate runs and aborts an upgrade pass.
+[Protecting Your Worlds]({% link technical/protecting-your-worlds.md %}#fail-safe-data-migrations) covers how Fabricate runs and aborts an upgrade pass.
 
 ---
 

@@ -73,5 +73,12 @@ export async function cardOffer(checkResult, handoff, authorization) {
 /** Evidence and the handoff share one entitlement: an unentitled initiator receives neither. */
 export async function withEntitledFacts(response, { check, handoff }, authorization) {
   if (!(handoff || check) || !(await initiatorEntitled(authorization))) return response;
-  return { ...response, ...(check && { check }), ...(handoff && { rollHandoff: handoff }) };
+  // A shown roll also names the routed tier its success went through (issue 1644).
+  const outcomeId = check ? authorization.result?.checkResult?.data?.outcomeId : null;
+  return {
+    ...response,
+    ...(check && { check }),
+    ...(outcomeId && { checkResult: { data: { outcomeId } } }),
+    ...(handoff && { rollHandoff: handoff }),
+  };
 }

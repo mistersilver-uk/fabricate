@@ -463,6 +463,89 @@ describe('IoTable mounted behavior', () => {
     assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
   });
 
+  // Issue 1782: the three groups are `DataTable`s, each headed, row-headed by its name column.
+  describe('the essence, tool and output tables', () => {
+    const IO = 'FABRICATE.App.Crafting.Io';
+    const groupOf = (target, name) => target.querySelector(`[data-io-group="${name}"]`);
+    const rowsOf = (target, name) => [
+      ...groupOf(target, name).querySelectorAll(':scope tbody tr.fabricate-data-table-row'),
+    ];
+    const mountAll = () =>
+      harness.mount({
+        craftability: craftability({
+          essenceStates: [
+            { type: 'aether', name: 'Aether', need: 1, have: 1, satisfied: true },
+            { type: 'ember', name: 'Ember', need: 3, have: 1, satisfied: false },
+          ],
+          toolStates: [
+            { componentId: 't1', name: 'Mortar', img: null, available: true },
+            { componentId: 't2', name: 'Tongs', img: null, available: false },
+          ],
+        }),
+        result: {
+          items: [
+            { name: 'Potion', img: null, qty: 2 },
+            { name: 'Gold', kind: 'currency', qty: 3, amountText: '3 gp' },
+            { kind: 'group', name: 'You choose one of…', members: [{ name: 'Gem', qty: 1 }] },
+          ],
+        },
+      });
+
+    it('heads each group and puts every row`s name in a row-scoped th', async () => {
+      const target = await mountAll();
+      for (const [name, heading] of [
+        ['essences', `${IO}.Essences`],
+        ['tools', `${IO}.Tools`],
+        ['outputs', `${IO}.Output`],
+      ]) {
+        assert.equal(
+          groupOf(target, name).querySelector('.fabricate-data-table-heading').textContent,
+          heading
+        );
+        for (const row of rowsOf(target, name)) {
+          assert.equal(row.children[0].tagName, 'TH', `a ${name} row is headed by its name`);
+          assert.equal(row.children[0].getAttribute('scope'), 'row');
+        }
+      }
+    });
+
+    it('marks each essence and tool row met or unmet, and states a tool`s status', async () => {
+      const target = await mountAll();
+      const met = (name) => rowsOf(target, name).map((row) => row.dataset.ioSatisfied);
+      assert.deepEqual(met('essences'), ['true', 'false']);
+      assert.deepEqual(met('tools'), ['true', 'false']);
+      assert.deepEqual(
+        rowsOf(target, 'tools').map((row) => row.children[1].textContent.trim()),
+        [`${IO}.Available`, `${IO}.Unavailable`]
+      );
+    });
+
+    it('right-aligns each output amount in mono, and a choice group states none', async () => {
+      const target = await mountAll();
+      const amounts = rowsOf(target, 'outputs').map((row) => row.children[1]);
+      assert.deepEqual(
+        amounts.map((cell) => cell.textContent.trim()),
+        ['×2', '3 gp', '—']
+      );
+      for (const cell of amounts) {
+        assert.ok(cell.classList.contains('is-align-end') && cell.classList.contains('is-mono'));
+      }
+      assert.ok(
+        Boolean(amounts[2].querySelector('.crafting-io-output-none')),
+        'the group’s dash is the muted none mark, not an amount'
+      );
+    });
+
+    it('draws no essence or tool table for a set that needs neither', async () => {
+      const target = await harness.mount({
+        craftability: craftability(),
+        result: { items: [{ name: 'Potion', img: null, qty: 1 }] },
+      });
+      assert.ok(!groupOf(target, 'essences') && !groupOf(target, 'tools'));
+      assert.ok(Boolean(groupOf(target, 'outputs')), 'precondition: the outputs table draws');
+    });
+  });
+
   it('draws an unavailable tool as a danger chip with its own glyph', async () => {
     const target = await harness.mount({
       craftability: craftability({

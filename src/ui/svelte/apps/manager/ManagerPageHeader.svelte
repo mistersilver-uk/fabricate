@@ -1,8 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The manager's page header: the breadcrumb trail, the eyebrow, one of eight identity headings and
-  the trailing action group, plus the Tool Studio's own second header (issue 1720, extracted from
-  the root).
+  the trailing action group, plus the Tool library's own second header, drawn by `PageHeader`
+  (issue 1720, extracted from the root; issue 1777).
 
   Props:
   | prop | values | default | contract |
@@ -27,6 +27,7 @@
   import Medallion from '../../components/Medallion.svelte';
   import ManagerHeaderActions from './ManagerHeaderActions.svelte';
   import ManagerHeaderBreadcrumbs from './ManagerHeaderBreadcrumbs.svelte';
+  import PageHeader from '../../components/PageHeader.svelte';
 
   let {
     header,
@@ -57,6 +58,17 @@
     environmentDraftForDisplay = null,
     ...rest
   } = $props();
+
+  // The Tool library's trail, from its root (issue 1328) and with no `Crafting` crumb, because the
+  // rail holds Tool Rules outside that group (issue 1373).
+  const toolLibraryCrumbs = $derived([
+    {
+      label: text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems'),
+      onSelect: () => selectSystemAndShowBrowser(),
+    },
+    { label: selectedSystem?.name, onSelect: () => editSystem(selectedSystem.id) },
+    { label: text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules') },
+  ]);
 </script>
 
 {#if !isToolStudioRoute}
@@ -233,35 +245,14 @@
 {/if}
 
 {#if currentView === 'tools' && selectedSystem}
-  <header class="manager-header manager-tools-context-header" data-tool-library-context>
-    <div class="manager-heading">
-      <nav
-        class="manager-breadcrumbs"
-        aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
-      >
-        <!-- The root this trail alone was missing: the Tool library has its own header and
-             began at the system name, so the two Tool screens disagreed (issue 1328). -->
-        <button type="button" onclick={() => selectSystemAndShowBrowser()}
-          >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
-        >
-        <i class="fas fa-chevron-right" aria-hidden="true"></i>
-        <button type="button" onclick={() => editSystem(selectedSystem.id)}
-          >{selectedSystem.name}</button
-        >
-        <!-- No `Crafting` crumb: the rail holds Tool Rules outside that group, and the Tool
-             editor's own trail never carried one either (issue 1373). -->
-        <i class="fas fa-chevron-right" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span>
-      </nav>
-      <h1 class="manager-title">
-        {text('FABRICATE.Admin.Manager.Tools.LibraryTitle', 'Tool Studio')}
-      </h1>
-      <p class="manager-subtitle">
-        {text(
-          'FABRICATE.Admin.Manager.Tools.LibrarySubtitle',
-          'Tools that recipes can require — from hand-held gear to fixed stations and places of power. Set how they break and who may wield them.'
-        )}
-      </p>
-    </div>
-  </header>
+  <PageHeader
+    class="manager-header manager-tools-context-header"
+    data-tool-library-context=""
+    breadcrumbs={toolLibraryCrumbs}
+    title={text('FABRICATE.Admin.Manager.Tools.LibraryTitle', 'Tool Studio')}
+    subtitle={text(
+      'FABRICATE.Admin.Manager.Tools.LibrarySubtitle',
+      'Tools that recipes can require — from hand-held gear to fixed stations and places of power. Set how they break and who may wield them.'
+    )}
+  />
 {/if}

@@ -14,6 +14,7 @@ import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.j
 import {
   ADDITIONAL_DICE_NOTICE_RAW_MODULES,
   CHECK_TARGET_RAW_MODULES,
+  GATHERING_DROPS_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
@@ -228,8 +229,7 @@ describe('GatheringView mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
+    for (const dropsModule of GATHERING_DROPS_COMPILED_MODULES) writeCompiledSvelte(dropsModule);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     for (const primitive of PLAYER_APP_COMPILED_MODULES) writeCompiledSvelte(primitive);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');

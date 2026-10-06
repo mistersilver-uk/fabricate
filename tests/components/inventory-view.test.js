@@ -99,6 +99,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
+    // The shared ladder the routed body draws, and the row each recovered result is (issue 1644).
+    'src/ui/svelte/components/OutcomeLadder.svelte',
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
@@ -1673,6 +1676,37 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       null,
       'no raw start–end attribute'
     );
+    // Issue 1644: the shared ladder, its hooks carried by per-item props.
+    const ladder = target.querySelector('[data-inventory-salvage-outcomes]');
+    assert.ok(ladder?.matches('[data-outcome-ladder]'), 'the outcomes are the shared ladder');
+    assert.ok(
+      bands.every((node) => node.matches('.manager-chip') && node.closest('.fab-outcome-tier')),
+      "each band is its tier's chip"
+    );
+    const award = ladder.querySelector(
+      ':scope [data-inventory-salvage-outcome="o2"] [data-list-row][data-inventory-salvage-result="c2"]'
+    );
+    assert.equal(award?.querySelector('.fabricate-list-row-name').textContent, 'Iron Shard');
+    assert.equal(award.querySelector('.fabricate-list-row-quantity').textContent, '×1');
+    assert.deepEqual(
+      [...ladder.querySelectorAll('[data-inventory-salvage-outcome]')].map(
+        (node) => node.dataset.outcomeSuccess
+      ),
+      ['false', 'true', 'false'],
+      'each tier keeps its success hook'
+    );
+    assert.equal(
+      ladder.querySelector(':scope [data-inventory-salvage-outcome="o1"] [data-outcome-status]')
+        .textContent,
+      'FABRICATE.Check.Evidence.Failure',
+      "a tier's status glyph is named"
+    );
+    assert.equal(
+      ladder.querySelector(':scope [data-inventory-salvage-outcome="o1"] [data-outcome-empty]')
+        .textContent,
+      'FABRICATE.App.Inventory.Salvage.OutcomeAwardsNothing',
+      'a tier with nothing says so'
+    );
 
     harness.remount();
     const relative = salvageServices(
@@ -1699,10 +1733,9 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       target.querySelector('[data-inventory-salvage-dc]').dataset.inventorySalvageDc,
       '15'
     );
-    assert.equal(
-      target.querySelector('[data-inventory-outcome-threshold]').dataset.inventoryOutcomeThreshold,
-      '15'
-    );
+    const threshold = target.querySelector('[data-inventory-outcome-threshold]');
+    assert.equal(threshold.dataset.inventoryOutcomeThreshold, '15');
+    assert.ok(threshold.matches('.fab-outcome-tier-heading > .manager-chip'), "the tier's chip");
     assert.equal(
       target.querySelector('[data-inventory-outcome-band]'),
       null,
@@ -1740,7 +1773,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       ]
     );
     assert.ok(
-      bands.every((node) => node.querySelector('.manager-chip.is-neutral')),
+      bands.every((node) => node.matches('.manager-chip.is-neutral')),
       'each band is the shared Chip, as the Journal ladder draws it'
     );
     assert.ok(
@@ -2661,7 +2694,11 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const marked = target.querySelectorAll('[data-outcome-rolled="true"]');
     assert.equal(marked.length, 1, 'exactly one tier is marked');
     assert.equal(marked[0].dataset.inventorySalvageOutcome, 'o2', 'and it is the one that matched');
-    assert.ok(marked[0].querySelector('[data-inventory-outcome-your-roll]'));
+    assert.equal(
+      marked[0].querySelector('[data-inventory-outcome-your-roll]').textContent.trim(),
+      'FABRICATE.App.Inventory.Salvage.YourRoll',
+      'the pill names the roll'
+    );
   });
 
   // Issue 2137: a successful count whose net is below the Botch row's floor marks that row, in
@@ -2716,6 +2753,8 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       awarded: [],
     };
     assert.deepEqual(await marked(failure), [], 'a failed salvage marks no row');
+    // Even one carrying a tier id and a net below the floor: only a success marks a row.
+    assert.deepEqual(await marked({ ...failure, outcomeId: 'o1', rollValue: -5 }), []);
   });
 });
 

@@ -109,6 +109,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1509: the editor tab strip, and the third key gained by neither of the two routes above —
   // the component did not acquire a state and it did not arrive.
   'src/ui/svelte/components/ChoiceOptionList.svelte',
+  // Issue 1782: the data table, on the drop rules card and the crafting IO table.
+  'src/ui/svelte/components/DataTable.svelte',
   // Issue 2006: the die tiles, a primitive ARRIVING, on the simulator's two rolled count frames.
   'src/ui/svelte/components/DiceTiles.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
@@ -144,6 +146,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1505: the surface that reports something that just happened.
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/OutcomeLadder.svelte',
+  // Issue 1777: the page header, on the Tool library and Tool editor frames.
+  'src/ui/svelte/components/PageHeader.svelte',
   // Issue 1518: the pager, on the player frames that draw its persistent and threshold forms.
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',

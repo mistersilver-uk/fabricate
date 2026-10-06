@@ -1989,8 +1989,7 @@ export class CraftingEngine {
         'CHECK_RESULT_INVALID'
       );
     }
-    // The executed product/direction ride the snapshot as claimed; `checkResolutionEvidence`
-    // alone decides whether they persist.
+    // Product and direction ride the snapshot; `checkResolutionEvidence` decides if they persist.
     const executedHistorySnapshots =
       historySnapshots.resolutionSnapshot?.kind === 'check'
         ? {
@@ -2191,6 +2190,7 @@ export class CraftingEngine {
         success: succeeded,
         disposition: succeeded ? 'succeeded' : 'failed',
         createdResultUuids: state.resultRecords.map((record) => record.itemUuid).filter(Boolean),
+        ...(succeeded && checkResult.data?.outcomeId && { outcomeId: checkResult.data.outcomeId }),
       }),
     };
   }

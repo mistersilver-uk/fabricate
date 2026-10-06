@@ -6,7 +6,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 implements the dense read-only image/name/quantity form for HistoricalRunDetail and StageCard, with OutcomeLadder and YieldScale adopting the same row. Medallion supplies the 22px art. The opt-in truncateName form retains full name/detail DOM and title text while the Journal host arranges four columns. The broader browse, selection, loading and error forms remain targets; the supported display API is recorded in the library. Rendered acceptance remains pending."
+      "why": "Issue 1648 implements the dense read-only image/name/quantity form for HistoricalRunDetail and StageCard, with OutcomeLadder and YieldScale adopting the same row. Medallion supplies the 22px art. The opt-in truncateName form retains full name/detail DOM and title text while the Journal host arranges four columns. Issue 1644 adds a root `class` and rest spread, after the class, so a caller's `data-*` hook reaches the row. The broader browse, selection, loading and error forms remain targets; the supported display API is recorded in the library. Rendered acceptance remains pending."
     },
     {
       "path": "src/ui/svelte/components/EssencePool.svelte",
@@ -30,7 +30,15 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified scale on RunDetail and HistoricalRunDetail. Default shared previews and explicit shared history retain one cut. The approved opt-in rollModel perRow/unknown forms omit that cut; labels.evidence presents independently recorded row fields, and null outcomes remain neutral. Historical quantities are individually attributable actual awards; unmatched receipts remain separate once. The components path selects broad evidence; rendered acceptance remains pending."
+      "why": "Issue 1648 promotes the specified scale on RunDetail and HistoricalRunDetail. Default shared previews and explicit shared history retain one cut. The approved opt-in rollModel perRow/unknown forms omit that cut; labels.evidence presents independently recorded row fields, and null outcomes remain neutral. Historical quantities are individually attributable actual awards; unmatched receipts remain separate once. Issue 1644 adds `order`: `authored` keeps entry order and draws no cut, and the gathering find list (`apps/gathering/GatheringTaskDrops.svelte`) passes it because gathering reward selection is by authored order, so the scale has three importers. Measured on its override frames it stays `target`: the dense row, the quantity, the chance chip and the kicker disagree with the specimen and are an OPEN planned-migrations row for issue 1523's sweep. The components path selects broad evidence; its override adds the two gathering frames."
+    },
+    {
+      "path": "src/ui/svelte/components/OutcomeLadder.svelte",
+      "library": "<OutcomeLadder>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1644 promotes the routed ladder on three importers: the Journal's previews (`apps/journal/RunDetail.svelte`), crafting's routed-by-check tiers (`apps/crafting/detail/OutcomeTierTable.svelte`) and salvage's routed body (`apps/inventory/detail/salvage/SalvageRoutedBody.svelte`). `reachedId` and `reachedLabel` mark the one tier a successful roll routed through, the band is optional, and each tier, band chip, pill and yield takes per-item `props`. Measured on its override frames, four figures disagree with the drawn specimen: the head glyph (14px against 10px), the band (a list-density Chip against bare mono text), the yields (40px ListRow rows against 24px wrapping chips) and the kicker (9px subtle against `k-kicker`). It stays target, and the planned-migrations table records all four for the geometry sweep."
     },
     {
       "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
@@ -127,6 +135,14 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "The editor tab strip. SIXTEEN importers under `src/` at issue 1779, which is the membership bar's own predicate, and TEN of them are wrapping strips: the system, environment, recipe-item, Checks, Knowledge, recipe, essence and tool strips, the player gathering detail strip and the Core-fallback Downtime strip each wrap it, while `ComponentEditView`, the world component, essence and tool entry pages, the player inventory component detail and the interactable browser render it inline without a wrapper. Before issue 1779, both figures fell by one at issue 1915, which retired `VocabularyTabs`: the Tags & Categories screen has no tab strip at all now, so the vocabulary wrapper is struck from that list rather than re-pointed. Both numbers are written out because this row said `8 callers` while nine files imported it — the inline caller was uncounted, and a single figure cannot say whether it means importers or wrappers. Issue 1509 re-measured both with `componentImporters.js` and found THIRTEEN importers and FOUR inline callers, not ten and one: the wrapper figure had not moved at all while the importer figure had drifted by three, which is exactly the failure a single number hides. `library.html:1137` specifies `<PageHeader> <TabBar>` and states that a studio never puts its tabs in a side rail. Its specimen also draws TWO Rail Marker Family vehicles on one bar — `Tiers 3` and `Businesses 23` as bare counts beside a warning badge on Validation — so drawing the family is part of what the entry specifies, not an extension of it, and spec.md requirement \"Near-neighbour primitives are routed by a stated rule\" forbids substituting one vehicle for another. Issue 1038 ruled the Checks section strip OUT of conversion, led by the reason that its count \"is a bare mono numeral, not a chip — the two treatments are deliberately different\"; that ruling was never recorded in this manifest, and it was wrong twice over — a deliberate STYLE divergence is the one kind a shared primitive may not record, and the strip was RIGHT about the marks while the primitive was too narrow to express them. Issue 1429 made the family a capability instead, and the Checks strip is a caller as of that change. Issue 1038's OTHER three conversions stand and are counted above — the recipe, essence and tool editors — and the capabilities they needed (a chip accessible name, a chip modifier class, the `positive` tone spelling and a suppressible tab hook) live on the primitive rather than in a hand-rolled strip. Issue 1429 converted the LAST hand-rolled strip, `TagsCategoriesView`'s inlined vocabulary tablist, by extracting it as `VocabularyTabs` first — it had survived issue 1038 only because it was not a standalone component and so was never counted. Issue 1915 then RETIRED that strip outright: the three vocabularies are rendered simultaneously through `VocabularyShell` and `VocabularyShellPanel`, so the screen the conversion was made for no longer has tabs, and the caller left this list rather than moving within it. Issue 1779 converted the last hand-rolled strip, `downtime/WorldDowntimeTabs`, by adding the four capabilities it needed — the tab-stop fallback, a per-tab accessible-name override, a per-tab description rendered beside the tablist, and the premium padlock as the `tierGated` tab state — so no manager strip is recorded as NOT a caller. ROOTED AT `fabricate-tabs` as of issue 1509, written at the head of its own tablist `class`, with its three vocabulary classes read out of a frozen `DEFAULT_CLASSES` map so the gate sees them as emission rather than as `$props()` defaults it has no reader for — without that hoist eleven of the family’s thirteen selectors would have read caller-owned and stayed application-rooted with the gate reporting the family clean. It is the ONE of that change’s five families that owns a control of its own, the `<button role=\"tab\">` it renders, so it is the one that declares both a font floor (`.fabricate-tabs button`, (0,1,1), in the shared group below the area baseline) and a NEW focus pair, strip above repaint. Broad as of issue 1509, and by DIRECTORY rather than by judgement: the move into `src/ui/svelte/components/` puts this file behind the components leg of `BROAD_SIGNAL_PATTERN`, which `selectRenderFileCases` consults BEFORE any case’s `sourceMatches`. The six cases that claimed it — one frame per wrapping editor — were re-expressed as this row’s `BROAD_SIGNAL_CASE_OVERRIDES` entry in the same commit, so the routing is preserved and the judgement now says where it comes from."
+    },
+    {
+      "path": "src/ui/svelte/components/PageHeader.svelte",
+      "library": "<PageHeader>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "manager-only",
+      "why": "The page header (issue 1777): a breadcrumb trail of `{label, onSelect?}` crumbs, an optional kicker, a title and subtitle or an `identity` snippet, and a trailing `actions` snippet. 2 importing files, measured by `componentImporters.js`, which is the membership bar: `apps/manager/ToolEditView.svelte` draws the Tool editor's header and `apps/manager/ManagerPageHeader.svelte` the Tool library's; the manager's other page headers render through it in a later change of the same issue. `target` because both callers keep the Tool screens' shipped geometry, which disagrees with the `library.html` specimen, so the disagreement is escalated rather than settled (issue 1777 decision E4) and the geometry converges in issue 1523. Broad through the `components/` leg of `BROAD_SIGNAL_PATTERN`, with a `BROAD_SIGNAL_CASE_OVERRIDES` entry naming the two Tool parity frames, because neither representative frame draws a Tool screen. Scoped `manager-only`: both importers are manager surfaces, and the vocabulary classes it writes (`manager-heading`, `manager-breadcrumbs`, `manager-title`, `manager-subtitle`) are still rooted at `.fabricate-manager`, so it renders unstyled outside the manager until that family is re-rooted at `fabricate-page-header`."
     },
     {
       "path": "src/ui/svelte/components/EditorValidationSurface.svelte",
@@ -326,7 +342,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "The product's one horizontal fill bar: a LEAF that renders the track and a value-width fill and no `role`, because the accessible semantics differ per site. Issue 1782 puts the three instruments `library.html` splits it into over it, so its importers are `components/Meter.svelte`, `components/BandedBar.svelte` and `components/StageBars.svelte`, each owning the one role its reading needs, plus `apps/gathering/GatheringTaskDrops.svelte`'s per-drop chance track, which keeps the bare leaf because its summary is a button whose children are presentational. It corresponds to no single library entry by the library's own account, which is why it stays `target` with `library: null`. Its broad-signal override names the opened drop row, the one frame that draws the bare leaf."
+      "why": "The product's one horizontal fill bar: a LEAF that renders the track and a value-width fill and no `role`, because the accessible semantics differ per site. Issue 1782 puts the three instruments `library.html` splits it into over it, so its importers are `components/Meter.svelte`, `components/BandedBar.svelte` and `components/StageBars.svelte`, each owning the one role its reading needs; issue 1644 retired its fourth, `apps/gathering/GatheringTaskDrops.svelte`'s bare per-drop chance track, when the find list moved onto `YieldScale`. It corresponds to no single library entry by the library's own account, which is why it stays `target` with `library: null`. With no app caller left, its broad-signal override names one frame per instrument: the run detail's stage track, the crafting essence meter and the gathering chance bar."
     },
     {
       "path": "src/ui/svelte/components/IconButton.svelte",
@@ -655,6 +671,14 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "Issue 1782 builds the specified inspector rail SECTION: a bare column at `--fab-space-2`, opened by the manager's eyebrow when it takes a `label`, which then names it as a `group`; unlabelled it is an unnamed `<section>`, never a `region`. It is one section of a right-hand inspector column, never the column itself, `ManagerNavRail`'s `.manager-rail-block` or `AppRail`. Three importers: `apps/manager/essences/EssenceBrowserInspector.svelte` (seven sections, three of them labelled, each a hand-written column at that gap), `apps/manager/tools/ToolBrowserInspector.svelte` (its Effective rules and Inheritance groups, kicker-and-body pairs that sat bare in the tool card and keep its 14px rhythm and flush kicker through a caller rule) and `apps/manager/RecipeItemEditor.svelte` (its two preview-rail sections, a column at that gap whose kickers keep their own size and tracking through a caller rule). `shipped`: the specimen was re-derived to the essence inspector, the exemplar, so no converted frame moves. Scoped `shared`: its family is rooted at `fab-rail`, the class it writes, in its own scoped block, so it paints wherever it is mounted. Its broad-signal override names a frame of each inspector."
+    },
+    {
+      "path": "src/ui/svelte/components/DataTable.svelte",
+      "library": "<DataTable>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1782 builds the specified table for records compared down columns, under ruling 3 (2026-09-19): a `<table>` whose visible `<caption>` is the `heading` and the `count` and names it, a caller `search` snippet at the caption's end, a `cell` snippet, a `<th scope=\"row\">` column, selection as `is-selected` on the `<tr>` by a pointer click with the row never focusable, `rowData(row)` and a `rowAction` on each row, and the shipped `Pagination` when it pages. Two importers: `apps/manager/gathering-task/GatheringTaskDropsCard.svelte` (the drop rules, paged, searchable, selectable and ranked, each row a drop target) and `apps/crafting/detail/IoTable.svelte` (its essence, tool and output groups, bounded and unpaged; its ingredient rail is not a table). The outcome-tier table is not a caller: it is a ladder, routed to `<OutcomeLadder>`. Scoped `shared`: its family is rooted at `fabricate-data-table`, the class it writes, in the module sheet, and it re-roots the drop table's retired `manager-gathering-task-drop-*` grid. Its broad-signal override names the drop rules with a row selected, the ranked table at the intermediate width, and the crafting outputs holding a choice group."
     }
   ],
   "notAPrimitive": [
@@ -783,15 +807,6 @@
         "src/ui/svelte/apps/journal/RunDetail.svelte"
       ],
       "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Measured at issue 1644 on `fabricate-journal-lifecycle-past-stage` and `-future-stage`, it matches its canonical spec, and its library specimen reads `shipped`."
-    },
-    {
-      "path": "src/ui/svelte/components/OutcomeLadder.svelte",
-      "library": "<OutcomeLadder>",
-      "evidence": "broad",
-      "callers": [
-        "src/ui/svelte/apps/journal/RunDetail.svelte"
-      ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
     },
     {
       "path": "src/ui/svelte/components/StageBars.svelte",

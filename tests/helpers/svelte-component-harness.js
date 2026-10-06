@@ -357,6 +357,16 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
 ]);
 
+// The gathering find section (issue 1644): the shared scale, its rows, the one disclosure beneath
+// them and the per-drop breakdown it opens.
+export const GATHERING_DROPS_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/ListRow.svelte',
+  'src/ui/svelte/components/YieldScale.svelte',
+  'src/ui/svelte/components/RowDisclosure.svelte',
+  'src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte',
+  'src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte',
+]);
+
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
 /** `src/systems/checkTarget.js` and its import closure. */
 export const CHECK_TARGET_RAW_MODULES = Object.freeze([
@@ -550,6 +560,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // The check card is a strip of current values (issue 1521).
   'src/ui/svelte/components/InfoStrip.svelte',
   'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
+  // Its essence, tool and output groups' table (issue 1782).
+  'src/ui/svelte/components/DataTable.svelte',
   // IoTable is the requirement surface's composition root (issue 917) and renders these; the
   // rail renders the shared chooser, which draws the shared slot tile.
   'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
@@ -564,6 +576,9 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // are already listed, so omitting this HANGS every mounted crafting suite.
   'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
+  // The shared ladder the table above adapts, and the row each award draws (issue 1644).
+  'src/ui/svelte/components/OutcomeLadder.svelte',
+  'src/ui/svelte/components/ListRow.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
   // Issue 1773: the one award pill the three above render.
   'src/ui/svelte/apps/crafting/detail/AwardPill.svelte',

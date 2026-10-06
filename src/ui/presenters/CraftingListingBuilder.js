@@ -1088,17 +1088,14 @@ export class CraftingListingBuilder {
   }
 
   /**
-   * Outcome tiers for `routedByCheck` mode only (null for every other mode). Each
-   * tier's award is resolved through `ResolutionModeService.resolveResultGroups`
-   * so the success-only routing, single-result-group exemption, and
-   * checkOutcomeIds→name→unrouted precedence are honoured identically to a real
-   * attempt. A `success === false` tier never routes and awards nothing.
-   *
-   * Tiers that produce the exact same result signature (same components + counts,
-   * and the same success flag) are collapsed into a single entry whose `names`
-   * lists every contributing tier in first-appearance order, so the OUTCOMES panel
-   * shows one row per distinct result rather than one row per tier.
-   * @returns {Array<{id: string|null, names: string[], success: boolean,
+   * Outcome tiers for `routedByCheck` mode only (null for every other mode). Each tier's award
+   * resolves through `ResolutionModeService.resolveResultGroups`, so success-only routing, the
+   * single-result-group exemption and checkOutcomeIds→name→unrouted precedence match a real
+   * attempt; a `success === false` tier never routes and awards nothing.
+   * Tiers that produce the exact same result signature (same components + counts, and
+   * the same success flag) collapse into one entry whose `names` and `ids` list every
+   * contributing tier in first-appearance order: one OUTCOMES row per distinct result.
+   * @returns {Array<{id: string|null, ids: string[], names: string[], success: boolean,
    *   awardedResults: Array<{name: string, img: string|null, qty: number}>}>|null}
    * @private
    */
@@ -1122,12 +1119,15 @@ export class CraftingListingBuilder {
       }
       const key = `${success ? 's' : 'f'}|${this._resultSignature(resolvedGroups)}`;
       const existing = byKey.get(key);
+      const id = stringOrNull(tier?.id);
       if (existing) {
         existing.names.push(stringOrEmpty(tier?.name));
+        if (id !== null) existing.ids.push(id);
         continue;
       }
       const entry = {
-        id: stringOrNull(tier?.id),
+        id,
+        ids: id === null ? [] : [id],
         names: [stringOrEmpty(tier?.name)],
         success,
         awardedResults: success

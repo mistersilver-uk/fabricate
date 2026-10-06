@@ -9,6 +9,8 @@ const PART = (name) => `src/ui/svelte/apps/manager/gathering-task/GatheringTask$
 export const GATHERING_TASK_EDITOR_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
+  // The drop rules card's table (issue 1782).
+  'src/ui/svelte/components/DataTable.svelte',
   ...[
     'Card',
     'AvailabilityCard',
@@ -17,7 +19,7 @@ export const GATHERING_TASK_EDITOR_COMPILED_MODULES = Object.freeze([
     'RequiredToolsCard',
     'NodesCard',
     'ComponentBrowserCard',
-    'DropRow',
+    'DropCell',
     'DropsCard',
     'OverviewTab',
     'RequirementsTab',

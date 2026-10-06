@@ -58,6 +58,8 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/Rail.svelte',
   // The log list (issue 1782): every tree holding the journal's Finished list renders it.
   'src/ui/svelte/components/LogList.svelte',
+  // The data table (issue 1782): the gathering task editor's drop rules and the crafting IO table.
+  'src/ui/svelte/components/DataTable.svelte',
   // Three the manager and the player window both render, adjudicated in when the two-root clause
   // below arrived (issue 1782): the dice faces of a check's evidence and outcome preview, the
   // segmented choice the browse filters and the Checks Studio share, and the inset well the
@@ -165,6 +167,12 @@ const SHARED_PRIMITIVES = [
   // The browse pager (issue 1518): every player browse list and the inventory inspector's
   // per-section lists render it, beside the manager's browse screens.
   'src/ui/svelte/components/Pagination.svelte',
+  // The routed ladder and its dense row (issue 1644): crafting's routed tiers and salvage's routed
+  // body draw them, and the recipe-item preview carries that salvage body into the manager tree.
+  'src/ui/svelte/components/OutcomeLadder.svelte',
+  'src/ui/svelte/components/ListRow.svelte',
+  // The yield scale (issue 1644): the gathering find section draws it over the same dense row.
+  'src/ui/svelte/components/YieldScale.svelte',
 ];
 
 /** Components adjudicated AGAINST membership, and why a non-entry is worth recording. */
