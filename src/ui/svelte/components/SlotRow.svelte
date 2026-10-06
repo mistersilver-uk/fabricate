@@ -1,5 +1,6 @@
 <!-- A requirement row composes fixed or selectable material evidence supplied by its caller. -->
 <script>
+  import { focusWhenEnabled } from '../util/focusWhenEnabled.js';
   import ChoiceOptionList from './ChoiceOptionList.svelte';
   import SlotTile from './SlotTile.svelte';
 
@@ -74,7 +75,7 @@
     openSlot = '';
     const tiles = [...root.querySelectorAll('[data-slot-id]')];
     const tile = tiles.find((entry) => entry.dataset.slotId === slotId);
-    tile?.querySelector('button')?.focus();
+    focusWhenEnabled(tile?.querySelector('button'));
   }
 </script>
 

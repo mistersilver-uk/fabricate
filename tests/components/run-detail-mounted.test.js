@@ -38,6 +38,8 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-run-detail-',
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
+    // Issue 1644: a candidate and its slot tile keep focus across a pending command.
+    'src/ui/svelte/util/focusWhenEnabled.js',
     // Issue 1504/1506: the raw closure the shared `<Select>` reaches through
     // `SearchablePopover`, which the compiled `<Chip>` closure below arrives with.
     ...SEARCHABLE_POPOVER_RAW_MODULES,

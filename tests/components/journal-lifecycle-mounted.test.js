@@ -47,6 +47,8 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-journal-lifecycle-',
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
+    // Issue 1644: a candidate and its slot tile keep focus across a pending command.
+    'src/ui/svelte/util/focusWhenEnabled.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
@@ -1624,25 +1626,49 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
   it('keeps the list open on an arrow choice and closes it onto the slot tile on activation', async () => {
     const mounted = await mountState('waiting-open-choice');
+    // Chromium drops focus to the body the moment a focused control is disabled, as each one is
+    // while the choice's command is pending. happy-dom does not, so the drop is played here;
+    // focus-when-enabled-rendered.test.js proves the browser half.
+    const chromiumBlur = new globalThis.window.MutationObserver((records) => {
+      for (const { target } of records) {
+        if (target.disabled && globalThis.document.activeElement === target) {
+          globalThis.document.body.focus();
+        }
+      }
+    });
+    chromiumBlur.observe(mounted.target, { attributes: true, attributeFilter: ['disabled'], subtree: true });
+    const press = (element, key) =>
+      element.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key, bubbles: true }));
+    const pending = async () => {
+      flushSync();
+      await Promise.resolve();
+      return [Boolean(mounted.store.busyRunKey), globalThis.document.activeElement?.tagName];
+    };
     const tile = () => mounted.target.querySelector(':scope [data-slot-id="metal"] button');
     const list = () =>
       mounted.target.querySelector(':scope [data-slot-row] [data-choice-options="metal"]');
-    tile().click();
-    flushSync();
-    const radios = [...list().querySelectorAll('[role="radio"]:not(:disabled)')];
-    assert.ok(radios.length > 1, 'the open slot offers more than one candidate');
-    const start = radios.find((radio) => radio.tabIndex === 0);
-    start.focus();
-    start.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-    await settleAction();
-    assert.ok(list(), 'an arrow choice leaves the list open');
-    const focused = globalThis.document.activeElement;
-    assert.ok(focused !== start && list().contains(focused), 'focus moves to the next candidate');
-    assert.equal(focused.getAttribute('aria-checked'), 'true', 'and that candidate is checked');
-    focused.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    await settleAction();
-    assert.ok(!list(), 'activation closes the list');
-    assert.ok(globalThis.document.activeElement === tile(), 'focus returns to the slot tile');
+    try {
+      tile().click();
+      flushSync();
+      const radios = [...list().querySelectorAll('[role="radio"]:not(:disabled)')];
+      assert.ok(radios.length > 1, 'the open slot offers more than one candidate');
+      const start = radios.find((radio) => radio.tabIndex === 0);
+      start.focus();
+      press(start, 'ArrowRight');
+      assert.deepEqual(await pending(), [true, 'BODY'], 'the pending command drops focus');
+      await settleAction();
+      assert.ok(list(), 'an arrow choice leaves the list open');
+      const focused = globalThis.document.activeElement;
+      assert.ok(focused !== start && list().contains(focused), 'focus returns to the next candidate');
+      assert.equal(focused.getAttribute('aria-checked'), 'true', 'and that candidate is checked');
+      press(focused, 'Enter');
+      assert.deepEqual(await pending(), [true, 'BODY']);
+      await settleAction();
+      assert.ok(!list(), 'activation closes the list');
+      assert.ok(globalThis.document.activeElement === tile(), 'focus returns to the slot tile');
+    } finally {
+      chromiumBlur.disconnect();
+    }
   });
 
   it('states confirmed receipt rows, uncertainty and unstarted effects with strict redaction', async () => {

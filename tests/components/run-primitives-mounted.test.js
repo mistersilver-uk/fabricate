@@ -33,16 +33,13 @@ const runActionHarness = createHarness(
 const worldClockHarness = createHarness('WorldClockChip', [component('Chip')]);
 const listRowHarness = createHarness('ListRow', [component('Medallion')]);
 const chipHarness = createHarness('Chip');
-const slotRowHarness = createHarness('SlotRow', [
-  component('SlotTile'),
-  component('ChoiceOptionList'),
-  component('Medallion'),
-  component('Kicker'),
-]);
-const choiceListHarness = createHarness('ChoiceOptionList', [
-  component('Medallion'),
-  component('Kicker'),
-]);
+const FOCUS_WHEN_ENABLED = ['src/ui/svelte/util/focusWhenEnabled.js'];
+const slotRowHarness = createHarness(
+  'SlotRow',
+  [component('SlotTile'), component('ChoiceOptionList'), component('Medallion'), component('Kicker')],
+  FOCUS_WHEN_ENABLED
+);
+const choiceListHarness = createHarness('ChoiceOptionList', [component('Medallion'), component('Kicker')], FOCUS_WHEN_ENABLED);
 const essenceHarness = createHarness('EssencePool', [
   component('FillBar'),
   component('Meter'),

@@ -36,6 +36,8 @@ const harness = createMountedComponentHarness({
   // import closure and names the importer chain, the specifier and the target list.
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
+    // Issue 1644: a candidate and its slot tile keep focus across a pending command.
+    'src/ui/svelte/util/focusWhenEnabled.js',
     // The salvage action's state the inspector header and panel share (issue 1518).
     'src/ui/svelte/apps/inventory/detail/salvage/salvageAction.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.

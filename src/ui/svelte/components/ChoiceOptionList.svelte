@@ -8,6 +8,7 @@
   caller's own refusal. The rest spread lands on the root.
 -->
 <script>
+  import { focusWhenEnabled } from '../util/focusWhenEnabled.js';
   import Kicker from './Kicker.svelte';
   import Medallion from './Medallion.svelte';
 
@@ -83,7 +84,7 @@
     if (next < 0) return;
     event.preventDefault();
     onChoose(slotId, rows[next].option.id, { via: 'arrow' });
-    event.currentTarget.parentElement.querySelectorAll('[role="radio"]')[next]?.focus();
+    focusWhenEnabled(event.currentTarget.parentElement.querySelectorAll('[role="radio"]')[next]);
   }
 </script>
 

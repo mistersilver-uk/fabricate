@@ -15,6 +15,7 @@ const harness = createMountedComponentHarness({
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
+    'src/ui/svelte/util/focusWhenEnabled.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
