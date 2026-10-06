@@ -199,7 +199,6 @@
   truncateName
   {selected}
   onOpen={activate}
-  nameClass="journal-run-card-name"
   openProps={{
     class: ['journal-run-card', { 'is-selected': selected }],
     'data-run-id': id,

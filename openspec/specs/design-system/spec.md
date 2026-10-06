@@ -42,8 +42,8 @@ The host MAY arrange dense rows in a four-column `minmax(0, 1fr)` grid without c
 ListRow MAY also draw a selectable form, at `density` dense or default and `layout` row or card.
 With `onOpen`, the row's content MUST be one native button holding phrasing content only and carrying `data-keyboard-focus`, and that button is pressed only while `selected` is given and true.
 The button is named by the item's name followed by each state the row shows only visually.
-Its `trailing` controls MUST sit beside the button, and block content sits in its `aside`, beside the button as well.
-With neither `onOpen` nor `openProps` nor any other prop of the selectable form, the dense output MUST be unchanged.
+The row's `trailing` controls MUST sit beside the button, and block content sits in its `aside`, beneath it, outside it.
+A ListRow given none of the selectable form's props MUST draw the dense output unchanged.
 Its loading and error forms remain targets in the library.
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 
