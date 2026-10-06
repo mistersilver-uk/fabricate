@@ -367,18 +367,22 @@ A component can claim a full source-reference chain through `registeredItemUuid`
 
 #### World component registration
 
-Every import also makes the component a world component the system holds, so it appears in the world Component catalogue.
+Every import also registers the component as a world component the system holds, so it appears in the world Component catalogue.
 Only a GM client writes the catalogue.
 
 - A new component whose source an existing world component already shares adopts that world component.
-  The new component takes its id, no second world component is created, and the component follows the world category and world essence values until the system overrides them.
-  A category staged by a folder-mapping import is kept as the system's own override instead.
+  The new component takes its id, no second world component is created, and the component follows any world category and world essence values that world component already carries until the system overrides them.
+  A category staged by a folder-mapping import is kept as the system's own override against a world category the adopted world component already carries.
   If the system already holds a component under that id, nothing is written to the catalogue.
-- A new component that no world component shares creates one from the component's name, image, description and source.
+- A new component that no world component shares registers a new one from the component's name, image, description and source.
+  A newly registered component carries no world category and no world essence values, so the system resolves its own values until they are authored.
+  A staged category is an ordinary value of the system, and a world category authored later replaces it in that system unless the system overrides it.
 - A component the import finds already present with no world component gains one, and it keeps every value it resolved before.
-- A component that already has a world component under a different id sharing its source is left without one.
+- A component is left without one when the world component sharing its source has a different id from the component's own, typically because another system imported the item first.
   Linking it would renumber a component that recipes, salvage results, gathering drops, tools and owned items may name.
-  To recover, delete the other world component in the catalogue while no system holds it, then import again.
+  To recover, check what uses the other system's component for that item, then remove it from every system that holds it, which rewrites the recipes that name it.
+  Then delete the other world component in the catalogue, which is only possible once no system holds it, and import again.
+  Where several systems hold the same item, import it again first in the systems that already hold it, because importing it into a new system first gives that system a world component the older components cannot adopt.
 - An Item that belongs to an actor is imported as before and registers nothing.
 - A call with `persist: false` and no `registrations` array registers nothing, because it has no way to flush after its own save.
 - With no catalogue available, the import behaves as it did before.

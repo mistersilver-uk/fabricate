@@ -80,7 +80,7 @@ Drop the item from the Items directory or a compendium instead.
 This drop zone creates the shared world record on its own.
 It does not add the component to any crafting system.
 Add it to a system from the entry's per-system rows, or from a crafting system's own Component Rules screen, described below.
-Importing an item into a crafting system also creates a world record, and it holds the component in that system at the same time, as described under [Imports also create world components](#imports-also-create-world-components).
+Importing an item into a crafting system also registers a world component, and the system holds it at the same time, as described under [Imports also register world components](#imports-also-register-world-components).
 
 ### What the catalogue actually shares
 
@@ -277,7 +277,7 @@ It tells you when the world catalogue has no components at all, when this system
 
 The list opens with its first component already selected, and a component you reached by a link from its world entry, or had selected before, is kept instead.
 Changing the sort, a filter, or the cohort never moves the selection, and a dimmed ghost row from the world catalogue is never selected for you.
-Selecting a component that has a world record shows a **Shared identity** card in the inspector, stating that its name, art, and description are authored in the world Component catalogue, and naming how many other systems also have rules for it when there is at least one, with an **Edit shared identity** link to that component's world entry.
+Selecting a component that has a world component shows a **Shared identity** card in the inspector, stating that its name, art, and description are authored in the world Component catalogue, and naming how many other systems also have rules for it when there is at least one, with an **Edit shared identity** link to that component's world entry.
 The editor carries its own version of this card too, described below.
 
 ## Adding Components
@@ -362,19 +362,24 @@ If any imported item has a broken original source link, Fabricate warns once wit
 Items that are already registered add no fallback and are not counted.
 If the folder contains no Item documents, a notification says so and nothing is written.
 
-### Imports also create world components
+### Imports also register world components
 
-Every import above makes the component a world component in the world Component catalogue as well, and the system you imported into holds it.
+Every import above also registers the component as a world component in the world Component catalogue, and the system you imported into holds it.
 That covers a single drop, a pack drop, a folder drop and its category mapping step, and the Compendium Directory action.
 Before, an imported component had no catalogue entry, so it could not be added to another system from the catalogue.
 
 - If the item is not linked to any world component, Fabricate creates one carrying the component's name, image, and description.
+  A newly registered component carries no world category and no world essence values, so the system resolves its own values until a world category or world essence values are authored.
+  A category you chose for a folder in the mapping step is an ordinary value of this system.
+  A world category authored later replaces it in this system unless the system overrides it.
 - If the item is already linked to a world component, because you dropped it on the catalogue or another system imported it, this system adopts that one instead of creating a second.
-  The new component then follows the world category and the world essence values, like any component added from the catalogue.
-  A category you chose for a folder in the mapping step is the exception, and stays this system's own.
+  The new component follows any world category and world essence values that world component already carries, like any component added from the catalogue.
+  A category you chose for a folder in the mapping step is kept as this system's own against a world category the adopted world component already carries.
 - An item that belongs to an actor is imported as before and does not become a world component.
 
 A component held by one system is labelled as authored in the world catalogue, and no longer reads as shared with other systems.
+<!-- markdownlint-disable-next-line markdownlint-sentences-per-line -->
+The rules editor says "Name, image and description are authored in the world catalogue. Everything below belongs to {system} alone."
 
 If the world catalogue cannot be updated, the import still succeeds and one warning says so.
 <!-- markdownlint-disable-next-line markdownlint-sentences-per-line -->
@@ -388,12 +393,22 @@ Drop the items again, or import the folder or pack again.
 Nothing else about those components changes, and they keep every value they had.
 
 There is one limit.
-If a world component for that item already exists under a different component, the older component is left without one.
+If the world component for that item has a different id from this system's component, this system's component is left without one.
 This is typically because another system imported the item first.
 Linking it would mean renumbering a component that recipes already reference, and an import never does that.
-To recover, delete the other world component in the catalogue once no system holds it, then import again.
-In a world where several systems hold the same item, import again in each system that already holds it before importing it into a new one.
-That order lets them all share one world component.
+
+To recover, work in this order.
+
+1. Check what uses the other system's component for that item, because removing it rewrites the recipes that name it.
+2. Remove that component from every crafting system that holds it.
+   The **Systems using this component** card on its catalogue entry and the bulk remove both do this.
+   Removing it from a system does not delete its catalogue entry.
+3. Delete the world component's entry in the catalogue.
+   This only becomes possible once no system holds it.
+4. Import the item again.
+
+In a world where several systems hold the same item, import it again first in the systems that already hold it.
+Importing it into a new system first gives that system a world component that the older components cannot adopt.
 
 {: .note }
 > Bulk pack import requires that Foundry emits a compendium-type drag event from the pack header row.
@@ -479,11 +494,11 @@ Two tabs sit below it, **Component rules** and **Validation**.
 If you leave with unsaved changes, Fabricate asks you to confirm first.
 
 The page starts with one identity callout carrying the component's icon and name.
-When the component has a world record, the callout also carries a **World catalogue** pill, a note, and an **Edit shared identity** link to the component's world entry.
+When the component has a world component, the callout also carries a **World catalogue** pill, a note, and an **Edit shared identity** link to the component's world entry.
 The note says the name, image, and description are authored in the world catalogue, and counts the other systems that share them when there is at least one.
 A component held by this system alone says so without any count, so it never reads as shared with zero other systems.
-A component with no world record carries a note saying its name, image, and description are this system's own instead.
-Items you import into a system get a world record automatically, as described under [Imports also create world components](#imports-also-create-world-components).
+A component with no world component carries a note saying its name, image, and description are this system's own instead.
+Items you import into a system are registered as world components automatically, as described under [Imports also register world components](#imports-also-register-world-components).
 A component imported before that was added may still have none, and [importing it again](#importing-again-and-its-limit) gives it one.
 Name, image, and description are never typed on this screen.
 They come from wherever they are actually authored, the linked item or the world entry.
