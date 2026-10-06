@@ -11,6 +11,7 @@
 <script>
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import GatheringEventInspector from './GatheringEventInspector.svelte';
   import GatheringRulesInspector from './GatheringRulesInspector.svelte';
   import GatheringTaskInspector from './GatheringTaskInspector.svelte';
@@ -228,10 +229,7 @@
     {onRenameRealm}
   />
 {:else if currentView === 'environments' && activeGatheringInspectorTab}
-  <section
-    class="fabricate-card"
-    data-gathering-inspector-placeholder={activeGatheringInspectorTab.id}
-  >
+  <InspectorCard data-gathering-inspector-placeholder={activeGatheringInspectorTab.id}>
     <div class="manager-inspector-title-row is-hero-large">
       <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
         <i class={activeGatheringInspectorTab.icon}></i>
@@ -248,9 +246,9 @@
     <p class="manager-muted">
       {text(activeGatheringInspectorTab.hintKey, activeGatheringInspectorTab.hintFallback)}
     </p>
-  </section>
+  </InspectorCard>
 {:else if selectedEnvironment}
-  <section class="fabricate-card">
+  <InspectorCard>
     <img
       class={`manager-environment-preview ${hasEnvironmentImage(selectedEnvironment) ? '' : 'is-fallback'}`}
       src={environmentImage(selectedEnvironment)}
@@ -276,9 +274,9 @@
       {truncateDescription(selectedEnvironment.description) ||
         text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
     </p>
-  </section>
+  </InspectorCard>
 
-  <section class="fabricate-card">
+  <InspectorCard>
     <h3 class="manager-card-title">
       {text('FABRICATE.Admin.Manager.Environment.Details', 'Environment details')}
     </h3>
@@ -302,10 +300,10 @@
         </div>
       {/if}
     </div>
-  </section>
+  </InspectorCard>
 
   {#if environmentDirtyFor(selectedEnvironment) || environmentInvalidFor(selectedEnvironment) || environmentSaveError}
-    <section class="fabricate-card">
+    <InspectorCard>
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Environment.DraftState', 'Draft state')}
       </h3>
@@ -325,7 +323,7 @@
       {#if environmentSaveError}
         <p class="manager-muted">{environmentSaveError}</p>
       {/if}
-    </section>
+    </InspectorCard>
   {/if}
 {:else if environmentList.length === 0}
   <section

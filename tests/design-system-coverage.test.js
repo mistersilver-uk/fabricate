@@ -208,7 +208,6 @@ test('every manifest library name resolves to a library entry', () => {
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BrowseCard',
-  'DataTable',
   'NavSidebar', 'PageHeader',
   'Search',
   'TierTrack', 'ViewToggle', 'XrefList',
@@ -451,6 +450,7 @@ const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
 const RE_ROOTED_ROWS = [
   'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
+  'src/ui/svelte/components/DataTable.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/Field.svelte',
@@ -626,6 +626,7 @@ const BUILT_BY_1782 = [
   'SetPicker',
   'Rail',
   'LogList',
+  'DataTable',
 ];
 
 /** Names issue 1782 merged away, which must be no entry and must be on the ruled-out register. */

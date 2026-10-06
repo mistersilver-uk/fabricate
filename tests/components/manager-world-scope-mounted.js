@@ -645,6 +645,7 @@ export function registerWorldScopeCases() {
       'the travel inspector marks itself as the travel branch of the inspector chain'
     );
     assert.equal(inspector.getAttribute('data-travel-inspector'), 'realms');
+    assert.ok(!inspector.classList.contains('is-empty'), 'a selected realm is not the empty state');
     assert.equal(
       inspector.querySelector('.manager-inspector-name').textContent.trim(),
       'Green March',
@@ -685,6 +686,10 @@ export function registerWorldScopeCases() {
       target.querySelector('.manager-travel-inspector').getAttribute('data-travel-inspector'),
       'map',
       'the one card follows the tab rather than being two cards'
+    );
+    assert.ok(
+      target.querySelector('.manager-travel-inspector').classList.contains('is-empty'),
+      'the map tab with no region selected draws the empty state'
     );
   });
 

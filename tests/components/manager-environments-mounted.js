@@ -960,9 +960,14 @@ export function registerEnvironmentsCases() {
     assert.equal(target.querySelector('[data-gathering-task-matching-logic]'), null);
     assert.ok(target.textContent.includes('Drop chance'));
     assert.equal(target.querySelector('.manager-task-card-header .manager-drop-count'), null);
-    assert.ok(target.querySelector('.manager-task-drop-footer [data-gathering-task-drop-count]'));
+    // The count is the drop table's own caption since issue 1782, beside its heading.
+    assert.equal(
+      target.querySelector('[data-gathering-task-drops-table] caption .fabricate-data-table-count')
+        ?.textContent,
+      String(target.querySelectorAll('tr[data-gathering-task-drop-id]').length)
+    );
     const dropColumnHeaders = Array.from(
-      target.querySelectorAll('[data-gathering-task-drops-table] [role="columnheader"]')
+      target.querySelectorAll('[data-gathering-task-drops-table] th[scope="col"]')
     ).map((node) => node.textContent.trim());
     assert.ok(dropColumnHeaders.includes('Count'));
     assert.ok(

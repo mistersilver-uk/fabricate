@@ -331,7 +331,7 @@ describe('RecipeDetail mounted behavior', () => {
     });
 
     const label = target.querySelector(
-      '[data-io-group="tools"] .crafting-io-row .crafting-io-tool-label'
+      '[data-io-group="tools"] tr[data-io-satisfied] .crafting-io-tool-label'
     );
     assert.ok(label, 'tool label wrapper rendered');
     const thumb = label.querySelector('[data-medallion="image"] img');

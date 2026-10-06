@@ -58,6 +58,8 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/Rail.svelte',
   // The log list (issue 1782): every tree holding the journal's Finished list renders it.
   'src/ui/svelte/components/LogList.svelte',
+  // The data table (issue 1782): the gathering task editor's drop rules and the crafting IO table.
+  'src/ui/svelte/components/DataTable.svelte',
   // Three the manager and the player window both render, adjudicated in when the two-root clause
   // below arrived (issue 1782): the dice faces of a check's evidence and outcome preview, the
   // segmented choice the browse filters and the Checks Studio share, and the inset well the

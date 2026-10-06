@@ -121,7 +121,7 @@ An entry whose specimen states no Svelte API therefore cannot read `shipped`, be
 A heading that names several primitives MUST declare a status PER NAME, so every member of the set carries exactly one, and the block's own value is the weakest of them — `divergent` if any name is, otherwise `target` if any name is, otherwise `shipped`.
 The status is declared on the block rather than inside the heading, because a status written there would be read as part of the vocabulary the heading is: the census pins the text of the 20 prose headings verbatim, and the 40 naming headings are pinned instead by the rule that a naming heading is exactly the names it declares and nothing else, which is what keeps the status chip beside the heading rather than inside it.
 
-Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the `deferred: root convergence pending` exemptions in the source-contract tests record.
+Status is FIDELITY of the shipped API and geometry to the specimen, and it is a different axis from ADOPTION debt — how many call sites have converted onto a primitive — which the per-file deferral exemptions in the source-contract tests record.
 An entry may be `shipped` while most of the tree still hand-rolls the thing it replaces, and an entry whose every caller is perfect may be `target` because the specimen names props nothing has built.
 A single inline disagreement between a shipped component and its specimen puts that entry at `target`, and the library's planned-migrations table carries the row that says what the disagreement is and what it moves to.
 That row is not a licence to leave the entry at `shipped`, and it is not `divergent` either, which is reserved for a decision that the component STAYS different.
@@ -221,6 +221,7 @@ The same issue adds the rule pair: `RuleRow` emits `fabricate-rule-row` on its o
 The same issue adds `SetPicker`, which emits `fabricate-set-picker` on its own root and the rest of its `fabricate-set-picker-*` family beneath it and on the panel parts it hands `SearchablePopover`; it portals only through that primitive, whose two roots it keeps.
 The same issue adds `Rail`, which emits `fab-rail` on its own `<section>` root and `fab-rail-label` on its kicker, both painted from its own scoped block; the section rules it replaces were each scoped to one inspector, so no sheet selector moved, and the two inspectors whose sections keep a rhythm or a kicker of their own state it in a caller rule anchored on their own container.
 The same issue adds `LogList`, which emits `fab-log-list` on its own root and the rest of its `fab-log-list-*` family beneath it, all painted from its own scoped block; the history row rules it replaces were scoped to the journal's own components, so no sheet selector moved.
+The same issue adds `DataTable`, which emits `fabricate-data-table` on its own root and the rest of its `fabricate-data-table-*` family beneath it, rooted in the module sheet, so the drop rules' column grid that was rooted at `.fabricate-manager` under `manager-gathering-task-drop-*` is retired for the rules the table writes; its table, head and rows double the root to clear core's element rules for tables, and the drop rules card keeps its frame and row height through its own card classes.
 As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
 The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issues 1523 and 1779.
 `tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
@@ -768,6 +769,7 @@ A set picker (`SetPicker`) takes exactly one naming route, `label` or `ariaLabel
 A `trigger` snippet handed to a set picker names its own button, exactly as one handed to `SearchablePopover` does, and passes neither `addLabel` nor `addProps`, which belong to the dashed Add it replaces.
 A rail section (`Rail`) is a `group` named by its kicker `label`, or an unnamed `<section>` when it has none, and never a `region`, because a column of named landmarks would bury the screen's own.
 A log list (`LogList`) is a `list` named by its required `ariaLabel`; an entry it opens is a button pressed while it is the selected entry, and an entry's outcome is an image named by its label, so an outcome is never told by colour alone.
+A data table (`DataTable`) is a `<table>` named by its visible caption's heading and count alone, so a search placed in the caption adds nothing to its name; a selected row is marked by `is-selected` on its `<tr>`, which takes a pointer click and never focus, and focus entering any control in the row selects it, so the cell's own button, carrying `aria-current`, is the keyboard path to the same selection.
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
 An `aria-label` bound to a prop that may be empty MUST be written `aria-label={name || undefined}`, because an EMPTY `aria-label` does not fall back to the element's content — it overrides it, so a button reading Delete announces as an unnamed button and a modal opened without a title announces as an unnamed dialog.
@@ -993,6 +995,7 @@ It is never a policy record (Gathering Rules, Advantage Rule), a Check Modifier 
 `SetPicker` is a bounded trigger opening a staged panel committed on Apply, and its `choose` form exists only for the session control "Set membership is edited through a bounded, staged picker" exempts; a control that commits one choice into a single slot, a filter or a short list its caller renders is not a set picker.
 The deciding test is the widget and when the write lands, never how the control looks.
 `Rail` is ONE SECTION of a right-hand inspector column, the library's inspector rail section: never the column itself, never the nav rail's `.manager-rail-block`, which carries the Rail Marker Family, and never `AppRail`.
+`DataTable` is for records compared down columns and `ListRow` for records scanned one at a time; a ladder of tiers is `OutcomeLadder`, never a table.
 A GRIP is the pointer's drag handle and the keyboard's move control, one per ordered row; a ROCKER is the stacked up and down chevron PAIR that steps a row one position, and neither word names the other's affordance.
 
 #### Scenario: A list row and an editor both show the same record state
@@ -1763,9 +1766,14 @@ A headed, paged table is the right shape only where a reader compares the same f
 A record carrying art, a status and actions is a list row, and forcing it into columns costs those affordances and buys nothing; the test is whether the columns would be worth sorting.
 
 A table states its record count in its heading rather than leaving it to be inferred from the pager, and scrolls horizontally inside its own container so the page never does.
-It closes with the standard pagination bar WHEN the record count can exceed a page; a table whose rows are bounded and few — an outcome-tier table, a craft’s inputs and outputs — carries no pager, and adding one to reach a uniform shape would be furniture.
+It closes with the standard pagination bar WHEN the record count can exceed a page; a table whose rows are bounded and few — a craft’s inputs and outputs — carries no pager, and adding one to reach a uniform shape would be furniture.
 A column header MUST NOT appear sortable unless sorting it is meaningful.
 An empty table keeps its heading and count, drops the header row, and says what would put a row in it.
+
+Its one implementation is `src/ui/svelte/components/DataTable.svelte`, the library's `<DataTable>`, whose `heading` and `count` are the table's visible `<caption>`; it closes with the shipped pager only when it pages and its count exceeds the smallest page.
+Issue 1782 converts the gathering task editor's drop rules, paged, searchable, selectable, ranked under highest-ranked rewards and a drop target per row, and `IoTable`'s essence, tool and output groups in the crafting detail, which are bounded and carry no pager.
+The crafting detail's ingredient rail stays the requirement chooser's, and `OutcomeTierTable` is a ladder rather than a table, owned by issue 1644's `OutcomeLadder`.
+A table whose rows hold controls — the drop rules' chance sliders, count fields and rank rockers — keeps a taller row than the specimen's text rows, because its controls set the row's height.
 
 ### Requirement: Validation is one screen everywhere
 

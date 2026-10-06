@@ -187,4 +187,16 @@ describe('the switch declares itself focused to Foundry, on the host that needs 
     });
     assert.equal(target.querySelector('button').getAttribute('data-keyboard-focus'), 'false');
   });
+
+  it('renders the label with the manager-status-toggle-label class when label prop is set', async () => {
+    const target = await harness.mount({
+      as: 'button',
+      on: false,
+      label: 'Override?',
+    });
+
+    const label = target.querySelector('.manager-status-toggle-label');
+    assert.ok(Boolean(label), 'the label element renders when a label prop is provided');
+    assert.equal(label.textContent, 'Override?', 'the label displays the provided text');
+  });
 });

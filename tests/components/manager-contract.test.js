@@ -206,6 +206,7 @@ const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svel
 // The world Tool entry, which took the linked-item card off the system editor (issue 1373).
 const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte';
 const CHANCE_SLIDER = 'src/ui/svelte/components/ChanceSlider.svelte';
+const INSPECTOR_CARD = 'src/ui/svelte/components/InspectorCard.svelte';
 const ENVIRONMENT_EDIT = 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte';
 // The reward and event limit counts are one shared component (issue 1050).
 const GATHERING_INSPECTOR_RAIL =
@@ -234,7 +235,7 @@ const GATHERING_TASK_PARTS = Object.freeze(
     'ResultsTab',
     'ComponentBrowserCard',
     'DropsCard',
-    'DropRow',
+    'DropCell',
     'Card',
   ].map(taskPart)
 );
@@ -1794,13 +1795,17 @@ describe('CraftingSystemManager source contract', () => {
   // The per-system condition shortcut card moved with the systems inspector chain (issue 1721).
   defineStructureContract('draws the global condition shortcuts', SYSTEM_BROWSER_INSPECTOR, {
     names: ['selectedGatheringConditionShortcuts'],
-    // A hand-written card, so the recipe inspector's `spellsNo` card shell reads a token the
-    // reader can find. The real pair is the liveness test in
-    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
-    // `fabricate-card`.
-    spells: ['fabricate-card'],
+    // An `InspectorCard` since issue 1777, so the shell class is the primitive's to spell.
+    spells: ['manager-condition-shortcut-card'],
+    spellsNo: ['fabricate-card'],
     calls: ['buildSelectedGatheringConditionShortcuts'],
     writes: ['data-systems-gathering-conditions', 'data-systems-gathering-condition'],
+  });
+
+  // The positive control for every `spellsNo: ['fabricate-card']` row: the token the reader can find,
+  // in the one component that writes it since issue 1777.
+  defineStructureContract('spells the card shell class in the primitive', INSPECTOR_CARD, {
+    spells: ['fabricate-card'],
   });
 
   // The rules card moved into `environment/GatheringRulesInspector.svelte` (issue 1707 phase 2):
@@ -2039,29 +2044,31 @@ describe('CraftingSystemManager source contract', () => {
       'manager-task-component-card-grip',
     ],
   });
+  // A `DataTable` since issue 1782: each row is a drop target through the table's row action.
   defineStructureContract('tables the drop rules', taskPart('DropsCard'), {
-    renders: ['GatheringTaskDropRow'],
-    writes: ['data-gathering-task-drops-table', 'data-gathering-task-drop-count'],
-    spellsExactly: ['manager-task-drop-controls', 'manager-task-drop-footer'],
+    renders: ['DataTable', 'GatheringTaskDropCell'],
+    names: ['dragDrop', 'dropZone'],
+    callsWith: [['onImportDrop', 'rowId']],
+    writes: ['data-gathering-task-drops-table', 'data-gathering-add-drop'],
+    spellsExactly: ['manager-task-drop-controls', 'data-gathering-task-drop-id'],
   });
-  defineStructureContract('draws a drop rule as one row', taskPart('DropRow'), {
+  defineStructureContract('draws each cell of a drop rule', taskPart('DropCell'), {
     renders: ['ChanceSlider'],
     names: [
-      'dragDrop',
       'dropRateTierColor',
       'onDropComponentMouseDown',
       'onQuantityInput',
       'onQuantityKeydown',
     ],
     calls: ['onClearDropComponent', 'dropRateTierClass'],
-    callsWith: [['onImportDrop', 'row']],
     writes: [
       'data-gathering-task-drop-component-cell',
       'data-gathering-task-drop-chance-cell',
       'oncontextmenu',
+      'aria-current',
     ],
     attributes: [['inputmode', 'numeric']],
-    spells: ['manager-drop-cell', 'manager-drop-component-cell', 'manager-drop-quantity-cell'],
+    spells: ['manager-drop-component-cell', 'manager-drop-quantity-cell'],
     spellsExactly: [
       'manager-drop-modifier-pill',
       'manager-drop-modifier-list',
@@ -2094,10 +2101,10 @@ describe('CraftingSystemManager source contract', () => {
   // resets the row's identity and enables it.
   defineStructureContract(
     'resets a drop row identity when a managed component lands on it',
-    { file: taskPart('DropRow'), fn: 'handleDropZoneDrop' },
+    { file: taskPart('DropsCard'), fn: 'handleDropZoneDrop' },
     {
       compares: ['FabricateManagedComponent'],
-      callsWith: [['onUpdateDrop', 'row']],
+      callsWith: [['onUpdateDrop', 'rowId']],
       reads: ['data.componentId'],
       keys: ['componentId', 'itemUuid', 'systemItemId', 'name', 'enabled'],
     }

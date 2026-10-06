@@ -28,6 +28,8 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // Each attached condition modifier is a rule row (issue 1782).
     'src/ui/svelte/components/Button.svelte',
