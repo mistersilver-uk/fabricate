@@ -359,7 +359,8 @@ describe('Typeahead carries its caller’s hooks to the part each names', () => 
 
   it('draws the magnifier when the caller names no glyph', async () => {
     const { root } = await mountTypeahead();
-    assert.ok(root.querySelector('.fabricate-typeahead > i.fas.fa-search'));
+    const field = root.querySelector('.fabricate-typeahead');
+    assert.ok(field.querySelector(':scope > i.fas.fa-search'));
   });
 
   it('writes the holder contract over a colliding inputProps key', async () => {

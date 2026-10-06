@@ -284,9 +284,10 @@ function expectedCompactBox(entry) {
 
 /** A nested host's probe markup and the box its classes expect, as one compound chain. */
 function nestedCompactProbe(chain, fieldMarkup) {
-  const markup = chain
-    .toReversed()
-    .reduce((inner, name) => `<div class="${name}">${inner}</div>`, fieldMarkup);
+  const markup = chain.reduceRight(
+    (inner, name) => `<div class="${name}">${inner}</div>`,
+    fieldMarkup
+  );
   return {
     markup: `<div class="fabricate-manager">${markup}</div>`,
     expected: expectedCompactBox({ compounds: chain.map((name) => ({ classes: [name] })) }),
