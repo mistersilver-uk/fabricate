@@ -2059,3 +2059,47 @@ test('World Travel Map Region Links rows and empty state sit on the 12px browse 
     }
   }
 });
+// The operator's sign tone is a border on its trigger, which outranks the Select family's focus
+// border; keyboard focus must still repaint it in the accent (issue 1777, WCAG 2.4.7).
+test('the character-modifier operator keeps a visible keyboard focus over its sign tone', async () => {
+  const context = await openLayoutContext({ viewport: { width: 420, height: 200 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style>` +
+        '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
+        '<span data-accent style="border:1px solid var(--fab-accent-border)"></span>' +
+        ['is-positive', 'is-negative']
+          .map(
+            (tone) =>
+              `<div class="fabricate-picker manager-travel-picker fabricate-select ` +
+              `manager-character-modifier-operator-select ${tone}">` +
+              `<button type="button" data-tone="${tone}" ` +
+              'class="fabricate-select-trigger fabricate-select-trigger-inline">Sign</button></div>'
+          )
+          .join('') +
+        '</div>'
+    );
+    const accent = await page.evaluate(
+      () => getComputedStyle(document.querySelector('[data-accent]')).borderTopColor
+    );
+    const border = (tone) =>
+      page.evaluate(
+        (selector) => getComputedStyle(document.querySelector(selector)).borderTopColor,
+        `[data-tone="${tone}"]`
+      );
+    for (const tone of ['is-positive', 'is-negative']) {
+      const rest = await border(tone);
+      assert.notEqual(rest, accent, `${tone}: the resting trigger carries its tone, not the accent`);
+      await page.keyboard.press('Tab');
+      assert.equal(
+        await page.evaluate(() => document.activeElement?.dataset.tone),
+        tone,
+        `${tone}: Tab lands on the trigger, so the state below is keyboard focus`
+      );
+      assert.equal(await border(tone), accent, `${tone}: keyboard focus repaints the border`);
+    }
+  } finally {
+    await context.close();
+  }
+});

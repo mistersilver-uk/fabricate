@@ -296,17 +296,26 @@
 
   <div class="fab-stack" data-gap="2">
     {#each RULES as rule (rule.field)}
+      {@const value = rules[rule.field] ?? rule.fallback ?? null}
       <div class="manager-rule-row">
         <span class="manager-rule-icon" aria-hidden="true"><i class={`fas ${rule.icon}`}></i></span>
-        <div class="manager-rule-copy" id={`${rule.id}-caption`}>
+        <!-- The caption's click focuses its trigger, a pointer convenience; the trigger is the keyboard path. -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="manager-rule-copy"
+          id={`${rule.id}-caption`}
+          onclick={() => document.getElementById(rule.id)?.focus()}
+        >
           <strong>{rule.title}</strong>
           <span>{rule.description}</span>
         </div>
         <div class="manager-rule-field">
           <Select
             id={rule.id}
-            value={rules[rule.field] ?? rule.fallback ?? null}
+            {value}
             options={rule.options}
+            triggerTitle={rule.options.find((option) => option.value === value)?.label ?? ''}
             ariaLabelledBy={`${rule.id}-caption`}
             onChange={(next) => onUpdate({ [rule.field]: next })}
           />

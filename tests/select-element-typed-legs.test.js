@@ -178,7 +178,7 @@ test('the element-typed leg scan is alive, so the clause below is not quantifyin
     TEMPLATES.size > 100,
     `the component walk found ${TEMPLATES.size} templates, so it is not walking`
   );
-  // 22 measured once issue 1777 stripped the six legs its converted field selects left behind.
+  // 22 measured at issue 1777; no field hosts a native select, so the field family has no leg.
   assert.ok(
     legs.length > 20,
     `only ${legs.length} element-typed \`select\` legs found across both corpora, so the ` +

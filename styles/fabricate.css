@@ -4059,7 +4059,7 @@
   min-width: 0;
 }
 
-/* The operator is a `<Select size="inline">`, whose 30px trigger is the bordered 28px native select's box; the sign's tone is its border and text, and the option list keeps the panel's own colours (issue 1777). */
+/* The operator is an `inline` `<Select>` whose trigger carries the sign's tone as its border and text; keyboard focus repaints that border in the accent, so the tone never hides the ring (issue 1777). */
 .fabricate-manager .manager-character-modifier-operator-select {
   flex: none;
 }
@@ -4072,6 +4072,10 @@
 .fabricate-manager .manager-character-modifier-operator-select.is-negative .fabricate-select-trigger {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
+}
+
+.fabricate-manager .manager-character-modifier-operator-select .fabricate-select-trigger:focus-visible {
+  border-color: var(--fab-accent-border);
 }
 
 .fabricate-manager .manager-character-modifier-row-reference-delete {
@@ -10777,7 +10781,7 @@
   text-align: center;
 }
 
-/* The select fills its field; the native select's retired 36px box takes the `form` rung's 38 (issue 1777). */
+/* The select fills its field at the `form` rung; 38 against the retired 36 is issue 1523's. */
 .fabricate-manager .manager-condition-shortcut .fabricate-select-trigger {
   width: 100%;
 }
@@ -12624,7 +12628,7 @@
   padding: var(--fab-space-2xs) var(--fab-space-2);
 }
 
-/* The condition picker fills its cell at the 28px the native select stood, under the `inline` rung's 30 (issue 1777). */
+/* The condition picker fills its cell at 28px, the inspector's compact control height; 28 against the `inline` rung's 30 is issue 1523's. */
 .fabricate-manager .manager-condition-modifier-picker .fabricate-select-trigger {
   width: 100%;
   min-height: 28px;
@@ -13109,7 +13113,7 @@
   font-weight: 400;
 }
 
-/* The rule's `<Select>` fills the description column; the native select's retired 36px box takes the `form` rung's 38 (issue 1777). */
+/* The rule's `<Select>` fills the description column at the `form` rung; 38 against the retired 36 is issue 1523's. */
 .fabricate-manager .manager-rule-field .fabricate-select-trigger {
   width: 100%;
 }
