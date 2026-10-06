@@ -6,6 +6,7 @@
  * the metadata refresh (`refreshComponentMetadataForUpdatedItem`) keys on the own uuid alone.
  */
 import { advanceDefinitionRevision } from '../../utils/definitionIndex.js';
+import { isEmbeddedItemUuid } from '../../utils/sourceReferenceUnion.js';
 import {
   getCompendiumSourceUuid,
   getDuplicateSourceUuid,
@@ -371,9 +372,13 @@ export function flushImportRegistrations(io, registrations) {
 }
 
 /** The array one import records its registration into, or `null` when it registers nothing: an
- * Item embedded in an actor, or an unpersisted call whose owner passed no array to flush. */
-function registrationsFor(source, options) {
-  if (source?.isEmbedded) return null;
+ * Item embedded in an actor, read off its uuid when it no longer resolves, or an unpersisted call
+ * whose owner passed no array to flush. */
+function registrationsFor(itemUuid, source, options) {
+  const embedded = source
+    ? source.isEmbedded
+    : isEmbeddedItemUuid(itemUuid, globalThis.foundry?.utils?.parseUuid);
+  if (embedded) return null;
   if (options.registrations) return options.registrations;
   return options.persist === false ? null : [];
 }
@@ -430,7 +435,7 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
     itemUuid,
     (documentName) => `Cannot add non-Item document (${documentName}) as a crafting component`
   );
-  const registrations = registrationsFor(source, options);
+  const registrations = registrationsFor(itemUuid, source, options);
   const settle = (result) => settleImport(io, system, options, registrations, result);
 
   const nextSourceData = await io.resolveImportedComponentSourceData(itemUuid, source);

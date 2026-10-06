@@ -13,6 +13,7 @@ import {
 import { reportWorldIdentityDrift } from '../../src/systems/worldIdentityDrift.js';
 import { identityOf } from '../../src/systems/worldScopeEntityGrouping.js';
 import { createWorldScopeEntityActions } from '../../src/ui/svelte/stores/worldScopeActions.js';
+import { sourceReferenceKey } from '../../src/utils/sourceReferenceUnion.js';
 import { byCodePoint } from '../helpers/codePointOrder.js';
 import { makeScopeSettings, makeScopeStore } from '../helpers/worldScopeCorpus.js';
 
@@ -119,6 +120,24 @@ describe('the registration decision for one in-system record', () => {
       record.aliasItemUuids,
       'the alias list is a copy'
     );
+  });
+});
+
+describe('sourceReferenceKey', () => {
+  it('drops the document-type segment of a pack Item uuid and nothing else', () => {
+    const KEY = 'Compendium.world.scrolls.fire';
+    assert.equal(sourceReferenceKey('Compendium.world.scrolls.Item.fire'), KEY);
+    assert.equal(sourceReferenceKey(KEY), KEY);
+    for (const kept of [
+      'Item.fire',
+      'Actor.hero.Item.fire',
+      'Scene.s.Token.t.Item.fire',
+      'Library.world.scrolls.Item.fire',
+      'Compendium.world.scrolls.JournalEntry.fire',
+      'Compendium.world.scrolls.Actor.hero.Item.fire',
+    ]) {
+      assert.equal(sourceReferenceKey(kept), kept);
+    }
   });
 });
 

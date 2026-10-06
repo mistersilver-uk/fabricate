@@ -6,6 +6,8 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
+import { parseUuidDouble } from './helpers/manager/parseUuidDouble.js';
+
 let minted = 0;
 const DOCUMENTS = new Map();
 const PACKS = new Map();
@@ -16,6 +18,7 @@ Object.assign(globalThis, {
       randomID: () => `minted-${(minted += 1)}`,
       getProperty: (object, path) =>
         path.split('.').reduce((node, key) => node?.[key], object) ?? undefined,
+      parseUuid: parseUuidDouble,
     },
   },
   game: {
@@ -472,6 +475,50 @@ describe('what an import leaves unregistered', () => {
 
     assert.equal((await manager.addItemFromUuid(FORGE, loot.uuid)).action, 'skipped');
     assert.deepEqual(events, ['craftingSystems'], 'nor is the row it left registered later');
+  });
+});
+
+describe('an Item that no longer resolves', () => {
+  it('registers under its uuid when that uuid addresses a world or pack Item', async () => {
+    for (const uuid of ['Item.gone', 'Compendium.world.reagents.Item.gone']) {
+      const { manager, events, entityIds } = world();
+
+      const result = await manager.addItemFromUuid(FORGE, uuid);
+
+      assert.deepEqual(entityIds(), [result.item.id], uuid);
+      assert.deepEqual(events, ['craftingSystems', 'componentScope'], uuid);
+    }
+  });
+
+  it('registers and adopts nothing when its uuid addresses an embedded document', async () => {
+    const uuid = 'Actor.gone.Item.dagger';
+    const { manager, events, settings } = world({
+      scope: scopeOf({ entities: [worldEntity('world-dagger', uuid)] }),
+    });
+
+    const result = await manager.addItemFromUuid(FORGE, uuid);
+
+    assert.equal(result.action, 'added');
+    assert.match(result.item.id, /^minted-/);
+    assert.deepEqual(events, ['craftingSystems']);
+    assert.equal(settings.writes.length, 0);
+  });
+
+  it('registers nothing when the uuid cannot be parsed, while a resolved Item answers for itself', async () => {
+    const parseUuid = globalThis.foundry.utils.parseUuid;
+    try {
+      for (const broken of [undefined, () => null, () => assert.fail('a V13 throw')]) {
+        globalThis.foundry.utils.parseUuid = broken;
+        const { manager, events, entityIds } = world();
+        await manager.addItemFromUuid(FORGE, 'Item.gone');
+        assert.deepEqual(events, ['craftingSystems']);
+
+        const ash = await manager.addItemFromUuid(FORGE, worldItem('ash').uuid);
+        assert.deepEqual(entityIds(), [ash.item.id]);
+      }
+    } finally {
+      globalThis.foundry.utils.parseUuid = parseUuid;
+    }
   });
 });
 

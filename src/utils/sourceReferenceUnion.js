@@ -20,6 +20,20 @@ export function sourceReferenceKey(reference) {
   return packItem ? `Compendium.${parts[1]}.${parts[2]}.${parts[4]}` : reference;
 }
 
+/** Whether an Item uuid addresses an embedded document, asked of `foundry.utils.parseUuid` handed
+ * in. Fails closed: an absent parser, a throw and an unreadable answer all count as embedded. */
+export function isEmbeddedItemUuid(uuid, parseUuid) {
+  if (typeof parseUuid !== 'function') return true;
+  // V13.351 throws a TypeError at `uuid.startsWith` for a truthy non-string; V14.365 returns null.
+  try {
+    const parsed = parseUuid(uuid);
+    if (!parsed || typeof parsed !== 'object') return true;
+    return Number(parsed.embedded?.length) > 0;
+  } catch {
+    return true;
+  }
+}
+
 /** Collect every UUID reference a registered ENTRY can use for runtime matching. */
 export function getItemMatchUuids(entry) {
   const refs = [];
