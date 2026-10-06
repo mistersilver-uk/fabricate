@@ -1428,7 +1428,7 @@ const HEADER_CENSUS = Object.freeze({
     ],
     "the Tool Studio, which is the other header element": [
       "- 0 header class=\"manager-header\"",
-      "+ 0 header class=\"manager-header manager-tools-context-header\" data-tool-library-context=\"\"",
+      "+ 0 header class=\"fabricate-page-header manager-header manager-tools-context-header\" data-tool-library-context=\"\"",
       "- 2 div class=\"manager-page-kicker\"",
       "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
       "- 2 h1 class=\"manager-title\" | Crafting systems",
