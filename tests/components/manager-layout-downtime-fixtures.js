@@ -157,7 +157,7 @@ async function readDowntimeRoute(managerWidth, hostClasses, hostChildren, readIn
         `<div style="width:${managerWidth}px;height:760px">` +
         `<div class="fabricate-manager" data-manager-view="world-downtime">` +
         `<div class="manager-titlebar">titlebar</div>` +
-        `<div class="manager-header">header</div>` +
+        `<div class="fabricate-page-header manager-header">header</div>` +
         `<div class="manager-body">` +
         `<aside class="manager-rail">rail</aside>` +
         `<main class="manager-main">` +

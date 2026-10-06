@@ -1199,7 +1199,8 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-header {
+/* THE PAGE HEADER'S FAMILY IS ROOTED AT `PageHeader`'s OWN CLASS (issue 1777), doubled to keep the (0,2,0) it had under `.fabricate-manager`: the title and subtitle keep both roots because the rail and the scoped cards spell them too. */
+.fabricate-page-header.fabricate-page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1211,14 +1212,14 @@
 }
 
 /* `flex: 1 1 auto` lived here while the Downtime route led the header with a glyph tile (issue 1185): that tile was a THIRD child, and `space-between` then parked the heading in the middle of the row rather than beside it. */
-.fabricate-manager .manager-heading {
+.fabricate-page-header .manager-heading {
   min-width: 0;
 }
 
 /* THE MANAGER'S EYEBROW, AT THE REFERENCE'S OWN FIGURES (issue 1373). */
 
 /* THE PAGE HEADER'S EYEBROW WRAPPER. The eyebrow itself is `Kicker.svelte`, which declares `margin: 0` and takes no `class` — a caller needing layout keeps its own element and nests the primitive inside it (issue 1515). */
-.fabricate-manager .manager-page-kicker {
+.fabricate-page-header .manager-page-kicker {
   margin-bottom: var(--fab-space-2xs);
 }
 
@@ -1232,7 +1233,8 @@
 }
 
 /* The screen title is the manager's display type — and the ONLY page title on the screen (issue 643: the recipe library used to render a second `manager-section-header` under this one). */
-.fabricate-manager .manager-title {
+.fabricate-manager .manager-title,
+.fabricate-page-header .manager-title {
   margin: 0;
   font-family: var(--fab-font-serif);
   font-size: 1.375rem;
@@ -1328,7 +1330,8 @@
   line-height: 1.35;
 }
 
-.fabricate-manager .manager-subtitle {
+.fabricate-manager .manager-subtitle,
+.fabricate-page-header .manager-subtitle {
   margin: var(--fab-space-2xs) 0 0;
   color: var(--fab-text-muted);
 
@@ -1351,7 +1354,7 @@
 
 /* NO CHIP RULE LIVES HERE ANY MORE, and the reason is ownership rather than taste (issue 1118). */
 
-.fabricate-manager .manager-breadcrumbs {
+.fabricate-page-header .manager-breadcrumbs {
   display: flex;
   align-items: center;
   gap: var(--fab-space-chip);
@@ -1363,7 +1366,7 @@
 }
 
 /* `display: block`, stated: core's `a.button, button` reset makes every button a centred flex container, and a flex container's text is an anonymous item that cannot shrink, so a squeezed crumb clipped its label at BOTH edges instead of taking the ellipsis the rule below declares. A block container is what `text-overflow` applies to. */
-.fabricate-manager .manager-breadcrumbs button {
+.fabricate-page-header .manager-breadcrumbs button {
   appearance: none;
   -webkit-appearance: none;
   display: block;
@@ -1377,13 +1380,13 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-breadcrumbs button:hover,
-.fabricate-manager .manager-breadcrumbs button:focus-visible {
+.fabricate-page-header .manager-breadcrumbs button:hover,
+.fabricate-page-header .manager-breadcrumbs button:focus-visible {
   color: var(--fab-text);
 }
 
-.fabricate-manager .manager-breadcrumbs span,
-.fabricate-manager .manager-breadcrumbs button {
+.fabricate-page-header .manager-breadcrumbs span,
+.fabricate-page-header .manager-breadcrumbs button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -13545,7 +13548,7 @@
 }
 
 @container fabricate-manager (max-width: 680px) {
-  .fabricate-manager .manager-header {
+  .fabricate-page-header.fabricate-page-header {
     align-items: stretch;
     flex-direction: column;
   }

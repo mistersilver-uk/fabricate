@@ -1172,7 +1172,7 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
   const badgeBlock = blockFor('.fabricate-manager .manager-titlebar-badge');
   const statusBlock = blockFor('.fabricate-manager .manager-titlebar-status');
   const statusTextBlock = blockFor('.fabricate-manager .manager-titlebar-status-text');
-  const titleBlock = blockFor('.fabricate-manager .manager-title');
+  const titleBlock = blockFor('.fabricate-page-header .manager-title');
 
   assert.ok(
     rootBlock.includes('grid-template-rows: auto auto 1fr;'),

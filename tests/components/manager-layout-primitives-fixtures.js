@@ -45,7 +45,7 @@ function shortWindowRailMarkup(navItems) {
   }).join('');
   return `<div class="fabricate-manager" data-manager-view="systems">
       <div class="manager-titlebar" data-manager-titlebar><span>Fabricate</span></div>
-      <header class="manager-header"><h1>Crafting systems</h1></header>
+      <header class="fabricate-page-header manager-header"><h1>Crafting systems</h1></header>
       <div class="manager-body">
         <aside class="manager-rail">
           <p class="manager-rail-title" data-manager-rail-section>GM management</p>

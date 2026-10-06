@@ -5418,7 +5418,7 @@ function buildExpectViewPredicate() {
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'src/ui/svelte/apps/manager/headerModel.svelte.js',
     'src/ui/svelte/apps/manager/ManagerPageHeader.svelte',
-    'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte',
+    'src/ui/svelte/apps/manager/headerBreadcrumbs.js',
     'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte',
     'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
     'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
@@ -6394,12 +6394,15 @@ test('every unit the shell extracted selects the shell\u2019s own case set', () 
   const MANAGER = 'src/ui/svelte/apps/manager';
   const shell = [`${MANAGER}/CraftingSystemManagerRoot.svelte`];
   const extracted = [
-    'ManagerPageHeader',
-    'ManagerHeaderBreadcrumbs',
-    'ManagerHeaderActions',
-    'ManagerHeaderCraftingActions',
-    'ManagerHeaderGatheringActions',
-  ].map((unit) => `${MANAGER}/${unit}.svelte`);
+    ...[
+      'ManagerPageHeader',
+      'ManagerHeaderActions',
+      'ManagerHeaderCraftingActions',
+      'ManagerHeaderGatheringActions',
+    ].map((unit) => `${MANAGER}/${unit}.svelte`),
+    // The trail model `ManagerPageHeader` renders through `PageHeader` (issue 1777).
+    `${MANAGER}/headerBreadcrumbs.js`,
+  ];
   const ids = (paths) =>
     [...new Set(mapChangedFilesToCases(paths).map((entry) => entry.id ?? entry))].sort();
   const expected = ids(shell);

@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { headerBreadcrumbs } from '../../src/ui/svelte/apps/manager/headerBreadcrumbs.js';
 import { COMPONENT_EDITOR_CARD_FILES } from '../helpers/componentEditorCards.js';
 import {
   calledName,
@@ -136,7 +137,8 @@ const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensio
 const MANAGER_NAV_RAIL = 'src/ui/svelte/apps/manager/ManagerNavRail.svelte';
 const MANAGER_PAGE_HEADER = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
 const MANAGER_TITLE_BAR = 'src/ui/svelte/apps/manager/ManagerTitleBar.svelte';
-const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte';
+const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/headerBreadcrumbs.js';
+const PAGE_HEADER = 'src/ui/svelte/components/PageHeader.svelte';
 const MANAGER_HEADER_ACTIONS = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
 const MANAGER_HEADER_CRAFTING_ACTIONS =
   'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte';
@@ -634,20 +636,29 @@ describe('CraftingSystemManager source contract', () => {
     attributes: [['class', 'manager-rail']],
   });
 
-  // `manager-header` is the page header's own identity since issue 1720, and it draws the two
-  // `<header>` elements as bare siblings rather than under a wrapper of its own.
+  // `manager-header` is the page header's identity since issue 1720, a caller class on
+  // `PageHeader` since issue 1777, and the two headers stay bare siblings under no wrapper.
   defineStructureContract('names both page headers', MANAGER_PAGE_HEADER, {
-    attributes: [
-      ['class', 'manager-header'],
-      ['class', 'manager-heading'],
-    ],
+    attributes: [['class', 'manager-header']],
     spells: ['manager-tools-context-header'],
-    renders: ['ManagerHeaderBreadcrumbs', 'ManagerHeaderActions', 'Kicker', 'Medallion'],
+    renders: ['PageHeader', 'ManagerHeaderActions', 'Medallion'],
+    rendersNo: ['Kicker'],
+    writesNo: ['aria-current'],
   });
 
-  // `manager-breadcrumbs` is the trail's own identity since issue 1720.
-  defineStructureContract('names the breadcrumb trail', MANAGER_HEADER_BREADCRUMBS, {
-    attributes: [['class', 'manager-breadcrumbs']],
+  // `manager-breadcrumbs` and `manager-heading` are `PageHeader`'s since issue 1777: the manager
+  // hands it crumbs from `headerBreadcrumbs.js` and writes no trail markup of its own.
+  defineStructureContract('names the breadcrumb trail', PAGE_HEADER, {
+    attributes: [
+      ['class', 'manager-breadcrumbs'],
+      ['class', 'manager-heading'],
+    ],
+  });
+  defineStructureContract('writes no trail markup in the manager header', MANAGER_PAGE_HEADER, {
+    attributesNo: [
+      ['class', 'manager-breadcrumbs'],
+      ['class', 'manager-heading'],
+    ],
   });
 
   // `manager-header-actions` is the action group's own identity since issue 1720, and the two
@@ -3044,18 +3055,26 @@ describe('world scoped-entity source contract (issue 1362)', () => {
   // rendering no inspector, would have had no way back at all if this were left to them.
   it('renders the entry trail as three crumbs, the middle one a button back to the catalogue', () => {
     const root = componentAstOf(MANAGER_ROOT);
-    const crumbs = templateNodes(componentAstOf(MANAGER_HEADER_BREADCRUMBS)).filter((node) =>
-      declaresAttribute(node, 'data-breadcrumb-world-scoped-catalogue', { directives: false })
-    );
-    assert.equal(crumbs.length, 1, 'the entry trail draws one intermediate catalogue crumb');
-    const [crumb] = crumbs;
-    assert.equal(crumb.name, 'button', 'and it is a real button, not a static crumb');
-    const navigation = attributeExpression(crumb, 'onclick');
-    assert.ok(callNames(navigation).has('setView'), 'the crumb navigates');
-    assert.ok(
-      memberPaths(navigation).includes('worldScopedEntryRoute.catalogueView'),
-      'to the catalogue the entry route records, rather than to a second copy of that mapping'
-    );
+    // The trail is `headerBreadcrumbs.js`'s since issue 1777, so the model answers for it. The
+    // catalogue view is a value no route has, so a second copy of the mapping cannot pass.
+    const views = [];
+    const crumbs = headerBreadcrumbs({
+      text: (key) => key,
+      header: { title: 'Entry' },
+      currentView: 'world-essence-entry',
+      isWorldScopedRoute: true,
+      worldScopedEntryRoute: { catalogueView: 'catalogue-sentinel', catalogueTitleKey: 'k' },
+      worldScopedEntryCrumb: 'Water',
+      setView: (view) => {
+        views.push(view);
+      },
+    });
+    assert.equal(crumbs.length, 3, 'the entry trail draws World, the catalogue and the entry');
+    const catalogue = crumbs.filter((crumb) => 'data-breadcrumb-world-scoped-catalogue' in crumb);
+    assert.equal(catalogue.length, 1, 'the entry trail draws one intermediate catalogue crumb');
+    assert.equal(typeof catalogue[0].onSelect, 'function', 'and it is a control, not a static crumb');
+    catalogue[0].onSelect();
+    assert.deepEqual(views, ['catalogue-sentinel'], 'to the catalogue the entry route records');
 
     // AND THE SUBJECT REACHES IT WITHOUT REOPENING THIS FILE. A catalogue row in PR 6a calls
     // `onOpenEntry(entityId)`; the shell records the subject, performs the navigation through

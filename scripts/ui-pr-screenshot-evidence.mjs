@@ -149,7 +149,7 @@ const requirementRailFrame = (id, label) => ({
 // header actions of every manager frame the shell appears in are drawn by these six.
 const PAGE_HEADER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ManagerPageHeader\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderBreadcrumbs\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/headerBreadcrumbs\.js$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderActions\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderCraftingActions\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderGatheringActions\.svelte$/,

@@ -1,19 +1,19 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The manager's page header: the breadcrumb trail, the eyebrow, one of eight identity headings and
-  the trailing action group, plus the Tool library's own second header, drawn by `PageHeader`
-  (issue 1720, extracted from the root; issue 1777).
+  The manager's page header, drawn by `PageHeader`: the breadcrumb trail `headerBreadcrumbs.js`
+  derives, the eyebrow, one of eight identity headings and the trailing action group, plus the
+  Tool library's own second header (issues 1720 and 1777).
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `header` | the `headerModel` instance | — | `headingVariant` selects the identity heading; passed WHOLE to both children |
+  | `header` | the `headerModel` instance | — | `headingVariant` selects the identity heading; passed WHOLE to the trail and the actions |
   | `isToolStudioRoute` | `boolean` | `false` | the two headers are exclusive, and the Tool Studio draws the second |
   | `text` | the shell's localizer | — | `(key, fallback)` |
 
   Rest spread:
-  - `{...rest}` lands on both children; every prop this unit does not read itself belongs to the
-    trail or to the action group, and each declares its own.
+  - `{...rest}` reaches the trail model and the action group; every prop this unit does not read
+    itself belongs to one of them, and each declares its own.
 
   Invariants:
   - Two `<header>` elements under no wrapper, so the shell's own children are unchanged — pinned
@@ -23,11 +23,10 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import Kicker from '../../components/Kicker.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import ManagerHeaderActions from './ManagerHeaderActions.svelte';
-  import ManagerHeaderBreadcrumbs from './ManagerHeaderBreadcrumbs.svelte';
   import PageHeader from '../../components/PageHeader.svelte';
+  import { headerBreadcrumbs } from './headerBreadcrumbs.js';
 
   let {
     header,
@@ -59,6 +58,21 @@
     ...rest
   } = $props();
 
+  const crumbs = $derived(
+    headerBreadcrumbs({
+      ...rest,
+      header,
+      currentView,
+      text,
+      selectedSystem,
+      selectSystemAndShowBrowser,
+      editSystem,
+      recipeDraft,
+      componentForEdit,
+      essenceEditName,
+    })
+  );
+
   // The Tool library's trail, from its root (issue 1328) and with no `Crafting` crumb, because the
   // rail holds Tool Rules outside that group (issue 1373).
   const toolLibraryCrumbs = $derived([
@@ -73,26 +87,8 @@
 
 {#if !isToolStudioRoute}
   <!-- Two children, always: the heading block and the trailing actions. -->
-  <header class="manager-header">
-    <div class="manager-heading">
-      <ManagerHeaderBreadcrumbs
-        {header}
-        {currentView}
-        {text}
-        {selectedSystem}
-        {selectSystemAndShowBrowser}
-        {editSystem}
-        {recipeDraft}
-        {componentForEdit}
-        {essenceEditName}
-        {...rest}
-      />
-      <!-- The eyebrow sits between the trail and the title. -->
-      {#if header.kicker}
-        <div class="manager-page-kicker">
-          <Kicker data-page-kicker="">{header.kicker}</Kicker>
-        </div>
-      {/if}
+  <PageHeader class="manager-header" breadcrumbs={crumbs} kicker={header.kicker}>
+    {#snippet identity()}
       {#if header.headingVariant === 'recipe-edit'}
         <!-- The recipe editor's identity header: the recipe's own image, its name and the
              "<category> · <resolution mode>" subline. -->
@@ -239,9 +235,11 @@
           </Chip>
         </div>
       {/if}
-    </div>
-    <ManagerHeaderActions {header} {text} {currentView} {...rest} />
-  </header>
+    {/snippet}
+    {#snippet actions()}
+      <ManagerHeaderActions {header} {text} {currentView} {...rest} />
+    {/snippet}
+  </PageHeader>
 {/if}
 
 {#if currentView === 'tools' && selectedSystem}
