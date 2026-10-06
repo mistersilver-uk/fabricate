@@ -32,6 +32,11 @@ import {
   installPrimitiveLabFoundry,
   parseLabRelease,
 } from './view-lab/primitives/labFoundry.js';
+import { readSlotInset } from './view-lab/primitives/slot.js';
+import {
+  SPECIMEN_SNIPPET_NAMES,
+  readSpecimenSnippets,
+} from './view-lab/primitives/specimenSnippets.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -223,4 +228,21 @@ test('the mounted-set comparison catches a count, an identity and a multiplicity
     /a\.svelte: catalogued 1, mounted 2/,
     'a path mounted more often than catalogued is a disagreement even when the count agrees'
   );
+});
+
+test('a row inset is a positive pixel count, and absent means none', () => {
+  assert.equal(readSlotInset({}), 0);
+  assert.equal(readSlotInset({ inset: 12 }), 12);
+  for (const inset of [0, -4, '12', NaN, null]) {
+    assert.throws(() => readSlotInset({ inset }), /positive number of CSS pixels/, String(inset));
+  }
+});
+
+test('a row names only the snippets a specimen renders, each as a node array', () => {
+  assert.ok(SPECIMEN_SNIPPET_NAMES.length > 0, 'a specimen renders no named snippet at all');
+  assert.deepEqual(readSpecimenSnippets({}), {});
+  const snippets = { body: ['Body text'], footer: [{ tag: 'button', text: 'Close' }] };
+  assert.deepEqual(readSpecimenSnippets({ snippets }), snippets);
+  assert.throws(() => readSpecimenSnippets({ snippets: { header: [] } }), /snippets\.header/);
+  assert.throws(() => readSpecimenSnippets({ snippets: { body: 'text' } }), /must be a node array/);
 });

@@ -96,7 +96,7 @@
     "path": "src/ui/svelte/components/SearchablePopover.svelte",
     "slot": {
       "width": 300,
-      "height": 320
+      "height": 260
     },
     "props": {
       "open": true,

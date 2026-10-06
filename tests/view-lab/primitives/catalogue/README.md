@@ -27,6 +27,8 @@ this programme has already measured what happens to those.
 | `slot`    | no       | `{width?, height?}`, in CSS px. Present at all, the slot's window subtree generates real BOXES at that size rather than `display: contents`. Omit it unless the specimen needs a containing block or a query container — an overlay, or a panel that restyles at a breakpoint. See below.                                                                                     |
 | `props`   | no       | A plain object, passed to the component verbatim. Plain JSON only — no functions, no state, no knobs.                                                                                                                                                                                                                                                                         |
 | `content` | no       | The `children` snippet, as a node array. See below.                                                                                                                                                                                                                                                                                                                           |
+| `snippets` | no      | Named snippets (`body`, `footer`), each a node array in `content`'s shape. See below.                                                                                                                                                                                                                                                                                       |
+| `inset`   | no       | The padding, in CSS px, of the region the primitive is placed in, for a primitive whose edges bleed into it. See below.                                                                                                                                                                                                                                                       |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -62,6 +64,18 @@ the DOM and in the inheritance chain, but they generate no boxes, so the
 component's own root is what the library's layout lays out and a live control
 stands exactly where the drawing stood.
 That is right for a control, and it is wrong for two kinds of specimen.
+
+A default slot sizes its `<iframe>` from the specimen, one of two ways.
+An inline-level specimen, or one standing where an inline drawing stood, is
+shrink-wrapped to its own box, as a control is.
+A block-level specimen standing where a block drawing stood **fills** that
+drawing's inline size, and only its height comes from the specimen: the page
+lets the slot stretch it when the library stretched the drawing, and otherwise
+keeps the width the drawing was drawn at, carrying the drawing's `max-width`
+either way.
+That is what keeps a card, a panel or a bar at the width of the column it
+replaces, rather than at its text's single-line width or, for a primitive that
+is itself a query container, at no width at all.
 
 An element with no principal box is **not a containing block** and is **not a
 query container**.
@@ -102,6 +116,23 @@ window `z-index` that draw a floating window are dropped.
 And it is exactly as big as the row said, so a breakpoint answer or a flip
 decision read off the page is an answer for that box and not for the manager's
 real content width.
+The box is also the specimen's **viewport**: the page sizes the `<iframe>` to it
+before the specimen lays out, so a fixed overlay centres in it and a popover
+clamps against it, and core's viewport clamp on a window's height is lifted so
+the declared height stands.
+
+## `inset` — when a primitive bleeds into the region around it
+
+Some primitives reach past their own box on purpose: the bulk panel's dock
+bleeds by the inspector rail's padding so Apply pins to the rail's edge.
+Standing alone, that bleed overflows the specimen.
+
+```json
+"inset": 12
+```
+
+`inset` is the padding of the region the primitive is placed in, in CSS px; the
+specimen is laid out inside it, and it is measured with it.
 
 ## `content` — what a call site puts inside
 
@@ -125,6 +156,18 @@ Each entry is either a plain string, rendered as text, or an object:
 Omit both `text` and `children` for a void element — `input`, `br`, `img` —
 because Svelte refuses children on one and the catalogue should not have to know
 which tags those are.
+
+A primitive that takes named snippets rather than children — `<Modal>`'s `body`
+and `footer` — gets them from `snippets`, an object of node arrays in the same
+shape:
+
+```json
+"snippets": { "body": [...], "footer": [...] }
+```
+
+Only the names `specimenSnippets.js` lists are rendered, because a Svelte snippet
+cannot be built from a name at runtime; any other name is refused rather than
+dropped, and the coverage gate checks each name is a prop the component declares.
 
 ## What a row deliberately cannot say
 

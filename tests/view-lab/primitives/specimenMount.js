@@ -12,7 +12,13 @@ import { createLocalizer, toI18nStub } from '../labI18n.js';
 import { loadComponent } from './importers.js';
 import { installPrimitiveLabFoundry } from './labFoundry.js';
 import LiveSpecimen from './LiveSpecimen.svelte';
-import { applySlotBox, buildSpecimenFrame, describeCollapsedSlot, readSlotBox } from './slot.js';
+import {
+  applySlotBox,
+  buildSpecimenFrame,
+  describeCollapsedSlot,
+  readSlotBox,
+  readSlotInset,
+} from './slot.js';
 import {
   SPECIMEN_ASSIGN,
   SPECIMEN_ERROR,
@@ -20,6 +26,7 @@ import {
   SPECIMEN_READY,
   SPECIMEN_RESIZE,
 } from './specimenProtocol.js';
+import { readSpecimenSnippets } from './specimenSnippets.js';
 
 /** A fallback box, big enough to show the printed error message, when mounting fails. */
 const ERROR_BOX = Object.freeze({ width: 420, height: 120 });
@@ -32,7 +39,8 @@ function postToParent(message) {
 /**
  * Announce readiness, and wait for the parent to hand back this iframe's one catalogue row.
  *
- * @returns {Promise<object>} The assigned row.
+ * @returns {Promise<{row: object, fill: boolean}>} The assigned row, and whether the drawing it
+ *   replaces was block-level.
  */
 function waitForAssignment() {
   return new Promise((resolve) => {
@@ -41,7 +49,7 @@ function waitForAssignment() {
       if (event.source !== globalThis.parent) return;
       if (event.data?.type !== SPECIMEN_ASSIGN) return;
       globalThis.removeEventListener('message', onMessage);
-      resolve(event.data.row);
+      resolve({ row: event.data.row, fill: event.data.fill === true });
     }
     globalThis.addEventListener('message', onMessage);
     postToParent({ type: SPECIMEN_READY });
@@ -49,12 +57,27 @@ function waitForAssignment() {
 }
 
 /**
+ * Whether the specimen renders a block-level box, looking through `display: contents` wrappers.
+ *
+ * @param {Element} parent The `.pl-specimen` wrapper, or a `contents` element inside it.
+ * @returns {boolean} True when any rendered child is block-level rather than inline-level.
+ */
+function rendersBlock(parent) {
+  return [...parent.children].some((child) => {
+    const { display } = getComputedStyle(child);
+    if (display === 'contents') return rendersBlock(child);
+    return display !== 'none' && !display.startsWith('inline');
+  });
+}
+
+/**
  * Report the observed size: the first callback as MOUNTED, every later one as RESIZE.
  *
  * @param {Element} target The `.pl-specimen` wrapper (default slot) or `.application` (boxed).
+ * @param {boolean} fill Whether the parent sizes the inline axis, so only the height is the report.
  * @returns {Promise<void>} Resolves once the first (MOUNTED) report has been sent.
  */
-function reportSize(target) {
+function reportSize(target, fill) {
   return new Promise((resolve) => {
     let reported = false;
     const observer = new ResizeObserver((entries) => {
@@ -62,7 +85,7 @@ function reportSize(target) {
       const borderBox = entry.borderBoxSize?.[0];
       const width = borderBox ? borderBox.inlineSize : entry.contentRect.width;
       const height = borderBox ? borderBox.blockSize : entry.contentRect.height;
-      const size = { width: Math.ceil(width), height: Math.ceil(height) };
+      const size = { width: Math.ceil(width), height: Math.ceil(height), fill };
       if (reported) {
         postToParent({ type: SPECIMEN_RESIZE, ...size });
       } else {
@@ -87,8 +110,9 @@ function renderError(message) {
 }
 
 async function boot() {
-  const row = await waitForAssignment();
+  const { row, fill: hostIsBlock } = await waitForAssignment();
   const box = readSlotBox(row);
+  const inset = readSlotInset(row);
 
   const i18n = toI18nStub(await createLocalizer());
   installPrimitiveLabFoundry(i18n);
@@ -109,6 +133,7 @@ async function boot() {
       component,
       props: row.props ?? {},
       content: row.content ?? null,
+      snippets: readSpecimenSnippets(row),
     },
   });
 
@@ -121,8 +146,11 @@ async function boot() {
   }
 
   // A default slot measures the component's natural box; a boxed slot measures the declared box.
-  const measured = box ? frame : root.querySelector('.pl-specimen');
-  await reportSize(measured);
+  const wrapper = root.querySelector('.pl-specimen');
+  if (inset) wrapper.style.padding = `${inset}px`;
+  const fill = !box && hostIsBlock && rendersBlock(wrapper);
+  document.body.classList.toggle('pl-fill', fill);
+  await reportSize(box ? frame : wrapper, fill);
 }
 
 try {

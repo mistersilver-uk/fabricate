@@ -40,6 +40,23 @@ export function readSlotBox(row) {
 }
 
 /**
+ * Read a row's `inset`: the padding of the region the primitive is placed in, for one whose edges
+ * bleed into it by design (the bulk panel's dock bleeds by the inspector rail's padding).
+ *
+ * @param {object} row A catalogue row.
+ * @returns {number} The inset in CSS px, or 0 when the row declares none.
+ * @throws {TypeError} When `inset` is present but is not a positive number of CSS pixels.
+ */
+export function readSlotInset(row) {
+  const { inset } = row;
+  if (inset === undefined) return 0;
+  if (typeof inset !== 'number' || !Number.isFinite(inset) || inset <= 0) {
+    throw new TypeError('`inset` must be a positive number of CSS pixels');
+  }
+  return inset;
+}
+
+/**
  * Build one specimen's window subtree — the whole body of its iframe document.
  *
  * @param {object} chrome The two attribute names the frame carries.

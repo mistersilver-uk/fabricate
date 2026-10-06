@@ -12,6 +12,7 @@
 import { CATALOGUE } from './catalogue.js';
 import { resolveSlots } from './inject.js';
 import { LIVE_CLASS, PAGE_CLASS, readLibrary } from './library.js';
+import { readSlotBox } from './slot.js';
 import {
   SPECIMEN_ASSIGN,
   SPECIMEN_ERROR,
@@ -29,6 +30,9 @@ const SPECIMEN_ATTRIBUTE = 'data-primitive-lab-specimen';
 
 /** Applied once an iframe's measured size has been read and applied. See `page.css`. */
 const SIZED_CLASS = 'pl-specimen-sized';
+
+/** Applied while a block specimen fills the replaced drawing's inline size. See `page.css`. */
+const FILL_CLASS = 'pl-specimen-fill';
 
 /** The query parameter that says how much of the catalogue to mount. */
 const MOUNT_PARAMETER = 'mount';
@@ -112,16 +116,62 @@ function renderLibrary(library) {
   while (library.body.firstChild) document.body.append(document.adoptNode(library.body.firstChild));
 }
 
-/** Apply a specimen's reported size to its `<iframe>`, and reveal it once sized. */
-function applySize(iframe, { width, height }) {
-  iframe.style.width = `${width}px`;
+/**
+ * Apply a specimen's reported size to its `<iframe>`, and reveal it once sized. A filling specimen
+ * takes the replaced drawing's inline size (`page.css`), so only its height is the report's.
+ */
+function applySize(iframe, { width, height, fill = false }, host) {
+  iframe.classList.toggle(FILL_CLASS, fill);
+  iframe.style.width = fill ? host.inlineSize : `${width}px`;
+  iframe.style.maxWidth = fill && host.maxInlineSize !== 'none' ? host.maxInlineSize : '';
   iframe.style.height = `${height}px`;
   iframe.classList.add(SIZED_CLASS);
 }
 
 /**
+ * What the drawing a row replaces says about its slot: whether it was block-level, so a block
+ * specimen fills that slot rather than shrink-wrapping, and how wide the slot is. A drawing its
+ * container stretched leaves the width to the page; one sized by its own content keeps its width,
+ * because a percentage in a shrink-to-fit container resolves against nothing the drawing set.
+ *
+ * @param {Element} host The hand-drawn element, still in the document.
+ * @returns {{fill: boolean, inlineSize: string, maxInlineSize: string}} The slot's inline facts.
+ */
+function readHostLayout(host) {
+  const style = getComputedStyle(host);
+  const parent = host.parentElement;
+  const parentStyle = getComputedStyle(parent);
+  const available =
+    parent.clientWidth -
+    Number.parseFloat(parentStyle.paddingLeft) -
+    Number.parseFloat(parentStyle.paddingRight);
+  const drawn = host.getBoundingClientRect().width;
+  return {
+    fill: !style.display.startsWith('inline'),
+    inlineSize: Math.abs(drawn - available) < 1 ? '' : `${Math.ceil(drawn)}px`,
+    maxInlineSize: style.maxWidth,
+  };
+}
+
+/**
+ * Give a boxed row's iframe its declared box before the specimen lays out, because the box is
+ * the specimen's viewport: a fixed overlay centres in it and a popover flips and clamps against it.
+ */
+function presizeBoxedSlot(iframe, row) {
+  let box;
+  try {
+    box = readSlotBox(row);
+  } catch {
+    return; // The specimen reports the malformed declaration itself.
+  }
+  if (box?.width) iframe.style.width = `${box.width}px`;
+  if (box?.height) iframe.style.height = `${box.height}px`;
+}
+
+/**
  * Stand up one specimen: create its `<iframe>`, place it where the drawing stood, run the
- * `specimenProtocol.js` handshake, and resolve once it has settled.
+ * `specimenProtocol.js` handshake, and resolve once it has settled. The listener stays after
+ * MOUNTED, because every later RESIZE is the same specimen re-measured.
  *
  * @param {{host: Element, row: object}} slot One resolved slot.
  * @param {string[]} problems The collector.
@@ -133,6 +183,8 @@ function standUpSpecimen(slot, problems, results) {
   iframe.className = LIVE_CLASS;
   iframe.setAttribute(SPECIMEN_ATTRIBUTE, slot.row.path);
   iframe.title = `${slot.row.spec}: ${slot.row.path}`;
+  const host = readHostLayout(slot.host);
+  presizeBoxedSlot(iframe, slot.row);
 
   const settled = new Promise((resolve) => {
     function onMessage(event) {
@@ -141,24 +193,23 @@ function standUpSpecimen(slot, problems, results) {
       const data = event.data ?? {};
       if (data.type === SPECIMEN_READY) {
         iframe.contentWindow.postMessage(
-          { type: SPECIMEN_ASSIGN, row: slot.row },
+          { type: SPECIMEN_ASSIGN, row: slot.row, fill: host.fill },
           globalThis.location.origin
         );
         return;
       }
       if (data.type === SPECIMEN_MOUNTED) {
-        applySize(iframe, data);
+        applySize(iframe, data, host);
         results.mounted += 1;
-        globalThis.removeEventListener('message', onMessage);
         resolve();
         return;
       }
       if (data.type === SPECIMEN_RESIZE) {
-        applySize(iframe, data);
+        applySize(iframe, data, host);
         return;
       }
       if (data.type === SPECIMEN_ERROR) {
-        applySize(iframe, data);
+        applySize(iframe, data, host);
         problems.push(`${slot.row.spec} / ${slot.row.path}: ${data.message}`);
         globalThis.removeEventListener('message', onMessage);
         resolve();
