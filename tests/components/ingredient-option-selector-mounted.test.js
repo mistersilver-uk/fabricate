@@ -1,5 +1,6 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -96,7 +97,7 @@ describe('IngredientOptionSelector mounted behavior', () => {
   it('keeps the roving keyboard model over the stacks, moving focus with the choice', async () => {
     const calls = [];
     const target = await harness.mount({
-      choices: [stackChoice()],
+      choices: [stackChoice({ optionIndex: 1 })],
       onChoose: (groupId, choice) => calls.push([groupId, choice]),
     });
     const radios = [...target.querySelectorAll('[role="radio"]')];
@@ -110,12 +111,17 @@ describe('IngredientOptionSelector mounted behavior', () => {
     const press = (key) =>
       radios[0].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key, bubbles: true }));
     press('ArrowRight');
-    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0, heldItemId: 'Item.bog' }]);
+    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1, heldItemId: 'Item.bog' }], 'the stack keeps its option');
     assert.ok(globalThis.document.activeElement === radios[1], 'focus follows the choice');
-    press('End');
-    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0, heldItemId: 'Item.bog' }]);
     press(' ');
-    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0, heldItemId: 'Item.oak' }]);
+    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1, heldItemId: 'Item.oak' }]);
+    press('End');
+    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1, heldItemId: 'Item.bog' }]);
+  });
+
+  it('reads a stack in English as held against the need', () => {
+    const en = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+    assert.equal(en.FABRICATE.App.Crafting.Io.StackReading, '{have} held · needs {need}');
   });
 
   it('draws a stack with no linked image as the crafting default art', async () => {
