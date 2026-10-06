@@ -1,14 +1,6 @@
-/**
- * The page's check that a specimen's document ran at all. A specimen whose module graph fails to
- * compile or import (a syntax error in a file it imports) never posts READY, and the page would
- * otherwise wait for `npm run lab:check`'s whole timeout without naming the row.
- */
+/** Names a specimen whose module graph never ran (so never posted READY) instead of hanging. */
 
-/**
- * How long after an `<iframe>` finishes loading its document may take to announce READY. A healthy
- * specimen announces it as the first thing its module body does, so this is generous; it starts at
- * the `load` event, so a cold dev server still fetching the module graph is not counted.
- */
+/** Grace after the `<iframe>` load event (so a cold dev server is not counted) before it is silent. */
 export const READY_GRACE_MS = 15_000;
 
 /**
