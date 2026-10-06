@@ -1449,7 +1449,9 @@ Spec reference: issue #119
 ## Source UUID
 
 `getCompendiumSourceUuid()` resolves only the **compendium source** (`_stats.compendiumSource`, with the legacy `flags.core.sourceId` fallback).
-It is distinct from the **world-duplicate source** (`_stats.duplicateSource`), which Foundry stamps when a world Item is duplicated or dragged into an actor.
+It is distinct from the **world-duplicate source** (`_stats.duplicateSource`), which Foundry stamps when a world Item is duplicated from the sidebar.
+Whether a drag into an actor also stamps it depends on the core build: core 14.365 does not, so an owned copy there carries no back-reference to the world Item it was dragged from, and resolves through the durable `roles[systemId]` leaf it inherits or through its **Source UUID**.
+A shared **Source UUID** proves descent from one compendium entry, not that two Items are the same thing; see **Derivative Source**.
 
 Canonical mapping: `getCompendiumSourceUuid()` in `src/utils/sourceUuid.js`
 
@@ -1461,20 +1463,44 @@ An owned item is resolved to the single component it IS through the shared, list
 `systemId` is threaded because component ids are not globally unique (copy-import preserves them), so identity is scoped per system.
 The resolver serves every source-reference consumer — crafting ingredients, crafting/gathering Tool presence, essence/used-by resolution, owned-item repair, gathering award-stacking, alchemy signature matching, and canvas Item→Tool drop — so a drag/duplicate copy of a component's source world item is recognized everywhere, while a copy carrying a distinct durable identity is NOT mis-attributed via a transitive `duplicateSource`.
 The separate **name fallback** some callers apply after the resolver returns null is not part of this matcher and is deferred to issue #557.
-**Identity decisions use a narrower chain:** import de-duplication (`addItemFromUuid`) and source-metadata propagation (`refreshComponentMetadataForUpdatedItem`) use `getItemIdentityReferences()` — `item.uuid` + compendium **Source UUID** only, **excluding** `_stats.duplicateSource`.
-This keeps a world Item cloned from another world Item (Foundry stamps `duplicateSource` on the copy) as a distinct component instead of merging it with — or rewriting — the original.
+**Identity decisions use narrower sets, and never `_stats.duplicateSource`.**
+Import de-duplication (`addItemFromUuid`) keys on the source's own uuid plus its compendium **Source UUID** (`getItemIdentityReferences()`), and drops the **Source UUID** too when the source is a clone or a **Derivative Source**.
+Source-metadata propagation (`refreshComponentMetadataForUpdatedItem`) keys on the edited Item's own uuid alone (`getOwnSourceUuids()`): the edited Item's compendium and duplicate sources name sibling Items, so a sidebar duplicate, a derivative, an unregistered world copy and an actor-owned copy never rewrite a component they are not registered to.
+A pack Item's own uuid is read in both spellings, with and without the document-type segment.
+This keeps a world Item duplicated from another world Item (the sidebar Duplicate stamps `duplicateSource` on the copy) as a distinct component instead of merging it with — or rewriting — the original.
 `flags.fabricate.mythwrightId` and similar importer/pack bookkeeping ids are never matching keys.
 
-Canonical mapping: `getItemSourceReferences()` / `getItemIdentityReferences()` / `getDuplicateSourceUuid()` / `resolveComponentForItem()` / `itemResolvesToComponent()` in `src/utils/sourceUuid.js`; `RecipeManager.toolMatchesItem`
+Canonical mapping: `getItemSourceReferences()` / `getItemIdentityReferences()` / `getOwnSourceUuids()` / `getDuplicateSourceUuid()` / `resolveComponentForItem()` / `itemResolvesToComponent()` in `src/utils/sourceUuid.js`; `RecipeManager.toolMatchesItem`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipe-visibility/spec.md, openspec/specs/gathering-and-harvesting/spec.md
+
+## Derivative Source
+
+Whether a source is a derivative is decided by a name comparison, trimmed, whitespace-collapsed and case-insensitive.
+The source's stored name (`_source.name`, else `name`) is compared against the compendium document's stored name and, when the Babele translation module recorded one on that document, its `flags.babele.originalName`.
+The source's own `flags.babele.originalName` is never read, because an Item built from a translated entry inherits that entry's flags and would always match it.
+A source whose **Source UUID** does not resolve, or a comparison in which either side has no name, is not a derivative, so components and recipe items sharing an unresolvable entry still merge until it is restored.
+The motivating case is the dnd5e spell scroll (issue 2217): dnd5e builds every scroll of one level from that level's template entry, so scrolls registered from freshly built Items shared one **Source UUID** and each overwrote the component the last one registered.
+The test errs toward a separate definition: a renamed copy of a compendium entry is a derivative, so it does not claim the entry, and an owned Item dropped straight from the pack does not resolve to it by source reference; the GM hands out copies of the registered Item instead.
+It is told apart from a clone by the absence of `_stats.duplicateSource`, and from a double import (two world copies of one entry that keep its name, which still de-duplicate to one definition) by its name.
+Unlike a clone's stripped provenance, a derivative's `_stats.compendiumSource` stays on the Item.
+The gate decides only what a new definition claims.
+Find-existing prefers the definition claiming the source's own uuid, and re-registering such a source neither adds nor releases a compendium-source claim: a registered derivative renamed back to its entry's name stays on its own uuid, and one registered before the gate moves its `originItemUuid` to its own uuid on its next import and keeps the entry's uuid in `aliasItemUuids`.
+For a recipe item and a tool, a durable `roles[systemId]` leaf a derivative inherited from a stamped entry is an inherited marker, passed over and (on a world source) overwritten, when the definition it names claims none of the source's own uuids and does not carry its stored name; a component's find-existing reads no durable leaf.
+The gate never un-merges: a component that absorbed several derivatives before it holds each one's uuid in `aliasItemUuids` and still matches them, and the recovery is to delete that component and import the Items again.
+It is a registration and source-replacement rule only: the runtime matchers have no derivative gate, and Repair Item Data applies own-uuid precedence and the clone-gate alone, so an unregistered derivative whose **Source UUID** a definition still claims is stamped with that definition's id.
+
+Canonical mapping: `isDerivativeOf` / `resolveImportedComponentSourceData` in `src/systems/manager/itemSources.js`; `storedMatchName()` / `normalizeMatchName()` / `getOwnSourceUuids()` / `findRegisteredDefinition()` / `settleCompendiumClaim()` in `src/utils/sourceUuid.js`; `resolveSourceRepairOwner` in `src/systems/SourceIdentityService.js`
+
+Spec reference: openspec/specs/data-models/spec.md (Registration Source Identity; Component requirement 9), openspec/specs/recipe-visibility/spec.md, issue #2217
 
 ## Recipe Item Match Tiers
 
 Definition ids are NOT globally unique (generated per system), so `systemId` scopes the identity tier exactly like components; a dotted/unsafe id degrades to the legacy-scalar + source-uuid tiers (warn once), never throws.
-There is **no clone-gate** at match time (tier 3 is always trusted).
-The clone-gate is a **registration/source-repair** rule: a world source Item carrying `_stats.duplicateSource` at registration is a duplicate and keys on its own uuid only (excluding the inherited compendium source), so a registered duplicate becomes a NEW definition instead of overwriting the original.
-Registration stamps the durable flag and strips a clone's stale `_stats`.
+There is **no clone-gate** and no derivative gate at match time (tier 3 is always trusted).
+The clone-gate is a **registration, source-replacement and source-repair** rule: a world source Item carrying `_stats.duplicateSource` at registration is a duplicate and keys on its own uuid only (excluding the inherited compendium source), so a registered duplicate becomes a NEW definition instead of overwriting the original.
+The derivative gate is a **registration and source-replacement** rule that keys a **Derivative Source** on its own uuid in the same way; source repair applies the clone-gate and own-uuid precedence only.
+Registration stamps the durable flag and strips a clone's stale `_stats`, and leaves a derivative's `_stats.compendiumSource` on the Item.
 A primary-GM one-shot auto-stamp backfills the flag on existing sources; its recipe-item arm reads `originItemUuid` alone, with NO `registeredItemUuid` fallback, unlike the component and tool arms which read `originItemUuid || registeredItemUuid` (`autoStampRecipeItemSources` vs `autoStampComponentSources` and `autoStampToolSources` in `SourceIdentityService.js`) — a recipe item's `registeredItemUuid` is set once at registration and never refreshed on re-registration, unlike a component's (`CraftingSystemManager.js:1288-1291` vs `:2552`), so falling back to it here would risk stamping a document the flag no longer names; the GM **Repair Item Data** action reconciles both kinds across world items, packs, and actor inventories, with a guardrailed name-assisted re-point.
 Within that reconciliation, the tools kind alone filters out any tool with neither `originItemUuid` nor `registeredItemUuid` (`buildRepairKinds`, `SourceIdentityService.js`); an alias-only tool is genuinely representable (`normalizeTool` preserves `aliasItemUuids` whether or not a primary ref is present, `src/systems/normalize/tools.js:46-59`) and matchable by the same resolver the component and recipe-item kinds use, so the exclusion is a deliberate narrowing rather than a no-op, pinned as intended behaviour by issue #1699's revision — no comment, spec or issue history states why a tool must clear that bar before the component and recipe-item kinds are asked to.
 Its remit is every PROJECTION of a definition’s resolved source document, not identity alone: the same action also refreshes each component’s and recipe-item’s stored **description** by resolving that definition’s own source reference through Foundry’s enricher (issue 800), which — unlike the identity walk — reaches sources in LOCKED packs.

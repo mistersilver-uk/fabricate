@@ -5,10 +5,13 @@
  */
 import { FABRICATE_FLAG_NAMESPACE, getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import {
+  findRegisteredDefinition,
   getDuplicateSourceUuid,
   getItemIdentityReferences,
   getItemMatchUuids,
+  getOwnSourceUuids,
   matchRecipeItemDefinition,
+  normalizeMatchName,
   resolveComponentForItem,
   resolveToolForItem,
 } from '../utils/sourceUuid.js';
@@ -46,8 +49,8 @@ async function writeSourceIdentity(source, flagKey, id) {
  * Stamp a durable identity on a registered source world Item, so a future copy inherits it even
  * when Foundry's transitive `_stats.duplicateSource` points at a template; a no-op for a non-Item
  * or any pack source. The clone-gate is safe only on a source, where `duplicateSource` means a
- * sidebar Duplicate, never on an actor-owned copy, which carries it from every non-compendium
- * drop; `matchRecipeItemDefinition` deliberately has no gate.
+ * sidebar Duplicate, never on an actor-owned copy, which may carry it from a drop depending on
+ * the core build; `matchRecipeItemDefinition` deliberately has no gate.
  */
 export async function stampSourceIdentity(source, flagKey, id) {
   if (!id) return;
@@ -150,39 +153,18 @@ export async function autoStampToolSources(io) {
   });
 }
 
-/** The definition a registered source maps to. A non-clone's durable flag wins even over a
- * drifted `originItemUuid`, the per-system leaf (issue 567) before the legacy scalar; a clone's
- * inherited flag is ignored, so a duplicate becomes its own definition (issue 555). */
+/** The definition a registered source maps to. Its durable flag wins even over a drifted
+ * `originItemUuid`, the per-system leaf (issue 567) before the legacy scalar; a clone's or a
+ * derivative's inherited flag is passed over, so it becomes its own definition (issues 555, 2217). */
 export function findRecipeItemDefinitionForSource(io, system, snapshot, source) {
   const definitions = Array.isArray(system.recipeItemDefinitions)
     ? system.recipeItemDefinitions
     : [];
-  if (!getDuplicateSourceUuid(source)) {
-    const roleFlagKey = io.recipeItemRoleFlagKey(system.id);
-    const roleId = roleFlagKey ? getFabricateFlag(source, roleFlagKey, null) : null;
-    if (roleId) {
-      const byRole = definitions.find((def) => def.id === roleId);
-      if (byRole) return byRole;
-    }
-    const flagId = getFabricateFlag(source, 'recipeItemDefinitionId', null);
-    if (flagId) {
-      const byFlag = definitions.find((def) => def.id === flagId);
-      if (byFlag) return byFlag;
-    }
-  }
-  // The snapshot's refs are already clone-gated, so a duplicate cannot match the original.
-  const claimed = new Set(getItemMatchUuids(snapshot));
-  if (claimed.size === 0) return null;
-  return definitions.find((def) => getItemMatchUuids(def).some((ref) => claimed.has(ref))) || null;
-}
-
-// Trimmed, whitespace-collapsed and lowercased for exact matching; names are registration
-// snapshots, not localized keys, so the client language cannot move a match.
-function normalizeMatchName(name) {
-  return String(name ?? '')
-    .trim()
-    .replaceAll(/\s+/g, ' ')
-    .toLowerCase();
+  const roleFlagKey = io.recipeItemRoleFlagKey(system.id);
+  return findRegisteredDefinition(definitions, snapshot, source, [
+    roleFlagKey ? getFabricateFlag(source, roleFlagKey, null) : null,
+    getFabricateFlag(source, 'recipeItemDefinitionId', null),
+  ]);
 }
 
 // The one definition of this system with the name, `'ambiguous'` for two or more, else `null`;
@@ -196,23 +178,20 @@ function uniqueDefinitionByName(name, definitions) {
   return matches[0];
 }
 
-// A world or writable-pack source's owner, clone-gated: a clone keys on its own uuid alone, or
-// its inherited `compendiumSource` would stamp it with the original's id.
+// A world or writable-pack source's owner: the definition claiming its own uuid, and only
+// otherwise one claiming its compendium source. A clone keys on its own uuid alone, or its
+// inherited `compendiumSource` would stamp it with the original's id.
 function resolveSourceRepairOwner(item, kind) {
-  const isClone = !!getDuplicateSourceUuid(item);
-  const refs = new Set(
-    isClone
-      ? [item?.uuid].filter((ref) => typeof ref === 'string' && ref.trim())
-      : getItemIdentityReferences(item)
-  );
-  if (refs.size === 0) return null;
-  return (
-    kind.definitions.find((def) => kind.refExtractor(def).some((ref) => refs.has(ref))) || null
-  );
+  const claimedBy = (refs) =>
+    kind.definitions.find((def) => kind.refExtractor(def).some((ref) => refs.includes(ref))) ||
+    null;
+  const byOwnUuid = claimedBy(getOwnSourceUuids(item?.uuid, item));
+  if (byOwnUuid || getDuplicateSourceUuid(item)) return byOwnUuid;
+  return claimedBy(getItemIdentityReferences(item));
 }
 
-// An actor-owned item's `{definition, tier}`, with no clone-gate: Foundry stamps
-// `duplicateSource` on drag-drop, so the ordinary runtime matchers apply.
+// An actor-owned item's `{definition, tier}`, with no clone-gate: a drop may stamp
+// `duplicateSource`, depending on the core build, so the ordinary runtime matchers apply.
 function resolveOwnedRepairOwner(item, kind) {
   if (kind.bucket === 'recipeItems') {
     return matchRecipeItemDefinition(item, kind.definitions, kind.systemId);
