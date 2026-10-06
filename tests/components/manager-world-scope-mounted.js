@@ -451,7 +451,8 @@ export function registerWorldScopeCases() {
     flushSync();
     assert.equal(worldNavItem('parties').getAttribute('aria-current'), 'page');
     assert.equal(
-      target.querySelectorAll('[aria-current="page"]').length,
+      // The rail's own: the breadcrumb trail's leaf is the current page of ITS nav (issue 1777).
+      target.querySelector('.manager-rail').querySelectorAll('[aria-current="page"]').length,
       1,
       'only the concrete destination is current'
     );
