@@ -16,27 +16,12 @@ import { collectStyleCorpus, splitSelectorList } from './helpers/styleBlockScan.
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
-/** The legs that are already dead at this change and are not its to strip (issue 1523). */
-const STRANDED_BASELINE = Object.freeze([
-  Object.freeze({
-    file: 'styles/fabricate.css',
-    selector:
-      '.fabricate-manager .manager-gathering-event-edit-view ' +
-      ':is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea)',
-    why:
-      'The gathering EVENT editor emits no `<select>`; the leg arrived with markup copied from ' +
-      'the TASK editor, which does. Dead before this change and owned by issue 1523.',
-  }),
-  Object.freeze({
-    file: 'styles/fabricate.css',
-    selector:
-      '.fabricate-manager .manager-gathering-event-edit-view ' +
-      ':is(input:not([type="checkbox"]):not([type="radio"]), select)',
-    why:
-      'The focus half of the pair above, dead for the same reason and deleted by the same ' +
-      'change. Owned by issue 1523.',
-  }),
-]);
+/**
+ * The legs that are already dead at a change and are not its to strip. Empty since issue 1777
+ * deleted every element-typed leg with the last native select, the two gathering event editor
+ * legs issue 1523 owned among them. An entry is `{ file, selector, why }`, `why` naming its issue.
+ */
+const STRANDED_BASELINE = Object.freeze([]);
 
 const SOURCES = collectSources(join(REPO_ROOT, 'src'), { extensions: ['.svelte'] });
 const IMPORT_GRAPH = measureImporters(REPO_ROOT);
@@ -172,34 +157,57 @@ function strandedLegs() {
 
 const key = (leg) => `${leg.file}  ${leg.selector}`;
 
-test('the element-typed leg scan is alive, so the clause below is not quantifying over nothing', () => {
-  const legs = selectElementLegs();
+/** The templates whose MARKUP writes a `<select>`, by the text scan above. */
+const renderers = () =>
+  [...RENDERS_SELECT]
+    .filter(([, renders]) => renders)
+    .map(([file]) => file)
+    .sort();
+
+test('the element-typed leg scan is alive, so the clauses below are not quantifying over nothing', () => {
   assert.ok(
     TEMPLATES.size > 100,
     `the component walk found ${TEMPLATES.size} templates, so it is not walking`
   );
-  // 22 measured at issue 1777; no field hosts a native select, so the field family has no leg.
-  assert.ok(
-    legs.length > 20,
-    `only ${legs.length} element-typed \`select\` legs found across both corpora, so the ` +
-      'selector walk has stopped seeing them'
-  );
-  // The renderers ARE the files the native-select gate's parsed-template walk finds a `<select>`
-  // in, so this text scan is checked against that walk rather than against a floor a converted
-  // file's prose could hold up.
+  // The text scan is checked against the native-select gate's parsed-template walk rather than
+  // against a floor: both empty is agreement, and is the tree since issue 1777.
   const tree = workingTree(TEMPLATE_CORPUS);
   const parsed = nativeSelectSites(templatesOf(tree.readFile, tree.listFiles()));
-  assert.ok(parsed.length > 0, 'the parsed-template walk found no `<select>` to check against');
   assert.deepEqual(
-    [...RENDERS_SELECT]
-      .filter(([, renders]) => renders)
-      .map(([file]) => file)
-      .sort(),
+    renderers(),
     [...new Set(parsed.map((site) => site.file))].sort(),
     'the templates this scan says render a `<select>` are not the ones the native-select gate ' +
       'parses one out of, so a leg would be judged against hosts that do not render one, or every ' +
       'leg would report as stranded and the baseline below would be measuring the scan rather ' +
       'than the sheet'
+  );
+});
+
+test('while no template renders a native <select>, no element-typed `select` leg exists', (t) => {
+  if (renderers().length > 0) {
+    t.skip('a template renders a native select, so each leg is judged against its hosts below');
+    return;
+  }
+  const corpus = collectStyleCorpus();
+  assert.deepEqual(
+    selectElementLegs(corpus).map((leg) => `${leg.file}:${leg.line}  ${leg.selector}`),
+    [],
+    'no Svelte template renders a native `<select>`, so a rule reaching one by ELEMENT TYPE ' +
+      'paints nothing; the three DialogV2 bodies that still build one carry no Fabricate root'
+  );
+
+  // POSITIVE CONTROL: the same walk over the real corpus with one leg appended to the END of
+  // the global sheet finds exactly that leg, so the zero above is the sheet's and not the walk's.
+  const sheet = 'styles/fabricate.css';
+  assert.ok(corpus[sheet], `${sheet} is missing from the style corpus`);
+  const probed = selectElementLegs({
+    ...corpus,
+    [sheet]: `${corpus[sheet]}\n.fabricate-manager .probe-host select:focus { outline: none; }\n`,
+  });
+  assert.deepEqual(
+    probed.map((leg) => leg.tokens),
+    [['fabricate-manager', 'probe-host']],
+    'a `select` leg appended to the global sheet is invisible to the walk, so the zero is vacuous'
   );
 });
 

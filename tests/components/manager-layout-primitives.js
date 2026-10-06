@@ -62,10 +62,10 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
   // pair's earlier position. Both areas are covered by this one block because `.fabricate` is
   // the player app's own root and the manager `<div>`'s ancestor.
   const moduleFocusBlock = blockFor(
-    '.fabricate a:focus,\n.fabricate button:focus,\n.fabricate input:focus,\n.fabricate select:focus,\n.fabricate textarea:focus,\n.fabricate [tabindex]:focus'
+    '.fabricate a:focus,\n.fabricate button:focus,\n.fabricate input:focus,\n.fabricate textarea:focus,\n.fabricate [tabindex]:focus'
   );
   const moduleFocusVisibleBlock = blockFor(
-    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate select:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
+    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
   );
 
   assert.ok(
@@ -108,9 +108,10 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
     // NON-EMPTY, asserted rather than assumed, for the reason the note above gives.
     assert.deepEqual(
       suppressed,
-      ['[tabindex]', 'a', 'button', 'input', 'select', 'textarea'],
-      `the ${area}'s :focus list must name the six element targets the pair is written for, ` +
-        'or the comparison below is between two empty lists'
+      ['[tabindex]', 'a', 'button', 'input', 'textarea'],
+      `the ${area}'s :focus list must name the five element targets the pair is written for — ` +
+        '`select` left with the last native select a template rendered (issue 1777) — or the ' +
+        'comparison below is between two empty lists'
     );
     assert.deepEqual(
       elementsIn(supplying).sort(compareStrings),
@@ -183,7 +184,7 @@ test('the rail crafting-system card selects a system and links back to the libra
   );
   // The manager's keyboard ring is the module-rooted pair's supplying half (issue 1501).
   const focusBlock = blockFor(
-    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate select:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
+    '.fabricate a:focus-visible,\n.fabricate button:focus-visible,\n.fabricate input:focus-visible,\n.fabricate textarea:focus-visible,\n.fabricate [tabindex]:focus-visible'
   );
 
   assert.ok(

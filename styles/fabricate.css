@@ -808,7 +808,6 @@
 .fabricate a:focus,
 .fabricate button:focus,
 .fabricate input:focus,
-.fabricate select:focus,
 .fabricate textarea:focus,
 .fabricate [tabindex]:focus {
   outline: none;
@@ -826,7 +825,6 @@
 .fabricate a:focus-visible,
 .fabricate button:focus-visible,
 .fabricate input:focus-visible,
-.fabricate select:focus-visible,
 .fabricate textarea:focus-visible,
 .fabricate [tabindex]:focus-visible {
   outline: 2px solid var(--fab-accent);
@@ -849,7 +847,6 @@
 .fabricate a[data-validation-focused],
 .fabricate button[data-validation-focused],
 .fabricate input[data-validation-focused],
-.fabricate select[data-validation-focused],
 .fabricate textarea[data-validation-focused] {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
@@ -1007,7 +1004,6 @@
 
 .fabricate-manager button,
 .fabricate-manager input,
-.fabricate-manager select,
 .fabricate-manager textarea {
   font: inherit;
 }
@@ -1022,7 +1018,7 @@
 
 /* PERMANENT baseline for free-text controls in the manager (issues 643, 1050, 1515). */
 
-/* skin census (issue 1523): not an adopter — an element-level baseline with no class; `.fab-field-skin` does not reproduce the (0,2,1) contract this comment states across hundreds of unmarked manager text fields and selects. */
+/* skin census (issue 1523): not an adopter — an element-level baseline with no class; `.fab-field-skin` does not reproduce the (0,2,1) contract this comment states across hundreds of unmarked manager text fields. */
 .fabricate-manager input[type="text"],
 .fabricate-manager input[type="url"],
 .fabricate-manager input[type="email"],
@@ -1044,100 +1040,6 @@
   min-height: 68px;
   padding: var(--fab-space-2);
   line-height: 1.4;
-}
-
-/* …and the SAME baseline for `<select>` (issue 1286). */
-
-/* skin census (issue 1523): not an adopter — an element-level baseline with no class; its (0,1,1) low-specificity fallback exists so ANY select nothing else claims still paints, a guarantee a class-scoped skin does not reproduce. */
-.fabricate-manager select {
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager select:disabled {
-  color: var(--fab-text-muted);
-  background: var(--fab-overlay-light-04);
-  cursor: default;
-}
-
-/* The OPEN state of every manager `<select>` (issues 772, 1511). */
-.fabricate-manager select option {
-  color: var(--fab-text);
-  background: var(--fab-bg-3);
-}
-
-/* The selected row, on the engines that paint the list in-page (Firefox today). */
-.fabricate-manager select option:checked {
-  color: var(--fab-accent);
-  background: var(--fab-overlay-light-08);
-}
-
-/* …and the opt-in that makes the rules above actually VISIBLE (issue 772). */
-@supports (appearance: base-select) {
-  /* `base-select` re-boxes the CLOSED control: it stops being a platform widget that centres its own text and becomes an ordinary flex container holding the selected option's content plus a `::picker-icon`. */
-  .fabricate-manager select {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    justify-content: space-between;
-    line-height: 1;
-    appearance: base-select;
-  }
-
-  /* The closed control renders the chosen row through `selectedcontent`, which clones the option's children — so the picker's row padding must not ride along into the field. */
-  .fabricate-manager select selectedcontent {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    padding: 0;
-  }
-
-  /* Both halves opt in separately, not as one grouped selector: the picker needs the opt-in AND its own surface, and grouping them left two blocks answering to the same selector with the paint in only one of them. */
-  .fabricate-manager select::picker(select) {
-    appearance: base-select;
-    padding: var(--fab-space-1);
-    border: 1px solid var(--fab-border-strong);
-    border-radius: 9px;
-    background: var(--fab-bg-3);
-    box-shadow: var(--fab-shadow-lg);
-  }
-
-  .fabricate-manager select option {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    padding: var(--fab-space-1) var(--fab-space-2);
-    border-radius: 6px;
-    background: transparent;
-  }
-
-  .fabricate-manager select option:hover,
-  .fabricate-manager select option:focus {
-    background: var(--fab-overlay-light-08);
-  }
-
-  .fabricate-manager select option:checked {
-    color: var(--fab-text);
-    background: var(--fab-overlay-light-08);
-  }
-
-  /* The tick the customizable select reserves space for on every row: hidden until the row is the selected one, so the list does not gain a ragged empty gutter. */
-  .fabricate-manager select option::checkmark {
-    color: var(--fab-accent);
-    content: '\2713';
-  }
-
-  .fabricate-manager select::picker-icon {
-    color: var(--fab-text-muted);
-    transition: transform 120ms ease;
-  }
-
-  .fabricate-manager select:open::picker-icon {
-    transform: rotate(180deg);
-  }
 }
 
 .fabricate-manager input[type="text"]:disabled,
@@ -7763,7 +7665,6 @@
 }
 
 .fabricate-manager .form-group input,
-.fabricate-manager .form-group select,
 .fabricate-manager .form-group textarea {
   width: 100%;
   min-width: 0;
@@ -7773,8 +7674,7 @@
   background: var(--fab-bg-1);
 }
 
-.fabricate-manager .form-group input,
-.fabricate-manager .form-group select {
+.fabricate-manager .form-group input {
   min-height: 34px;
   padding: 0 var(--fab-space-2);
 }
@@ -11320,7 +11220,7 @@
 /* Excludes `[type="range"]` for the reason documented on the task edit view's twin rule: the chance slider paints its fill behind a transparent input, and this blanket rule outranks the slider's own reset (issue 883). */
 .fabricate-manager
   .manager-gathering-event-edit-view
-  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea) {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
@@ -11331,7 +11231,7 @@
   font: inherit;
 }
 
-.fabricate-manager .manager-gathering-event-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+.fabricate-manager .manager-gathering-event-edit-view input:not([type="checkbox"]):not([type="radio"]) {
   min-height: 32px;
   padding: var(--fab-space-1) var(--fab-space-2);
 }
