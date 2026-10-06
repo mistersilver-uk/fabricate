@@ -160,7 +160,7 @@
             unavailable: option?.available !== true,
             needed: Number(option?.need) || 1,
             claimed: 0,
-            held: option?.available === true ? Number(option?.need) || 1 : 0,
+            held: Math.max(0, Number(option?.held) || 0),
             optionIndex: Number(option?.index) || 0,
             heldItemId: null,
           },
@@ -209,13 +209,13 @@
     requirements.map((requirement, requirementIndex) => {
       const groupId = String(requirement?.groupId ?? `requirement-${requirementIndex}`);
       const options = choiceOptions(groupId, requirement?.option);
-      // A refusal locks only stock held in full yet claimed elsewhere; a short one stays offered.
+      // ChoiceOptionList locks stock held in full yet claimed elsewhere; a pending command, all.
       const candidates = candidateRows(groupId, options).map((candidate) => ({
         ...candidate,
         reason: candidate.unavailable
           ? localize('FABRICATE.App.Journal.Stage.CandidateUnavailable')
           : '',
-        disabled: busy || (candidate.unavailable && candidate.held >= candidate.needed),
+        disabled: busy,
       }));
       const selected = selectedCandidate(requirement, candidates);
       const needed = Math.max(1, Number(requirement?.option?.need) || 1);

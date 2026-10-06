@@ -2227,7 +2227,7 @@ Crafting's essence pool MUST compose `EssencePool` through its adapter; its opt-
 Repeated thresholds for the same essence MUST sum their required amounts before comparing the shared contribution and render one keyed pool, so Fire 2 plus Fire 2 requires four Fire rather than counting the same two Fire twice.
 `ChoiceOptionList` MUST use each option's own `needed` amount when provided, falling back to the slot-level amount only for uniform-quantity callers.
 `ChoiceOptionList` MUST be one single-select `radiogroup` of `radio` candidates with one tab stop, whose arrow, Home and End keys move focus and the choice together past any disabled candidate.
-It MUST disable a candidate only when it is held but the stage claims it elsewhere; a candidate held short of the need MUST stay pressable, dimmed and described by its reading.
+It MUST disable a candidate only when it is held but the stage claims it elsewhere, or while its caller refuses it, such as a pending selection command; a candidate held short of the need MUST stay pressable, dimmed and described by its reading.
 `SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.
 `SlotTile` has a `partial` face: a `--fab-warning-border` hairline, its pip on solid `--fab-warning` inked `--fab-bg-0`, and `--fab-warning-text` caption ink.
 `SlotRow` and `RequirementChooser` MUST paint a partly delivered essence with that face, never the `short` one, even while its group is still reported missing; an unchosen choice slot keeps the `open` face.

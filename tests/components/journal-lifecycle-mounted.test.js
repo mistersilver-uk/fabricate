@@ -1468,7 +1468,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     const options = [...mounted.target.querySelectorAll('[data-choice-id]')];
     const large = options.find((option) => option.textContent.includes('iron stock'));
     const small = options.find((option) => option.textContent.includes('copper stock'));
-    assert.match(large.textContent, /3 held · needs 3/);
+    assert.match(large.textContent, /3 held · needs 3 · 2 spare/, 'the fixed group claims one');
     assert.equal(large.disabled, true, 'the candidate would leave the fixed iron group short');
     assert.match(small.textContent, /2 held · needs 1/);
     assert.equal(small.disabled, false, 'the smaller alternate uses its own required amount');
@@ -1580,6 +1580,46 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(overrides.choice.optionIndex, 0, 'pressing the short candidate selects it');
     assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
     assert.equal(begin().disabled, true, 'a short stack never readies the run');
+  });
+
+  it('measures each candidate against what the stage can fund, so a short fixed group locks none', async () => {
+    const set = ingredientSet('remainder', [
+      {
+        id: 'choice',
+        options: [componentOption('iron', 'iron', 1), componentOption('steel', 'steel', 1)],
+      },
+      { id: 'fuel', options: [componentOption('coal', 'coal', 2)] },
+    ]);
+    const fixture = selectionFixture([set], {
+      selectedIngredientSetId: set.id,
+      ingredientOptionOverrides: { choice: { optionIndex: 0 } },
+    });
+    fixture.builderOptions.actor = { ...ACTOR, items: [item('iron-a', 'iron', 5)] };
+    const mounted = await mountState('ready-single', fixture);
+    const begin = () => mounted.target.querySelector('[data-run-action="begin"]');
+    assert.equal(begin().disabled, true, 'no coal is held, so the stage cannot begin');
+    mounted.target.querySelector(':scope [data-slot-id="choice"] button').click();
+    await settleAction();
+    const options = [...mounted.target.querySelectorAll('[data-choice-id][role="radio"]')];
+    const iron = options.find((option) => option.textContent.includes('iron stock'));
+    const steel = options.find((option) => option.textContent.includes('steel'));
+    const unavailable = localizedLabel('FABRICATE.App.Journal.Stage.CandidateUnavailable');
+    assert.equal(iron.disabled, false, 'held in full and claimed by nothing the stage can fund');
+    assert.match(iron.textContent, /5 held · needs 1 · 5 spare/);
+    assert.ok(!iron.textContent.includes(unavailable) && !iron.hasAttribute('title'));
+    assert.ok(!iron.hasAttribute('aria-describedby'), 'a met candidate is not described as refused');
+    assert.equal(steel.disabled, false, 'an unheld option is short, never locked');
+    assert.ok(steel.classList.contains('is-short'));
+    const reading = mounted.target.querySelector(`[id="${steel.getAttribute('aria-describedby')}"]`);
+    assert.equal(reading.textContent, `0 held · needs 1 · 0 spare · ${unavailable}`);
+    assert.equal(steel.getAttribute('title'), unavailable);
+    steel.click();
+    await settleAction();
+    const overrides =
+      mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan
+        .ingredientOptionOverrides;
+    assert.deepEqual(overrides.choice, { optionIndex: 1 }, 'the unheld option is chosen by index');
+    assert.equal(begin().disabled, true);
   });
 
   it('states confirmed receipt rows, uncertainty and unstarted effects with strict redaction', async () => {

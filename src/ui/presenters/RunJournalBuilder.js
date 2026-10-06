@@ -63,6 +63,7 @@ import {
   inFlightAwardJournal,
   stepAwardEvidence,
 } from './runAwardChoiceProjection.js';
+import { choiceAvailability, missingGroupId } from './runJournalChoiceAvailability.js';
 import { SAFE_EXECUTION_EFFECT_KINDS } from './runJournalEffectKinds.js';
 import {
   ingredientNeed,
@@ -1599,55 +1600,32 @@ export class RunJournalBuilder {
     system,
     selection,
   }) {
-    const groupId = stringOrNull(group?.id);
-    const selectedOptionIndex = selectedIngredientIndex(group, optionOverrides, selection);
-    const options = normalizeList(group?.options).map((option, index) => {
-      const candidate = this._resolveIngredientSelection({
-        ingredientSet,
-        recipe,
-        actor,
-        items,
-        optionOverrides: {
-          ...optionOverrides,
-          [groupId]: { optionIndex: index },
-        },
-        essenceAllocation,
-        editFeasibility: true,
-      });
-      const presentation = this._ingredientOptionPresentation({
-        group,
-        option,
-        index,
-        available: candidate?.success === true,
-        recipe,
-        items,
-        system,
-      });
-      presentation.candidates = presentation.candidates.map((item) => {
-        const resolved = this._resolveIngredientSelection({
-          ingredientSet,
+    return choiceAvailability({
+      group,
+      ingredientSet,
+      optionOverrides,
+      selection,
+      resolve: (set, overrides) =>
+        this._resolveIngredientSelection({
+          ingredientSet: set,
           recipe,
           actor,
           items,
+          optionOverrides: overrides,
           essenceAllocation,
           editFeasibility: true,
-          optionOverrides: {
-            ...optionOverrides,
-            [groupId]: { optionIndex: index, heldItemId: item.itemId },
-          },
-        });
-        const claimed = normalizeList(resolved?.plan)
-          .filter(
-            (entry) =>
-              entry.ingredient !== option &&
-              (stringOrNull(entry.item?.uuid) || stringOrNull(idOf(entry.item))) === item.itemId
-          )
-          .reduce((sum, entry) => sum + Math.max(0, Number(entry.quantity) || 0), 0);
-        return { ...item, claimed, available: resolved?.success === true };
-      });
-      return presentation;
+        }),
+      present: (option, index, available) =>
+        this._ingredientOptionPresentation({
+          group,
+          option,
+          index,
+          available,
+          recipe,
+          items,
+          system,
+        }),
     });
-    return { groupId, selectedOptionIndex, options };
   }
 
   _requirementPresentation({ group, recipe, items, optionOverrides, selection, system, choice }) {
@@ -2946,8 +2924,4 @@ function safeMissingGroup(group) {
     need: numberOrNull(group?.need),
     have: numberOrNull(group?.have),
   };
-}
-
-function missingGroupId(group) {
-  return stringOrNull(group?.group?.id ?? group?.groupId ?? group?.id);
 }
