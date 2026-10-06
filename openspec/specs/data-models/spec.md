@@ -1477,9 +1477,12 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     12c.
     A bulk import persists its registrations with a single `fabricate.componentScope` write, issued after its `craftingSystems` write and only when that write resolved or was not needed, and a run that registers nothing writes nothing to that setting.
     A single-item import is its own batch of one here too: it writes its registration after its own `craftingSystems` write.
-    The registrations belong to the run that recorded them, so a run whose `craftingSystems` write is rejected registers nothing, and no later run writes them.
+    A caller that defers its `craftingSystems` write registers only through a registrations array it hands to `flushWorldComponentRegistrations` after that write; without one, the import registers and adopts nothing.
+    The registrations belong to the run that recorded them, and a registration is written only for a record the persisted `craftingSystems` setting holds, so a record a rejected or still-pending write left only in memory is registered by the import that next finds it persisted.
+    The residual is two overlapping runs over one system: when one run saves before the other flushes, the other registers the first run's freshly adopted record as one the system already held, so its membership keeps the record's own values instead of inheriting the world's.
+    A non-GM flush registers and writes nothing, and is answered rather than refused.
     Each registration is decided again when the write is issued, against the scope as it then stands and the system's current records, so a record deleted in the meantime registers nothing and a scope edit made in the meantime survives.
-    A rejected `fabricate.componentScope` write is reported on the run's result and never replaces an error the import is already raising.
+    A rejected `fabricate.componentScope` write is reported on the run's result as `worldRegistrationError`, the import handlers warn the GM once, and it never replaces an error the import is already raising.
     It leaves an in-system record with no World Component, which the next import of that Item registers.
 13. `Component.category` defaults to `general`.
     Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
@@ -2612,7 +2615,7 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    The refusal is reported rather than thrown, so a bulk apply continues through its remaining pairs.
 6. Every component-import path — single item, compendium pack, folder, the folder-mapping commit, the Compendium Directory action and `addItemFromUuid` — registers the component as a World Component the target system holds: a world entity carrying the component's identity and source link, and a membership record for `(component, system)` (issue 2218).
    The in-system record's id is the world entity's id.
-   An Item embedded in an actor registers nothing.
+   An Item embedded in an actor registers nothing, and an unresolvable uuid that addresses an embedded document registers nothing either.
    Two records share a source when their source references intersect, and a pack Item's uuid is compared without its document-type segment, so the type-less spelling earlier bulk imports stored matches the document's own.
    An id match alone binds nothing: a component whose id a world entity carries without sharing its source is left unregistered, because ids are not globally unique.
    6a.
