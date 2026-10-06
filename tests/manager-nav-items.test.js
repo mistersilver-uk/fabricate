@@ -18,6 +18,12 @@ import {
   navRowClass,
 } from '../src/ui/svelte/apps/manager/managerNavItems.js';
 
+import { shippedString } from './helpers/manager/managerLocalization.js';
+import { literalStrings } from './helpers/moduleAst.js';
+import { moduleAstOf } from './helpers/parsedSource.js';
+
+const MODEL_PATH = 'src/ui/svelte/apps/manager/managerNavItems.js';
+
 const text = (_key, fallback) => fallback;
 const LOCKED_REASON = 'This section stays open while you are on one of its pages.';
 
@@ -45,6 +51,77 @@ function presses() {
     };
   return { calls, record };
 }
+
+/** A built section as data, every handler reduced to the fact that there is one. */
+const shapeOf = (built) =>
+  JSON.parse(
+    JSON.stringify(built, (_key, value) => (typeof value === 'function' ? '[handler]' : value))
+  );
+const noop = () => {};
+
+// Each unit's prop defaults as `ManagerSystemNav`, `ManagerWorldNav` and
+// `ManagerWorldDowntimeNavGroup` declared them at `5054dde66`, before the model took them over.
+const SYSTEM_PROP_DEFAULTS = {
+  currentView: '',
+  setView: noop,
+  editSystem: noop,
+  systemOverviewCount: 0,
+  isCraftingRoute: false,
+  activateCraftingParent: noop,
+  craftingNavCount: 0,
+  craftingNavItems: [],
+  activeCraftingTab: '',
+  openCraftingSection: noop,
+  selectedCounts: {},
+  tagCategoryCounts: {},
+  canShowEssences: false,
+  toolsNavCount: 0,
+  isChecksRoute: false,
+  activateChecksParent: noop,
+  checksNavCount: 0,
+  checksNavItems: [],
+  canShowEnvironments: false,
+  isGatheringRoute: false,
+  activateGatheringParent: noop,
+  gatheringNavCounts: {},
+  visibleGatheringNavItems: [],
+  displayedGatheringTab: '',
+  openGatheringSection: noop,
+  experimentalFeaturesEnabled: false,
+};
+const WORLD_PROP_DEFAULTS = {
+  currentView: '',
+  setView: noop,
+  worldScopedCounts: {},
+  isWorldRoute: false,
+  openWorldParties: noop,
+  travelParties: [],
+  isWorldTravelRoute: false,
+  activateWorldTravelParent: noop,
+  worldRealms: [],
+  worldTravelTab: '',
+  openWorldTravelDestination: noop,
+  isWorldRulesRoute: false,
+  activateWorldRulesParent: noop,
+  selectedCurrencyUnits: [],
+  selectedCharacterPrerequisites: [],
+  selectedSystemModifiers: [],
+  isWorldCurrencyRoute: false,
+  isWorldPrerequisitesRoute: false,
+  isWorldModifiersRoute: false,
+  openWorldRulesDestination: noop,
+};
+const DOWNTIME_PROP_DEFAULTS = {
+  isWorldDowntimeRoute: false,
+  downtimeCoreFallback: true,
+  downtimeTabs: [],
+  downtimeNavTabBadges: null,
+  downtimeTabText: () => '',
+  downtimeNavLabelId: () => '',
+  worldDowntimeTabId: '',
+  openWorldDowntime: noop,
+  openWorldDowntimePreview: noop,
+};
 
 const byId = (entries, id) => entries.find((entry) => entry.id === id);
 const markerKinds = (item) => item.markers.map((marker) => marker.kind);
@@ -106,6 +183,17 @@ describe('the crafting-system section', () => {
     assert.deepEqual(managerSystemNavItems(systemProps({ selectedSystem: null }), text), []);
   });
 
+  it('builds the same rows from omitted props as from the unit’s shipped defaults', () => {
+    const rail = navRail();
+    const selectedSystem = { id: 'alchemy' };
+    assert.deepEqual(
+      shapeOf(managerSystemNavItems({ navRail: rail, selectedSystem }, text)),
+      shapeOf(
+        managerSystemNavItems({ navRail: rail, selectedSystem, ...SYSTEM_PROP_DEFAULTS }, text)
+      )
+    );
+  });
+
   it('drops the gated rows: Essences, Gathering and the experimental Graph placeholder', () => {
     const ids = managerSystemNavItems(
       systemProps({
@@ -158,6 +246,13 @@ describe('the crafting-system section', () => {
       { kind: 'count', value: 3, label: 'Open validation issues' },
     ]);
     assert.equal(countOf(byId(busy, 'tool-rules')), 6);
+
+    const single = managerSystemNavItems(
+      systemProps({ systemOverviewCount: 1, toolsNavCount: 1 }),
+      text
+    );
+    assert.equal(countOf(byId(single, 'system-overview')), 1, 'one issue is a count');
+    assert.equal(countOf(byId(single, 'tool-rules')), 1, 'one Tool is a count');
   });
 
   it('marks Checks issues as named badges, and an unsaved section before its badge', () => {
@@ -294,6 +389,14 @@ function worldProps(overrides = {}) {
 }
 
 describe('the world section', () => {
+  it('builds the same rows from omitted props as from the unit’s shipped defaults', () => {
+    const rail = navRail();
+    assert.deepEqual(
+      shapeOf(managerWorldNavItems({ navRail: rail }, text)),
+      shapeOf(managerWorldNavItems({ navRail: rail, ...WORLD_PROP_DEFAULTS }, text))
+    );
+  });
+
   it('lists the catalogue leaves the harness addresses, then Parties, Travel and Rules', () => {
     const entries = managerWorldNavItems(worldProps(), text);
     assert.deepEqual(
@@ -422,6 +525,15 @@ const PROVIDER = {
 };
 
 describe('the Downtime group', () => {
+  it('builds the same group from omitted props as from the unit’s shipped defaults', () => {
+    const rail = navRail();
+    const open = { navRail: rail, worldDowntimeAvailable: true };
+    assert.deepEqual(
+      shapeOf(managerDowntimeNavGroup(open, text)),
+      shapeOf(managerDowntimeNavGroup({ ...open, ...DOWNTIME_PROP_DEFAULTS }, text))
+    );
+  });
+
   it('is absent behind a shut gate', () => {
     assert.equal(
       managerDowntimeNavGroup(downtimeProps({ worldDowntimeAvailable: false }), text),
@@ -567,5 +679,22 @@ describe('the Downtime group', () => {
       ['openWorldDowntime', 'click'],
       ['openWorldDowntimePreview', 'tracking'],
     ]);
+  });
+});
+
+describe('the model’s copy', () => {
+  it('names only lang keys that resolve in the shipped lang file', () => {
+    // The localizer above answers with the fallback, so a mistyped key renders English here and
+    // in the mounted suites alike; only the lang file can say the key is real.
+    const keys = literalStrings(moduleAstOf(MODEL_PATH).ast).filter((literal) =>
+      literal.startsWith('FABRICATE.')
+    );
+    assert.ok(keys.length > 40, `the scan found only ${keys.length} keys`);
+    assert.ok(keys.includes('FABRICATE.Admin.Manager.Nav.LockedOpen'), 'the lock reason’s key');
+    assert.deepEqual(
+      keys.filter((key) => shippedString(key) === key),
+      [],
+      'these keys resolve to no string in lang/en.json'
+    );
   });
 });

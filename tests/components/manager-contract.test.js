@@ -1257,11 +1257,7 @@ describe('CraftingSystemManager source contract', () => {
 
   });
 
-  // That a nav parent never takes the selected pill class from the route it groups is retired
-  // rather than re-pointed at `managerNavItems.js` (issue 1777): the class is composed in one place,
-  // `navRowClass`, so it is pinned by value instead. `tests/manager-nav-items.test.js` holds the
-  // Crafting and Gathering parents current without `active` on their own routes, and the rail
-  // census in `tests/components/manager-rail-mounted.js` pins both parents' classes there.
+  // A nav parent's pill is pinned by value: tests/manager-nav-items.test.js ("keeps the Crafting and Gathering parents out of the pill") and the rail census's Crafting and Gathering locked-open states.
 
   // The gathering rail is one submenu group with its own expand/collapse control and a rollup
   // count summarising the three sections beneath it.
