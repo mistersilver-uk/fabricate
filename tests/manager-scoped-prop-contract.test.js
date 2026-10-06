@@ -160,6 +160,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // Added by issue 1721: the import report and the folder-aware component drop are their own unit.
   './importFlowModel.svelte.js',
   './navRailModel.svelte.js',
+  // Added by issue 1721: the Books & Scrolls selection and recipe-item draft are their own unit.
+  './recipe-item/recipeItemModel.svelte.js',
   './recipes/RecipeBrowserInspector.svelte',
   './recipes/RecipeBulkEditPanel.svelte',
   // ADDED BY ISSUE 1371's D6 HEADER SUBTITLE.
