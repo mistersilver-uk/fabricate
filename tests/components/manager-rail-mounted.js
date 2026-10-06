@@ -315,6 +315,9 @@ export function registerRailCases() {
     mountManager();
 
     assertHook(target, '.manager-titlebar[data-manager-titlebar]');
+    const titlebar = target.querySelector('.manager-titlebar');
+    assert.equal(target.querySelectorAll('.manager-titlebar').length, 1, 'the shell draws one titlebar');
+    assert.equal(titlebar.previousElementSibling, null, 'and nothing the shell draws precedes it');
     assertHook(target, '[data-manager-titlebar-status]', 'the titlebar reports the resolution');
     assert.ok(
       target.querySelector('[data-manager-titlebar-status]').getAttribute('title')?.length > 0,
@@ -342,6 +345,16 @@ export function registerRailCases() {
       target.querySelector('[data-manager-titlebar-status]').textContent.trim(),
       'Routed by check · 2 outcome tiers'
     );
+  });
+
+  it('counts no outcome tiers for a selection that does not route by check', () => {
+    useShippedLocalization();
+    mountManager([], {
+      craftingCheck: { routed: { type: 'fixed', fixedOutcomes: [{ id: 'great' }, { id: 'fair' }] } },
+    });
+    const status = target.querySelector('[data-manager-titlebar-status]').textContent.trim();
+    assert.ok(status.length > 0, 'the selection still reports its resolution');
+    assert.ok(!status.includes('outcome tier'), 'leftover routed tiers are not counted: ' + status);
   });
 
   it('draws no titlebar status line without a selected system', () => {
