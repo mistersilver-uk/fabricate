@@ -1013,7 +1013,7 @@
 }
 
 /* THE FONT FLOOR FOR THE FAMILIES WHOSE ROOT IS NOT THEIR CONTROL (issues 1508, 1509). */
-.fabricate-field :is(input, select, textarea),
+.fabricate-field :is(input, textarea),
 .fabricate-search input,
 .fabricate-slider input,
 .fabricate-tabs button {
@@ -4059,54 +4059,18 @@
   min-width: 0;
 }
 
+/* The operator is a `<Select size="inline">`, whose 30px trigger is the bordered 28px native select's box; the sign's tone is its border and text, and the option list keeps the panel's own colours (issue 1777). */
 .fabricate-manager .manager-character-modifier-operator-select {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--fab-border);
-  border-radius: 4px;
-  padding: 0;
+  flex: none;
 }
 
-.fabricate-manager .manager-character-modifier-operator-select select {
-  appearance: auto;
-  height: 28px;
-  min-height: 28px;
-  border: none;
-  background: var(--fab-bg-1);
-  color: inherit;
-  font-size: 0.75rem;
-  padding: 0 var(--fab-space-chip);
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-character-modifier-operator-select select option {
-  background: var(--fab-bg-1);
-  color: var(--fab-text);
-}
-
-.fabricate-manager .manager-character-modifier-operator-select.is-positive {
+.fabricate-manager .manager-character-modifier-operator-select.is-positive .fabricate-select-trigger {
   border-color: var(--fab-success-border);
-  background: var(--fab-overlay-light-06);
-}
-
-.fabricate-manager .manager-character-modifier-operator-select.is-positive select {
   color: var(--fab-success-text);
 }
 
-.fabricate-manager .manager-character-modifier-operator-select.is-positive select option {
-  color: var(--fab-success-text);
-}
-
-.fabricate-manager .manager-character-modifier-operator-select.is-negative {
+.fabricate-manager .manager-character-modifier-operator-select.is-negative .fabricate-select-trigger {
   border-color: var(--fab-danger-border);
-  background: var(--fab-overlay-light-06);
-}
-
-.fabricate-manager .manager-character-modifier-operator-select.is-negative select {
-  color: var(--fab-danger-text);
-}
-
-.fabricate-manager .manager-character-modifier-operator-select.is-negative select option {
   color: var(--fab-danger-text);
 }
 
@@ -8301,7 +8265,6 @@
 
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome (48px wide, 22px tall, transparent) from its component-scoped \3c style> (issue 883), and the requirement row's rolled amount is sized to that stepper by its own rule (issue 1516). */
 .fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox']):not([type='range']),
-.fabricate-field.fabricate-field select,
 .fabricate-field.fabricate-field textarea {
   width: 100%;
   min-width: 0;
@@ -8312,17 +8275,9 @@
 }
 
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood 36px tall with 8px of side padding instead of the 28px/0 the control asks for (issue 1523). */
-.fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox']):not([type='range']),
-.fabricate-field.fabricate-field select {
+.fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox']):not([type='range']) {
   height: 36px;
   padding: 0 var(--fab-space-2);
-}
-
-.fabricate-field.fabricate-field select:disabled {
-  color: var(--fab-text-muted);
-  background: var(--fab-overlay-light-04);
-  cursor: default;
-  opacity: 0.62;
 }
 
 /* THE FIELD FAMILY'S STRIP HALF, for the reason spelled out on `.fabricate-button:focus`: core paints every focused control with an orange outline and a 4px glow, the module reset removes it inside every Fabricate window, and a family rooted at the class it emits also renders in hosts that carry no Fabricate root at all (issue 1508). */
@@ -10822,8 +10777,10 @@
   text-align: center;
 }
 
-.fabricate-manager .manager-condition-shortcut select {
-  font-weight: 400;
+/* The select fills its field at the 36px the native select stood, under the `form` rung's 38 (issue 1777). */
+.fabricate-manager .manager-condition-shortcut .fabricate-select-trigger {
+  width: 100%;
+  min-height: 36px;
 }
 
 /* THE FAMILY'S BARE-ELEMENT TYPE BASELINE, and it is a FLOOR rather than an override (issue 1502). */
@@ -12642,7 +12599,7 @@
   flex: 0 0 28px;
 }
 
-.fabricate-manager .manager-drop-editor-card :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
+.fabricate-manager .manager-drop-editor-card input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
   width: 100%;
   min-width: 0;
   height: 28px;
@@ -12662,16 +12619,16 @@
   padding-block: 0;
 }
 
-.fabricate-manager .manager-character-modifier-row-card .fabricate-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
+.fabricate-manager .manager-character-modifier-row-card .fabricate-field input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
   height: 28px;
   min-height: 28px;
   padding: var(--fab-space-2xs) var(--fab-space-2);
 }
 
-.fabricate-manager .manager-drop-editor-condition-modifier-card .fabricate-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
-  height: 28px;
+/* The condition picker fills its cell at the 28px the native select stood, under the `inline` rung's 30 (issue 1777). */
+.fabricate-manager .manager-condition-modifier-picker .fabricate-select-trigger {
+  width: 100%;
   min-height: 28px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
 }
 
 /* `[type="number"]`, not `[type="text"]`: the inspector's rate field is rendered by `ChanceSlider` now, and the shared control uses a real number input (issue 883). */
@@ -13153,17 +13110,10 @@
   font-weight: 400;
 }
 
-/* The `<select>` alone. This was a two-selector rule that also painted `.manager-rule-stepper input` — the reward/event limit fields, which were a hand-rolled −/+ pair around a bare `type="number"` (issue 1050). */
-.fabricate-manager .manager-rule-field select {
+/* The rule's `<Select>` fills the description column at the 36px the native select stood, under the `form` rung's 38 (issue 1777). */
+.fabricate-manager .manager-rule-field .fabricate-select-trigger {
   width: 100%;
-  min-width: 0;
-  height: 36px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-  font-weight: 400;
+  min-height: 36px;
 }
 
 /* PLACEMENT only, now that the control itself is the shared `Stepper`. The limit field is a SIBLING of its `.manager-rule-row` inside the rules `.fab-stack`, not a child of it, so `padding-left` is what lines it up under the description column: the row's icon track is 34px plus its 8px gap. */

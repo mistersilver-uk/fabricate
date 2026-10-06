@@ -10,6 +10,7 @@ import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
   TYPEAHEAD_RUNE_MODULES,
 } from '../helpers/svelte-component-harness.js';
 
@@ -26,13 +27,12 @@ const harness = createMountedComponentHarness({
   ],
   runeModules: [...TYPEAHEAD_RUNE_MODULES],
   compiledModules: [
-    'src/ui/svelte/components/EmptyState.svelte',
-    'src/ui/svelte/components/Field.svelte',
+    // The condition picker and the operator are `<Select>`s (issue 1777).
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // Each attached condition modifier is a rule row (issue 1782).
-    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/RuleSentence.svelte',
     'src/ui/svelte/components/RuleRow.svelte',

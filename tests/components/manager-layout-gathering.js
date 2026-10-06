@@ -186,10 +186,8 @@ test('manager gathering rules inspector stacks descriptions above normal-weight 
   const ruleCopyBlock = blockFor('.fabricate-manager .manager-rule-copy');
   const ruleCopyDescriptionBlock = blockFor('.fabricate-manager .manager-rule-copy span');
   const ruleFieldBlock = blockFor('.fabricate-manager .manager-rule-field');
-  // Was a two-selector rule that also painted `.manager-rule-stepper input`. That field is
-  // the shared `Stepper` now (issue 1050) and brings its own chrome, so the rule is the
-  // `<select>` alone.
-  const ruleInputBlock = blockFor('.fabricate-manager .manager-rule-field select');
+  // The rule's control is the shared `<Select>` (issue 1777), so the rule is its trigger's skin.
+  const ruleTriggerBlock = blockFor('.fabricate-manager .manager-rule-field .fabricate-select-trigger');
 
   assert.ok(
     ruleRowBlock.includes('grid-template-columns: 34px minmax(0, 1fr);'),
@@ -212,8 +210,8 @@ test('manager gathering rules inspector stacks descriptions above normal-weight 
     'rule field text should not force bold select text'
   );
   assert.ok(
-    ruleInputBlock.includes('font-weight: 400;'),
-    'rule select and input text should not inherit bold labels'
+    ruleTriggerBlock.includes('width: 100%;') && ruleTriggerBlock.includes('min-height: 36px;'),
+    'rule selects fill the description column at the 36px box the native select stood'
   );
   assert.equal(
     css.includes('.fabricate-manager .manager-gathering-settings-summary'),
@@ -583,7 +581,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   const dropModifierOverflowBlock = blockFor('.fabricate-manager .manager-drop-modifier-overflow');
   const dropEditorInputBlock = blockFor(
-    '.fabricate-manager .manager-drop-editor-card :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]))'
+    '.fabricate-manager .manager-drop-editor-card input:not([type="checkbox"]):not([type="radio"]):not([type="range"])'
   );
   const dropEditorValuesBlock = blockFor('.fabricate-manager .manager-drop-editor-values');
   const dropEditorRatePercentBlock = blockFor(
@@ -633,10 +631,10 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-drop-inspector-stack .fabricate-search input'
   );
   const dropInspectorCharacterFieldBlock = blockFor(
-    '.fabricate-manager .manager-character-modifier-row-card .fabricate-field :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]))'
+    '.fabricate-manager .manager-character-modifier-row-card .fabricate-field input:not([type="checkbox"]):not([type="radio"]):not([type="range"])'
   );
   const dropInspectorCharacterOperatorBlock = blockFor(
-    '.fabricate-manager .manager-character-modifier-operator-select select'
+    '.fabricate-manager .manager-character-modifier-operator-select.is-negative .fabricate-select-trigger'
   );
   const dropEditorActionsBlock = blockFor('.fabricate-manager .manager-drop-editor-actions');
   const dropInspectorStackBlock = blockFor('.fabricate-manager .manager-drop-inspector-stack');
@@ -1085,7 +1083,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     dropEditorInputBlock.includes('height: 28px;') &&
       dropEditorInputBlock.includes('min-height: 28px;') &&
       dropEditorInputBlock.includes('padding: var(--fab-space-2xs) var(--fab-space-2);'),
-    'selected drop inspector generic inputs and selects should use compact 28px right-sidebar geometry'
+    'selected drop inspector generic inputs should use compact 28px right-sidebar geometry'
   );
   assert.ok(
     dropEditorValuesBlock.includes('grid-template-columns: minmax(0, 1fr) 72px;') &&
@@ -1205,10 +1203,9 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'selected drop inspector character modifier fields should override shared 36px field height'
   );
   assert.ok(
-    dropInspectorCharacterOperatorBlock.includes('height: 28px;') &&
-      dropInspectorCharacterOperatorBlock.includes('min-height: 28px;') &&
-      dropInspectorCharacterOperatorBlock.includes('padding: 0 var(--fab-space-chip);'),
-    'selected drop inspector character modifier operator select should keep compact 28px height'
+    dropInspectorCharacterOperatorBlock.includes('border-color: var(--fab-danger-border);') &&
+      dropInspectorCharacterOperatorBlock.includes('color: var(--fab-danger-text);'),
+    'the operator select carries the sign tone on the inline trigger itself'
   );
   assert.ok(
     dropEditorActionsBlock.includes('grid-template-columns: repeat(2, minmax(0, 1fr));') &&

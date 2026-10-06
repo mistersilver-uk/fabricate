@@ -23,7 +23,9 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Field from '../../components/Field.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
+  import Select from '../../components/Select.svelte';
   import Button from '../../components/Button.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
@@ -263,24 +265,26 @@
       </h3>
       <div class="manager-condition-shortcut-list">
         {#each selectedGatheringConditionShortcuts as condition (condition.kind)}
-          <label
-            class="fabricate-field manager-condition-shortcut"
+          {@const captionId = `manager-system-condition-${condition.kind}-caption`}
+          <Field
+            as="div"
+            class="manager-condition-shortcut"
             data-systems-gathering-condition={condition.kind}
           >
-            <span class="manager-condition-shortcut-label">
+            <span class="manager-condition-shortcut-label" id={captionId}>
               <i class={condition.icon} aria-hidden="true"></i>
               <span>{condition.label}</span>
             </span>
-            <select
+            <Select
               value={condition.setting.current}
-              onchange={(event) =>
-                updateSelectedGatheringCondition(condition.kind, event.currentTarget.value)}
-            >
-              {#each conditionValues(condition.setting) as option (conditionId(option))}
-                <option value={conditionId(option)}>{conditionLabel(option)}</option>
-              {/each}
-            </select>
-          </label>
+              options={conditionValues(condition.setting).map((option) => ({
+                value: conditionId(option),
+                label: conditionLabel(option),
+              }))}
+              ariaLabelledBy={captionId}
+              onChange={(next) => updateSelectedGatheringCondition(condition.kind, next)}
+            />
+          </Field>
         {/each}
       </div>
     </InspectorCard>

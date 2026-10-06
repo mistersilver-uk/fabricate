@@ -989,7 +989,7 @@ export const CASES = Object.freeze([
     steps: [
       'Gathering',
       { selector: '#manager-gathering-nav-settings' },
-      { selector: '#manager-gathering-rule-events', select: 'highestRankedDrop' },
+      ...chooseSelectOption('#manager-gathering-rule-events', 'highestRankedDrop'),
       { selector: '#manager-gathering-nav-environments' },
       {
         selector:
@@ -1116,12 +1116,50 @@ export const CASES = Object.freeze([
       },
       taskTab('results'),
       SELECT_SLOWBLOOM_DROP,
-      { selector: '[data-gathering-drop-condition-modifier-picker="biome"] button' },
+      {
+        selector: '[data-gathering-drop-condition-modifier-picker="biome"] .fabricate-icon-button',
+      },
       { selector: '[data-gathering-drop-condition-modifiers="biome"]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
     expectSelector:
       '.fabricate-manager .manager-inspector [data-gathering-drop-condition-modifiers="biome"] [data-gathering-drop-modifier-id]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
+      GATHERING_TASK_EDITOR_PATTERN,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-drop-character-modifier-attached',
+    label: 'Manager — Gathering task drop with an attached character modifier',
+    // Beyond the smoke: it attaches a library modifier, so the reference row's operator select
+    // and its sign tone are on screen, which no other frame draws (issue 1777).
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
+      },
+      taskTab('results'),
+      { selector: '[data-gathering-task-drop-id="hb-slowbloom-drop"]' },
+      { selector: '[data-gathering-drop-character-modifier-search] input', fill: 'Herb' },
+      {
+        selector:
+          '[data-gathering-drop-character-modifier-suggestion="hb-mod-herbalism-training"]',
+      },
+      { selector: '[data-gathering-drop-character-modifier-ref]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager .manager-inspector [data-gathering-drop-character-modifier-ref]' +
+      ' .manager-character-modifier-operator-select.is-positive .fabricate-select-trigger',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,

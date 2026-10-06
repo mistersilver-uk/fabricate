@@ -10,34 +10,8 @@ import {
 /** The primitive whose adoption this file pins. */
 const FIELD_PATH = 'src/ui/svelte/components/Field.svelte';
 
-/** The components still writing a raw `class="fabricate-field …"`, with their EXACT site count. */
-const RAW_FIELD_ALLOWLIST = Object.freeze([
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte',
-    sites: 1,
-    why:
-      "The systems-list condition shortcut, the last of the manager root's seven. Issue 1721 " +
-      'relocated it with the systems inspector chain without converting it, so the deferral is ' +
-      "unchanged in substance; the file is now one screen's form, which a conversion lane can " +
-      'take on its own.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
-    sites: 2,
-    why:
-      'The condition-modifier picker and the expression-override field of the panel issue 1707 ' +
-      'wrote once. RELOCATED without converting either, so the deferral is unchanged in ' +
-      'substance; the file is now one screen\'s form, which a conversion lane can take on its own.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
-    sites: 2,
-    why:
-      'The drop-rate editor and the drop-count editor, relocated by issue 1707 phase 2 without ' +
-      'converting either, so the deferral is unchanged in substance; the file is now one ' +
-      "screen's form, which a conversion lane can take on its own.",
-  }),
-]);
+/** No component writes a raw `.fabricate-field`, and the empty array is the claim (issue 1777). */
+const RAW_FIELD_ALLOWLIST = Object.freeze([]);
 
 const { callSites } = definePrimitiveAdoptionContract({
   label: 'fabricate-field',
