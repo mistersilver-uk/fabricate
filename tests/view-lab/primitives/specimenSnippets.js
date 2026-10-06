@@ -14,6 +14,9 @@ export const SPECIMEN_SNIPPET_NAMES = Object.freeze(['body', 'footer']);
  */
 export function readSpecimenSnippets(row) {
   const snippets = row.snippets ?? {};
+  if (Array.isArray(snippets) || typeof snippets !== 'object' || snippets === null) {
+    throw new TypeError('`snippets` must be an object mapping a snippet name to a node array');
+  }
   for (const [name, nodes] of Object.entries(snippets)) {
     if (!SPECIMEN_SNIPPET_NAMES.includes(name)) {
       throw new Error(

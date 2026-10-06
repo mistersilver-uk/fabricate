@@ -5,6 +5,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 
 import { missingChromeMessage, resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
+
 import { worktreeWatchIgnores } from './watchIgnore.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');

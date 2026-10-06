@@ -45,11 +45,18 @@ export function readSlotBox(row) {
  *
  * @param {object} row A catalogue row.
  * @returns {number} The inset in CSS px, or 0 when the row declares none.
- * @throws {TypeError} When `inset` is present but is not a positive number of CSS pixels.
+ * @throws {Error} When `inset` is not a positive number of CSS pixels, or the row also has a
+ *   boxed `slot`, where it would be silently ignored.
  */
 export function readSlotInset(row) {
   const { inset } = row;
   if (inset === undefined) return 0;
+  if (row.slot !== undefined) {
+    throw new Error(
+      '`inset` pads the wrapper of a default slot and does nothing in a boxed `slot`: ' +
+        'drop one, or size the boxed slot to include the region padding'
+    );
+  }
   if (typeof inset !== 'number' || !Number.isFinite(inset) || inset <= 0) {
     throw new TypeError('`inset` must be a positive number of CSS pixels');
   }

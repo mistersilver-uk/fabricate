@@ -14,6 +14,6 @@ const WORKTREE_DIRECTORIES = ['.worktrees', join('.claude', 'worktrees')];
  */
 export function worktreeWatchIgnores(repoRoot) {
   return WORKTREE_DIRECTORIES.map((directory) =>
-    join(repoRoot, directory, '**').replaceAll(String.fromCharCode(92), '/')
+    join(repoRoot, directory, '**').replaceAll(String.fromCodePoint(92), '/')
   );
 }

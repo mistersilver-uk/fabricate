@@ -28,7 +28,8 @@ this programme has already measured what happens to those.
 | `props`   | no       | A plain object, passed to the component verbatim. Plain JSON only — no functions, no state, no knobs.                                                                                                                                                                                                                                                                         |
 | `content` | no       | The `children` snippet, as a node array. See below.                                                                                                                                                                                                                                                                                                                           |
 | `snippets` | no      | Named snippets (`body`, `footer`), each a node array in `content`'s shape. See below.                                                                                                                                                                                                                                                                                       |
-| `inset`   | no       | The padding, in CSS px, of the region the primitive is placed in, for a primitive whose edges bleed into it. See below.                                                                                                                                                                                                                                                       |
+| `note`    | no       | Why the row is shaped the way it is, in a sentence: the intent of a `slot` box, say. Read by people only; the page ignores it.                                                                                                                                                                                                                                              |
+| `inset`   | no       | The padding, in CSS px, of the region the primitive is placed in, for a primitive whose edges bleed into it. Refused beside a boxed `slot`. See below.                                                                                                                                                                                                                                                       |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -76,6 +77,17 @@ either way.
 That is what keeps a card, a panel or a bar at the width of the column it
 replaces, rather than at its text's single-line width or, for a primitive that
 is itself a query container, at no width at all.
+The `<iframe>` is given that width before the specimen first lays out, so its
+first report is already at the final width and the page never publishes ready
+ahead of a corrective resize.
+The width is read **once**, when the specimen is stood up: a host whose width
+came from flex sizing (`flex: 1`) is frozen at the width it had then, and does
+not follow a later window resize.
+A drawing with no box of its own (`display: contents`) draws no width, so the
+width is left to the page.
+A specimen whose reports keep changing after it mounts (a `100vh` or
+`min-height: 100%` height follows its own iframe) is stopped after forty
+re-measures and reported by name rather than left to grow.
 
 An element with no principal box is **not a containing block** and is **not a
 query container**.

@@ -94,6 +94,7 @@
     "cap": "list form",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/SearchablePopover.svelte",
+    "note": "The 300x260 box is the open panel's own footprint, not a window: tall enough for the search field and the first rows of the list, so the panel neither flips nor clamps. Trimmed from 320 when the iframe viewport became the box.",
     "slot": {
       "width": 300,
       "height": 260

@@ -238,7 +238,18 @@ test('the catalogue is alive and every row carries an address', () => {
   );
 
   for (const entry of CATALOGUE) {
-    const { spec, cap, draws, path: componentPath, props, content, snippets, inset } = entry.row;
+    const {
+      spec,
+      cap,
+      draws,
+      path: componentPath,
+      props,
+      content,
+      snippets,
+      inset,
+      note,
+      slot,
+    } = entry.row;
     assert.ok(
       typeof spec === 'string' && spec.length > 0,
       `${where(entry)}: \`spec\` must be the library entry's heading, decoded and verbatim`
@@ -266,6 +277,7 @@ test('the catalogue is alive and every row carries an address', () => {
     assert.ok(
       snippets === undefined ||
         (typeof snippets === 'object' &&
+          !Array.isArray(snippets) &&
           snippets !== null &&
           Object.entries(snippets).every(
             ([name, nodes]) => SPECIMEN_SNIPPET_NAMES.includes(name) && Array.isArray(nodes)
@@ -275,6 +287,14 @@ test('the catalogue is alive and every row carries an address', () => {
     assert.ok(
       inset === undefined || (Number.isFinite(inset) && inset > 0),
       `${where(entry)}: \`inset\` is a positive number of CSS pixels`
+    );
+    assert.ok(
+      inset === undefined || slot === undefined,
+      `${where(entry)}: \`inset\` pads a default slot's wrapper and does nothing beside a boxed \`slot\``
+    );
+    assert.ok(
+      note === undefined || (typeof note === 'string' && note.length > 0),
+      `${where(entry)}: \`note\` is a non-empty string`
     );
   }
 });
