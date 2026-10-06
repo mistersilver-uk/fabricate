@@ -1133,6 +1133,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const tile = row.querySelector('.fab-medallion');
     assert.match(tile.getAttribute('style'), /width:\s*22px;\s*height:\s*22px/, 'at the row size');
     assert.equal(tile.getAttribute('data-medallion'), 'image', 'and it carries the drop artwork');
+    assert.equal(tile.querySelector('img').getAttribute('src'), 'icons/svg/mystery-man.svg');
     assert.ok(!row.querySelector('.fab-fill-bar'), 'the chance is a figure, not a fill track');
   });
 
