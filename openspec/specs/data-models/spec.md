@@ -1100,7 +1100,9 @@ Represent one curated item entry available to recipes and salvage operations.
    Every SUCCESS tier must route to an existing result group; failure tiers may stay unrouted (the runtime yields nothing for an unrouted outcome), and a route pointing at a deleted group is invalid.
    When the salvage check defines no outcome tiers, routing is impossible and the component must NOT be faulted — the gap surfaces once as the system-level `salvageRoutedNoTiers` issue instead of a per-component error.
 8. `salvage.ingredientQuantity` must be a positive integer.
-9. If a linked source item updates its name, image, or description, managed components that match the item's live UUID, canonical source UUID, or fallback source references must refresh their stored `name`, `img`, and display-safe plain-text `description` from the linked item.
+9. A managed component refreshes its stored `name`, `img`, and display-safe plain-text `description` from an updated Item only when the component claims that Item's OWN uuid, as its `registeredItemUuid`, its `originItemUuid` or one of its `aliasItemUuids`.
+   The updated Item's `_stats.compendiumSource` and `_stats.duplicateSource` are never refresh keys.
+   A sidebar duplicate, a derivative, an unregistered world copy and an actor-owned copy are siblings of the linked source Item, not the linked source.
    9a.
    A component's or recipe-item definition's stored `description` is the RESOLVED plain text of its source document's description.
    A content-link directive resolves to the referenced document's name whether or not the author supplied a label.
@@ -1118,6 +1120,7 @@ Represent one curated item entry available to recipes and salvage operations.
    A name resolved under GM authority may be visible to a player who could not have resolved it themselves; this is an accepted consequence of write-time resolution.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
 11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
+    The exception is importing again an Item whose own uuid a component already claims without that compendium source: the import adds no alias and reports no fallback (see **Recipe Item Identity → Registration Source Identity**); replace-source is not excepted.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
     12a.
     Every bulk component-import path — compendium pack import, folder import, and the folder-mapping commit — must persist its whole run with a SINGLE `craftingSystems` world-setting write, and the number of writes must not grow with the number of imported items or with the number of mapped folders.
@@ -1422,17 +1425,34 @@ A TOOL-REPLACEMENT grant item created from a Component-discriminated `onBreak.re
 A direct-Item replacement preserves the resolved Item source identity and never receives fabricated Component identity.
 These creation-time stamps write the same `roles[systemId]` leaves the one-shot component restamp and the **Repair item data** action write, with the same values, so they are idempotent-compatible; they add no migration and fix only items created after the one-shot back-fill has run.
 
-- A source's identity references are its own uuid plus its `_stats.compendiumSource`, **only when the source is not a clone**.
+- A source's identity references are its own uuid plus its `_stats.compendiumSource`, **only when the source is neither a clone nor a derivative of that compendium source**.
   A CLONE (a world source Item carrying `_stats.duplicateSource` at registration — a sidebar-Duplicate) keys purely on its own uuid: its inherited `compendiumSource` is excluded from both the canonical uuid and the find-existing references.
   So a registered duplicate becomes a NEW definition or component instead of overwriting the original.
-- This clone-gate is a REGISTRATION and source-repair rule only.
-  It must never reach the runtime matcher: an actor-owned drag copy also carries `_stats.duplicateSource`, but its `compendiumSource` is legitimate provenance there (tier 3).
+  A DERIVATIVE is a non-clone source whose compendium source resolves to a document none of whose names it shares, compared trimmed, whitespace-collapsed and case-insensitive.
+  The source is compared by its stored name alone; the compendium document by its stored name and, when a translation module records one on it, its original name.
+  The source's own recorded original name is not read, because an Item built from a translated entry inherits that entry's record.
+  When the compendium source does not resolve, or a name is empty, the source is not a derivative.
+  A derivative keys purely on its own uuid, as a clone does: its compendium source is excluded from the canonical uuid, from the find-existing references and from the aliases the registration adds.
+  The test errs toward a separate definition: a renamed copy of a compendium entry is a derivative, so it does not claim the entry, and an owned Item dropped straight from the pack does not resolve to it by source reference.
+- Find-existing prefers the definition that claims the source's own uuid over one that claims only its compendium source.
+  A pack Item's own uuid is read in both spellings, with and without the document-type segment.
+  Re-registering a source whose own uuid a definition already claims neither adds nor releases a compendium-source claim on that definition: an existing claim is kept, in `aliasItemUuids` where the source is now a derivative, and an absent one is not added whatever the name now says.
+  For a tool, find-existing does not match through an unresolvable compendium source the registration would only record as an alias.
+- For a recipe item and a tool, find-existing honours a source's durable `roles[systemId]` leaf, except that for a clone, or for a derivative whose name the named definition does not carry, a leaf naming a definition that does not claim the source's own uuid is an inherited marker: it is ignored, and for a world source the registration overwrites it.
+  A component's find-existing reads no durable leaf: it keys on the source references alone, and registration overwrites whatever leaf a world source carries.
+  A pack source is never stamped at registration, so it keeps the inherited leaf until Repair Item Data reaches it in an unlocked pack.
+- The derivative gate never un-merges.
+  A component that absorbed several derivatives before this rule holds each one's uuid in `aliasItemUuids` and still matches them; the recovery is to delete that component and import the Items again.
+- The clone gate is a registration, source-replacement and source-repair rule; the derivative gate is a registration and source-replacement rule; neither reaches the runtime matcher.
+  Source repair applies the clone gate and own-uuid precedence only, so an unregistered derivative whose compendium source a definition still claims is stamped with that definition's id.
+  An actor-owned drag copy may carry `_stats.duplicateSource`, depending on the core build, and its `compendiumSource` is legitimate provenance there either way (tier 3).
 - Registration stamps the durable flag (overwriting any marker inherited from a duplicated original), strips a clone's stale `_stats.duplicateSource`, and clears a clone's stale `_stats.compendiumSource`.
+  A derivative's `_stats.compendiumSource` is left on the Item.
 - Existing stored `originItemUuid` values are never recomputed.
-  A recipe item records the same union of source references a component does (`registeredItemUuid` = the registered live document, `originItemUuid` = the canonical compendium/source uuid, `aliasItemUuids` = broken-source fallbacks), so a compendium-imported book resolves owned copies dragged from EITHER the compendium item or the imported world item.
+  A recipe item records the same union of source references a component does (`registeredItemUuid` = the registered live document, `originItemUuid` = the canonical compendium/source uuid, `aliasItemUuids` = broken-source fallbacks), so a compendium-imported book resolves owned copies dragged from EITHER the compendium item or the imported world item, while the registered copy keeps the entry's name.
 
-Flow-1 double-import (the same pack item imported into the world twice and both registered) still dedups to ONE definition: the second registration is a non-clone whose `compendiumSource` still matches, so find-existing dedups.
-It is cleanly distinguishable from the duplicate case by the absence of `_stats.duplicateSource`.
+Flow-1 double-import (the same pack item imported into the world twice and both registered) still dedups to ONE definition: both copies carry the compendium entry's name, so the second registration is neither a clone nor a derivative, its `compendiumSource` still matches, and find-existing dedups.
+It is distinguished from a clone by the absence of `_stats.duplicateSource` and from a derivative by that name.
 
 ### Repair and Auto-Stamp
 
@@ -1442,7 +1462,7 @@ It is cleanly distinguishable from the duplicate case by the absence of `_stats.
   This removes the confirmed regression whereby a real registered book and an unregistered duplicate of it are byte-for-byte identical on the matcher's inputs (tier-4 only).
   It is NOT a `MigrationRunner` entry: that runner reads and writes only settings-data payloads and has no Item handle, so it cannot write Item flags.
 - A GM **Repair item data** maintenance action reconciles both kinds across world items, writable packs, and actor-owned items.
-  World/pack SOURCE items use the same clone-gated identity (a clone is matched by its own uuid only, never its inherited `compendiumSource`, fixing the self-corruption whereby a clone would be stamped with the original's id).
+  A world/pack SOURCE item resolves first to the definition claiming its own uuid, and only otherwise through its clone-gated compendium source (a clone is matched by its own uuid only, never its inherited `compendiumSource`, fixing the self-corruption whereby a clone would be stamped with the original's id).
   Actor-owned copies use the ordinary runtime matchers — the four-tier recipe-item matcher, or the list-aware, system-scoped component resolver (no clone-gate).
   Components, tools, AND recipe items are reconciled PER SYSTEM: the repair resolves each item against one system's definition set with that system's id, and writes or clears ONLY that system's `roles[systemId]` leaf for the kind (`componentId` / `toolId` / `recipeItemDefinitionId`), so a non-owning system's null-owner pass finds its own leaf unset and no-ops — it can never clear another system's identity regardless of `getSystems()` order.
   For recipe items, an unflagged owned copy matched only via tier 4 may be re-pointed by an exact (case/whitespace-normalized) name match, unique WITHIN the system being reconciled, to a different definition — the duplicated-scroll-mislabelled-as-book case — recorded in a reversible audit log; a name matching two or more definitions within that system is skipped as ambiguous.
