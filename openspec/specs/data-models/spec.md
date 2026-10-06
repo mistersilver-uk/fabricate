@@ -1348,8 +1348,8 @@ This record PERMANENTLY retains `id`, `difficulty`, `complications` and the whol
 `essences` is the one field that gained a destination WITHOUT leaving: since `1.32.0` (issue 1371 r18-store, maintainer ruling M31) the WORLD default carries an `essences` section a system inherits unless it overrides, and this record's own map REMAINS the value an overriding system resolves — the read union answers an INHERITING system the world map and an OVERRIDING one this record, exactly as it does `category` (`### Component scope` requirement 2a).
 
 **"World Identity Snapshot" is NOT the `snapshot` this section already uses, and the two are easy to conflate over the very same three fields.**
-Requirement 9c below calls `name` and `img` "the one-hop snapshots", and requirement 9b REFRESHES the description copy from the linked source Item on two triggers — the exact opposite of "written by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
-SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYSTEM and is copied FROM THE LINKED SOURCE ITEM; the World Identity Snapshot is WORLD-SCOPE, is copied FROM THIS IN-SYSTEM RECORD by the `1.30.0` migration, feeds no display precedence, and is written by nothing thereafter.
+Requirement 9c below calls `name` and `img` "the one-hop snapshots", and requirement 9b REFRESHES the description copy from the linked source Item on two triggers — the exact opposite of "refreshed by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
+SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYSTEM and is copied FROM THE LINKED SOURCE ITEM; the World Identity Snapshot is WORLD-SCOPE, is copied FROM THIS IN-SYSTEM RECORD by the `1.30.0` migration and by the component import that registers it (requirement 12b), feeds no display precedence, and is REFRESHED by nothing thereafter: the world entry editors write it, and nothing copies it again from this record or from the linked source Item.
 
 ### Properties
 
@@ -2619,11 +2619,13 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    Two records share a source when their source references intersect, and a pack Item's uuid is compared without its document-type segment, so the type-less spelling earlier bulk imports stored matches the document's own.
    An id match alone binds nothing: a component whose id a world entity carries without sharing its source is left unregistered, because ids are not globally unique.
    6a.
-   The membership record inherits every section, except that a record created for a component the system already held never changes what that component resolves, and a category the same run's folder mapping staged is written as an override.
+   The membership record inherits every section, with two exceptions that apply only against a world default the World Component already carries: a record created for a component the system already held never changes what that component resolves, and a category the same run's folder mapping staged is kept rather than replaced by the world's.
    For a component the system already held, each section the world default authors with a value different from the in-system record's is written as an override carrying the record's own value: `category` verbatim, and `essences` wherever the two normalized maps differ.
    For a record the run added, a category other than the reserved `general` that differs from an authored world category is written as an override, and every other section inherits, as it does for a component added from the catalogue.
+   A World Component the import itself creates carries no world default, so its record inherits every section and resolves the in-system record's own values until a world default is authored.
    6b.
    An imported Item that shares a source reference with an existing World Component makes the target system adopt that World Component: the new in-system record takes the entity's id and no second entity is created.
+   The new record keeps the identity the import read from its Item and the entity keeps its stored one, so the two can differ from the start; `## Scoped Entity Definitions` requirement 15 answers the in-system record's and names the pair in its drift report.
    The match is made before the new record's id is minted and takes the first sharing entity in roster order.
    It reads the World Component's stored source link, which is not refreshed when a system re-points its own record.
    Where the target system already holds a record under that id, nothing is written at world scope.
