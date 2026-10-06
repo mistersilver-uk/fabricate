@@ -334,7 +334,7 @@ describe('GatheringView mounted behavior', () => {
     const lockedCard = target.querySelector('[data-environment-id="env-locked"]');
     assert.equal(lockedCard.getAttribute('data-locked'), 'true', 'locked hook set');
     assert.equal(lockedCard.tagName.toLowerCase(), 'div', 'locked card is a div, not a button');
-    assert.equal(lockedCard.querySelector('button'), null, 'locked card renders no button');
+    assert.ok(!lockedCard.querySelector('button'), 'locked card renders no button');
     assert.equal(lockedCard.hasAttribute('tabindex'), false, 'locked card is not focusable');
     assert.ok(lockedCard.querySelector('.fa-lock'), 'locked card shows a lock icon');
 
@@ -437,7 +437,7 @@ describe('GatheringView mounted behavior', () => {
 
     const realmCard = target.querySelector('[data-environment-id="env-realm"]');
     assert.equal(realmCard.getAttribute('data-locked'), 'true', 'realm-gated env renders locked');
-    assert.equal(realmCard.querySelector('button'), null, 'realm-locked card is not selectable');
+    assert.ok(!realmCard.querySelector('button'), 'realm-locked card is not selectable');
 
     const alert = realmCard.querySelector('.gathering-env-card-realm-alert');
     assert.ok(alert, 'realm-locked card shows the realm alert chip');
@@ -668,7 +668,7 @@ describe('GatheringView mounted behavior', () => {
 
     // The card is non-interactive: a locked div, no button, not focusable.
     assert.equal(card.tagName.toLowerCase(), 'div', 'locked card is a div, not a button');
-    assert.equal(card.querySelector('button'), null, 'locked card renders no button');
+    assert.ok(!card.querySelector('button'), 'locked card renders no button');
     assert.equal(card.hasAttribute('tabindex'), false, 'locked card is not focusable');
 
     // If the (x/y) suffix renders, it must show (0/0).
