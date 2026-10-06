@@ -52,6 +52,7 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { COMPONENT_EDITOR_CARD_FILES } from './helpers/componentEditorCards.js';
 import { INSPECTOR_VERB_SITES } from './helpers/inspectorVerbRoles.js';
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
@@ -6406,4 +6407,27 @@ test('every unit the shell extracted selects the shell\u2019s own case set', () 
   for (const path of extracted) {
     assert.deepEqual(ids([path]), expected, `${path} alone selects a different set`);
   }
+});
+
+/**
+ * The title bar renders on every manager screen, so a change to it alone publishes a
+ * representative subset of the shell's set rather than all of it (issue 1777): the six system
+ * frames and the one frame that draws its PREMIUM mark.
+ */
+test('the title bar selects the system frames and the premium-installed frame', () => {
+  const MANAGER = 'src/ui/svelte/apps/manager';
+  const ids = (paths) =>
+    [...new Set(mapChangedFilesToCases(paths).map((entry) => entry.id))].sort(byCodePoint);
+  const titleBar = ids([`${MANAGER}/ManagerTitleBar.svelte`]);
+  assert.deepEqual(titleBar, [
+    'manager-default-selection',
+    'manager-rail-collapsed',
+    'manager-rail-expanded',
+    'manager-selected-normal',
+    'manager-selected-stacked',
+    'manager-systems-empty',
+    'manager-world-downtime-test-companion-installed',
+  ]);
+  const shell = new Set(ids([`${MANAGER}/CraftingSystemManagerRoot.svelte`]));
+  for (const id of titleBar) assert.ok(shell.has(id), `${id} is not a frame the shell draws`);
 });

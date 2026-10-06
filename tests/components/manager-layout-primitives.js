@@ -35,6 +35,7 @@ import {
   emptyStateStyles,
   iconFactRowStyles,
   readShortWindowRailGeometry,
+  readTitleBarGeometry,
   stackedBodyRule,
 } from './manager-layout-primitives-fixtures.js';
 
@@ -1229,6 +1230,17 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
     titleBlock.includes('font-family: var(--fab-font-serif);'),
     'the manager screen title should override the host h1 font with the studio serif'
   );
+});
+
+// The AppTitleBar specimen's inline padding is what renders; its 9px gap is off the spacing scale
+// and snaps to 8, and its full border and radius cannot frame a band spanning the window edge
+// (issue 1777; the disagreements are routed to issue 1523).
+test('the manager titlebar takes the AppTitleBar specimen inline padding on the spacing scale', async () => {
+  const strip = await readTitleBarGeometry();
+  assert.deepEqual(strip.padding, ['12px', '16px', '12px', '16px']);
+  assert.equal(strip.columnGap, '8px', 'the nearest spacing rung to the specimen 9px');
+  assert.deepEqual(strip.borders, ['0px', '0px', '1px', '0px'], 'a bottom rule only');
+  assert.equal(strip.radius, '0px');
 });
 
 test('every view-specific manager-body grid override narrows the rail column when collapsed', () => {

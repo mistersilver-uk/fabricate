@@ -107,6 +107,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // group and took `Kicker`, `Medallion`, `ComponentEditorHeader`, `ScopedEntryHeaderActions`
   // and the `managerHeaderActionClass` named import with them.
   './ManagerPageHeader.svelte',
+  // Added by issue 1777: the title bar is its own unit.
+  './ManagerTitleBar.svelte',
   './RecipeEditView.svelte',
   './RecipeItemEditor.svelte',
   './RecipesBrowserView.svelte',
