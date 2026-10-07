@@ -77,7 +77,7 @@
 
 {#snippet meta()}
   <span class="crafting-recipe-row-meta">
-    <span class="crafting-recipe-row-system">{systemName}</span>
+    <span class="crafting-recipe-row-system" title={systemName}>{systemName}</span>
     {#if !uncraftable}
       <!-- The row has already said the status in words on the recipe beside it, so this is
            the chip's icon-only face: a square with the label as its accessible NAME rather

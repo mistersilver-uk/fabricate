@@ -400,6 +400,8 @@ describe('RecipeBrowser mounted behavior', () => {
     assert.ok(badge, 'a non-general row shows the category badge');
     assert.equal(badge.textContent.trim(), 'Weapons', 'badge text is the categoryLabel, not the raw token');
     assert.equal(badge.getAttribute('title'), 'Weapons', 'full label available via title on hover');
+    const system = target.querySelector(':scope [data-recipe-id="r1"] .crafting-recipe-row-system');
+    assert.equal(system.getAttribute('title'), system.textContent, 'and so is the system name');
   });
 
   it('suppresses the category badge for a general recipe (keyed on category, not redaction)', async () => {
