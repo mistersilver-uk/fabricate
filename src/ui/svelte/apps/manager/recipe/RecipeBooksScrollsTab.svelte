@@ -233,7 +233,7 @@
     height: 26px;
     overflow: hidden;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 7px;
     color: var(--fab-text-subtle);
     background: var(--fab-bg-3);
     font-size: 0.66rem;

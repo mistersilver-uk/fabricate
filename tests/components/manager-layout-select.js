@@ -260,14 +260,13 @@ test('all three browser sort-direction toggles render as one control', async () 
       'so the bare probe still discriminates — an equality that held for every property would mean the rule was reaching nothing'
     );
 
-    // M12a, measured: the CONVERTED control is on the 34-38px band's 9px corner and the
-    // unconverted hand-written button is still on the base rule's 6px, so the ruling moved the
-    // primitive and not the whole `.fabricate-button` family.
+    // M12a, measured: the CONVERTED control is on the 34-38px band's 9px corner, and so is the
+    // unconverted hand-written button, from the base rule that sizes it at 34.
     assert.equal(measured.bare.borderRadius, '9px', 'a converted manager button paints the band corner');
     assert.equal(
       measured.unconverted.borderRadius,
-      '6px',
-      'and an unconverted hand-written one still paints the base control, so the edit is scoped to the primitive'
+      '9px',
+      'and an unconverted hand-written one takes the same corner from the base rule that sizes it'
     );
 
     for (const property of ['gap', 'fontSize', 'fontWeight', 'padding', 'height', 'borderRadius']) {
@@ -642,7 +641,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
     }
     assert.equal(row.display.computed, 'grid');
     assert.equal(row['min-height'].computed, '38px');
-    assert.equal(row['border-top-left-radius'].computed, '6px');
+    assert.equal(row['border-top-left-radius'].computed, '9px');
     assert.equal(
       row.color.selector,
       SHARED_ROW,

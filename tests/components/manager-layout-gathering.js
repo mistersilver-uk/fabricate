@@ -383,7 +383,7 @@ test('manager gathering settings condition panels use a two-column responsive gr
     'biome custom hex input should be allowed to shrink inside the popover grid'
   );
   assert.ok(
-    pillBlock.includes('border-radius: 6px;'),
+    pillBlock.includes('border-radius: 9px;'),
     'condition pills should be rounded rectangles rather than ovals'
   );
   assert.ok(

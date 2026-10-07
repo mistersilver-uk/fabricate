@@ -1613,7 +1613,7 @@ test('the values the comparison holds over are the ones the family declares, not
   assert.equal(bare('button')['border-radius'], '9px');
   assert.equal(bare('button')['min-height'], '34px');
   assert.equal(bare('icon-button')['box-sizing'], 'border-box');
-  assert.equal(bare('icon-button')['border-radius'], '6px');
+  assert.equal(bare('icon-button')['border-radius'], '9px');
 
   // `line-height: 1` — the declaration the `font: inherit` baseline would delete wherever it
   // outranked the block that declares it. Chromium reports a NUMERIC line-height as its used px
@@ -2062,13 +2062,13 @@ test('the issue-1508 families declare their own control chrome rather than inher
 
   // FIELD. `min-height: 34px` and `appearance: none` come from the family's element-typed chrome
   // rule — the one that restates the area baseline's predicate leg for leg — and `height: 38px`,
-  // the 6px corner, the border and the fill from the family's own re-rooted control block. All
+  // its 9px corner, the border and the fill from the family's own re-rooted control blocks. All
   // six are values the manager used to supply and the family now declares for itself.
   assert.equal(field['min-height'], '34px');
   assert.equal(field.appearance, 'none');
   assert.equal(field['-webkit-appearance'], 'none');
   assert.equal(field.height, '38px');
-  assert.equal(field['border-radius'], '6px');
+  assert.equal(field['border-radius'], '9px');
   assert.equal(field['border-top-width'], '1px');
   assert.equal(field['border-top-style'], 'solid');
   assert.match(
@@ -2161,10 +2161,10 @@ test('the toggle and the slider declare their own control chrome rather than inh
     await tab.close();
   }
 
-  // THE SLIDER'S TWO CONTROLS. The number half declares its own 28px box, 6px corner.
+  // THE SLIDER'S TWO CONTROLS. The number half declares its own 28px box, 7px corner.
   const number = bare('slider-number');
   assert.equal(number.height, '28px');
-  assert.equal(number['border-radius'], '6px');
+  assert.equal(number['border-radius'], '7px');
   assert.equal(number['border-top-width'], '1px');
   assert.equal(number['text-align'], 'center');
   assert.match(number['font-family'], /Signika/);

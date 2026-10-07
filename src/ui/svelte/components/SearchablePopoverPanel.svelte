@@ -385,7 +385,7 @@
     padding: 7px;
     gap: 7px;
     border: 1px solid var(--fab-border);
-    border-radius: 7px;
+    border-radius: 9px;
     background: var(--fab-bg-3);
   }
 

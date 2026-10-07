@@ -421,6 +421,7 @@
   .manager-import-mapping-row :global(.fabricate-button.fab-manager-button),
   .manager-import-mapping-row :global(.fabricate-button.manager-recipe-routing-add-trigger) {
     min-height: 28px;
+    border-radius: 7px;
     padding: 0 var(--fab-space-2);
     font-size: var(--fab-recipe-control-font);
   }

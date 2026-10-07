@@ -465,5 +465,6 @@
     width: 24px;
     height: 24px;
     min-height: 24px;
+    border-radius: 6px;
   }
 </style>

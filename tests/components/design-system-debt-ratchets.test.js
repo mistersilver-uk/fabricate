@@ -1199,8 +1199,11 @@ const WITHDRAWN_UTILITIES = Object.freeze([
   {
     name: 'fab-field-skin',
     why:
-      'measured at sixteen carriers of the target tuple: four are PINNED by a test or a script ' +
-      'that reads their selectors, five are recorded non-adopters and seven are unpinned. The ' +
+      'measured at eighteen carriers of the target tuple: seven are PINNED by a test or a script ' +
+      'that reads their selectors, four are recorded non-adopters and seven are unpinned. The ' +
+      'corners-by-kind pass added three pinned carriers when it put the ingredient set name, the ' +
+      'condition pill and the pill-select menu button on 9, and took the portaled hex input, a ' +
+      'non-adopter, off the tuple at its 28px rung. The ' +
       'radius sweep added four when it put rows and wells on 9: the requirement option ' +
       'row, pinned by the picker-row and studio font-size suites, and the unpinned recipe flow ' +
       'row, Tool system label and Tool required row. Issue ' +
@@ -1478,9 +1481,9 @@ test('every carrier of the withdrawn skin tuple carries its census marker', () =
 
   assert.equal(
     carriers.length,
-    16,
-    'the census is sixteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
-      'its four-pinned / five-non-adopter / seven-unpinned split as prose, so a carrier arriving ' +
+    18,
+    'the census is eighteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
+      'its seven-pinned / four-non-adopter / seven-unpinned split as prose, so a carrier arriving ' +
       'or ' +
       'leaving means re-deriving that `why` text with it rather than moving this number alone.'
   );

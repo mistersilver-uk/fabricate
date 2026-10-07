@@ -1340,7 +1340,7 @@
   height: 30px;
   padding: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--fab-text-muted);
   background: transparent;
   cursor: pointer;
@@ -2841,7 +2841,7 @@
   flex: 0 0 auto;
   padding: 4px 9px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 6px;
   font-size: 10px;
   font-weight: 600;
   white-space: nowrap;
@@ -3194,7 +3194,7 @@
   min-height: 30px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   font-size: 0.76rem;
@@ -3931,7 +3931,7 @@
   padding: var(--fab-space-2xs) var(--fab-space-4) var(--fab-space-2xs) var(--fab-space-1);
   text-align: center;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
@@ -4273,6 +4273,7 @@
   margin-left: auto;
   padding: 0 var(--fab-space-2);
   min-height: 30px;
+  border-radius: 7px;
   font-size: 0.78rem;
   font-weight: 600;
 }
@@ -5912,6 +5913,7 @@
   flex: 0 0 auto;
   width: 26px;
   height: 26px;
+  border-radius: 7px;
 }
 
 /* Two-outcome Produces (alchemy / simple-with-check): a Success and a Failure section, each headed by a toned pill; the failure section shows "No results" when empty (issue 643). */
@@ -6350,6 +6352,7 @@
 .fabricate-manager .manager-inspector-icon.is-art {
   width: 38px;
   height: 38px;
+  border-radius: 9px;
   border: 0;
   background: none;
 }
@@ -6786,7 +6789,7 @@
   width: 34px;
   height: 34px;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   color: var(--fab-accent);
   background: var(--fab-overlay-dark-16);
 }
@@ -7212,6 +7215,7 @@
   width: 100%;
   min-width: 0;
   min-height: var(--fab-icon-picker-row);
+  border-radius: 9px;
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
@@ -7338,7 +7342,7 @@
   min-height: var(--fab-icon-picker-row);
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--fab-overlay-light-06);
   text-align: left;
 }
@@ -7364,7 +7368,7 @@
   min-height: 44px;
   padding: var(--fab-space-1);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--fab-overlay-light-06);
   text-align: left;
 }
@@ -7435,7 +7439,7 @@
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--fab-overlay-dark-14);
 }
 
@@ -7466,7 +7470,7 @@
   min-height: 38px;
   padding: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--fab-overlay-light-05);
   overflow: hidden;
 }
@@ -8381,7 +8385,6 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
   color: var(--fab-text);
   background: var(--fab-bg-1);
 }
@@ -8390,6 +8393,7 @@
 .fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']) {
   height: 38px;
   padding: 0 var(--fab-space-2);
+  border-radius: 9px;
 }
 
 /* THE FIELD FAMILY'S STRIP HALF, for the reason spelled out on `.fabricate-button:focus`: core paints every focused control with an orange outline and a 4px glow, the module reset removes it inside every Fabricate window, and a family rooted at the class it emits also renders in hosts that carry no Fabricate root at all (issue 1508). */
@@ -9097,7 +9101,7 @@
   margin: 0;
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--fab-accent);
   background: var(--fab-surface-soft);
   font-family: inherit;
@@ -9246,14 +9250,14 @@
   align-items: flex-end;
 }
 
-/* A NAME input is set in the serif, exactly as the name it authors renders elsewhere — the set name here, the recipe name on the Overview tab (issue 643). */
+/* A NAME input is set in the serif, exactly as the name it authors renders elsewhere — the set name here, the recipe name on the Overview tab (issue 643). skin census (issue 1523): a carrier pinned by tests/components/manager-layout-browsers.js. */
 .fabricate-manager .manager-recipe-ingredient-set-name {
   flex: 1 1 auto;
   min-width: 0;
   height: 34px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--fab-bg-1);
   color: var(--fab-text);
   font-family: var(--fab-font-serif);
@@ -10166,6 +10170,7 @@
 .fabricate-field.fabricate-field textarea {
   min-height: 92px;
   padding: var(--fab-space-2) var(--fab-space-2);
+  border-radius: 9px;
   resize: vertical;
 }
 
@@ -10345,7 +10350,7 @@
   min-height: 34px;
   padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 9px;
   color: var(--fab-text-muted);
   background: transparent;
   font-weight: 500;
@@ -10819,7 +10824,7 @@
   max-width: 100%;
   padding: var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--fab-overlay-dark-14);
 }
 
@@ -10934,6 +10939,7 @@
 .fabricate-button.fabricate-button {
   min-height: 34px;
   padding: 0 var(--fab-space-3);
+  border-radius: 9px;
   font-weight: 700;
 }
 
@@ -11026,6 +11032,7 @@
   width: 34px;
   height: 34px;
   padding: 0;
+  border-radius: 9px;
   flex: 0 0 34px;
 }
 
@@ -11038,6 +11045,7 @@
   min-height: 24px;
   padding: 0;
   flex: 0 0 24px;
+  border-radius: 6px;
 }
 
 /* The banded Modal's close (maintainer ruling 2026-09-28); its paint is `Modal`'s. */
@@ -11049,6 +11057,7 @@
   min-height: 26px;
   padding: 0;
   flex: 0 0 26px;
+  border-radius: 7px;
 }
 
 /* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange
@@ -11214,7 +11223,7 @@
   width: 64px;
   height: 64px;
   flex: 0 0 64px;
-  border-radius: 6px;
+  border-radius: 11px;
   object-fit: cover;
   align-self: center;
 }
@@ -11454,6 +11463,7 @@
 .fabricate-manager .manager-gathering-event-edit-view textarea {
   min-height: 54px;
   padding: var(--fab-space-2) var(--fab-space-2);
+  border-radius: 9px;
   resize: vertical;
 }
 
@@ -11517,6 +11527,7 @@
 .fabricate-manager .manager-gathering-task-edit-view textarea {
   min-height: 54px;
   padding: var(--fab-space-2) var(--fab-space-2);
+  border-radius: 9px;
   resize: vertical;
 }
 
@@ -11683,6 +11694,7 @@
   min-width: 0;
 }
 
+/* skin census (issue 1523): a carrier pinned by tests/components/pill-family-routing.test.js and the gathering mounted suites. */
 .fabricate-pill-select .manager-availability-menu-button,
 .fabricate-manager .manager-condition-menu-button {
   display: flex;
@@ -11693,7 +11705,7 @@
   min-height: 34px;
   padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   color: var(--fab-text);
   background: var(--fab-bg-1);
   font-size: 0.8rem;
@@ -11846,7 +11858,7 @@
 .fabricate-manager .manager-task-drop-summary-thumb {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: 7px;
   object-fit: cover;
   flex: 0 0 28px;
   background: var(--fab-overlay-dark-12);
@@ -12034,7 +12046,7 @@
 .fabricate-manager .manager-task-component-card-image {
   width: 38px;
   height: 38px;
-  border-radius: 6px;
+  border-radius: 9px;
   object-fit: cover;
   background: var(--fab-bg-3);
 }
@@ -12291,6 +12303,7 @@
   height: 18px;
   min-height: 18px;
   flex: 0 0 18px;
+  border-radius: 6px;
   padding: 0;
 }
 
@@ -12375,7 +12388,7 @@
   box-sizing: border-box;
   padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-overlay-dark-18);
   font: inherit;
@@ -12706,6 +12719,7 @@
 .fabricate-manager .manager-drop-inspector-stack .fabricate-icon-button {
   width: 28px;
   height: 28px;
+  border-radius: 7px;
   flex: 0 0 28px;
 }
 
@@ -12716,7 +12730,7 @@
   min-height: 28px;
   padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
@@ -12771,7 +12785,7 @@
   min-height: 28px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 7px;
   background: var(--fab-overlay-dark-18);
   box-sizing: border-box;
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
@@ -12945,6 +12959,7 @@
   min-width: 0;
 }
 
+/* skin census (issue 1523): a carrier pinned by tests/components/manager-layout-gathering.js. */
 .fabricate-manager .manager-condition-pill {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) 24px;
@@ -12955,7 +12970,7 @@
   min-height: 34px;
   padding: var(--fab-space-2xs);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   color: var(--fab-text);
   background: var(--fab-bg-1);
   overflow: hidden;
@@ -13039,6 +13054,7 @@
 
 .fabricate-manager .manager-condition-add .manager-color-picker-trigger {
   height: 38px;
+  border-radius: 9px;
   border: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-06);
 }
@@ -13090,7 +13106,6 @@
 
 /* The hex field paints its OWN chrome, which is the one place this family needed a declaration rather than a new root (issue 1470). */
 
-/* skin census (issue 1523): not an adopter — this node is portaled (`TintPicker.svelte`) and can fall back to `document.body` outside `.fabricate`, where an ancestor-scoped skin would stop matching. */
 .fabricate-color-picker-popover .manager-color-custom input {
   appearance: none;
   -webkit-appearance: none;
@@ -13100,7 +13115,7 @@
   height: 28px;
   padding: 0 var(--fab-space-chip);
   border: 1px solid var(--fab-border);
-  border-radius: 9px;
+  border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-bg-1);
   font-size: 0.76rem;
@@ -13108,6 +13123,7 @@
 
 .fabricate-manager .manager-condition-add .essence-icon-picker-trigger.icon-only {
   height: 38px;
+  border-radius: 9px;
   border: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-06);
 }
@@ -13183,7 +13199,7 @@
   width: 34px;
   height: 34px;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   color: var(--fab-warning-text);
   background: var(--fab-overlay-dark-20);
 }
@@ -15908,7 +15924,7 @@
 .fabricate-manager .manager-environment-comp-thumb {
   width: 38px;
   height: 38px;
-  border-radius: 6px;
+  border-radius: 9px;
   object-fit: cover;
   flex: 0 0 auto;
 }
@@ -16332,7 +16348,7 @@
   width: 34px;
   height: 34px;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--fab-overlay-light-06);
   object-fit: cover;
 }
@@ -16408,7 +16424,7 @@
   padding: var(--fab-space-2xs) var(--fab-space-4) var(--fab-space-2xs) var(--fab-space-1);
   text-align: center;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
@@ -16420,6 +16436,7 @@
   width: 28px;
   height: 28px;
   min-height: 28px;
+  border-radius: 7px;
   padding: 0;
   justify-self: start;
 }
@@ -17273,7 +17290,7 @@
   justify-content: center;
   width: 38px;
   height: 38px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-04);
   color: var(--fab-text-muted);
@@ -17644,6 +17661,7 @@
   width: 100%;
   height: 30px;
   min-height: 30px;
+  border-radius: 7px;
   padding: 0 var(--fab-space-2);
   overflow: hidden;
   font-size: 10.5px;
@@ -17747,6 +17765,7 @@
 .fabricate-manager .fab-bulk-book-picker .fab-bulk-book-trigger {
   width: 100%;
   min-height: 38px;
+  border-radius: 9px;
 }
 
 /* AND THE SAME JOB FOR THE SAME RAIL, one control along. `BulkEditSelect` was a native `<select>` whose own scoped rule carried `width: 100%` for exactly the reason above; it is a shared `<Select>` now, whose trigger is rendered by `SearchablePopover` and whose API deliberately exposes no trigger-box prop (issue 1504). */
@@ -17758,6 +17777,7 @@
   justify-content: flex-start;
   height: auto;
   min-height: 34px;
+  border-radius: 9px;
 }
 
 /* THE PANEL, AT THE DESIGN'S OWN FIGURES. `proto:2258` states it as `padding:7px; border-radius:10px; background:var(--bg0); border:1px solid var(--border-strong); box-shadow` (a deep 16/38 drop, which `--fab-shadow-lg` already answers for); `display:flex; flex-direction:column; gap:5px` (issue 1373). */

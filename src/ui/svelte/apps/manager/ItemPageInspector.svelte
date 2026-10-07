@@ -358,7 +358,7 @@
     width: 24px;
     height: 24px;
     flex: none;
-    border-radius: var(--fab-books-control-radius);
+    border-radius: 6px;
     background: var(--fab-bg-3);
     color: var(--fab-accent);
     font-size: 0.65rem;
