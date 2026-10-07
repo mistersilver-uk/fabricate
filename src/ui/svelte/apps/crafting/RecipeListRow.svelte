@@ -230,6 +230,7 @@
      truncates with an ellipsis + hover title at half the meta line so a long custom category name
      cannot blow out the row. */
   .crafting-recipe-row-category {
+    box-sizing: border-box;
     flex: 0 0 auto;
     min-width: 6ch;
     max-width: min(9rem, 50%);
