@@ -11421,7 +11421,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 9px;
+  border-radius: 6px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
@@ -11430,6 +11430,7 @@
 
 .fabricate-manager .manager-gathering-event-edit-view input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
   min-height: 34px;
+  border-radius: 9px;
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
@@ -11467,7 +11468,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 9px;
+  border-radius: 6px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
@@ -11479,6 +11480,7 @@
   .manager-gathering-task-edit-view
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="search"]):not([data-recipe-option-formula]):not([data-recipe-option-search]) {
   min-height: 34px;
+  border-radius: 9px;
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
