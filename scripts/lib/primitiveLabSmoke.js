@@ -267,7 +267,7 @@ export function describeLiveLabelMismatch({ expected, labels }) {
     if (paired !== want) {
       problems.push(
         `${entry} has ${want} specimen(s) beside their drawing and ${paired} "live" label(s)` +
-          'directly before one'
+          ' directly before one'
       );
     }
   }

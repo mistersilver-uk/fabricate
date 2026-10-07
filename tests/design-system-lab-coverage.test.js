@@ -348,11 +348,16 @@ test('every catalogue row stands up a component its drawing’s own entry names'
   assert.ok(hosts.length > 50, `${hosts.length} drawings claimed, so this rule has no domain`);
   assert.deepEqual(rowsOutsideTheirEntry(hosts, namesByPath), []);
 
-  const [{ host, entry }] = hosts;
-  const own = namesByPath.get(entry.row.path);
-  const stranger = [...namesByPath].find(([, names]) => names.every((n) => !own.includes(n)))[0];
-  const repathed = [{ host, entry: { ...entry, row: { ...entry.row, path: stranger } } }];
-  assert.equal(rowsOutsideTheirEntry(repathed, namesByPath).length, 1);
+  const headingOf = (host) =>
+    host.closest('.spec')?.querySelector(':scope > .spec-head > h4')?.textContent ?? '';
+  const prose = hosts.find(({ host }) => primitiveNamesIn(headingOf(host)).length === 0);
+  assert.ok(prose, 'no row stands in a prose entry, so its caption branch has no domain');
+  for (const { host, entry } of [hosts[0], prose]) {
+    const own = namesByPath.get(entry.row.path);
+    const stranger = [...namesByPath].find(([, names]) => names.every((n) => !own.includes(n)))[0];
+    const repathed = [{ host, entry: { ...entry, row: { ...entry.row, path: stranger } } }];
+    assert.equal(rowsOutsideTheirEntry(repathed, namesByPath).length, 1, entry.row.path);
+  }
 });
 
 /**
