@@ -40,3 +40,28 @@
   align-self: center;
   width: max-content;
 }
+
+/* In place: a partial specimen's caption, heading it. */
+.pl-live-caption {
+  align-self: flex-start;
+  width: max-content;
+}
+
+.pl-live-label > .pl-live-partial::before {
+  content: '·';
+  margin-inline: 0.5em;
+}
+
+/* In a grid, the chip and its specimen take a row each beneath the drawing, not a cell each. */
+.pl-live-row {
+  grid-column: 1 / -1;
+}
+
+/*
+ * A filling specimen beside its drawing takes the width the drawing gives its region, and adds none:
+ * in a unit sized by its content, `width: 100%` would otherwise resolve against the iframe's own
+ * 300px default and widen the unit past the drawing.
+ */
+.pl-live-label + .pl-live.pl-specimen-sized.pl-specimen-fill {
+  contain: inline-size;
+}

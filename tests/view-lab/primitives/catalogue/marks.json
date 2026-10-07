@@ -440,6 +440,9 @@
     "cap": "row badges — the reference’s essence dot, count only",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/apps/manager/components/EssenceChip.svelte",
+    "undrawn": {
+      "Fire": "the chip’s accessible name; the drawing draws the count alone"
+    },
     "props": {
       "essence": {
         "id": "fire",
@@ -455,6 +458,9 @@
     "cap": "row badges — the reference’s essence dot, count only",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/apps/manager/components/EssenceChip.svelte",
+    "undrawn": {
+      "Earth": "the chip’s accessible name; the drawing draws the count alone"
+    },
     "props": {
       "essence": {
         "id": "earth",
@@ -470,6 +476,9 @@
     "cap": "row badges — the reference’s essence dot, count only",
     "draws": ":scope > div > span",
     "path": "src/ui/svelte/apps/manager/components/EssenceChip.svelte",
+    "undrawn": {
+      "Metal": "the chip’s accessible name; the drawing draws the count alone"
+    },
     "props": {
       "essence": {
         "id": "metal",
@@ -535,6 +544,7 @@
     "cap": "meter — two segments, granted vs paid",
     "draws": ".k-track",
     "path": "src/ui/svelte/components/Meter.svelte",
+    "partial": "first segment only",
     "note": "Passes both segments the drawing shows. The shipped meter draws only the first, which is what its API states.",
     "props": {
       "value": 1,
@@ -617,6 +627,9 @@
     "draws": ".k-stage-row",
     "path": "src/ui/svelte/components/StageBars.svelte",
     "note": "Unnumbered: the drawing's caption row sits outside the bar row this replaces and stays drawn, so a numbered specimen would caption every stage twice.",
+    "undrawn": {
+      "Draw the billet stages": "the group’s accessible name; the drawing draws no name"
+    },
     "props": {
       "ariaLabel": "Draw the billet stages",
       "currentIndex": 2,

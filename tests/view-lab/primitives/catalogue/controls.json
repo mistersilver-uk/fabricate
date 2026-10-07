@@ -4,6 +4,10 @@
     "cap": "integer",
     "draws": ".k-step",
     "path": "src/ui/svelte/components/Stepper.svelte",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
     "props": {
       "decrementLabel": "Decrease",
       "incrementLabel": "Increase",
@@ -16,6 +20,10 @@
     "cap": "with unit",
     "draws": ".k-step",
     "path": "src/ui/svelte/components/Stepper.svelte",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
     "props": {
       "decrementLabel": "Decrease",
       "incrementLabel": "Increase",
@@ -28,6 +36,10 @@
     "cap": "signed",
     "draws": ".k-step",
     "path": "src/ui/svelte/components/Stepper.svelte",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
     "props": {
       "decrementLabel": "Decrease",
       "incrementLabel": "Increase",
@@ -40,6 +52,10 @@
     "cap": "at min · unset",
     "draws": ".k-step",
     "path": "src/ui/svelte/components/Stepper.svelte",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
     "props": {
       "decrementLabel": "Decrease",
       "incrementLabel": "Increase",
@@ -55,6 +71,10 @@
     "cap": "coarse rail",
     "draws": ".k-step",
     "path": "src/ui/svelte/components/Stepper.svelte",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
     "props": {
       "decrementLabel": "Decrease",
       "incrementLabel": "Increase",
@@ -68,6 +88,10 @@
     "cap": "comfortable",
     "draws": ".k-step",
     "path": "src/ui/svelte/components/Stepper.svelte",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
     "props": {
       "decrementLabel": "Decrease",
       "incrementLabel": "Increase",
@@ -81,6 +105,10 @@
     "cap": "vertical",
     "draws": ".k-step",
     "path": "src/ui/svelte/components/Stepper.svelte",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
     "props": {
       "decrementLabel": "Decrease",
       "incrementLabel": "Increase",
@@ -94,6 +122,10 @@
     "cap": "disabled",
     "draws": ".k-step",
     "path": "src/ui/svelte/components/Stepper.svelte",
+    "undrawn": {
+      "Decrease": "the minus button’s accessible name; the drawing draws its glyph",
+      "Increase": "the plus button’s accessible name; the drawing draws its glyph"
+    },
     "props": {
       "decrementLabel": "Decrease",
       "incrementLabel": "Increase",
@@ -225,6 +257,9 @@
     "cap": "icon 28",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/IconButton.svelte",
+    "undrawn": {
+      "Link a world item": "the icon button’s accessible name; the drawing draws its glyph"
+    },
     "props": {
       "ariaLabel": "Link a world item"
     },
@@ -243,6 +278,9 @@
     "cap": "icon 28",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/IconButton.svelte",
+    "undrawn": {
+      "More actions": "the icon button’s accessible name; the drawing draws its glyph"
+    },
     "props": {
       "ariaLabel": "More actions"
     },
@@ -261,6 +299,9 @@
     "cap": "icon 28",
     "draws": ".k-btn",
     "path": "src/ui/svelte/components/IconButton.svelte",
+    "undrawn": {
+      "Remove this row": "the icon button’s accessible name; the drawing draws its glyph"
+    },
     "props": {
       "ariaLabel": "Remove this row"
     },
@@ -415,6 +456,9 @@
     "cap": "on · accent",
     "draws": ".k-tog",
     "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "undrawn": {
+      "Enabled": "the switch’s accessible name; the drawing draws the track alone"
+    },
     "props": {
       "on": true,
       "ariaLabel": "Enabled"
@@ -425,6 +469,9 @@
     "cap": "off",
     "draws": ".k-tog",
     "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "undrawn": {
+      "Enabled": "the switch’s accessible name; the drawing draws the track alone"
+    },
     "props": {
       "on": false,
       "ariaLabel": "Enabled"
@@ -435,6 +482,9 @@
     "cap": "on · success",
     "draws": ".k-tog",
     "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "undrawn": {
+      "Enabled": "the switch’s accessible name; the drawing draws the track alone"
+    },
     "props": {
       "on": true,
       "ariaLabel": "Enabled"
@@ -445,6 +495,9 @@
     "cap": "disabled",
     "draws": ".k-tog",
     "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "undrawn": {
+      "Enabled": "the switch’s accessible name; the drawing draws the track alone"
+    },
     "props": {
       "on": false,
       "disabled": true,
@@ -456,6 +509,9 @@
     "cap": "on · with its reading — 28 of 37 shipped sites",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "undrawn": {
+      "Enabled": "the switch’s accessible name; the drawing draws the track alone"
+    },
     "props": {
       "on": true,
       "label": "On",
@@ -467,6 +523,9 @@
     "cap": "locked · an indicator, not a control",
     "draws": ".k-tog",
     "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "undrawn": {
+      "Required by the mode": "the switch’s accessible name; the drawing draws the track alone"
+    },
     "props": {
       "as": "indicator",
       "on": true,
@@ -488,6 +547,10 @@
     "cap": "default · in a well",
     "draws": ".k-seg",
     "path": "src/ui/svelte/components/SegmentedControl.svelte",
+    "undrawn": {
+      "flat": "an option’s value, not its words",
+      "Pricing model": "the group’s accessible name; the drawing draws no name"
+    },
     "props": {
       "options": [
         {
@@ -513,6 +576,11 @@
     "cap": "bare · no well",
     "draws": ".k-seg",
     "path": "src/ui/svelte/components/SegmentedControl.svelte",
+    "undrawn": {
+      "any": "an option’s value, not its words",
+      "all": "an option’s value, not its words",
+      "Tag match": "the group’s accessible name; the drawing draws no name"
+    },
     "props": {
       "options": [
         {
@@ -534,6 +602,10 @@
     "cap": "fill",
     "draws": ".k-seg",
     "path": "src/ui/svelte/components/SegmentedControl.svelte",
+    "undrawn": {
+      "list": "an option’s value, not its words",
+      "Browse layout": "the group’s accessible name; the drawing draws no name"
+    },
     "props": {
       "options": [
         {
@@ -556,6 +628,12 @@
     "cap": "stacked — three or more, with the reveal",
     "draws": ":scope > div:not(.k-well)",
     "path": "src/ui/svelte/components/RadioCardGroup.svelte",
+    "undrawn": {
+      "When the tool breaks": "the group’s legend, which the shipped group requires; the drawing draws none",
+      "breakable": "an option’s value, not its words",
+      "immune": "an option’s value, not its words",
+      "degrading": "an option’s value, not its words"
+    },
     "props": {
       "legend": "When the tool breaks",
       "groupName": "pl-tool-breakage",
@@ -612,6 +690,12 @@
     "draws": ".k-lbl",
     "path": "src/ui/svelte/components/Select.svelte",
     "note": "The drawing carries no hint, so the live Select has none. The disabled Downtime option with its Premium badge is kept: it is the only place the unavailable state shows.",
+    "undrawn": {
+      "routed": "an option’s value, not its words",
+      "simple": "an option’s value, not its words",
+      "progressive": "an option’s value, not its words",
+      "downtime": "an option’s value, not its words"
+    },
     "props": {
       "label": "Resolution",
       "value": "routed",
@@ -729,6 +813,9 @@
     "cap": "off",
     "draws": ".k-cb",
     "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
+    "undrawn": {
+      "Select this row": "the checkbox’s accessible name; the drawing draws the box alone"
+    },
     "props": {
       "checked": false,
       "ariaLabel": "Select this row"
@@ -739,6 +826,9 @@
     "cap": "on",
     "draws": ".k-cb",
     "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
+    "undrawn": {
+      "Select this row": "the checkbox’s accessible name; the drawing draws the box alone"
+    },
     "props": {
       "checked": true,
       "ariaLabel": "Select this row"
@@ -749,6 +839,9 @@
     "cap": "indeterminate",
     "draws": ".k-cb",
     "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
+    "undrawn": {
+      "Select every row": "the checkbox’s accessible name; the drawing draws the box alone"
+    },
     "props": {
       "checked": false,
       "indeterminate": true,
@@ -760,6 +853,9 @@
     "cap": "disabled",
     "draws": ".k-cb",
     "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
+    "undrawn": {
+      "Select this row": "the checkbox’s accessible name; the drawing draws the box alone"
+    },
     "props": {
       "checked": false,
       "disabled": true,
@@ -791,6 +887,12 @@
     "cap": "ready — the primary is live",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "undrawn": {
+      "Cancel the whole run": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Keep it": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Closes the run at stage 2; what earlier stages spent stays spent.": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Resume": "the label of another state, drawn in its own unit"
+    },
     "props": {
       "run": {
         "id": "forge-iron-rivets"
@@ -820,6 +922,15 @@
     "cap": "counting down — nothing to press, and the completion switch appears",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "undrawn": {
+      "Cancel the whole run": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Keep it": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Closes the run at stage 2; what earlier stages spent stays spent.": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Resume": "the label of another state, drawn in its own unit",
+      "Waiting for enough world time to pass before the next step can be triggered.": "a held action’s reason, its tooltip; the drawing draws none",
+      "manual": "an option’s value, not its words",
+      "worldTime": "an option’s value, not its words"
+    },
     "props": {
       "run": {
         "id": "forge-iron-rivets"
@@ -867,6 +978,12 @@
     "cap": "paused — Resume is the action",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "undrawn": {
+      "Cancel the whole run": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Keep it": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Closes the run at stage 2; what earlier stages spent stays spent.": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Roll check": "the label of another state, drawn in its own unit"
+    },
     "props": {
       "run": {
         "id": "forge-iron-rivets",
@@ -897,6 +1014,14 @@
     "cap": "a stage waiting on a choice — the primary says which",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "undrawn": {
+      "Cancel the whole run": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Keep it": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Closes the run at stage 2; what earlier stages spent stays spent.": "the cancel confirmation’s words, drawn in the cancel-armed unit",
+      "Resume": "the label of another state, drawn in its own unit",
+      "A run waiting on a choice is not counting down, so there is no time to hold.": "a held action’s reason, its tooltip; the drawing draws none",
+      "You do not hold everything this stage needs.": "a held action’s reason, its tooltip; the drawing draws none"
+    },
     "props": {
       "run": {
         "id": "forge-iron-rivets"
@@ -929,6 +1054,13 @@
     "cap": "cancel armed — the siblings step aside",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "undrawn": {
+      "Forge Iron Rivets": "the run’s name, in the cancel button’s accessible name; drawn in the other units",
+      "Cancel Forge Iron Rivets": "the run’s name, in the cancel button’s accessible name; drawn in the other units",
+      "Pause": "the label of another state, drawn in its own unit",
+      "Resume": "the label of another state, drawn in its own unit",
+      "Roll check": "the label of another state, drawn in its own unit"
+    },
     "props": {
       "run": {
         "id": "forge-iron-rivets"

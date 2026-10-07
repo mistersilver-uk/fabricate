@@ -2,8 +2,10 @@
  * The named snippets a catalogue row's `snippets` may supply (issue 1487). `LiveSpecimen.svelte`
  * declares one Svelte snippet per name, because a snippet cannot be built from a name at runtime,
  * and the coverage gate checks every row against this list and against the component's props.
+ * Each takes no argument: a snippet a component hands an item draws per item, which one node array
+ * cannot.
  */
-export const SPECIMEN_SNIPPET_NAMES = Object.freeze(['body', 'footer']);
+export const SPECIMEN_SNIPPET_NAMES = Object.freeze(['actions', 'body', 'footer', 'meta']);
 
 /**
  * Read a row's `snippets`, refusing a name `LiveSpecimen.svelte` has no snippet for.

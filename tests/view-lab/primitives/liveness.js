@@ -16,6 +16,11 @@ export const DRAWING = 'drawing';
 export const LIVE_LABEL_CLASS = 'st st-prose pl-live-label';
 export const LIVE_LABEL_TEXT = 'live';
 
+/** A row's `partial` qualifier; its chip in place, with no label to sit in; a pair given a row. */
+export const PARTIAL_CLASS = 'pl-live-partial';
+export const PARTIAL_CAPTION_CLASS = 'st st-prose pl-live-caption';
+export const ROW_CLASS = 'pl-live-row';
+
 const MODE_BY_STATUS = Object.freeze({ shipped: REPLACE, target: BESIDE, divergent: BESIDE });
 
 /**
@@ -79,19 +84,28 @@ export function decideLiveness(block, blocks, names) {
 }
 
 /**
- * Put a specimen where its drawing stood, or, beside, after the kept drawing under a label.
- *
- * @param {{host: Element, mode: string}} slot One resolved slot.
- * @param {Element} iframe The specimen's `<iframe>`.
- * @param {Document} document The document that creates the label.
+ * Put a specimen where its drawing stood, or, beside, after the kept drawing under a label; a row's
+ * `partial` rides in that label, or in place in a caption chip. `spansRow` is `spansTheRow`'s.
  */
-export function placeSpecimen(slot, iframe, document) {
-  if (slot.mode !== BESIDE) {
-    slot.host.replaceWith(iframe);
-    return;
+export function placeSpecimen(slot, iframe, document, { spansRow = false } = {}) {
+  const partial = slot.row?.partial;
+  let lead = null;
+  if (slot.mode === BESIDE) {
+    lead = document.createElement('span');
+    lead.className = LIVE_LABEL_CLASS;
+    lead.textContent = LIVE_LABEL_TEXT;
+  } else if (partial) {
+    lead = document.createElement('span');
+    lead.className = PARTIAL_CAPTION_CLASS;
   }
-  const label = document.createElement('span');
-  label.className = LIVE_LABEL_CLASS;
-  label.textContent = LIVE_LABEL_TEXT;
-  slot.host.after(label, iframe);
+  if (lead && partial) {
+    const qualifier = document.createElement('span');
+    qualifier.className = PARTIAL_CLASS;
+    qualifier.textContent = partial;
+    lead.append(qualifier);
+  }
+  if (lead && spansRow) for (const element of [lead, iframe]) element.classList.add(ROW_CLASS);
+  const placed = lead ? [lead, iframe] : [iframe];
+  if (slot.mode === BESIDE) slot.host.after(...placed);
+  else slot.host.replaceWith(...placed);
 }

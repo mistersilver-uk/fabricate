@@ -27,9 +27,12 @@ this programme has already measured what happens to those.
 | `slot`    | no       | `{width?, height?}`, in CSS px. Present at all, the slot's window subtree generates real BOXES at that size rather than `display: contents`. Omit it unless the specimen needs a containing block or a query container — an overlay, or a panel that restyles at a breakpoint. See below.                                                                                     |
 | `props`   | no       | A plain object, passed to the component verbatim. Plain JSON only — no functions, no state, no knobs.                                                                                                                                                                                                                                                                         |
 | `content` | no       | The `children` snippet, as a node array. See below.                                                                                                                                                                                                                                                                                                                           |
-| `snippets` | no      | Named snippets (`body`, `footer`), each a node array in `content`'s shape. See below.                                                                                                                                                                                                                                                                                       |
+| `snippets` | no      | Named snippets (`actions`, `body`, `footer`, `meta`), each a node array in `content`'s shape. See below.                                                                                                                                                                                                                                                                     |
 | `note`    | no       | Why the row is shaped the way it is, in a sentence: the intent of a `slot` box, say. Read by people only; the page ignores it.                                                                                                                                                                                                                                              |
 | `inset`   | no       | The padding, in CSS px, of the region the primitive is placed in, for a primitive whose edges bleed into it. Refused beside a boxed `slot`. See below.                                                                                                                                                                                                                                                       |
+| `window`  | no       | `"player"` stands the specimen in the player window's `.fabricate-app` area, as `SvelteFabricateApp` frames it, rather than the GM manager's. For a primitive that ships only there: the area's rules differ, e.g. it removes Foundry core's `button.active` ring.                                                                                                       |
+| `partial` | no       | What the specimen leaves drawn, said on the page: a short qualifier in its `live` label, or, for a specimen in place, in a caption chip directly before it — `"first section only"`. Required when the live component draws only part of its drawing. See below.                                                                                                       |
+| `undrawn` | no       | `{word: reason}`: a word the row passes that its drawing does not show, each with why — an accessible name, an option's value, a caller-only word. See below.                                                                                                                                                                                                             |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -160,6 +163,12 @@ Standing alone, that bleed overflows the specimen.
 
 `inset` is the padding of the region the primitive is placed in, in CSS px; the
 specimen is laid out inside it, and it is measured with it.
+A block drawing that caps its own width (`max-width`) drew that region, so its
+slot keeps the drawn width; one with no cap drew the primitive alone, so its slot
+adds the inset on both sides, unless the slot stretches it, when the width is the
+page's.
+`<SlotTile>` is the second kind: its count pip sits 7px above the tile and its
+pressed outline 4px outside it.
 
 ## `content` — what a call site puts inside
 
@@ -195,6 +204,35 @@ shape:
 Only the names `specimenSnippets.js` lists are rendered, because a Svelte snippet
 cannot be built from a name at runtime; any other name is refused rather than
 dropped, and the coverage gate checks each name is a prop the component declares.
+They are `actions`, `body`, `footer` and `meta`, and each takes no argument.
+A snippet a component hands an item, such as `<LogList>`'s `action(entry)`, draws
+once per item, which one node array cannot, so a row leaves that unit drawn.
+
+## `partial` — a specimen that draws only part of its drawing
+
+A live component that cannot draw everything its drawing shows — a unit that
+needs a function, a scoped child component, a snippet handed an item — says so
+on the page, not only in its `note`.
+`partial` is that qualifier: beside its drawing it rides inside the `live`
+label, after the word, so the label still reads `live` and still stands directly
+before its specimen; in place, where a shipped name has no label, it is a caption
+chip directly before the specimen.
+In a grid, the chip and its specimen each take a row beneath the drawing rather
+than a cell each, so the grid keeps one cell per drawing.
+`npm run lab:check` compares every entry's qualifiers with its rows'.
+
+## `undrawn` — the words a drawing does not show
+
+Words come from the drawing, and `tests/primitive-lab-drawing-text.test.js`
+holds every row to that: each string a row passes — a prop, a `content` or
+snippet text, a node's `aria-label`, `placeholder`, `title` or `alt` — must
+appear in its drawing, the captioned unit (or, for a row with no caption, the
+stage its drawing stands on).
+Props whose values are identifiers, enumerations, icon classes or styles (`id`,
+`tone`, `icon`, `class`, …) are not words, and are not read.
+A word the shipped component needs and the drawing lacks is named in `undrawn`
+with its reason; an entry the row no longer passes, or the drawing now shows,
+fails as stale.
 
 ## What a row deliberately cannot say
 

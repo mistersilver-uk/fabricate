@@ -63,6 +63,24 @@ export function readSlotInset(row) {
   return inset;
 }
 
+/** The `.application` classes of the shipped window a specimen stands in (row `window`). */
+const WINDOW_CLASSES = Object.freeze({
+  manager: 'application fabricate crafting-system-manager',
+  player: 'application fabricate fabricate-app',
+});
+
+/** A row's `window`, `manager` by default; an unknown one is refused. */
+export function readSlotWindow(row) {
+  const { window: windowName = 'manager' } = row;
+  if (!Object.hasOwn(WINDOW_CLASSES, windowName)) {
+    throw new Error(
+      `\`window\` ${JSON.stringify(windowName)} is not a window a specimen stands in; it takes ` +
+        Object.keys(WINDOW_CLASSES).join(' or ')
+    );
+  }
+  return windowName;
+}
+
 /**
  * Build one specimen's window subtree — the whole body of its iframe document.
  *
@@ -72,9 +90,9 @@ export function readSlotInset(row) {
  * @returns {{frame: HTMLElement, root: HTMLElement}} `frame` is the `.application` element (append
  *   it to `document.body`); `root` is the `.fabricate-manager` to mount the component into.
  */
-export function buildSpecimenFrame({ themeAttribute, themeId }) {
+export function buildSpecimenFrame({ themeAttribute, themeId, windowName = 'manager' }) {
   const frame = document.createElement('div');
-  frame.className = 'application fabricate crafting-system-manager';
+  frame.className = WINDOW_CLASSES[windowName];
   frame.setAttribute(themeAttribute, themeId);
   const content = document.createElement('section');
   content.className = 'window-content';

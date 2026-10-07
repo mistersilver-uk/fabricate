@@ -4,6 +4,10 @@
     "cap": "outcome bands — 46px, fixed",
     "draws": ":scope > div:first-of-type",
     "path": "src/ui/svelte/components/ThresholdBandStrip.svelte",
+    "undrawn": {
+      "Smith's Tools": "the previewed record, read into the strip’s accessible name; the drawing draws no name",
+      "These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers below; the strip returns once the ranges meet.": "shown only when the bands leave a gap or overlap, and these meet"
+    },
     "props": {
       "binding": "relative",
       "bands": [
@@ -68,7 +72,7 @@
     "path": "src/ui/svelte/components/ItemDropZone.svelte",
     "props": {
       "item": {
-        "name": "Blacksmith's Compendium"
+        "name": "Blacksmith’s Compendium"
       },
       "uuid": "Item.kR3nQ8sT1vW2xY4z",
       "emptyIcon": "fas fa-book"
@@ -95,6 +99,9 @@
     "draws": ":scope > div > div",
     "path": "src/ui/svelte/components/ArtPicker.svelte",
     "note": "Replaces the tile only. The drawn \"Remove image\" line under it is the clear action, which renders only beside an `onClear` handler, and a row passes no function.",
+    "undrawn": {
+      "Choose the image for Steel Ingot": "the picker’s accessible name; the drawing draws the tile alone"
+    },
     "props": {
       "art": "icons/commodities/metal/ingot-plain-steel.webp",
       "alt": "",
@@ -106,6 +113,9 @@
     "cap": "empty",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/ArtPicker.svelte",
+    "undrawn": {
+      "Choose the image for Steel Ingot": "the picker’s accessible name; the drawing draws the tile alone"
+    },
     "props": {
       "ariaLabel": "Choose the image for Steel Ingot"
     }
@@ -115,6 +125,10 @@
     "cap": "locked",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/ArtPicker.svelte",
+    "undrawn": {
+      "Image provided by the linked scene": "the locked tile’s accessible name, the shipped caller’s",
+      "This image comes from the linked scene and can't be edited. Unlink the scene on the Linked scene card below to choose a custom image.": "the locked tile’s tooltip, the shipped caller’s"
+    },
     "props": {
       "art": "icons/environment/wilderness/cave-entrance-mountain.webp",
       "alt": "",
@@ -128,10 +142,17 @@
     "cap": "list form",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/SearchablePopover.svelte",
-    "note": "The 300x260 box is the open panel's own footprint, not a window: tall enough for the search field and the first rows of the list, so the panel neither flips nor clamps. Trimmed from 320 when the iframe viewport became the box.",
     "slot": {
       "width": 300,
       "height": 260
+    },
+    "note": "The 300x260 box is the open panel's own footprint, not a window: tall enough for the search field and the first rows of the list, so the panel neither flips nor clamps. Trimmed from 320 when the iframe viewport became the box.",
+    "undrawn": {
+      "steel-ingot": "the picked option’s id, not its words",
+      "Choose a component": "the trigger’s and the panel’s accessible name; the drawing draws no name",
+      "Search components": "the query field’s name and placeholder; the drawing shows the field holding a query",
+      "Components": "the panel header’s title, the shipped caller’s",
+      "{matched} of {total}": "the count’s template; the drawing shows it filled, “3 of 412”"
     },
     "props": {
       "open": true,
@@ -182,10 +203,13 @@
     "cap": "anchored menu",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/ActionMenu.svelte",
-    "note": "Open, so the panel the drawing shows is drawn. The box holds the trigger and the panel under it; the panel caps itself at the box width less 32px, so the box is wide enough for the longest label not to clip.",
     "slot": {
       "width": 260,
       "height": 170
+    },
+    "note": "Open, so the panel the drawing shows is drawn. The box holds the trigger and the panel under it; the panel caps itself at the box width less 32px, so the box is wide enough for the longest label not to clip.",
+    "undrawn": {
+      "Add an alternative": "the menu’s accessible name; the drawing draws no name"
     },
     "props": {
       "open": true,

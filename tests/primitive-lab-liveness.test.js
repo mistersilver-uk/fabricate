@@ -18,7 +18,10 @@ import {
   BESIDE,
   LIVE_LABEL_CLASS,
   LIVE_LABEL_TEXT,
+  PARTIAL_CAPTION_CLASS,
+  PARTIAL_CLASS,
   REPLACE,
+  ROW_CLASS,
   livenessFor,
   placeSpecimen,
 } from './view-lab/primitives/liveness.js';
@@ -220,14 +223,22 @@ test('each name has one status across every block, so first-declared cannot diff
 });
 
 /** A slot over a drawing, in a happy-dom page; returns the page so the order can be read. */
-function placed(mode) {
+function placed(mode, row = {}, layout = undefined) {
   const window = new Window();
   const { document } = window;
   document.write('<body><p id="before"></p><div id="drawing"></div><p id="after"></p></body>');
   const host = document.querySelector('#drawing');
   const iframe = document.createElement('iframe');
-  placeSpecimen({ host, mode }, iframe, document);
+  placeSpecimen({ host, mode, row }, iframe, document, layout);
   return { document, host, iframe };
+}
+
+/** A label's own words, without the partial qualifier inside it: what `lab:check` reads. */
+function ownWords(element) {
+  return [...element.childNodes]
+    .filter((node) => node.nodeType === 3)
+    .map((node) => node.textContent)
+    .join('');
 }
 
 test('a beside specimen keeps its drawing and follows it under a live label', () => {
@@ -250,4 +261,38 @@ test('a replace specimen takes its drawing’s place and the drawing leaves', ()
     ['before', 'iframe', 'after']
   );
   assert.ok(document.body.contains(iframe));
+});
+
+const PARTIAL = 'first section only';
+
+test('a partial beside specimen says so inside its live label, which keeps its word', () => {
+  const { document, iframe } = placed(BESIDE, { partial: PARTIAL });
+  const label = iframe.previousElementSibling;
+  assert.equal(label.className, LIVE_LABEL_CLASS);
+  assert.equal(ownWords(label), LIVE_LABEL_TEXT);
+  assert.equal(label.querySelector(`.${PARTIAL_CLASS}`)?.textContent, PARTIAL);
+  assert.equal(document.querySelectorAll(`.${PARTIAL_CLASS}`).length, 1);
+});
+
+test('a partial specimen in place says so in a caption directly before it, with no live word', () => {
+  const { document, host, iframe } = placed(REPLACE, { partial: PARTIAL });
+  assert.ok(!document.body.contains(host));
+  const caption = iframe.previousElementSibling;
+  assert.equal(caption.className, PARTIAL_CAPTION_CLASS);
+  assert.equal(caption.textContent, PARTIAL);
+  assert.equal(ownWords(caption), '', 'an in-place specimen carries no live marker');
+  assert.deepEqual(
+    [...document.body.children].map((node) => node.id || node.localName),
+    ['before', 'span', 'iframe', 'after']
+  );
+});
+
+test('a whole specimen in place gets no caption, and a spanning pair is marked on both', () => {
+  assert.equal(placed(REPLACE).iframe.previousElementSibling.id, 'before');
+  const { iframe } = placed(BESIDE, {}, { spansRow: true });
+  assert.ok(iframe.classList.contains(ROW_CLASS));
+  assert.ok(iframe.previousElementSibling.classList.contains(ROW_CLASS));
+  const inPlace = placed(REPLACE, { partial: PARTIAL }, { spansRow: true });
+  assert.ok(inPlace.iframe.previousElementSibling.classList.contains(ROW_CLASS));
+  assert.ok(!placed(BESIDE).iframe.classList.contains(ROW_CLASS));
 });

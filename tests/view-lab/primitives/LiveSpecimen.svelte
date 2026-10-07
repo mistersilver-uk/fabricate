@@ -8,10 +8,15 @@
   | `component` | Svelte component | required | The component the row names. |
   | `props` | plain object | `{}` | Spread verbatim; specimens are not stateful. |
   | `content` | node array | `null` | The children snippet: a string, or `{tag, attrs, text, children}`; neither `text` nor `children` is a void element. |
-  | `snippets` | `{body?, footer?}` of node arrays | `{}` | Named snippets, same node shape; `specimenMount.js` refuses a name outside `SPECIMEN_SNIPPET_NAMES`. |
+  | `snippets` | `{actions?, body?, footer?, meta?}` of node arrays | `{}` | Named snippets, same node shape, each taking no argument; `specimenMount.js` refuses a name outside `SPECIMEN_SNIPPET_NAMES`. |
 -->
 <script>
   let { path = '', component: Specimen, props = {}, content = null, snippets = {} } = $props();
+
+  /** The named snippets this row supplies, each one of the declared snippets below. */
+  function supplied(declared) {
+    return Object.fromEntries(Object.keys(snippets).map((name) => [name, declared[name]]));
+  }
 </script>
 
 {#snippet nodes(list)}
@@ -29,19 +34,17 @@
   {/each}
 {/snippet}
 
+{#snippet actions()}{@render nodes(snippets.actions)}{/snippet}
 {#snippet body()}{@render nodes(snippets.body)}{/snippet}
 {#snippet footer()}{@render nodes(snippets.footer)}{/snippet}
+{#snippet meta()}{@render nodes(snippets.meta)}{/snippet}
 
 <div class="pl-specimen" data-primitive-lab-specimen={path}>
   {#if content}
-    <Specimen {...props} {...snippets.body ? { body } : {}} {...snippets.footer ? { footer } : {}}
+    <Specimen {...props} {...supplied({ actions, body, footer, meta })}
       >{@render nodes(content)}</Specimen
     >
   {:else}
-    <Specimen
-      {...props}
-      {...snippets.body ? { body } : {}}
-      {...snippets.footer ? { footer } : {}}
-    />
+    <Specimen {...props} {...supplied({ actions, body, footer, meta })} />
   {/if}
 </div>

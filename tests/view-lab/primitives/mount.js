@@ -14,7 +14,7 @@
 import MANIFEST from '../../../scripts/lib/designSystemPrimitives.json' with { type: 'json' };
 
 import { CATALOGUE } from './catalogue.js';
-import { MAX_APPLIED_RESIZES, createSizeGovernor, describeHost } from './hostLayout.js';
+import { MAX_APPLIED_RESIZES, createSizeGovernor, layoutFor } from './hostLayout.js';
 import { resolveSlots } from './inject.js';
 import { LIVE_CLASS, PAGE_CLASS, readLibrary } from './library.js';
 import { placeSpecimen } from './liveness.js';
@@ -34,6 +34,10 @@ const ERROR_ATTRIBUTE = 'data-primitive-lab-error';
 
 /** The identity marker `npm run lab:check` reads off each specimen's `<iframe>`. */
 const SPECIMEN_ATTRIBUTE = 'data-primitive-lab-specimen';
+
+/** The drawing's width as measured before it was replaced, and `capped` when it has a `max-width`. */
+const DRAWN_ATTRIBUTE = 'data-primitive-lab-drawn';
+const CAPPED_ATTRIBUTE = 'data-primitive-lab-capped';
 
 /** Applied once an iframe's measured size has been read and applied. See `page.css`. */
 const SIZED_CLASS = 'pl-specimen-sized';
@@ -162,20 +166,24 @@ function applySize(iframe, { width, height, fill = false }, host) {
   iframe.classList.add(SIZED_CLASS);
 }
 
-/** Read the live drawing's facts for `describeHost`. */
-function readHostLayout(host) {
-  const parent = host.parentElement;
-  const parentStyle = getComputedStyle(parent);
+/** Measure the live drawing and its parent for `layoutFor`, with the row's `inset` around them. */
+function readHostLayout(host, row) {
+  const parentStyle = getComputedStyle(host.parentElement);
   const style = getComputedStyle(host);
-  return describeHost({
-    display: style.display,
-    maxWidth: style.maxWidth,
-    drawnWidth: host.getBoundingClientRect().width,
-    availableWidth:
-      parent.clientWidth -
-      Number.parseFloat(parentStyle.paddingLeft) -
-      Number.parseFloat(parentStyle.paddingRight),
-  });
+  return layoutFor(
+    {
+      display: style.display,
+      maxWidth: style.maxWidth,
+      drawnWidth: host.getBoundingClientRect().width,
+      parent: {
+        display: parentStyle.display,
+        clientWidth: host.parentElement.clientWidth,
+        paddingLeft: Number.parseFloat(parentStyle.paddingLeft),
+        paddingRight: Number.parseFloat(parentStyle.paddingRight),
+      },
+    },
+    row
+  );
 }
 
 /**
@@ -208,7 +216,9 @@ function standUpSpecimen(slot, problems, results) {
   iframe.className = LIVE_CLASS;
   iframe.setAttribute(SPECIMEN_ATTRIBUTE, slot.row.path);
   iframe.title = `${slot.row.spec}: ${slot.row.path}`;
-  const host = readHostLayout(slot.host);
+  const host = readHostLayout(slot.host, slot.row);
+  iframe.setAttribute(DRAWN_ATTRIBUTE, String(slot.host.getBoundingClientRect().width));
+  if (host.maxInlineSize !== 'none') iframe.setAttribute(CAPPED_ATTRIBUTE, '');
   // Before READY, so the first report is measured at the width the specimen will keep.
   if (host.presize) iframe.style.width = host.presize;
   presizeBoxedSlot(iframe, slot.row);
@@ -275,7 +285,7 @@ function standUpSpecimen(slot, problems, results) {
   });
 
   iframe.src = SPECIMEN_URL;
-  placeSpecimen(slot, iframe, document);
+  placeSpecimen(slot, iframe, document, { spansRow: host.spansRow });
   return settled;
 }
 
