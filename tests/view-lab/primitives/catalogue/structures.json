@@ -340,7 +340,7 @@
     }
   },
   {
-    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
     "cap": "default — 38px chip, serif name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -398,7 +398,7 @@
     }
   },
   {
-    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
     "cap": "default — 38px chip, serif name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -442,7 +442,7 @@
     }
   },
   {
-    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
     "cap": "dense — the cross-reference and result form",
     "draws": ".k-row.dense",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -454,7 +454,7 @@
     }
   },
   {
-    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
     "cap": "dense — the cross-reference and result form",
     "draws": ".k-row.dense",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -466,7 +466,7 @@
     }
   },
   {
-    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
     "cap": "card grid — same row model, one track",
     "draws": ".k-card",
     "path": "src/ui/svelte/components/ListRow.svelte",
@@ -493,7 +493,7 @@
     }
   },
   {
-    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "spec": "<ListRow> <ViewToggle> <XrefList>",
     "cap": "card grid — same row model, one track",
     "draws": ".k-card",
     "path": "src/ui/svelte/components/ListRow.svelte",
