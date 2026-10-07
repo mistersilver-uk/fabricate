@@ -221,7 +221,7 @@ describe('design system: a programmatic focus target declares itself focused to 
     // 173 once the manager rail's hand-authored rows became loops over `managerNavItems.js`.
     assert.ok(
       formlessButtons.length >= 160,
-      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 160 ` +
+      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 159 ` +
         'this tree holds'
     );
     assert.ok(
