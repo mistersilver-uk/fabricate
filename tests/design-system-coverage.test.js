@@ -207,7 +207,7 @@ test('every manifest library name resolves to a library entry', () => {
  * entry leaves it when its primitive ships or is merged, and the check below fails until it does.
  */
 const SPECIFIED_ONLY = [
-  'AppTitleBar', 'BrowseCard',
+  'AppTitleBar',
   'TierTrack', 'ViewToggle', 'XrefList',
 ];
 
@@ -640,6 +640,9 @@ const DELETED_BY_1782 = ['ValidationList'];
 /** Names issue 1777 merged away (decision E2), held to the same register as issue 1782's. */
 const MERGED_BY_1777 = ['AppRail'];
 
+/** Names issue 1778 merged away (decision D2): a browse card is ListRow's card layout. */
+const MERGED_BY_1778 = ['BrowseCard'];
+
 test('every name issue 1782 built reads shipped in the library', () => {
   for (const name of BUILT_BY_1782) {
     assert.equal(
@@ -651,8 +654,8 @@ test('every name issue 1782 built reads shipped in the library', () => {
   }
 });
 
-test('every name issue 1782 or issue 1777 merged away is no entry and is recorded as ruled out', () => {
-  for (const name of [...DELETED_BY_1782, ...MERGED_BY_1777]) {
+test('every name issue 1782, 1777 or 1778 merged away is no entry and is recorded as ruled out', () => {
+  for (const name of [...DELETED_BY_1782, ...MERGED_BY_1777, ...MERGED_BY_1778]) {
     assert.ok(!library.names.includes(name), `${name} was merged and still heads an entry`);
     const entry = RULED_OUT.find((row) => primitiveNamesIn(row.name).includes(name));
     assert.ok(entry, `${name} was merged and the register omits it`);

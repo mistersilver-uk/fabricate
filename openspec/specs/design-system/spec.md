@@ -43,6 +43,7 @@ ListRow MAY also draw a selectable form, at `density` dense or default and `layo
 With `onOpen`, the row's content MUST be one native button holding phrasing content only and carrying `data-keyboard-focus`, and that button is pressed only while `selected` is given and true.
 The button is named by the item's name followed by each state the row shows only visually.
 The row's `trailing` controls MUST sit beside the button, and block content sits in its `aside`, beneath it, outside it.
+`<BrowseCard>` is merged into ListRow's `layout="card"`, which a browse card MUST render through.
 A ListRow given none of the selectable form's props MUST draw the dense output unchanged.
 Its loading and error forms remain targets in the library.
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
@@ -75,7 +76,8 @@ A member that has SHIPPED MUST also carry a row in `scripts/lib/designSystemPrim
 A member that has not shipped carries no row, because the manifest enumerates what ships and a row naming no file is a correspondence to nothing.
 `tests/design-system-coverage.test.js` reads both artifacts and fails when a name is in one and not the other, in either direction.
 `EditorValidationSurface` is the shipped implementation of the library's `<ValidationSummary>` entry, and issue 1782 merged `<ValidationList>` into it.
-`NavSidebar` is the shipped implementation of the library's `<NavSidebar>` entry, and issue 1777 merged `<AppRail>` into it as its `icon` variant (decision E2); issue 1782 added `<Typeahead>`, born shipped, so the 42 naming headings declare 72 distinct names.
+`NavSidebar` is the shipped implementation of the library's `<NavSidebar>` entry, and issue 1777 merged `<AppRail>` into it as its `icon` variant (decision E2); issue 1782 added `<Typeahead>`, born shipped.
+`ListRow` is the shipped implementation of the library's `<ListRow>` entry, and issue 1778 merged `<BrowseCard>` into it as its `layout="card"` (decision D2), so the 42 naming headings declare 71 distinct names.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 `Chip` ships under `src/ui/svelte/components/` and is the vocabulary's one chip: `StatusPill`, `RunStatusPill`, `CraftingStatusBadge` and `QuantityTag` are RETIRED into it, and `CraftingThumb` and `CraftingEssenceThumb` are retired into the icon chip.
 The two groups are disjoint — four pills into one chip, two thumbnails into one tile — and `Medallion` and `Avatar` are the shipped implementations of the library's `<IconChip>` and `<Avatar>` entries.
@@ -1015,6 +1017,7 @@ The deciding test is the widget and when the write lands, never how the control 
 A `Search` narrows a list already on screen and never commits a choice; a field that also commits a choice is a typeahead combobox, which `Typeahead` implements save the requirement row's name cell.
 `Rail` is ONE SECTION of a right-hand inspector column, the library's inspector rail section: never the column itself, never the nav rail's `.manager-rail-block`, which carries the Rail Marker Family, and never `NavSidebar`'s `icon` variant.
 `DataTable` is for records compared down columns and `ListRow` for records scanned one at a time; a ladder of tiers is `OutcomeLadder`, never a table.
+A BROWSE CARD is a `ListRow` at `layout="card"`, the same row model on one track, and the grid around the cards owns their track.
 `NavSidebar`'s variants are routed by shape, never by consumer, and its ARIA follows the variant.
 The `icon` variant MUST render a vertical tablist that keeps one tab stop, consistent with "A tab strip always keeps a tab stop", with `aria-selected` on the current tab, `aria-controls` naming the panel, each tooltip a sibling of the tablist referenced by `aria-describedby`, and Up, Down, Home and End moving the selection and focus.
 The `labelled` variant MUST render a `nav` with `aria-current` on the current row, a group parent's separate chevron carrying `aria-expanded` and `aria-controls`, and a disabled row or locked chevron carrying `disabled`, `aria-disabled` and its reason through `aria-describedby` to a visually hidden element, its `title` kept.
