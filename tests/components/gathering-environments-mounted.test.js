@@ -407,7 +407,16 @@ describe('GatheringView mounted behavior', () => {
   it('keeps a locked environment an inert listitem with no control', async () => {
     await mountView(makeServices(listing([
       environment({ id: 'env-open', name: 'Open' }),
-      environment({ id: 'env-locked', name: 'Sealed', locked: true })
+      environment({
+        id: 'env-locked',
+        name: 'Sealed',
+        locked: true,
+        description: 'A vault behind a rune-sealed door.',
+        biomeTags: [
+          { id: 'cave', label: 'Cave', icon: 'fas fa-dungeon', colorToken: 'stone', customColor: '' },
+          { id: 'ruin', label: 'Ruin', icon: 'fas fa-landmark', colorToken: 'ember', customColor: '' }
+        ]
+      })
     ])));
 
     const locked = target.querySelector('[data-environment-id="env-locked"]');
@@ -421,6 +430,17 @@ describe('GatheringView mounted behavior', () => {
     const inert = locked.querySelector(':scope > .fabricate-list-row-open');
     assert.equal(inert?.tagName, 'DIV', 'its content sits in the row’s inert form, laid out as the button is');
     assert.ok(inert.querySelector('.gathering-env-card-name'), 'and still names the environment');
+    assert.equal(
+      target.querySelectorAll(':scope .gathering-env-card.is-locked .gathering-env-card-chip').length,
+      2,
+      'its biomes are its meta'
+    );
+    assert.equal(
+      inert.querySelector(':scope .fabricate-list-row-children > span.gathering-env-card-description')
+        ?.textContent,
+      'A vault behind a rune-sealed door.',
+      'and its description its content'
+    );
   });
 
   it('renders a "Not in current realm" alert badge on a realm-locked card', async () => {
@@ -711,7 +731,7 @@ describe('GatheringView mounted behavior', () => {
       })
     ])));
 
-    // Issue 1778: the header strip became the row's badges, which wrap after the name.
+    // The selection-mode summary is a badge after the name, apart from the biomes.
     const card = target.querySelector('[data-environment-id="env-blind"]');
     const badges = card.querySelector('.fabricate-list-row-badges');
     const blind = card.querySelector('.gathering-env-card-blind');
