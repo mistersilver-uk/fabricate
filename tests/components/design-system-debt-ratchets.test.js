@@ -952,7 +952,10 @@ const CORNER_SCOPE = /^(?:styles\/|src\/ui\/svelte\/(?:components|apps\/manager)
 /** Sized rules whose corner follows something other than their band, keyed `file: selector`. */
 const CORNER_KIND_EXCEPTIONS = new Map([
   ['src/ui/svelte/components/Chip.svelte: .manager-chip', 'a text chip keeps its stadium'],
-  ['src/ui/svelte/components/LogList.svelte: .fab-log-list-entry', 'LogList geometry is issue 2257'],
+  [
+    'src/ui/svelte/components/LogList.svelte: .fab-log-list-entry',
+    'LogList geometry is issue 2257',
+  ],
   [
     'src/ui/svelte/components/NavSidebar.svelte: .fabricate-app-nav-well',
     'NavSidebar geometry is issue 2257',
@@ -1028,7 +1031,7 @@ function offBandCorners({ declarations, definitions, sources }) {
     );
     if (corners.every((corner) => corner === band || SHAPE_CORNERS.includes(corner))) continue;
     found.push({
-      key: key.split('\u{0}')[0],
+      key: key.split('\u{0}', 1)[0],
       line: radius.at,
       label: `${size.property} ${size.value} at ${radius.value}, band ${band}`,
       exempt: rule.some((d) => exemptAt(d.file, sources[d.file], d.at)),
