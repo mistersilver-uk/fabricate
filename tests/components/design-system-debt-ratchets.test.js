@@ -883,9 +883,7 @@ function offLadderRadii(corpus) {
 const RADIUS_GATE = styleGate(offLadderRadii);
 
 test('a radius written into a token still resolves, so the ladder cannot be paid by renaming', () => {
-  // THE RESOLUTION HALF, PROVED IN BOTH DIRECTIONS AGAINST SYNTHETIC DEFINITIONS. The live corpus
-  // exercised it while `--fab-books-control-radius` was 5px, and paying that row down took the
-  // live proof with it, which is why the proof never depended on the tree.
+  // The proof runs on synthetic definitions so it never depends on the tree.
   const definitions = new Map([
     ['--fixture-off', ['5px']],
     ['--fixture-on', ['6px']],

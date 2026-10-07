@@ -615,7 +615,7 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
     );
     // The shared card took the studio card's 11px corner and `--fab-bg-2` fill, so the shell
     // no longer differs there; the combination-rule gap below carries the proof.
-    assert.equal(broken.cardRadius, fixed.cardRadius, 'the shared card is on the card rung too');
+    assert.equal(broken.cardRadius, 11, 'the shared card is on the 11px card rung too');
     assert.equal(broken.cardBackground, fixed.cardBackground, 'and on the same fill');
     assert.notEqual(
       broken.optionGap,
