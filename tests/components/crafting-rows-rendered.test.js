@@ -83,6 +83,7 @@ const page = ({ rows, routes }) => `<!doctype html><html><head><meta charset="ut
 </head><body class="game"><div class="fabricate fabricate-app" style="width:1000px">
   <div data-case="selected" style="width:278px">${rows[0]}</div>
   <div data-case="resting" style="width:278px">${rows[1]}</div>
+  <div data-case="wide" style="width:900px">${rows[1]}</div>
   <div data-case="routes" style="width:460px">${routes}</div>
 </div></body></html>`;
 
@@ -133,6 +134,31 @@ describe('crafting rows, rendered (issue 1778)', () => {
         `${JSON.stringify(child)} leaves the button ${JSON.stringify(tall.button)}`
       );
     }
+  });
+
+  it('gives the system name up before the category, and packs the meta left on a wide row', async () => {
+    const metas = await tab.evaluate(() =>
+      ['resting', 'wide'].map((id) => {
+        const box = (selector) =>
+          document.querySelector(`[data-case="${id}"] ${selector}`).getBoundingClientRect();
+        const system = document.querySelector(`[data-case="${id}"] .crafting-recipe-row-system`);
+        return {
+          meta: box('.crafting-recipe-row-meta').width,
+          category: box('.crafting-recipe-row-category').width,
+          gap: box('.crafting-recipe-row-category').left - box('.crafting-recipe-row-system').right,
+          systemClipped: system.scrollWidth > system.clientWidth,
+        };
+      })
+    );
+    const [narrow, wide] = metas;
+    assert.ok(
+      Math.abs(narrow.category - narrow.meta / 2) < 0.5 && narrow.systemClipped,
+      `at 278px "Weaponsmithing" holds half the meta line while the system name truncates: ${JSON.stringify(narrow)}`
+    );
+    assert.ok(
+      !wide.systemClipped && Math.abs(wide.gap - 6) < 0.5,
+      `on a wide row the category follows the whole system name at the 6px gap: ${JSON.stringify(wide)}`
+    );
   });
 
   it('rings a selected uncraftable row inside its danger ground, and only while selected', async () => {
