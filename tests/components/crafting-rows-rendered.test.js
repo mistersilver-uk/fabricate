@@ -142,10 +142,13 @@ describe('crafting rows, rendered (issue 1778)', () => {
         const box = (selector) =>
           document.querySelector(`[data-case="${id}"] ${selector}`).getBoundingClientRect();
         const system = document.querySelector(`[data-case="${id}"] .crafting-recipe-row-system`);
+        // The drawn text's end, not the box's: a box that grows leaves its text short of the gap.
+        const text = document.createRange();
+        text.selectNodeContents(system);
         return {
           meta: box('.crafting-recipe-row-meta').width,
           category: box('.crafting-recipe-row-category').width,
-          gap: box('.crafting-recipe-row-category').left - box('.crafting-recipe-row-system').right,
+          gap: box('.crafting-recipe-row-category').left - text.getBoundingClientRect().right,
           systemClipped: system.scrollWidth > system.clientWidth,
         };
       })
