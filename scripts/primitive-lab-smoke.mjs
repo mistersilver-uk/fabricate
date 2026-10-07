@@ -184,7 +184,7 @@ function readSpecimenChips(page) {
           specimen: frame.dataset.primitiveLabSpecimen,
           width: frame.getBoundingClientRect().width,
           drawn: Number.parseFloat(frame.dataset.primitiveLabDrawn),
-          capped: frame.hasAttribute('data-primitive-lab-capped'),
+          capped: 'primitiveLabCapped' in frame.dataset,
         })),
         beside: all(`${label} + .pl-specimen-fill${specimen}`).map((frame) => ({
           entry: entryOf(frame),
