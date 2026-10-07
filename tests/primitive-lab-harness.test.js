@@ -15,13 +15,18 @@ import {
   catalogueEntries,
   catalogueFiles,
   cataloguePaths,
+  describeLiveLabelMismatch,
   describeMountFailure,
+  describeSectionMismatch,
   describeUnstableSizes,
   emptyCatalogueMessage,
   expectedSpecimenCount,
+  readLabExpectations,
 } from '../scripts/lib/primitiveLabSmoke.js';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
+import { readDesignLibrary } from './helpers/designLibrary.js';
+import { readLibrarySections } from './helpers/designLibrarySections.js';
 import CHROME_PROVENANCE from './view-lab/chrome-provenance.json' with { type: 'json' };
 import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
 import {
@@ -345,6 +350,113 @@ test('iframes that moved after ready are reported by name, and steady ones are n
     /a\.svelte: 300x40 at ready, 310x40 after/
   );
   assert.match(describeUnstableSizes(steady, []), /a\.svelte: 300x40 at ready, gone after/);
+});
+
+/** Two library sections as `readLabExpectations` reads them, the second with no lede. */
+const SECTIONS = Object.freeze([
+  { id: 'controls', number: '06', title: 'Controls', ledes: ['Every API below.'] },
+  { id: 'pickers', number: '07', title: 'Pickers & bars', ledes: [] },
+]);
+
+/** The same sections as the page draws them, every part with a box. */
+function drawnSections() {
+  return SECTIONS.map((section) => ({
+    ...section,
+    title: ` ${section.title}\n`,
+    ledes: section.ledes.map((lede) => lede.replace(' ', '\n  ')),
+    unseen: [],
+  }));
+}
+
+test('a page that drew every section, number, title and lede passes, whitespace aside', () => {
+  assert.equal(describeSectionMismatch(SECTIONS, drawnSections()), null);
+});
+
+test('a missing section, a wrong title, a lost lede and a part with no box are each reported', () => {
+  const drawn = drawnSections();
+  assert.match(
+    describeSectionMismatch(SECTIONS, drawn.slice(0, 1)),
+    /drew sections controls; the library has controls, pickers/
+  );
+  assert.match(
+    describeSectionMismatch(SECTIONS, [{ ...drawn[0], title: 'Inputs' }, drawn[1]]),
+    /#controls drew title "Inputs", not Controls/
+  );
+  assert.match(
+    describeSectionMismatch(SECTIONS, [{ ...drawn[0], ledes: [] }, drawn[1]]),
+    /#controls drew 0 lede\(s\); the library has 1/
+  );
+  assert.match(
+    describeSectionMismatch(SECTIONS, [{ ...drawn[0], unseen: ['number', 'lede 1'] }, drawn[1]]),
+    /#controls drew no box for number, lede 1/
+  );
+  assert.match(
+    describeSectionMismatch([{ ...SECTIONS[0], number: null }], [{ ...drawn[0], number: null }]),
+    /#controls has no number in the library/
+  );
+  assert.match(describeSectionMismatch([], []), /yielded no `section\[id\]`/);
+});
+
+test('every beside specimen carries one live label, directly before it, keyed by entry', () => {
+  const label = (entry, extra = {}) => ({ entry, text: 'live', paired: true, ...extra });
+  const expected = { '<Stepper>': 1, '<Chip>': 1 };
+  assert.equal(
+    describeLiveLabelMismatch({ expected, labels: [label('<Stepper>'), label('<Chip>')] }),
+    null
+  );
+  assert.match(
+    describeLiveLabelMismatch({ expected, labels: [label('<Stepper>')] }),
+    /<Chip> has 1 specimen\(s\) beside their drawing and 0 "live" label/
+  );
+  assert.match(
+    describeLiveLabelMismatch({
+      expected: { '<Stepper>': 1 },
+      labels: [label('<Stepper>', { paired: false })],
+    }),
+    /not directly before its specimen in <Stepper>/
+  );
+});
+
+test('a doubled label on one entry does not stand in for a missing one on another', () => {
+  const labels = [1, 2].map(() => ({ entry: '<Stepper>', text: 'live', paired: true }));
+  const problem = describeLiveLabelMismatch({ expected: { '<Stepper>': 1, '<Chip>': 1 }, labels });
+  assert.equal(labels.length, 2, 'the page total matches the expected total of 2');
+  assert.match(problem, /<Stepper> has 1 specimen\(s\) beside their drawing and 2 "live"/);
+  assert.match(problem, /<Chip> has 1 specimen\(s\) beside their drawing and 0 "live"/);
+  assert.match(
+    describeLiveLabelMismatch({ expected: {}, labels }),
+    /<Stepper> has 0 specimen\(s\) beside their drawing and 2/
+  );
+});
+
+test('a label that does not read live is reported', () => {
+  assert.match(
+    describeLiveLabelMismatch({
+      expected: { '<Stepper>': 1 },
+      labels: [{ entry: '<Stepper>', text: '', paired: true }],
+    }),
+    /a label in <Stepper> reads "", not "live"/
+  );
+});
+
+test('lab:check expects every library section and every catalogued beside specimen', () => {
+  const { sections, beside, besideByEntry } = readLabExpectations(REPO_ROOT);
+  assert.deepEqual(sections, readLibrarySections(readDesignLibrary()).sections);
+  assert.ok(sections.length > 10, `${sections.length} sections, so the reader is not reading`);
+  assert.ok(
+    sections.some((section) => section.ledes.length > 0),
+    'no section carries a lede, so the lede comparison has no domain'
+  );
+  assert.ok(
+    beside > 0 && beside < expectedSpecimenCount(REPO_ROOT),
+    `${beside} beside specimens, so the liveness decision is not deciding`
+  );
+  assert.equal(
+    Object.values(besideByEntry).reduce((total, count) => total + count, 0),
+    beside,
+    'the per-entry keys must account for every beside specimen'
+  );
+  assert.ok(Object.keys(besideByEntry).length > 1, 'one key, so the keying is not keying');
 });
 
 test('the lab watcher ignores the worktrees of the served root and never the served tree itself', () => {
