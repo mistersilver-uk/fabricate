@@ -196,6 +196,16 @@ function describedBy(control) {
     .map((id) => globalThis.document.querySelector(`[id="${id}"]`));
 }
 
+/** The caption an aside's chance draws left of its track: the text and what follows it. */
+function chanceCaption(aside) {
+  const caption = aside.querySelector(':scope > div > [aria-hidden="true"]:first-child');
+  return {
+    text: caption?.textContent,
+    nextRole: caption?.nextElementSibling?.getAttribute('role'),
+    inMeter: Boolean(aside.querySelector('[role="meter"] .fab-kicker')),
+  };
+}
+
 /** The block content inside a list-row control, which a native button may not hold. */
 function nonPhrasingIn(control) {
   return [...control.querySelectorAll(NON_PHRASING_CONTENT)].map((node) =>
@@ -2023,9 +2033,16 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       'weather chip uses the localized label key'
     );
 
+    const selectedOf = () =>
+      ['haz-1', 'haz-2'].map((id) =>
+        target.querySelector(`[data-event-id="${id}"]`).getAttribute('data-selected')
+      );
+    assert.deepEqual(selectedOf(), ['true', 'false'], 'the first event row is the selected one');
+
     // Selecting the second event updates the inspector + its matching fields.
     target.querySelector('[data-event-id="haz-2"] .gathering-event-summary').click();
     flushSync();
+    assert.deepEqual(selectedOf(), ['false', 'true'], 'the selection moves to the clicked row');
     const updated = target.querySelector(
       '[data-gathering-task-detail-column] [data-gathering-event-detail]'
     );
@@ -2114,6 +2131,15 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       'and its chance'
     );
     assert.ok(row.contains(chance) && !control.contains(chance), 'which sits beside the button');
+    assert.deepEqual(
+      chanceCaption(chance),
+      {
+        text: 'FABRICATE.App.Gathering.Detail.SuccessChanceLabel',
+        nextRole: 'meter',
+        inMeter: false,
+      },
+      'captioned left of its track, once'
+    );
 
     control.click();
     assert.deepEqual(picked, ['task-1'], 'the button selects the task');
@@ -2178,6 +2204,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(control.tagName, 'BUTTON');
     assert.equal(row.querySelectorAll('button, [role="button"], [tabindex]').length, 1);
     assert.equal(control.getAttribute('aria-pressed'), 'false');
+    assert.equal(row.getAttribute('data-selected'), 'false');
     assert.deepEqual(nonPhrasingIn(control), [], 'the button holds phrasing content only');
     assert.ok(
       control.querySelector(':scope .fabricate-list-row-badges .gathering-event-danger.risk-deadly')
@@ -2191,6 +2218,15 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(copy.querySelector('[data-gathering-event-description].is-fallback'));
     assert.ok(chance.querySelector(':scope [data-gathering-event-chance] [role="meter"]'));
     assert.ok(!control.contains(chance), 'the chance sits beside the button');
+    assert.deepEqual(
+      chanceCaption(chance),
+      {
+        text: 'FABRICATE.App.Gathering.Detail.EventChanceLabel',
+        nextRole: 'meter',
+        inMeter: false,
+      },
+      'captioned as the task’s chance is, so its qualifier is visible'
+    );
     control.click();
     assert.deepEqual(picked, ['haz-1']);
   });

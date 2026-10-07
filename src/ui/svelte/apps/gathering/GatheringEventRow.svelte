@@ -15,6 +15,7 @@
     toPercent,
   } from '../../util/gatheringFormat.js';
   import ChanceBar from './ChanceBar.svelte';
+  import Kicker from '../../components/Kicker.svelte';
   import ListRow from '../../components/ListRow.svelte';
 
   let { event = null, selected = false, onSelect = null } = $props();
@@ -83,6 +84,10 @@
 
 {#snippet odds()}
   <div class="gathering-event-chance" data-gathering-event-chance>
+    <span class="gathering-event-chance-caption" aria-hidden="true"
+      ><Kicker as="span">{localize('FABRICATE.App.Gathering.Detail.EventChanceLabel')}</Kicker
+      ></span
+    >
     <ChanceBar value={chance} scale="event" showCaption={false} />
   </div>
 {/snippet}
@@ -96,7 +101,7 @@
   data-selected={selected ? 'true' : 'false'}
   {selected}
   onOpen={select}
-  openProps={{ class: 'gathering-event-summary is-toggle', 'aria-label': accessibleName }}
+  openProps={{ class: 'gathering-event-summary', 'aria-label': accessibleName }}
   leading={thumb}
   badges={dangerLabel !== '' ? badges : undefined}
   children={copy}
@@ -158,6 +163,13 @@
   .gathering-event-danger.is-danger.risk-deadly i,
   .gathering-event-danger.is-danger.risk-extreme i {
     color: var(--fab-danger);
+  }
+
+  .gathering-event-chance {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--fab-space-2);
   }
 
   /* Clamped to two lines, as the task row's description is. */

@@ -12,6 +12,7 @@
   import { descriptionOrDefault, toPercent } from '../../util/gatheringFormat.js';
   import { calloutFor } from './gatheringBlockedReasons.js';
   import ChanceBar from './ChanceBar.svelte';
+  import Kicker from '../../components/Kicker.svelte';
   import ListRow from '../../components/ListRow.svelte';
 
   let { task = null, selected = false, onSelect = null } = $props();
@@ -140,9 +141,14 @@
   >
 {/snippet}
 
+<!-- The caption sits left of the track; the meter's own name already says it. -->
 {#snippet chance()}
   <div class="gathering-task-chance" data-gathering-success>
-    <ChanceBar value={successChance} scale="success" />
+    <span class="gathering-task-chance-caption" aria-hidden="true"
+      ><Kicker as="span">{localize('FABRICATE.App.Gathering.Detail.SuccessChanceLabel')}</Kicker
+      ></span
+    >
+    <ChanceBar value={successChance} scale="success" showCaption={false} />
   </div>
 {/snippet}
 
@@ -157,7 +163,7 @@
   data-selected={selected ? 'true' : 'false'}
   {selected}
   onOpen={select}
-  openProps={{ class: 'gathering-task-summary is-toggle', 'aria-label': accessibleName }}
+  openProps={{ class: 'gathering-task-summary', 'aria-label': accessibleName }}
   leading={thumb}
   badges={callouts.length > 0 ? badges : undefined}
   meta={nodeCount != null || staminaCost != null ? economy : undefined}
@@ -266,6 +272,13 @@
 
   .gathering-economy-chip i {
     font-size: 10px;
+  }
+
+  .gathering-task-chance {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--fab-space-2);
   }
 
   /* Clamped to two lines. The 1.5 line-height keeps the second line's descenders inside the clamp
