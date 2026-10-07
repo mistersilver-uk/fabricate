@@ -290,6 +290,15 @@ test('manager gathering settings condition panels use a two-column responsive gr
     false,
     'and no longer pins itself to the retired 48px box'
   );
+  const conditionPickerBlock = blockFor(
+    '.fabricate-manager .manager-condition-modifier-picker .fabricate-select-trigger'
+  );
+  assert.ok(conditionPickerBlock.includes('width: 100%;'), 'the condition picker fills its cell');
+  assert.equal(
+    conditionPickerBlock.includes('min-height'),
+    false,
+    'the condition picker declares no floor of its own, so the `inline` rung’s 30 applies'
+  );
   assert.ok(
     css.includes('.fabricate-manager .manager-condition-pill-list {\n  display: grid;'),
     'condition pills should use grid rows instead of wrapping as single full-width flex pills'

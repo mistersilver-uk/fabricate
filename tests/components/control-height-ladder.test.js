@@ -14,6 +14,7 @@ import {
   assertGateCases,
   checkGate,
   emptyMarkerFailure,
+  exemptAt,
   gateOver,
   styleCorpusOf,
   workingTree,
@@ -47,8 +48,8 @@ let cached = null;
 function scan() {
   if (cached === null) {
     const { readFile, listFiles } = workingTree(STYLE_CORPUS);
-    const corpus = styleCorpusOf(readFile, listFiles()).styles;
-    cached = { corpus, retired: retiredHeights(corpus) };
+    const { styles: corpus, sources } = styleCorpusOf(readFile, listFiles());
+    cached = { corpus, sources, retired: retiredHeights(corpus) };
   }
   return cached;
 }
@@ -231,6 +232,37 @@ test('no new retired control height has been introduced', (t) => {
       'the content box. A retired value as a `var()` fallback is reachable only when no ancestor ' +
       'sets the token, so paying it down means choosing a rung for the unparented case, not ' +
       'deleting the fallback.'
+  );
+});
+
+/** The player keys issue 1523's PR12 still owes; PR12 deletes each one as it snaps the site. */
+const PR12_PLAYER_KEYS = Object.freeze([
+  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte: height 40px',
+  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte: min-height 40px',
+  'src/ui/svelte/apps/crafting/RecipeListRow.svelte: height 32px',
+  'src/ui/svelte/apps/crafting/RecipeListRow.svelte: min-height 32px',
+  'src/ui/svelte/apps/crafting/ShoppingList.svelte: min-height 36px',
+  'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte: min-height 40px',
+]);
+
+// ABSOLUTE, not against the base: a site the base already carried passes the ratchet above.
+test('every retired height outside the PR12 player keys carries a reasoned marker', () => {
+  const { sources, retired } = scan();
+  const unmarked = retired.occurrences
+    .filter((record) => !exemptAt(record.file, sources[record.file], record.line))
+    .map((record) => ({
+      key: `${record.file}: ${record.property} ${record.value}px`,
+      line: record.line,
+    }))
+    .filter(({ key }) => !PR12_PLAYER_KEYS.includes(key))
+    .map(({ key, line }) => `${key} (line ${line})`);
+
+  assert.deepEqual(
+    unmarked,
+    [],
+    'these retired heights carry no ratchet-exempt(design-system) reason. Snap each to its rung ' +
+      'by kind, or mark the art tile, portrait or named exception it is:\n  ' +
+      unmarked.join('\n  ')
   );
 });
 
