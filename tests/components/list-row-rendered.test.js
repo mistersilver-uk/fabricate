@@ -1,7 +1,8 @@
 /**
  * Issue 1778 — ListRow's selectable form, measured in Chromium: the card layout's button keeps its
- * content's height, a focused row's ring sits inside the row where a scrolling list cannot clip
- * it, and a truncated name keeps 6ch before its badges wrap beneath it.
+ * content's height, a default row's button outgrows Foundry's fixed button height, a focused row's
+ * ring sits inside the row where a scrolling list cannot clip it, and a truncated name keeps 6ch
+ * before its badges wrap beneath it.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -36,6 +37,13 @@ const CASES = Object.freeze({
     onOpen: open,
     meta: snippet('<span>Forest, three tasks</span>'),
   },
+  tall: {
+    name: 'Moonlit Glade',
+    density: 'default',
+    onOpen: open,
+    leading: snippet('<span class="probe-leading"></span>'),
+    children: snippet('<span>A clearing under the old oaks,<br>where moonflowers open.</span>'),
+  },
   focus: { name: 'Healing Potion', onOpen: open, selected: false },
   floor: {
     name: 'Forge a Pattern-Welded Blade of the Deep Seam',
@@ -45,15 +53,21 @@ const CASES = Object.freeze({
   },
 });
 
-/** Core first, the module sheet in `layer(modules)`, the mark's scoped styles unlayered. */
+/**
+ * Core first, with Foundry's fixed button height in its own layer; the module sheet in
+ * `layer(modules)`; the mark's scoped styles unlayered.
+ */
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
-<style>${read('tests/fixtures/foundry-core-min.css')}</style>
+<style>${read('tests/fixtures/foundry-core-min.css')}
+@layer blocks{button{height:28px;overflow:hidden}}</style>
 <style>@layer modules {${read('styles/fabricate.css')}}</style>
 <style>${scopedComponentCss(resolve(repoRoot, component('Medallion'))).css}</style>
 <style>:root{--font-primary:Arial,sans-serif}
+.probe-leading{display:block;width:56px;height:56px}
 .probe-badges{display:flex;gap:4px}.probe-badges>span{display:block;width:48px;height:14px}</style>
 </head><body class="game"><div class="fabricate fabricate-app" style="width:1000px">
   <div data-case="card" style="width:220px">${markup.card}</div>
+  <div data-case="tall" style="width:320px">${markup.tall}</div>
   <div data-case="scroller" style="overflow-y:auto;width:320px;height:120px">${markup.focus}</div>
   <div data-case="narrow" style="width:220px">${markup.floor}</div>
   <div data-case="wide" style="width:360px">${markup.floor}</div>
@@ -100,6 +114,24 @@ describe('ListRow selectable form, rendered (issue 1778)', () => {
       card.bottom >= card.nameBottom - 0.01,
       `the name overflows a ${card.height}px button`
     );
+  });
+
+  it("grows a default row's button past Foundry's fixed button height to hold its content", async () => {
+    const tall = await tab.evaluate(() => {
+      const box = (element) => {
+        const { left, top, right, bottom } = element.getBoundingClientRect();
+        return { left, top, right, bottom };
+      };
+      const button = document.querySelector('[data-case="tall"] .fabricate-list-row-open');
+      return { button: box(button), children: [...button.children].map(box) };
+    });
+    assert.equal(tall.children.length, 2, 'the leading mark and the body');
+    for (const child of tall.children) {
+      assert.ok(
+        within(child, tall.button),
+        `${JSON.stringify(child)} leaves the button ${JSON.stringify(tall.button)}`
+      );
+    }
   });
 
   it('rings a focused row inside the row, where the list scrolling around it cannot clip it', async () => {
