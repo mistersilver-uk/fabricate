@@ -1,4 +1,5 @@
 /** The Primitive Lab page's sizing decisions as plain functions, provable without a browser. */
+import { readSlotInset } from './slot.js';
 
 /** The most RESIZEs one specimen may apply; past this its size depends on its own iframe (`100vh`). */
 export const MAX_APPLIED_RESIZES = 40;
@@ -15,7 +16,7 @@ export const MAX_APPLIED_RESIZES = 40;
  * @param {number} facts.availableWidth The parent's content-box width.
  * @param {number} [facts.inset] The row's `inset`. A drawing that caps its own width drew the region
  *   the primitive sits in, so its width already holds the inset; one with no cap drew the primitive
- *   alone, so its slot adds the inset on both sides and the padded specimen still fits.
+ *   alone, so its slot adds the inset on both sides, unless stretched.
  * @returns {{fill: boolean, inlineSize: string, maxInlineSize: string, presize: string}} The
  *   slot's inline facts; `presize` is the width the iframe takes before the specimen first lays
  *   out, so its first report is already at its final width, or `''` for none.
@@ -24,13 +25,41 @@ export function describeHost({ display, maxWidth, drawnWidth, availableWidth, in
   const fill = !display.startsWith('inline');
   const drawn = drawnWidth > 0;
   const stretched = !drawn || Math.abs(drawnWidth - availableWidth) < 1;
-  const around = maxWidth === 'none' ? 2 * inset : 0;
+  const around = drawn && !stretched && maxWidth === 'none' ? 2 * inset : 0;
   const width = drawn ? `${Math.ceil(drawnWidth) + around}px` : '';
   return {
     fill,
     inlineSize: stretched ? '' : width,
     maxInlineSize: maxWidth,
     presize: fill && drawn ? width : '',
+  };
+}
+
+/** In a grid, a specimen and its chip take a row beneath the drawing, not a cell each. */
+export function spansTheRow({ display }) {
+  return display.endsWith('grid');
+}
+
+/** The row's `inset`, or 0 for a malformed one, which the specimen reports itself. */
+export function insetOf(row) {
+  try {
+    return readSlotInset(row);
+  } catch {
+    return 0;
+  }
+}
+
+/** {@link describeHost}'s facts from the measured drawing and its parent, plus `spansRow`. */
+export function layoutFor({ display, maxWidth, drawnWidth, parent }, row) {
+  return {
+    ...describeHost({
+      display,
+      maxWidth,
+      drawnWidth,
+      availableWidth: parent.clientWidth - parent.paddingLeft - parent.paddingRight,
+      inset: insetOf(row),
+    }),
+    spansRow: spansTheRow(parent),
   };
 }
 

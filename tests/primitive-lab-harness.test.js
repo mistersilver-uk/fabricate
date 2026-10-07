@@ -17,8 +17,10 @@ import {
   cataloguePaths,
   describeLiveLabelMismatch,
   describeMountFailure,
+  describePartialMismatch,
   describeSectionMismatch,
   describeUnstableSizes,
+  describeWideBesideSpecimens,
   emptyCatalogueMessage,
   expectedSpecimenCount,
   readLabExpectations,
@@ -37,13 +39,16 @@ import {
   MAX_APPLIED_RESIZES,
   createSizeGovernor,
   describeHost,
+  insetOf,
+  layoutFor,
+  spansTheRow,
 } from './view-lab/primitives/hostLayout.js';
 import {
   LAB_RELEASE,
   installPrimitiveLabFoundry,
   parseLabRelease,
 } from './view-lab/primitives/labFoundry.js';
-import { readSlotInset } from './view-lab/primitives/slot.js';
+import { readSlotInset, readSlotWindow } from './view-lab/primitives/slot.js';
 import {
   SPECIMEN_SNIPPET_NAMES,
   readSpecimenSnippets,
@@ -284,6 +289,34 @@ test('LiveSpecimen.svelte declares one snippet per name a row may supply, and no
   );
 });
 
+test('each named snippet in LiveSpecimen.svelte renders the row’s snippet of the same name', () => {
+  const source = readFileSync(
+    path.join(REPO_ROOT, 'tests/view-lab/primitives/LiveSpecimen.svelte'),
+    'utf8'
+  );
+  const bodies = [...source.matchAll(/\{#snippet (\w+)\(\)\}(.*?)\{\/snippet\}/gs)];
+  const routed = bodies.map(([, name, body]) => [
+    name,
+    [...body.matchAll(/snippets\.(\w+)/g)].map((match) => match[1]),
+  ]);
+  assert.deepEqual(
+    routed.map(([name]) => name).toSorted(byCodePoint),
+    [...SPECIMEN_SNIPPET_NAMES].sort(byCodePoint),
+    'every snippet name must be declared as a parameterless snippet'
+  );
+  for (const [name, reads] of routed) {
+    assert.deepEqual(reads, [name], `{#snippet ${name}()} must render snippets.${name} alone`);
+  }
+});
+
+test('a row stands in the manager window unless it names the player window', () => {
+  assert.equal(readSlotWindow({}), 'manager');
+  assert.equal(readSlotWindow({ window: 'player' }), 'player');
+  assert.throws(() => readSlotWindow({ window: 'app' }), /`window` "app" is not a window/);
+  const windows = catalogueEntries(REPO_ROOT).map((entry) => readSlotWindow(entry.row));
+  assert.ok(windows.includes('player'), 'no row stands in the player window, so it has no domain');
+});
+
 test('an inset beside a boxed slot is refused, not silently dropped', () => {
   assert.throws(
     () => readSlotInset({ inset: 12, slot: { width: 300, height: 200 } }),
@@ -315,6 +348,41 @@ test('an uncapped sized host widens by its row inset on both sides; a capped one
   assert.equal(describeHost(panel).inlineSize, '300px');
   assert.equal(describeHost(panel).maxInlineSize, '300px');
   assert.equal(describeHost({ ...HOST, inset: 12 }).inlineSize, '');
+  assert.equal(describeHost({ ...HOST, inset: 12 }).presize, '300px', 'a stretched host adds none');
+});
+
+const PARENT = {
+  display: 'flex',
+  clientWidth: 742,
+  paddingLeft: 12,
+  paddingRight: 12,
+};
+
+const TILE = { display: 'flex', maxWidth: 'none', drawnWidth: 56, parent: PARENT };
+
+test('the page measures a drawing within its parent padding, and pads it by the row inset', () => {
+  const tile = TILE;
+  assert.equal(layoutFor(tile, { inset: 8 }).inlineSize, '72px');
+  assert.equal(layoutFor(tile, {}).inlineSize, '56px');
+  const stretched = { ...tile, drawnWidth: 718 };
+  assert.equal(layoutFor(stretched, { inset: 8 }).inlineSize, '', 'the padding is subtracted');
+  assert.equal(layoutFor(stretched, { inset: 8 }).presize, '718px');
+  assert.equal(layoutFor(tile, {}).spansRow, false);
+});
+
+test('a malformed inset adds nothing, since the specimen reports it itself', () => {
+  assert.equal(insetOf({ inset: 8 }), 8);
+  assert.equal(insetOf({ inset: -4 }), 0);
+  assert.equal(insetOf({ inset: 8, slot: { width: 300, height: 200 } }), 0);
+  assert.equal(insetOf({}), 0);
+});
+
+test('a specimen takes a row beneath its drawing in a grid, and stays inline in a flex row', () => {
+  assert.equal(spansTheRow({ display: 'grid' }), true);
+  assert.equal(spansTheRow({ display: 'inline-grid' }), true);
+  assert.equal(spansTheRow({ display: 'flex' }), false);
+  assert.equal(spansTheRow({ display: 'block' }), false);
+  assert.equal(layoutFor({ ...TILE, parent: { ...PARENT, display: 'grid' } }, {}).spansRow, true);
 });
 
 test('a host that drew no width (display: contents) is left to the page, never collapsed to 0px', () => {
@@ -449,8 +517,48 @@ test('a label that does not read live is reported', () => {
   );
 });
 
+test('every partial specimen says so, once, in the chip directly before it', () => {
+  const caption = (entry, text, paired = true) => ({ entry, text, paired });
+  const expected = { '<Rail>': ['first section only'], '<ListRow>': ['b', 'a'] };
+  const whole = [
+    caption('<Rail>', 'first section only'),
+    caption('<ListRow>', 'a'),
+    caption('<ListRow>', 'b'),
+  ];
+  assert.equal(describePartialMismatch({ expected, captions: whole }), null);
+  assert.match(
+    describePartialMismatch({ expected, captions: whole.slice(1) }),
+    /<Rail> catalogues partial \["first section only"\] and the page says \[\]/
+  );
+  assert.match(
+    describePartialMismatch({ expected: {}, captions: [caption('<Rail>', 'x', false)] }),
+    /not directly before its specimen in <Rail>/
+  );
+  assert.match(
+    describePartialMismatch({
+      expected,
+      captions: [...whole.slice(0, 2), caption('<ListRow>', 'c')],
+    }),
+    /<ListRow> catalogues partial/
+  );
+});
+
+test('a filling specimen beside its drawing is no wider than the drawing', () => {
+  const pair = { entry: '<NavSidebar>', specimen: 'NavSidebar.svelte', width: 72, drawn: 72 };
+  assert.equal(describeWideBesideSpecimens([pair, { ...pair, width: 72.6, drawn: 71.8 }]), null);
+  assert.equal(describeWideBesideSpecimens([{ ...pair, drawn: 56, inset: 8 }]), null);
+  assert.match(
+    describeWideBesideSpecimens([{ ...pair, drawn: 56, inset: 4 }]),
+    /72px beside a 56px/
+  );
+  assert.match(
+    describeWideBesideSpecimens([{ ...pair, width: 300 }]),
+    /<NavSidebar> \/ NavSidebar\.svelte: 300px beside a 72px drawing/
+  );
+});
+
 test('lab:check expects every library section and every catalogued beside specimen', () => {
-  const { sections, beside, besideByEntry } = readLabExpectations(REPO_ROOT);
+  const { sections, beside, besideByEntry, partialByEntry } = readLabExpectations(REPO_ROOT);
   assert.deepEqual(sections, readLibrarySections(readDesignLibrary()).sections);
   assert.ok(sections.length > 10, `${sections.length} sections, so the reader is not reading`);
   assert.ok(
@@ -467,6 +575,9 @@ test('lab:check expects every library section and every catalogued beside specim
     'the per-entry keys must account for every beside specimen'
   );
   assert.ok(Object.keys(besideByEntry).length > 1, 'one key, so the keying is not keying');
+  const partial = catalogueEntries(REPO_ROOT).filter((entry) => entry.row.partial).length;
+  assert.ok(partial > 1, `${partial} partial rows, so the partial caption has no domain`);
+  assert.equal(Object.values(partialByEntry).flat().length, partial);
 });
 
 test('the lab watcher ignores the worktrees of the served root and never the served tree itself', () => {

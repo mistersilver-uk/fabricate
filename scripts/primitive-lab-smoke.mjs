@@ -16,14 +16,17 @@ import {
   LIVE_LABEL_SELECTOR,
   MOUNTED_ATTRIBUTE,
   MOUNT_ALL_QUERY,
+  PARTIAL_SELECTOR,
   READY_ATTRIBUTE,
   SPECIMEN_ATTRIBUTE,
   SPECIMEN_SELECTOR,
   cataloguePaths,
   describeLiveLabelMismatch,
   describeMountFailure,
+  describePartialMismatch,
   describeSectionMismatch,
   describeUnstableSizes,
+  describeWideBesideSpecimens,
   emptyCatalogueMessage,
   readLabExpectations,
   startLabServer,
@@ -147,20 +150,47 @@ function readRenderedSections(page) {
   });
 }
 
-/** Every `live` label on the page: its entry heading, its text, and whether a specimen follows. */
-function readLiveLabels(page) {
+/**
+ * Every chip a specimen stands under, read in one pass: each `live` label (its own word, the partial
+ * qualifier aside), each partial qualifier, and each filling specimen beside its drawing with both
+ * widths and the row inset the specimen pads itself by. Every record carries its entry heading and whether its chip directly precedes a specimen.
+ */
+function readSpecimenChips(page) {
   return page.evaluate(
-    ([label, specimen]) =>
-      [...document.querySelectorAll(label)].map((element) => ({
-        entry: (
-          element.closest('.spec')?.querySelector(':scope > .spec-head > h4')?.textContent ?? '?'
-        )
+    ([label, partial, specimen]) => {
+      const entryOf = (element) =>
+        (element.closest('.spec')?.querySelector(':scope > .spec-head > h4')?.textContent ?? '?')
           .replaceAll(/\s+/g, ' ')
-          .trim(),
-        text: element.textContent,
-        paired: element.nextElementSibling?.matches(specimen) ?? false,
-      })),
-    [LIVE_LABEL_SELECTOR, SPECIMEN_SELECTOR]
+          .trim();
+      const leads = (element) => element?.nextElementSibling?.matches(specimen) ?? false;
+      const all = (selector) => [...document.querySelectorAll(selector)];
+      return {
+        labels: all(label).map((element) => ({
+          entry: entryOf(element),
+          text: [...element.childNodes]
+            .filter((node) => node.nodeType === Node.TEXT_NODE)
+            .map((node) => node.textContent)
+            .join(''),
+          paired: leads(element),
+        })),
+        captions: all(partial).map((element) => ({
+          entry: entryOf(element),
+          text: element.textContent,
+          paired: leads(element.parentElement),
+        })),
+        beside: all(`${label} + .pl-specimen-fill${specimen}`).map((frame) => ({
+          entry: entryOf(frame),
+          specimen: frame.dataset.primitiveLabSpecimen,
+          width: frame.getBoundingClientRect().width,
+          drawn: frame.previousElementSibling.previousElementSibling.getBoundingClientRect().width,
+          inset:
+            Number.parseFloat(
+              frame.contentDocument?.querySelector('.pl-specimen')?.style.paddingLeft
+            ) || 0,
+        })),
+      };
+    },
+    [LIVE_LABEL_SELECTOR, PARTIAL_SELECTOR, SPECIMEN_SELECTOR]
   );
 }
 
@@ -204,11 +234,19 @@ async function run() {
       await readRenderedSections(page)
     );
     if (sections) throw new Error(`the page did not draw the library's sections:\n  ${sections}`);
+    const chips = await readSpecimenChips(page);
     const labels = describeLiveLabelMismatch({
       expected: expectations.besideByEntry,
-      labels: await readLiveLabels(page),
+      labels: chips.labels,
     });
     if (labels) throw new Error(`the beside specimens are not all labelled:\n  ${labels}`);
+    const partial = describePartialMismatch({
+      expected: expectations.partialByEntry,
+      captions: chips.captions,
+    });
+    if (partial) throw new Error(`the partial specimens do not all say so:\n  ${partial}`);
+    const wide = describeWideBesideSpecimens(chips.beside);
+    if (wide) throw new Error(`a filling specimen is wider than the drawing beside it: ${wide}`);
     if (failures.length > 0) {
       throw new Error(
         `the page reported ${failures.length} failure(s):\n  ${failures.join('\n  ')}`
@@ -216,8 +254,8 @@ async function run() {
     }
     console.log(
       `OK  ${report.mounted} specimens mounted (${expectations.beside} beside their drawing, ` +
-        `each labelled), ${expectations.sections.length} sections drawn, no console, page or ` +
-        'request failures'
+        `each labelled; ${chips.captions.length} partial, each captioned), ` +
+        `${expectations.sections.length} sections drawn, no console, page or request failures`
     );
   } finally {
     await browser.close();

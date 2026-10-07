@@ -18,6 +18,7 @@ import {
   describeCollapsedSlot,
   readSlotBox,
   readSlotInset,
+  readSlotWindow,
 } from './slot.js';
 import {
   SPECIMEN_ASSIGN,
@@ -113,6 +114,7 @@ async function boot() {
   const { row, fill: hostIsBlock } = await waitForAssignment();
   const box = readSlotBox(row);
   const inset = readSlotInset(row);
+  const windowName = readSlotWindow(row);
 
   const i18n = toI18nStub(await createLocalizer());
   installPrimitiveLabFoundry(i18n);
@@ -121,6 +123,7 @@ async function boot() {
   const { frame, root } = buildSpecimenFrame({
     themeAttribute: FABRICATE_THEME_ATTRIBUTE,
     themeId: FABRICATE_THEME_IDS.FABRICATE,
+    windowName,
   });
   if (box) applySlotBox(box, frame);
   document.body.append(frame);

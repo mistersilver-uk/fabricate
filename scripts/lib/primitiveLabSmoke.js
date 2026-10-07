@@ -14,6 +14,7 @@ import {
   BESIDE,
   LIVE_LABEL_CLASS,
   LIVE_LABEL_TEXT,
+  PARTIAL_CLASS,
 } from '../../tests/view-lab/primitives/liveness.js';
 
 /** The lab page, relative to the Vite dev root (the repository root). */
@@ -42,6 +43,9 @@ export const SPECIMEN_SELECTOR = `[${SPECIMEN_ATTRIBUTE}]`;
 
 /** The label `liveness.js` puts before a specimen standing beside its drawing, as a selector. */
 export const LIVE_LABEL_SELECTOR = `.${LIVE_LABEL_CLASS.trim().replaceAll(/\s+/g, '.')}`;
+
+/** The qualifier a partial specimen's label or caption carries, as a selector. */
+export const PARTIAL_SELECTOR = `.${PARTIAL_CLASS}`;
 
 /** The catalogue directory, relative to the repository root. */
 export const CATALOGUE_DIRECTORY = 'tests/view-lab/primitives/catalogue';
@@ -167,12 +171,13 @@ export function describeMountFailure({ expected, mounted, reported }) {
 
 /**
  * What the page must show, derived in Node from the library, catalogue and manifest it renders:
- * each section's number, title and ledes, and how many specimens stand beside their drawing,
- * in all and per entry heading.
+ * each section's number, title and ledes, how many specimens stand beside their drawing, in all
+ * and per entry heading, and each entry's `partial` qualifiers.
  *
  * @param {string} root Absolute repository root.
  * @returns {{sections: {id: string, number: string|null, title: string|null, ledes: string[]}[],
- *   beside: number, besideByEntry: Record<string, number>}} The expectations `lab:check` holds the page to.
+ *   beside: number, besideByEntry: Record<string, number>, partialByEntry: Record<string,
+ *   string[]>}} The expectations `lab:check` holds the page to.
  */
 export function readLabExpectations(root) {
   const html = readFileSync(path.join(root, LIBRARY_PATH), 'utf8');
@@ -187,14 +192,22 @@ export function readLabExpectations(root) {
     );
     const beside = slots.filter((slot) => slot.mode === BESIDE);
     const besideByEntry = {};
-    for (const slot of beside) {
+    const partialByEntry = {};
+    for (const slot of slots) {
       const heading = slot.host
         .closest('.spec')
         ?.querySelector(':scope > .spec-head > h4')?.textContent;
       const entry = collapsed(heading ?? '?');
-      besideByEntry[entry] = (besideByEntry[entry] ?? 0) + 1;
+      if (slot.mode === BESIDE) besideByEntry[entry] = (besideByEntry[entry] ?? 0) + 1;
+      if (slot.row.partial)
+        partialByEntry[entry] = [...(partialByEntry[entry] ?? []), slot.row.partial];
     }
-    return { sections: readLibrarySections(html).sections, beside: beside.length, besideByEntry };
+    return {
+      sections: readLibrarySections(html).sections,
+      beside: beside.length,
+      besideByEntry,
+      partialByEntry,
+    };
   } finally {
     window.close();
   }
@@ -280,6 +293,64 @@ export function describeLiveLabelMismatch({ expected, labels }) {
     problems.push(`a label in ${label.entry} reads ${JSON.stringify(label.text)}, not "live"`);
   }
   return problems.length === 0 ? null : problems.join('\n  ');
+}
+
+/**
+ * Compare the partial qualifiers on the page with the catalogue's, entry by entry: each one sits in
+ * a label or caption directly before its specimen and reads its row's `partial`.
+ *
+ * @param {object} options Options.
+ * @param {Record<string, string[]>} options.expected Each entry's `partial` values, from
+ *   `readLabExpectations`.
+ * @param {{entry: string, text: string, paired: boolean}[]} options.captions Every qualifier on the
+ *   page, with its entry heading, its text, and whether its chip directly precedes a specimen.
+ * @returns {string|null} The disagreement, or null when every partial specimen says so.
+ */
+export function describePartialMismatch({ expected, captions }) {
+  const problems = [];
+  const order = (left, right) => (left < right ? -1 : Number(left > right));
+  const sorted = (list) => list.map(collapsed).sort(order);
+  const entries = new Set([...Object.keys(expected), ...captions.map((caption) => caption.entry)]);
+  for (const entry of [...entries].sort(order)) {
+    const want = sorted(expected[entry] ?? []);
+    const got = sorted(
+      captions.filter((caption) => caption.entry === entry && caption.paired).map((c) => c.text)
+    );
+    if (JSON.stringify(got) !== JSON.stringify(want)) {
+      problems.push(
+        `${entry} catalogues partial ${JSON.stringify(want)} and the page says ${JSON.stringify(got)}`
+      );
+    }
+  }
+  const unpaired = captions.filter((caption) => !caption.paired).map((caption) => caption.entry);
+  if (unpaired.length > 0) {
+    problems.push(
+      `a partial caption is not directly before its specimen in ${unpaired.join(', ')}`
+    );
+  }
+  return problems.length === 0 ? null : problems.join('\n  ');
+}
+
+/** Slack for a fractional drawing width against the whole pixels an iframe is sized in. */
+const WIDTH_TOLERANCE_PX = 1;
+
+/**
+ * Report a filling specimen standing beside its drawing that is wider than the drawing: it takes
+ * the region the drawing gives it and adds none (`page.css`, `contain: inline-size`), bar the row
+ * `inset` it pads itself by on both sides.
+ *
+ * @param {{entry: string, specimen: string, width: number, drawn: number, inset?: number}[]} pairs
+ *   Every beside filling specimen's width, its drawing's, and its inset, as rendered.
+ * @returns {string|null} The over-wide specimens, or null when none is wider than its drawing.
+ */
+export function describeWideBesideSpecimens(pairs) {
+  const wide = pairs
+    .filter(({ width, drawn, inset = 0 }) => width > drawn + 2 * inset + WIDTH_TOLERANCE_PX)
+    .map(
+      ({ entry, specimen, width, drawn }) =>
+        `${entry} / ${specimen}: ${Math.round(width)}px beside a ${Math.round(drawn)}px drawing`
+    );
+  return wide.length === 0 ? null : wide.join('; ');
 }
 
 /** Opaque, because `eslint-plugin-import-x` crashes on Vite's exports map (see the View Lab CLI). */

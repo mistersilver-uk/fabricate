@@ -14,11 +14,11 @@
 import MANIFEST from '../../../scripts/lib/designSystemPrimitives.json' with { type: 'json' };
 
 import { CATALOGUE } from './catalogue.js';
-import { MAX_APPLIED_RESIZES, createSizeGovernor, describeHost } from './hostLayout.js';
+import { MAX_APPLIED_RESIZES, createSizeGovernor, layoutFor } from './hostLayout.js';
 import { resolveSlots } from './inject.js';
 import { LIVE_CLASS, PAGE_CLASS, readLibrary } from './library.js';
 import { placeSpecimen } from './liveness.js';
-import { readSlotBox, readSlotInset } from './slot.js';
+import { readSlotBox } from './slot.js';
 import {
   SPECIMEN_ASSIGN,
   SPECIMEN_ERROR,
@@ -162,30 +162,24 @@ function applySize(iframe, { width, height, fill = false }, host) {
   iframe.classList.add(SIZED_CLASS);
 }
 
-/** Read the live drawing's facts for `describeHost`, with the row's `inset` around them. */
+/** Measure the live drawing and its parent for `layoutFor`, with the row's `inset` around them. */
 function readHostLayout(host, row) {
-  const parent = host.parentElement;
-  const parentStyle = getComputedStyle(parent);
+  const parentStyle = getComputedStyle(host.parentElement);
   const style = getComputedStyle(host);
-  return describeHost({
-    display: style.display,
-    maxWidth: style.maxWidth,
-    drawnWidth: host.getBoundingClientRect().width,
-    availableWidth:
-      parent.clientWidth -
-      Number.parseFloat(parentStyle.paddingLeft) -
-      Number.parseFloat(parentStyle.paddingRight),
-    inset: insetOf(row),
-  });
-}
-
-/** The row's `inset`, or 0 for a malformed one, which the specimen reports itself. */
-function insetOf(row) {
-  try {
-    return readSlotInset(row);
-  } catch {
-    return 0;
-  }
+  return layoutFor(
+    {
+      display: style.display,
+      maxWidth: style.maxWidth,
+      drawnWidth: host.getBoundingClientRect().width,
+      parent: {
+        display: parentStyle.display,
+        clientWidth: host.parentElement.clientWidth,
+        paddingLeft: Number.parseFloat(parentStyle.paddingLeft),
+        paddingRight: Number.parseFloat(parentStyle.paddingRight),
+      },
+    },
+    row
+  );
 }
 
 /**
@@ -285,7 +279,7 @@ function standUpSpecimen(slot, problems, results) {
   });
 
   iframe.src = SPECIMEN_URL;
-  placeSpecimen(slot, iframe, document);
+  placeSpecimen(slot, iframe, document, { spansRow: host.spansRow });
   return settled;
 }
 
