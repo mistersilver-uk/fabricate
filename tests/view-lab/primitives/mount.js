@@ -1,7 +1,9 @@
 /**
  * Primitive Lab boot (issue 1487): render `library.html` as the page and stand up an isolated
- * `<iframe>` (`specimen.html`) for every drawing the catalogue maps. This page links no Foundry
- * stylesheet, so core cannot repaint the library's drawings; each specimen carries the cascade.
+ * `<iframe>` (`specimen.html`) for every drawing the catalogue maps, in its place or, for a name
+ * the library does not yet record as shipped, beside it (`liveness.js`). This page links no
+ * Foundry stylesheet, so core cannot repaint the library's drawings; each specimen carries the
+ * cascade.
  *
  * `<body>` reports through three attributes `scripts/lib/primitiveLabSmoke.js` reads:
  * `data-primitive-lab-mounted` is the positive count of rows mounted, `data-primitive-lab-ready` is
@@ -9,10 +11,13 @@
  * Each iframe carries `data-primitive-lab-specimen` with its row's `path`, on the `<iframe>` itself
  * because the smoke's `page.evaluate` reads only this top document, never a specimen's realm.
  */
+import MANIFEST from '../../../scripts/lib/designSystemPrimitives.json' with { type: 'json' };
+
 import { CATALOGUE } from './catalogue.js';
 import { MAX_APPLIED_RESIZES, createSizeGovernor, describeHost } from './hostLayout.js';
 import { resolveSlots } from './inject.js';
 import { LIVE_CLASS, PAGE_CLASS, readLibrary } from './library.js';
+import { placeSpecimen } from './liveness.js';
 import { readSlotBox } from './slot.js';
 import {
   SPECIMEN_ASSIGN,
@@ -270,7 +275,7 @@ function standUpSpecimen(slot, problems, results) {
   });
 
   iframe.src = SPECIMEN_URL;
-  slot.host.replaceWith(iframe);
+  placeSpecimen(slot, iframe, document);
   return settled;
 }
 
@@ -283,7 +288,10 @@ async function boot() {
 
   renderLibrary(await readLibrary());
 
-  const { slots, problems } = resolveSlots(document.body, CATALOGUE);
+  const { slots, problems } = resolveSlots(document.body, CATALOGUE, [
+    ...MANIFEST.designSystemPrimitives,
+    ...MANIFEST.notAPrimitive,
+  ]);
   const results = { mounted: 0 };
   // Every specimen settles before the report is published.
   await Promise.all(slots.map((slot) => standUpSpecimen(slot, problems, results)));

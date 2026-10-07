@@ -1,21 +1,26 @@
 /**
  * Turn catalogue rows into the hand-drawn elements of the rendered library a real component
- * replaces. A row names one drawing by its `draws` selector, and every other node in the unit stays.
- * Rows sharing a `(spec, cap, draws)` address must equal the elements that selector matches; every
- * mismatch is collected rather than thrown, so the page reports each stale row (issue 1487).
+ * replaces or stands beside (`liveness.js`). A row names one drawing by its `draws` selector, and
+ * every other node in the unit stays. Rows sharing a `(spec, cap, draws)` address must equal the
+ * elements that selector matches; every mismatch is collected rather than thrown, so the page
+ * reports each stale row (issue 1487).
  */
 import { normalize, specBlocks, unitsOf } from './library.js';
+import { decideLiveness, libraryNamesByPath } from './liveness.js';
 
 /**
  * Resolve every catalogue row against the rendered library.
  *
  * @param {ParentNode} root The rendered library.
  * @param {object[]} rows The catalogue, in file then declaration order.
- * @returns {{slots: {host: Element, row: object}[], problems: string[]}} One slot per replaced
- *   drawing, and every row that could not be placed.
+ * @param {{path: string, library: string|null}[]} manifestRows Both manifest tables.
+ * @returns {{slots: {host: Element, row: object, name: string, mode: string}[], problems:
+ *   string[]}} One slot per live drawing with the name it stands up and its liveness mode, and
+ *   every row that could not be placed.
  */
-export function resolveSlots(root, rows) {
+export function resolveSlots(root, rows, manifestRows) {
   const blocks = specBlocks(root);
+  const namesByPath = libraryNamesByPath(manifestRows);
   const unitCache = new Map();
   const problems = [];
   const slots = [];
@@ -47,7 +52,12 @@ export function resolveSlots(root, rows) {
       );
       continue;
     }
-    for (const [index, host] of targets.entries()) slots.push({ host, row: group[index] });
+    for (const [index, host] of targets.entries()) {
+      const row = group[index];
+      const liveness = decideLiveness(block, blocks.values(), namesByPath.get(row.path) ?? []);
+      if (liveness.problem) problems.push(`${describe(row)} / ${row.path}: ${liveness.problem}`);
+      else slots.push({ host, row, ...liveness });
+    }
   }
 
   return { slots, problems };
