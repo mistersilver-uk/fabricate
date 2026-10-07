@@ -36,6 +36,7 @@ import { readLibrarySections } from './helpers/designLibrarySections.js';
 import { declaredPropNames, PROP_NAME } from './helpers/sveltePropsDeclaration.js';
 import { resolveSlots } from './view-lab/primitives/inject.js';
 import { normalize, specBlocks, unitsOf } from './view-lab/primitives/library.js';
+import { BESIDE, REPLACE } from './view-lab/primitives/liveness.js';
 import { SPECIMEN_SNIPPET_NAMES } from './view-lab/primitives/specimenSnippets.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -309,23 +310,59 @@ test('every catalogue row addresses a drawing the library actually has', () => {
   assert.ok(matched > 50, `${matched} drawings matched, which is not the whole catalogue`);
 });
 
-test('no drawing a row claims contains a drawing another row claims', () => {
-  // `inject.js` resolves every address before replacing, so an outer replacement would detach an
-  // inner host and its specimen would mount outside the document.
+/**
+ * The claimed drawings one claimed drawing contains, unless its specimen stands beside it.
+ *
+ * @param {{host: Element, entry: object, mode: string}[]} hosts Each claimed drawing.
+ * @returns {string[]} One problem per drawing a replacement would detach.
+ */
+function detachedClaims(hosts) {
+  // `inject.js` resolves every address before placing, so a replaced outer drawing detaches an
+  // inner host; one its specimen stands beside stays in the document, and so does the inner one.
+  return hosts.flatMap((outer) =>
+    outer.mode === BESIDE
+      ? []
+      : hosts
+          .filter((inner) => inner !== outer && outer.host.contains(inner.host))
+          .map(
+            (inner) =>
+              `${where(outer.entry)} replaces a drawing that contains the one ` +
+              `${where(inner.entry)} claims, so the inner specimen would mount into a detached subtree`
+          )
+  );
+}
+
+test('no drawing a row replaces contains a drawing another row claims', () => {
+  const modes = new Map(
+    resolveSlots(
+      LIBRARY_BODY,
+      CATALOGUE.map((entry) => entry.row),
+      MANIFEST_ROWS
+    ).slots.map((slot) => [slot.host, slot.mode])
+  );
   const hosts = RESOLVED.flatMap((resolved) =>
-    resolved.targets.map((host, index) => ({ host, entry: resolved.address.entries[index] }))
+    resolved.targets.map((host, index) => ({
+      host,
+      entry: resolved.address.entries[index],
+      mode: modes.get(host),
+    }))
   );
   assert.ok(hosts.length > 50, `${hosts.length} drawings claimed, so this rule has no domain`);
-  for (const outer of hosts) {
-    for (const inner of hosts) {
-      if (outer === inner) continue;
-      assert.ok(
-        !outer.host.contains(inner.host),
-        `${where(outer.entry)} claims a drawing that contains the one ${where(inner.entry)} ` +
-          'claims, so the inner specimen would mount into a detached subtree'
-      );
-    }
-  }
+  assert.ok(
+    hosts.some((outer) =>
+      hosts.some((inner) => inner !== outer && outer.host.contains(inner.host))
+    ),
+    'no claimed drawing nests inside another, so the beside exemption below is untested here'
+  );
+  assert.deepEqual(detachedClaims(hosts), []);
+
+  const [outer, inner] = [LIBRARY_BODY, LIBRARY_BODY.firstElementChild];
+  const nested = [
+    { host: outer, entry: { file: 'a.json', index: 0 } },
+    { host: inner, entry: { file: 'b.json', index: 0 } },
+  ];
+  assert.equal(detachedClaims(nested.map((h) => ({ ...h, mode: REPLACE }))).length, 1);
+  assert.deepEqual(detachedClaims([{ ...nested[0], mode: BESIDE }, nested[1]]), []);
 });
 
 test('the page resolver reads the catalogue exactly as this gate does', () => {
@@ -478,36 +515,15 @@ function unsectionedManifestRows({ library, manifestRows }) {
 }
 
 /**
- * The manifest rows with no specimen yet, by section. Phase 17 catalogues sections 06–09 and
- * Phase 18 sections 10–11, each deleting a line as it lands; the rule below is exact both ways.
+ * The manifest rows with no specimen yet, by section. Phase 18 catalogues sections 10–11, deleting
+ * a line as it lands; the rule below is exact both ways. A row that stays carries its reason.
  */
 const AWAITING_SPECIMEN = Object.freeze({
-  controls: [
-    '<RunActionBar> src/ui/svelte/components/RunActionBar.svelte',
-    '<Search> src/ui/svelte/components/SearchField.svelte',
-    '<Select> src/ui/svelte/components/Select.svelte',
-  ],
   pickers: [
-    '<ArtPicker> src/ui/svelte/components/ArtPicker.svelte',
-    '<Menu> src/ui/svelte/components/ActionMenu.svelte',
+    // The parent's portaled panel: it needs `optionIsSelected`, `chooseOption`, `close`,
+    // `popoverLayout` and an anchor element, and a row passes plain JSON. The list-form
+    // `SearchablePopover` specimen mounts it through its one real caller.
     '<SearchPopover> src/ui/svelte/components/SearchablePopoverPanel.svelte',
-  ],
-  marks: [
-    '<BandedBar> src/ui/svelte/components/BandedBar.svelte',
-    '<Chip> src/ui/svelte/components/Chip.svelte',
-    '<DiceTiles> src/ui/svelte/components/DiceTiles.svelte',
-    '<EssenceChip> src/ui/svelte/apps/manager/components/EssenceChip.svelte',
-    '<IconChip> src/ui/svelte/components/Medallion.svelte',
-    '<Kicker> src/ui/svelte/components/Kicker.svelte',
-    '<Meter> src/ui/svelte/components/Meter.svelte',
-    '<StageBars> src/ui/svelte/components/StageBars.svelte',
-    '<StatBox> src/ui/svelte/components/StatBox.svelte',
-    '<WorldClockChip> src/ui/svelte/components/WorldClockChip.svelte',
-  ],
-  surfaces: [
-    '<InfoStrip> src/ui/svelte/components/InfoStrip.svelte',
-    '<Notice> src/ui/svelte/components/Notice.svelte',
-    '<Well> src/ui/svelte/components/Well.svelte',
   ],
   structures: [
     '<Avatar> src/ui/svelte/components/Avatar.svelte',

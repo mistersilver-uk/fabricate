@@ -10,6 +10,75 @@
   },
   {
     "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "notice — reports something that just happened, or is wrong right now",
+    "draws": ".k-notice",
+    "path": "src/ui/svelte/components/Notice.svelte",
+    "props": {
+      "tone": "danger",
+      "blocking": true,
+      "title": "This recipe cannot be saved",
+      "detail": "Step 2 has no ingredients, and the Critical result set routes to a tier that no longer exists.",
+      "action": {
+        "label": "Show both"
+      }
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "notice — reports something that just happened, or is wrong right now",
+    "draws": ".k-notice",
+    "path": "src/ui/svelte/components/Notice.svelte",
+    "props": {
+      "tone": "warning",
+      "title": "Unsaved changes",
+      "detail": "Depth was raised to Full market. Prices start moving on the next tick.",
+      "action": {
+        "label": "Discard"
+      }
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "notice — reports something that just happened, or is wrong right now",
+    "draws": ".k-notice",
+    "path": "src/ui/svelte/components/Notice.svelte",
+    "props": {
+      "tone": "success",
+      "title": "4 essences deleted · 2 kept, still in use",
+      "action": {
+        "label": "Undo"
+      }
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "info strip — states current values, read-only, mono numerals",
+    "draws": ".k-strip",
+    "path": "src/ui/svelte/components/InfoStrip.svelte",
+    "props": {
+      "label": "Crafting check",
+      "badge": {
+        "label": "Required",
+        "tone": "info"
+      },
+      "facts": [
+        {
+          "icon": "fas fa-star",
+          "value": "DC 15"
+        },
+        {
+          "icon": "fas fa-hammer",
+          "value": "1d20 + 3"
+        },
+        {
+          "icon": "fas fa-clock",
+          "value": "4 h"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
     "cap": "empty — says what the emptiness means",
     "draws": ".k-empty",
     "path": "src/ui/svelte/components/EmptyState.svelte",
@@ -88,6 +157,25 @@
           "style": "margin:4px 0 0;color:var(--fab-text-subtle);font-size:11.5px"
         },
         "text": "2 ingredients"
+      }
+    ]
+  },
+  {
+    "spec": "<Card> <Well> <RowDisclosure>",
+    "cap": "collapsible card, body in a well",
+    "draws": ".k-well",
+    "path": "src/ui/svelte/components/Well.svelte",
+    "note": "The card row above stands beside its drawing rather than replacing it, so the drawing, and this well inside it, stays on the page.",
+    "props": {
+      "label": "Ingredients"
+    },
+    "content": [
+      {
+        "tag": "p",
+        "attrs": {
+          "style": "margin:0;font-size:11.5px;color:var(--fab-text-secondary)"
+        },
+        "text": "Iron Ingot ×2 · Charcoal ×1"
       }
     ]
   },
