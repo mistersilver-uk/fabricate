@@ -6,7 +6,7 @@
   (item), by learning it (knowledge), by a GM access grant (Manual), or by
   discovering it through brewing — all project identically here. Non-revealed
   recipes are never named; only their count shows in the footer. The discipline
-  block (system name + Switch) sits above the heading, a name search, recipe rows
+  block (system name + Switch) sits above the heading, a name search, ListRow rows
   with a signature summary and a live-match badge, an onboarding zero-revealed
   empty state, a distinct filtered "no matches" state, and the non-revealed-count
   footer. A "Switch discipline" button appears only when more than one discipline
@@ -17,7 +17,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import Button from '../../components/Button.svelte';
   import SearchField from '../../components/SearchField.svelte';
-  import Medallion from '../../components/Medallion.svelte';
+  import ListRow from '../../components/ListRow.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -59,6 +59,12 @@
       name: recipe.result.name,
       qty: recipe.result.quantity,
     });
+  }
+
+  // The row's name, then the bench match its `aria-hidden` badge only draws.
+  function accessibleName(name, matched) {
+    if (!matched) return name;
+    return `${name}, ${localize('FABRICATE.App.Alchemy.MatchedState')}`;
   }
 </script>
 
@@ -119,41 +125,44 @@
   {:else}
     <ul class="alchemy-known-list">
       {#each recipes as recipe (recipe.id)}
-        <li>
-          <button
-            type="button"
-            class="alchemy-recipe"
-            class:is-selected={recipe.id === selectedRecipeId}
-            class:is-match={recipe.id === matchedRecipeId}
-            data-alchemy-recipe={recipe.id}
-            onclick={() => onSelect?.(recipe.id)}
+        {@const selected = recipe.id === selectedRecipeId}
+        {@const matched = recipe.id === matchedRecipeId}
+        {@const sig = sigSummary(recipe)}
+        {#snippet matchBadge()}
+          <span class="alchemy-recipe-badge" aria-hidden="true"
+            ><i class="fas fa-wand-sparkles"></i></span
           >
-            <span class="alchemy-recipe-top">
-              <Medallion
-                art={recipe.img}
-                alt=""
-                size={36}
-                glyph={14}
-                tint="peach"
-                icon="fas fa-flask"
-              />
-              <span class="alchemy-recipe-meta">
-                <span class="alchemy-recipe-name">{recipe.name}</span>
-                <span class="alchemy-recipe-sig">{sigSummary(recipe)}</span>
-              </span>
-              {#if recipe.id === matchedRecipeId}
-                <span class="alchemy-recipe-badge" aria-hidden="true"
-                  ><i class="fas fa-wand-sparkles"></i></span
-                >
-              {/if}
-            </span>
-            {#if recipe.result}
-              <span class="alchemy-recipe-result">
-                <i class="fas fa-arrow-right-long" aria-hidden="true"></i>
-                {resultLabel(recipe)}
-              </span>
-            {/if}
-          </button>
+        {/snippet}
+        {#snippet signature()}
+          <span class="alchemy-recipe-sig" title={sig}>{sig}</span>
+        {/snippet}
+        {#snippet result()}
+          <span class="alchemy-recipe-result">
+            <i class="fas fa-arrow-right-long" aria-hidden="true"></i>
+            {resultLabel(recipe)}
+          </span>
+        {/snippet}
+        <li>
+          <ListRow
+            name={recipe.name}
+            art={recipe.img}
+            icon="fas fa-flask"
+            tint="peach"
+            markSize={38}
+            density="default"
+            truncateName
+            nameClass="alchemy-recipe-name"
+            {selected}
+            onOpen={() => onSelect?.(recipe.id)}
+            openProps={{
+              class: ['alchemy-recipe', { 'is-selected': selected, 'is-match': matched }],
+              'data-alchemy-recipe': recipe.id,
+              'aria-label': accessibleName(recipe.name, matched),
+            }}
+            badges={matched ? matchBadge : undefined}
+            meta={sig ? signature : undefined}
+            children={recipe.result ? result : undefined}
+          />
         </li>
       {/each}
     </ul>
@@ -256,88 +265,32 @@
     flex: 1 1 auto;
   }
 
-  .alchemy-recipe {
-    box-sizing: border-box;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 9px;
-    min-height: 56px;
-    padding: 12px 13px;
-    border-radius: 11px;
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface);
-    color: var(--fab-text);
-    cursor: pointer;
-    text-align: left;
-    /* Reset Foundry's global <button> styling (fixed height + line-height) so the
-       card lays out like a plain auto-height flex column; otherwise the fixed
-       height crops the box and the result row spills below the border. */
-    appearance: none;
-    -webkit-appearance: none;
-    margin: 0;
-    font: inherit;
-    line-height: normal;
-    height: auto;
-    overflow: visible;
-  }
-
-  .alchemy-recipe.is-selected,
-  .alchemy-recipe.is-match {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-surface-active);
-  }
-
-  .alchemy-recipe:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .alchemy-recipe-top {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .alchemy-recipe-meta {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .alchemy-recipe-name {
-    font-family: var(--font-primary);
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
+  /* The row, its button, its selected edge and its ring are ListRow's (issue 1778). */
   .alchemy-recipe-sig {
+    min-width: 0;
     font-size: 10px;
     color: var(--fab-text-subtle);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-top: 1px;
   }
 
+  /* The bench match, in the positive status tone (the accent edge means selected only, D7). It
+     keeps to the name's line: its space-1 overhang above and below adds no height. */
   .alchemy-recipe-badge {
+    box-sizing: border-box;
     width: 22px;
     height: 22px;
     flex: 0 0 auto;
+    margin-block: calc(-1 * var(--fab-space-1));
     border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--fab-accent-soft);
-    border: 1px solid var(--fab-accent-border);
-    color: var(--fab-accent);
-    font-size: 8px;
+    background: var(--fab-success-soft);
+    border: 1px solid var(--fab-success-border);
+    color: var(--fab-success-text);
+    font-size: 11px;
   }
 
   .alchemy-recipe-result {

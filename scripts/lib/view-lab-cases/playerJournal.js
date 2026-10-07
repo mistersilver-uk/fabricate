@@ -68,6 +68,19 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
   }),
   playerCase({
+    id: 'player-alchemy-known-recipe',
+    label: 'Player app — Alchemy known recipe selected',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // The alchemy journal state grants the player one recipe, so Known recipes draws a row; choosing
+    // it presses the row and loads the bench, which the bench then matches (issue 1778).
+    query: { tab: 'alchemy', journalCaseState: 'alchemy' },
+    steps: [{ selector: '[data-alchemy-recipe="al-r-fire"]' }],
+    expectSelector: '[data-alchemy-recipe="al-r-fire"].is-selected.is-match',
+    kinds: ['player', 'alchemy'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+  }),
+  playerCase({
     id: 'player-alchemy-stacked',
     label: 'Player app — Alchemy stacked',
     smokeLabels: ['player-alchemy-stacked'],

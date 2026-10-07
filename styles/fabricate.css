@@ -4461,8 +4461,9 @@
   border-radius: 11px;
 }
 
+/* One column, so one flex line: a wrapping column would size its line to the widest child and stretch the button past the card. */
 .fabricate-list-row.is-card {
-  flex-direction: column;
+  flex-flow: column nowrap;
   align-items: stretch;
   gap: var(--fab-space-2);
   padding: var(--fab-space-3);
@@ -4496,6 +4497,11 @@
   flex: 0 0 auto;
   flex-direction: column;
   align-items: flex-start;
+}
+
+/* A card's body takes the card's width: sized to its content, an unbroken name would widen it past the card rather than truncate. */
+.fabricate-list-row.is-card > .fabricate-list-row-open > .fabricate-list-row-body {
+  align-self: stretch;
 }
 
 .fabricate-list-row > .fabricate-list-row-open:enabled {

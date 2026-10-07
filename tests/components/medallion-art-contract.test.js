@@ -25,11 +25,12 @@ const ART_RESOLVER = 'resolveCraftingArt(';
 // shared YieldScale's rows; the held-stack picker's tile -1, its stacks now the shared
 // ChoiceOptionList's one site. Issue 1778: ListRow's mark +3, one literal tag per art rung (22,
 // 26, 30, 38); RunCard's tile -1, now that row's 30px mark; the ingredient routes' product tile -1,
-// now the dense row's 22px mark.
-const MEDALLION_SITES = 73;
+// now the dense row's 22px mark; the alchemy known-recipe and discipline card tiles -2, now that
+// row's 38px mark.
+const MEDALLION_SITES = 71;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 56;
+const ART_BEARING_SITES = 54;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>
