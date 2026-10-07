@@ -21,6 +21,7 @@ import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
+import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
 import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -28,6 +29,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 let tempRoot;
 let GatheringView;
 let GatheringTaskRow;
+let GatheringEventRow;
 let GatheringTaskDetail;
 let mounted;
 let target;
@@ -177,13 +179,38 @@ async function settle() {
 
 // Mount the task ROW / task DETAIL components directly (issue 301 exhausted-node
 // assertions), reusing this suite's compiled-component harness.
-async function renderRow(props = {}) {
+async function renderRow(props = {}, component = GatheringTaskRow) {
   target = document.createElement('div');
   document.body.appendChild(target);
-  mounted = mount(GatheringTaskRow, { target, props });
+  mounted = mount(component, { target, props });
   flushSync();
   await tick();
   flushSync();
+}
+
+/** The elements a list-row control's `aria-describedby` names, in order. */
+function describedBy(control) {
+  return control
+    .getAttribute('aria-describedby')
+    .split(' ')
+    .map((id) => globalThis.document.querySelector(`[id="${id}"]`));
+}
+
+/** The caption an aside's chance draws left of its track: the text and what follows it. */
+function chanceCaption(aside) {
+  const caption = aside.querySelector(':scope > div > [aria-hidden="true"]:first-child');
+  return {
+    text: caption?.textContent,
+    nextRole: caption?.nextElementSibling?.getAttribute('role'),
+    inMeter: Boolean(aside.querySelector('[role="meter"] .fab-kicker')),
+  };
+}
+
+/** The block content inside a list-row control, which a native button may not hold. */
+function nonPhrasingIn(control) {
+  return [...control.querySelectorAll(NON_PHRASING_CONTENT)].map((node) =>
+    node.tagName.toLowerCase()
+  );
 }
 
 async function renderDetail(props = {}) {
@@ -422,6 +449,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     GatheringTaskRow = (
       await import(
         pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/gathering/GatheringTaskRow.svelte.js'))
+      )
+    ).default;
+    GatheringEventRow = (
+      await import(
+        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/gathering/GatheringEventRow.svelte.js'))
       )
     ).default;
     GatheringTaskDetail = (
@@ -1928,9 +1960,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       6,
       'events paginate at the default page size'
     );
-    // Event rows are now selectable (interactive summary).
-    assert.ok(
-      section.querySelector('.gathering-event-row [role="button"]'),
+    // Event rows are selectable: each is a list row whose summary is its one button.
+    assert.equal(
+      section.querySelectorAll(':scope .gathering-event-row > button.gathering-event-summary')
+        .length,
+      6,
       'event rows are selectable'
     );
 
@@ -1999,9 +2033,16 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       'weather chip uses the localized label key'
     );
 
+    const selectedOf = () =>
+      ['haz-1', 'haz-2'].map((id) =>
+        target.querySelector(`[data-event-id="${id}"]`).getAttribute('data-selected')
+      );
+    assert.deepEqual(selectedOf(), ['true', 'false'], 'the first event row is the selected one');
+
     // Selecting the second event updates the inspector + its matching fields.
     target.querySelector('[data-event-id="haz-2"] .gathering-event-summary').click();
     flushSync();
+    assert.deepEqual(selectedOf(), ['false', 'true'], 'the selection moves to the clicked row');
     const updated = target.querySelector(
       '[data-gathering-task-detail-column] [data-gathering-event-detail]'
     );
@@ -2049,6 +2090,145 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       target.querySelector('[data-gathering-events-hidden]'),
       'a "events hidden" hint is shown instead'
     );
+  });
+
+  // Issue 1778: the task row is the selectable list row, its chance in the aside beside its button.
+  it('draws a task as one list-row button, named by its name and chance, its chance beside it', async () => {
+    const picked = [];
+    const task = taskModel({ rich: { nodes: { current: 2, max: 3 }, stamina: { cost: 1 } } });
+    await renderRow({
+      task,
+      selected: true,
+      onSelect: (id) => {
+        picked.push(id);
+      },
+    });
+
+    const row = target.querySelector('[data-task-id="task-1"]');
+    assert.ok(
+      row.matches('.gathering-task-row.is-selected[role="listitem"][data-list-row="default"]'),
+      'the listitem is the row and keeps its hooks'
+    );
+    const control = row.querySelector(':scope > .gathering-task-summary');
+    assert.equal(control.tagName, 'BUTTON', 'its summary is a native button');
+    assert.equal(
+      row.querySelectorAll('button, [role="button"], [tabindex]').length,
+      1,
+      'and its one control'
+    );
+    assert.equal(control.getAttribute('data-keyboard-focus'), 'true');
+    assert.equal(control.getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(nonPhrasingIn(control), [], 'the button holds phrasing content only');
+    assert.deepEqual(control.getAttribute('aria-label').split(', '), [
+      'Gather Iron',
+      'FABRICATE.App.Gathering.Detail.SuccessChance:{"x":50}',
+    ]);
+    const [economy, copy, chance] = describedBy(control);
+    assert.ok(economy.querySelector('[data-gathering-node-count]'), 'described by its economy');
+    assert.ok(copy.querySelector('[data-gathering-task-description]'), 'its description');
+    assert.ok(
+      chance.querySelector(':scope [data-gathering-success] [role="meter"]'),
+      'and its chance'
+    );
+    assert.ok(row.contains(chance) && !control.contains(chance), 'which sits beside the button');
+    assert.deepEqual(
+      chanceCaption(chance),
+      {
+        text: 'FABRICATE.App.Gathering.Detail.SuccessChanceLabel',
+        nextRole: 'meter',
+        inMeter: false,
+      },
+      'captioned left of its track, once'
+    );
+
+    control.click();
+    assert.deepEqual(picked, ['task-1'], 'the button selects the task');
+  });
+
+  it('keeps a blocked task an enabled control whose name says it is blocked', async () => {
+    const picked = [];
+    const task = taskModel({
+      id: 'task-blocked',
+      attemptable: false,
+      successChance: null,
+      blockedReasons: [{ code: 'TOOL_BLOCKED', message: 'Missing tools', data: {} }],
+    });
+    await renderRow({
+      task,
+      onSelect: (id) => {
+        picked.push(id);
+      },
+    });
+
+    const control = target.querySelector(
+      ':scope [data-task-id="task-blocked"] > .gathering-task-summary'
+    );
+    assert.equal(control.disabled, false, 'it opens the inspector that explains the block');
+    assert.equal(control.getAttribute('aria-pressed'), 'false');
+    assert.ok(
+      control.querySelector(':scope .fabricate-list-row-badges [data-gathering-callouts]'),
+      'the callouts are badges after the name'
+    );
+    assert.deepEqual(control.getAttribute('aria-label').split(', '), [
+      'Gather Iron',
+      'FABRICATE.App.Gathering.Detail.Callout.MissingTools',
+      'FABRICATE.App.Gathering.Detail.Blocked',
+    ]);
+    control.click();
+    assert.deepEqual(picked, ['task-blocked']);
+  });
+
+  it('draws an event as one list-row button, named by its danger and chance', async () => {
+    const picked = [];
+    const event = {
+      id: 'haz-1',
+      name: 'Rockslide',
+      description: '',
+      img: 'icons/svg/hazard.svg',
+      risk: 'deadly',
+      chance: 0.3,
+    };
+    await renderRow(
+      {
+        event,
+        onSelect: (id) => {
+          picked.push(id);
+        },
+      },
+      GatheringEventRow
+    );
+
+    const row = target.querySelector('[data-event-id="haz-1"]');
+    assert.ok(row.matches('.gathering-event-row[role="listitem"][data-list-row="default"]'));
+    const control = row.querySelector(':scope > .gathering-event-summary');
+    assert.equal(control.tagName, 'BUTTON');
+    assert.equal(row.querySelectorAll('button, [role="button"], [tabindex]').length, 1);
+    assert.equal(control.getAttribute('aria-pressed'), 'false');
+    assert.equal(row.getAttribute('data-selected'), 'false');
+    assert.deepEqual(nonPhrasingIn(control), [], 'the button holds phrasing content only');
+    assert.ok(
+      control.querySelector(':scope .fabricate-list-row-badges .gathering-event-danger.risk-deadly')
+    );
+    assert.deepEqual(control.getAttribute('aria-label').split(', '), [
+      'Rockslide',
+      'FABRICATE.App.Gathering.Detail.Pips.Danger:{"value":"FABRICATE.App.Gathering.Detail.Risk.deadly"}',
+      'FABRICATE.App.Gathering.Detail.EventChance:{"x":30}',
+    ]);
+    const [copy, chance] = describedBy(control);
+    assert.ok(copy.querySelector('[data-gathering-event-description].is-fallback'));
+    assert.ok(chance.querySelector(':scope [data-gathering-event-chance] [role="meter"]'));
+    assert.ok(!control.contains(chance), 'the chance sits beside the button');
+    assert.deepEqual(
+      chanceCaption(chance),
+      {
+        text: 'FABRICATE.App.Gathering.Detail.EventChanceLabel',
+        nextRole: 'meter',
+        inMeter: false,
+      },
+      'captioned as the task’s chance is, so its qualifier is visible'
+    );
+    control.click();
+    assert.deepEqual(picked, ['haz-1']);
   });
 
   // issue 301: permanently-exhausted (nonRegenerating) node state.

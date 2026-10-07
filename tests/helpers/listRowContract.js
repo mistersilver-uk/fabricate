@@ -3,6 +3,18 @@
 /** Each site converted to the selectable form so far, and the View Lab frame that draws it. */
 export const LIST_ROW_ADOPTERS = Object.freeze([
   Object.freeze({ file: 'src/ui/svelte/apps/journal/RunCard.svelte', frame: 'fabricate-journal' }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
+    frame: 'player-gathering-environments',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/gathering/GatheringTaskRow.svelte',
+    frame: 'player-gathering-task-ready',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/gathering/GatheringEventRow.svelte',
+    frame: 'player-gathering-events',
+  }),
 ]);
 
 /** Content a native button may not hold: flow and grouping elements, and widget roles. */

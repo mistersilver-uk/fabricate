@@ -194,9 +194,9 @@ describe('design system: a programmatic focus target declares itself focused to 
     const { roleZero } = focusPopulations();
 
     assert.ok(
-      roleZero.length >= 9,
+      roleZero.length >= 8,
       `only ${roleZero.length} elements carry both a static \`tabindex="0"\` and an interactive ` +
-        'role, against the 10 this tree holds. An absence check over an empty population passes ' +
+        'role, against the 8 this tree holds. An absence check over an empty population passes ' +
         'forever.'
     );
 
@@ -221,7 +221,7 @@ describe('design system: a programmatic focus target declares itself focused to 
     // 173 once the manager rail's hand-authored rows became loops over `managerNavItems.js`.
     assert.ok(
       formlessButtons.length >= 160,
-      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 168 ` +
+      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 164 ` +
         'this tree holds'
     );
     assert.ok(
