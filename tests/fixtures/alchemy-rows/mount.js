@@ -19,13 +19,14 @@ const record = (key) => (value) => {
 };
 
 const recipe = (id, name) => ({ id, name, img: '', result: null, signatureSummary: [] });
-const component = (componentId, name, available) => ({
+const essence = (id, quantity) => ({ id, name: id, icon: 'fas fa-fire', quantity });
+const component = (componentId, name, available, essences = []) => ({
   componentId,
   name,
   img: '',
   available,
-  held: 2,
-  essences: [],
+  held: 12,
+  essences,
   disabled: available <= 0,
 });
 
@@ -38,6 +39,8 @@ const cases = ['known', 'inventory', 'chooser'].map((name) => {
   root.append(host);
   return host;
 });
+// The component column at the player window's width for it: 280px, so each row is 254px.
+cases[1].style.width = '280px';
 document.body.append(root);
 
 mount(KnownRecipesColumn, {
@@ -52,9 +55,15 @@ mount(ComponentInventoryColumn, {
   target: cases[1],
   props: {
     components: [
-      component('emberroot', 'Emberroot', 2),
+      component(
+        'emberroot',
+        'Emberroot',
+        12,
+        ['fire', 'water', 'earth', 'air'].map((id) => essence(id, 12))
+      ),
       component('ashbloom', 'Ashbloom', 0),
-      component('nettle', 'Nettle', 1),
+      component('nettle', 'Nettle', 1, [essence('fire', 2)]),
+      component('longroot', 'Supercalifragilistic Root of Everlasting Vitality', 3),
     ],
     hasComponents: true,
     onAdd: record('added'),

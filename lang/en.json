@@ -1820,6 +1820,7 @@
         "AddComponent": "Add {name} to the bench",
         "Available": "{available} of {held} available",
         "Makes": "Makes {name} ×{qty}",
+        "MatchedState": "ready to brew",
         "KnownRecipes": "Known recipes",
         "SwitchDiscipline": "Switch discipline",
         "SearchKnown": "Search known recipes…",

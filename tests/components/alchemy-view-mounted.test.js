@@ -211,7 +211,14 @@ describe('AlchemyView mounted behavior', () => {
         fakeAlchemyStore({
           needsChooser: true,
           systems: [
-            { id: 'sys-a', name: 'Herbalism', knownCount: 1, totalCount: 4, description: 'Roots.' },
+            {
+              id: 'sys-a',
+              name: 'Herbalism',
+              img: 'icons/herbalism.webp',
+              knownCount: 1,
+              totalCount: 4,
+              description: 'Roots.',
+            },
             { id: 'sys-b', name: 'Poisoncraft', knownCount: 0, totalCount: 2 },
           ],
           chooseSystem: (id) => {
@@ -244,23 +251,32 @@ describe('AlchemyView mounted behavior', () => {
       'each card is one named action button holding phrasing content, pressed by nothing'
     );
     const herbalism = cards[0].querySelector(':scope > button');
+    const mark = herbalism.querySelector(':scope > .fab-medallion');
     assert.match(
-      herbalism.querySelector(':scope > .fab-medallion')?.getAttribute('style') ?? '',
+      mark?.getAttribute('style') ?? '',
       /width:\s*38px/u,
       "the card leads with the art ladder's 38px mark"
     );
+    assert.equal(
+      mark.querySelector('img')?.getAttribute('src'),
+      'icons/herbalism.webp',
+      "the discipline's art fills the mark"
+    );
+    const enter = herbalism.querySelector('.alchemy-chooser-card-enter');
+    assert.equal(enter.getAttribute('aria-hidden'), 'true', 'the enter cue is drawn only');
+    /** The text a reader announces: the node's text less its `aria-hidden` subtrees. */
+    const spoken = (node) => {
+      const copy = node.cloneNode(true);
+      for (const hidden of copy.querySelectorAll('[aria-hidden="true"]')) hidden.remove();
+      return copy.textContent.replaceAll(/\s+/gu, ' ').trim();
+    };
     const described = (herbalism.getAttribute('aria-describedby') ?? '')
       .split(/\s+/u)
-      .map((id) =>
-        target.querySelector(`[id="${id}"]`)?.textContent.replaceAll(/\s+/gu, ' ').trim()
-      );
+      .map((id) => spoken(target.querySelector(`[id="${id}"]`)));
     assert.deepEqual(
       described,
-      [
-        'FABRICATE.App.Alchemy.SystemSummary:{"known":1,"total":4}',
-        'Roots. FABRICATE.App.Alchemy.EnterDiscipline',
-      ],
-      'its count, then its blurb and its enter cue, describe it'
+      ['FABRICATE.App.Alchemy.SystemSummary:{"known":1,"total":4}', 'Roots.'],
+      'its count, then its blurb, describe it; the enter cue repeats what a press does'
     );
     cards[1].querySelector(':scope > button').click();
     assert.deepEqual(chosen, ['sys-b'], 'choosing a card enters that discipline');

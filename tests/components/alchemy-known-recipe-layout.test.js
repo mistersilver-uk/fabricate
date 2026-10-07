@@ -3,7 +3,9 @@
  * sheet and the Medallion's own styles, under Foundry's fixed button height: a known recipe's name
  * renders whole beside a long signature and clips from the right when it is itself too long, every
  * row and card grows its button to hold its content, and a disabled component row drops its grab.
- * A live mount (`tests/fixtures/alchemy-rows/`) presses real keys on the rows.
+ * The ring, the truncation, the match badge's tone, the drag handle's contrast and the card's
+ * surface are read off the same page. A live mount (`tests/fixtures/alchemy-rows/`), with the real
+ * strings, presses real keys on the rows and measures the component rows' one line of essences.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -61,6 +63,9 @@ const WORKBENCH = {
   ],
   knownCount: 4,
   selectedRecipeId: 'tonic',
+  // The bench matches the selected Ember Tonic, so its row is both pressed and matched.
+  mode: 'ready',
+  target: { id: 'tonic', name: 'Ember Tonic' },
   components: [
     {
       componentId: 'emberroot',
@@ -72,6 +77,15 @@ const WORKBENCH = {
       disabled: false,
     },
     { componentId: 'ashbloom', name: 'Ashbloom', img: null, available: 0, held: 1, disabled: true },
+    {
+      componentId: 'longroot',
+      name: 'Supercalifragilistic Root of Everlasting Vitality',
+      img: null,
+      available: 1,
+      held: 1,
+      essences: [essence('fire', 1)],
+      disabled: false,
+    },
   ],
   hasOwnedComponents: true,
 };
@@ -86,8 +100,25 @@ const CHOOSER = {
       description: 'Roots, leaves and the patience to steep them: a discipline of slow tonics.',
     },
     { id: 'sys-b', name: 'Poisoncraft', knownCount: 0, totalCount: 2 },
+    {
+      id: 'sys-long',
+      name: 'The Supercalifragilistic Discipline of Everlasting Distillation and Alembic Transmutation',
+      knownCount: 0,
+      totalCount: 1,
+    },
   ],
 };
+
+/** Every alchemy theme the player can pick, each checked for the drag handle's contrast. */
+const THEMES = [
+  'fabricate',
+  'mythwright',
+  'ironblood-forge',
+  'hearth-herb',
+  'starglass-arcana',
+  'foundry-native',
+  'sovereign',
+];
 
 /** Core first, with Foundry's fixed button height in its own layer; the module sheet in `layer(modules)`. */
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
@@ -232,13 +263,17 @@ describe('Alchemy rows, rendered (issues 675, 1778)', () => {
         await tab.evaluate((focused) => {
           const control = document.querySelector(`[data-case="workbench"] ${focused}`);
           const list = control.closest('ul');
-          const row = control.parentElement.getBoundingClientRect();
           const clip = list.getBoundingClientRect();
           const left = clip.left + list.clientLeft;
+          const inside = ({ left: from, right: to }) =>
+            from >= left - 0.01 && to <= left + list.clientWidth + 0.01;
+          const ring = getComputedStyle(control, '::after');
           return {
             focusVisible: control.matches(':focus-visible'),
-            ring: getComputedStyle(control, '::after').outlineStyle,
-            inside: row.left >= left - 0.01 && row.right <= left + list.clientWidth + 0.01,
+            ring: [ring.outlineStyle, ring.outlineOffset],
+            row: inside(control.parentElement.getBoundingClientRect()),
+            control: inside(control.getBoundingClientRect()),
+            padding: getComputedStyle(list).paddingLeft,
           };
         }, selector)
       );
@@ -246,10 +281,128 @@ describe('Alchemy rows, rendered (issues 675, 1778)', () => {
     assert.deepEqual(
       rows,
       [
-        { focusVisible: true, ring: 'solid', inside: true },
-        { focusVisible: true, ring: 'solid', inside: true },
+        { focusVisible: true, ring: ['solid', '-2px'], row: true, control: true, padding: '4px' },
+        { focusVisible: true, ring: ['solid', '-2px'], row: true, control: true, padding: '12px' },
       ],
-      "each focused row rings, and the list's sideways clip leaves the row whole"
+      "each focused row rings inside its own edge, and the list's sideways clip leaves the row whole"
+    );
+  });
+
+  it('truncates a long component name and a long discipline name with an ellipsis', async () => {
+    const names = await tab.evaluate(() =>
+      [
+        '[data-alchemy-inventory-row="longroot"] .alchemy-inventory-name',
+        '[data-alchemy-chooser-card="sys-long"] .alchemy-chooser-card-name',
+      ].map((selector) => {
+        const name = document.querySelector(selector);
+        const { textOverflow, whiteSpace } = getComputedStyle(name);
+        return [name.scrollWidth > name.clientWidth, textOverflow, whiteSpace];
+      })
+    );
+    assert.deepEqual(names, [
+      [true, 'ellipsis', 'nowrap'],
+      [true, 'ellipsis', 'nowrap'],
+    ]);
+  });
+
+  it("draws the bench match in the positive status tone, on the name's line", async () => {
+    const badge = await tab.evaluate(() => {
+      const control = document.querySelector(
+        '[data-case="workbench"] [data-alchemy-recipe="tonic"]'
+      );
+      const mark = control.querySelector('.alchemy-recipe-badge');
+      const style = getComputedStyle(mark);
+      const token = (name) => {
+        const probe = document.createElement('span');
+        probe.style.color = `var(${name})`;
+        mark.parentElement.append(probe);
+        const { color } = getComputedStyle(probe);
+        probe.remove();
+        return color;
+      };
+      return {
+        tone: [style.color, style.backgroundColor, style.borderTopColor],
+        expected: ['--fab-success-text', '--fab-success-soft', '--fab-success-border'].map(token),
+        nameLine:
+          control.querySelector('.fabricate-list-row-head').getBoundingClientRect().height ===
+          control.querySelector('.alchemy-recipe-name').getBoundingClientRect().height,
+      };
+    });
+    assert.deepEqual(badge.tone, badge.expected, 'the badge is not the positive status tone');
+    assert.ok(badge.nameLine, "the badge grows the matched row's name line");
+  });
+
+  it('draws the drag handle at the 3:1 affordance minimum on the row in every theme', async () => {
+    const contrasts = await tab.evaluate((themes) => {
+      const host = document.querySelector('.fabricate[data-fabricate-theme]');
+      const grip = document.querySelector(
+        '[data-case="workbench"] [data-alchemy-inventory-row="emberroot"] .alchemy-inventory-grip'
+      );
+      const row = grip.closest('.fabricate-list-row');
+      const rgba = (value) => {
+        const [r, g, b, a = 1] = value.match(/[\d.]+/gu).map(Number);
+        return { r, g, b, a };
+      };
+      const lum = ({ r, g, b }) =>
+        [r, g, b]
+          .map((v) => v / 255)
+          .map((s) => (s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4))
+          .reduce((sum, s, i) => sum + s * [0.2126, 0.7152, 0.0722][i], 0);
+      const original = host.dataset.fabricateTheme;
+      const out = {};
+      for (const theme of themes) {
+        host.dataset.fabricateTheme = theme;
+        const bg = rgba(getComputedStyle(row).backgroundColor);
+        const fg = rgba(getComputedStyle(grip).color);
+        const ink = { r: 0, g: 0, b: 0 };
+        for (const key of ['r', 'g', 'b']) ink[key] = fg[key] * fg.a + bg[key] * (1 - fg.a);
+        const [hi, lo] = [lum(ink), lum(bg)].sort((x, y) => y - x);
+        out[theme] = { opaque: bg.a === 1, ratio: (hi + 0.05) / (lo + 0.05) };
+      }
+      host.dataset.fabricateTheme = original;
+      return out;
+    }, THEMES);
+    for (const [theme, { opaque, ratio }] of Object.entries(contrasts)) {
+      assert.ok(
+        opaque,
+        `${theme}: the row's fill is translucent, so the ratio below is not its own`
+      );
+      assert.ok(ratio >= 3, `${theme}: the drag handle is ${ratio.toFixed(2)}:1 on its row`);
+    }
+  });
+
+  it('fills each discipline card with the list-row card surface, lit on hover and ringed on focus', async () => {
+    const selector = '[data-case="chooser"] [data-alchemy-chooser-card="sys-b"]';
+    const read = () =>
+      tab.evaluate((cardSelector) => {
+        const control = document.querySelector(cardSelector);
+        const card = control.parentElement;
+        const probe = document.createElement('span');
+        probe.style.backgroundColor = 'var(--fab-bg-2)';
+        card.append(probe);
+        const surface = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return {
+          fill: getComputedStyle(card).backgroundColor,
+          surface,
+          ring: getComputedStyle(control, '::after').outlineStyle,
+          focusVisible: control.matches(':focus-visible'),
+        };
+      }, selector);
+    await tab.mouse.move(0, 0);
+    const rest = await read();
+    assert.equal(rest.fill, rest.surface, "the card's fill is not the list-row card surface");
+    await tab.hover(selector);
+    const hovered = await read();
+    assert.notEqual(hovered.fill, rest.fill, 'hovering the card changes nothing');
+    await tab.mouse.move(0, 0);
+    await tab.keyboard.press('Tab');
+    await tab.focus(selector);
+    const focused = await read();
+    assert.deepEqual(
+      [focused.focusVisible, focused.ring],
+      [true, 'solid'],
+      'the focused card has no ring'
     );
   });
 
@@ -311,6 +464,59 @@ describe('Alchemy rows, live under real keys (issue 1778)', () => {
     assert.equal(await focused(), 'nettle', 'the unavailable Ashbloom takes no Tab stop');
     await live.keyboard.press('Enter');
     assert.equal((await recorded()).added, 'emberroot nettle');
+  });
+
+  it('holds every component row to one height, its essences on the availability line', async () => {
+    const rows = await live.evaluate(() =>
+      [...document.querySelectorAll('[data-case="inventory"] [data-alchemy-inventory-row]')].map(
+        (control) => {
+          const box = (node) => node.getBoundingClientRect();
+          const middle = (node) => box(node).top + box(node).height / 2;
+          const avail = control.querySelector('.alchemy-inventory-avail');
+          const strip = control.querySelector('.alchemy-inventory-essences');
+          const chips = [...control.querySelectorAll('.alchemy-essence-chip')];
+          const row = box(control.parentElement);
+          return {
+            id: control.dataset.alchemyInventoryRow,
+            chips: chips.map((chip) => chip.textContent.trim()),
+            height: row.height,
+            addFromRight: row.right - box(control.querySelector('.alchemy-inventory-add')).right,
+            nameLine:
+              box(control.querySelector('.fabricate-list-row-head')).height ===
+              box(control.querySelector('.alchemy-inventory-name')).height,
+            onLine: chips.every((chip) => Math.abs(middle(chip) - middle(avail)) < 1),
+            whole: strip ? strip.scrollWidth <= strip.clientWidth : true,
+          };
+        }
+      )
+    );
+    assert.deepEqual(
+      rows.map(({ id, chips }) => [id, chips]),
+      [
+        ['emberroot', ['×12', '+3']],
+        ['ashbloom', []],
+        ['nettle', ['×2']],
+        ['longroot', []],
+      ],
+      'four essences draw as their first chip and a "+3"'
+    );
+    for (const { id, nameLine, onLine, whole } of rows) {
+      assert.deepEqual(
+        { nameLine, onLine, whole },
+        { nameLine: true, onLine: true, whole: true },
+        `${id}: the add glyph grows the name line, or the essences leave the availability line`
+      );
+    }
+    assert.deepEqual(
+      [...new Set(rows.map(({ height }) => height))],
+      [rows[0].height],
+      'the rows differ in height'
+    );
+    assert.deepEqual(
+      [...new Set(rows.map(({ addFromRight }) => addFromRight))],
+      [rows[0].addFromRight],
+      'the add glyphs sit at different offsets from their rows’ right edges'
+    );
   });
 
   it('enters a discipline with Enter', async () => {

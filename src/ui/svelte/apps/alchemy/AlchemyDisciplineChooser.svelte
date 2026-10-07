@@ -53,7 +53,8 @@
           {#if system.description}
             <span class="alchemy-chooser-card-blurb">{system.description}</span>
           {/if}
-          <span class="alchemy-chooser-card-enter">
+          <!-- The visible cue to what activating does; the button's role already says it. -->
+          <span class="alchemy-chooser-card-enter" aria-hidden="true">
             {localize('FABRICATE.App.Alchemy.EnterDiscipline')}
             <i class="fas fa-arrow-right-long" aria-hidden="true"></i>
           </span>

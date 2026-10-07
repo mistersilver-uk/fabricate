@@ -130,7 +130,7 @@ describe('ComponentInventoryColumn (mounted)', () => {
 
   it('draws each component as one list-row action button, with no pressed state', async () => {
     const target = await harness.mount({
-      components: [inventoryRow('emberroot', 'Emberroot', { essences: ESSENCES })],
+      components: [inventoryRow('emberroot', 'Emberroot', { available: 1, held: 3, essences: ESSENCES })],
       hasComponents: true,
     });
     const [{ row, buttons, control }] = listRows(target, 'alchemy-inventory-list');
@@ -148,14 +148,50 @@ describe('ComponentInventoryColumn (mounted)', () => {
       ['alchemy-inventory-grip', 'fab-medallion'],
       'the grip, then the mark, lead the row'
     );
-    assert.ok(
-      Boolean(control.querySelector(':scope .fabricate-list-row-badges > .alchemy-inventory-add')),
-      'the add glyph stays inside the button'
+    const add = control.querySelector(':scope .fabricate-list-row-badges > .alchemy-inventory-add');
+    assert.ok(Boolean(add), 'the add glyph stays inside the button');
+    assert.deepEqual(
+      [leading.children[0].getAttribute('aria-hidden'), add.getAttribute('aria-hidden')],
+      ['true', 'true'],
+      'the grip and the add glyph are drawn only: the name already says what a press does'
     );
     assert.equal(control.querySelector(':scope .alchemy-inventory-name').textContent, 'Emberroot');
-    const [meta] = describedText(control);
-    assert.match(meta, /Available[\s\S]*×2/u, 'the availability and the essences describe it');
+    assert.deepEqual(
+      describedText(control).map((text) => text.replaceAll(/\s+/gu, ' ')),
+      ['FABRICATE.App.Alchemy.Available:{"available":1,"held":3} ×2'],
+      'the availability, with its own counts, and the essences describe it'
+    );
     assert.ok(!row.classList.contains('is-danger'));
+  });
+
+  it('keeps the essences to the availability line: one chip, then a "+N" naming the rest', async () => {
+    const essences = [
+      { id: 'fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 },
+      { id: 'water', name: 'Water', icon: 'fas fa-droplet', quantity: 1 },
+      { id: 'air', name: 'Air', icon: 'fas fa-wind', quantity: 3 },
+    ];
+    const target = await harness.mount({
+      components: [
+        inventoryRow('emberroot', 'Emberroot', { essences }),
+        inventoryRow('ashbloom', 'Ashbloom', { essences: essences.slice(0, 1) }),
+      ],
+      hasComponents: true,
+    });
+    const strips = listRows(target, 'alchemy-inventory-list').map(({ control }) => {
+      const strip = control.querySelector(':scope .alchemy-inventory-essences > [data-alchemy-essences]');
+      const more = strip.querySelector(':scope > [data-alchemy-essence-more]');
+      return {
+        capped: strip.classList.contains('is-capped'),
+        chips: [...strip.querySelectorAll(':scope > [data-alchemy-essence]')].map((chip) =>
+          chip.getAttribute('data-alchemy-essence')
+        ),
+        more: more && [more.textContent, more.getAttribute('title'), more.getAttribute('aria-label')],
+      };
+    });
+    assert.deepEqual(strips, [
+      { capped: true, chips: ['fire'], more: ['+2', 'Water ×1, Air ×3', 'Water ×1, Air ×3'] },
+      { capped: true, chips: ['fire'], more: null },
+    ]);
   });
 
   it('a disabled row neither drags nor adds', async () => {
@@ -318,6 +354,12 @@ describe('KnownRecipesColumn (mounted)', () => {
       ],
       'one named button per recipe, pressed while it is the selected one'
     );
+    const vigor = rows[0].control;
+    assert.deepEqual(
+      [Boolean(vigor.querySelector(':scope .alchemy-recipe-result')), describedText(vigor)],
+      [false, []],
+      'a recipe with no result and no signature draws no result line and is described by nothing'
+    );
     const control = rows[1].control;
     assert.deepEqual(nonPhrasingIn(control), [], 'the button holds phrasing content only');
     assert.equal(control.querySelector(':scope .alchemy-recipe-name').textContent, 'Blade Venom');
@@ -341,14 +383,61 @@ describe('KnownRecipesColumn (mounted)', () => {
     assert.equal(vigor.getAttribute('aria-label'), 'Elixir of Vigor');
     assert.equal(
       venom.getAttribute('aria-label'),
-      'Blade Venom, FABRICATE.App.Alchemy.Status.Ready:{"name":"Blade Venom"}',
-      'the name, then the status sentence the bench match reads'
+      'Blade Venom, FABRICATE.App.Alchemy.MatchedState',
+      'the name, then the state the bench match puts it in'
     );
     assert.ok(venom.classList.contains('is-match'), 'the control keeps its match hook');
     assert.equal(venom.getAttribute('aria-pressed'), 'false', 'a match is not a selection');
-    assert.ok(
-      Boolean(venom.querySelector(':scope .fabricate-list-row-badges > .alchemy-recipe-badge')),
-      'the badge sits after the name, inside the button'
+    const badge = venom.querySelector(':scope .fabricate-list-row-badges > .alchemy-recipe-badge');
+    assert.ok(Boolean(badge), 'the badge sits after the name, inside the button');
+    assert.equal(badge.getAttribute('aria-hidden'), 'true', 'the name carries the match, so the badge is drawn only');
+  });
+
+  it('draws a recipe both selected and matched as pressed, matched and named by its match', async () => {
+    const target = await harness.mount({
+      recipes: [knownRecipe('vigor', 'Elixir of Vigor'), knownRecipe('venom', 'Blade Venom')],
+      knownCount: 2,
+      selectedRecipeId: 'venom',
+      matchedRecipeId: 'venom',
+    });
+    const [, venom] = listRows(target, 'alchemy-known-list').map((row) => row.control);
+    assert.deepEqual(
+      [
+        venom.getAttribute('aria-pressed'),
+        venom.classList.contains('is-selected'),
+        venom.classList.contains('is-match'),
+        Boolean(venom.querySelector(':scope .alchemy-recipe-badge')),
+        venom.getAttribute('aria-label'),
+      ],
+      ['true', true, true, true, 'Blade Venom, FABRICATE.App.Alchemy.MatchedState']
+    );
+  });
+
+  it("titles a recipe's clipped ingredient line with the whole list, and draws its art", async () => {
+    const venom = {
+      ...knownRecipe('venom', 'Blade Venom'),
+      img: 'icons/venom.webp',
+      signatureSummary: [
+        {
+          setId: 'venom-set',
+          essences: [],
+          groups: [
+            { options: [{ name: 'Toxic', quantity: 2 }] },
+            { options: [{ name: 'Water', quantity: 1 }] },
+            { options: [{ name: 'Nightshade', quantity: 3 }] },
+          ],
+        },
+      ],
+    };
+    const target = await harness.mount({ recipes: [venom], knownCount: 1 });
+    const [{ control }] = listRows(target, 'alchemy-known-list');
+    const sig = control.querySelector(':scope .alchemy-recipe-sig');
+    assert.equal(sig.getAttribute('title'), 'Toxic ×2 · Water ×1 · Nightshade ×3');
+    assert.equal(sig.getAttribute('title'), sig.textContent);
+    assert.equal(
+      control.querySelector(':scope > .fab-medallion img')?.getAttribute('src'),
+      'icons/venom.webp',
+      "the recipe's art fills the row's mark"
     );
   });
 });

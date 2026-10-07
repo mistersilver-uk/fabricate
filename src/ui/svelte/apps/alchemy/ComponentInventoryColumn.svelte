@@ -3,7 +3,8 @@
   ComponentInventoryColumn — the right column of the Alchemy workbench: the owned
   components the player can place on the bench. A name-search input filters the
   list. Each row is a ListRow button (issue 1778) showing the component, "X of Y
-  available", an `aria-hidden` grip drag handle and an `aria-hidden` `+` glyph;
+  available" with its essences on the same line (one chip, then a "+N"), an
+  `aria-hidden` grip drag handle and an `aria-hidden` `+` glyph;
   unavailable rows carry the `disabled` attribute (not merely muted style). Rows are draggable so the
   workbench drop zone can accept them (drag stays mouse-only), and are the
   tap/left-click add affordance (keyboard-reachable). Two empty states: the
@@ -117,7 +118,9 @@
             })}</span
           >
           {#if component.essences?.length}
-            <EssenceChips essences={component.essences} />
+            <span class="alchemy-inventory-essences"
+              ><EssenceChips essences={component.essences} limit={1} /></span
+            >
           {/if}
         {/snippet}
         <li>
@@ -205,7 +208,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--fab-text-disabled);
+    /* The subtle ink holds the affordance minimum (3:1) on the row in every theme. */
+    color: var(--fab-text-subtle);
     font-size: 11px;
     cursor: grab;
   }
@@ -216,15 +220,28 @@
   }
 
   .alchemy-inventory-avail {
+    flex: none;
     font-size: 9.5px;
     color: var(--fab-text-subtle);
   }
 
+  /* The essences stay on the availability line: a zero basis never wraps the line, and the strip
+     is capped at one chip and a "+N" so it fits beside the availability. */
+  .alchemy-inventory-essences {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* The add square keeps to the name's line: its 4px overhang above and below adds no height. */
   .alchemy-inventory-add {
-    width: 26px;
-    height: 26px;
+    box-sizing: border-box;
+    width: 22px;
+    height: 22px;
     flex: 0 0 auto;
-    border-radius: 7px;
+    margin-block: -4px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;

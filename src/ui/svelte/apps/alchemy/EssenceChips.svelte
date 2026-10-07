@@ -11,14 +11,27 @@
   essence definition carries none, and `colorToken` (issue 917) is the GM-authored
   `--fab-tag-*` key. An essence with no authored colour keeps the accent chip every
   essence renders as today.
+
+  `limit` (issue 1778) keeps the strip to one line: past `limit` essences it draws the first
+  `limit` and one "+N" chip, which carries the rest's names and counts as its title and label.
 -->
 <script>
-  let { essences = [], size = 'sm' } = $props();
+  let { essences = [], size = 'sm', limit = null } = $props();
 
   const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
 
   const rows = $derived(
     Array.isArray(essences) ? essences.filter((entry) => entry && entry.quantity > 0) : []
+  );
+  const capped = $derived(Number.isInteger(limit) && limit > 0 && rows.length > limit);
+  const shown = $derived(capped ? rows.slice(0, limit) : rows);
+  const more = $derived(
+    capped
+      ? rows
+          .slice(limit)
+          .map((essence) => `${essence.name} ×${essence.quantity}`)
+          .join(', ')
+      : ''
   );
 
   function tintStyle(colorToken) {
@@ -29,8 +42,12 @@
 </script>
 
 {#if rows.length > 0}
-  <span class="alchemy-essences alchemy-essences-{size}" data-alchemy-essences>
-    {#each rows as essence (essence.id)}
+  <span
+    class="alchemy-essences alchemy-essences-{size}"
+    class:is-capped={limit != null}
+    data-alchemy-essences
+  >
+    {#each shown as essence (essence.id)}
       <span
         class="alchemy-essence-chip"
         class:is-tinted={Boolean(tintStyle(essence.colorToken))}
@@ -43,6 +60,14 @@
         <span class="alchemy-essence-count">×{essence.quantity}</span>
       </span>
     {/each}
+    {#if capped}
+      <span
+        class="alchemy-essence-chip is-more"
+        data-alchemy-essence-more
+        title={more}
+        aria-label={more}>+{rows.length - limit}</span
+      >
+    {/if}
   </span>
 {/if}
 
@@ -53,6 +78,11 @@
     align-items: center;
     gap: 4px;
     min-width: 0;
+  }
+
+  /* A capped strip is one line; the "+N" chip stands for whatever the cap left out. */
+  .alchemy-essences.is-capped {
+    flex-wrap: nowrap;
   }
 
   .alchemy-essence-chip {

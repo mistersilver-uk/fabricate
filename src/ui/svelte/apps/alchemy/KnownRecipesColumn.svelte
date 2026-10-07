@@ -61,10 +61,10 @@
     });
   }
 
-  // The row's name, then the bench match its badge only draws, in the status strip's sentence.
+  // The row's name, then the bench match its `aria-hidden` badge only draws.
   function accessibleName(name, matched) {
     if (!matched) return name;
-    return `${name}, ${localize('FABRICATE.App.Alchemy.Status.Ready', { name })}`;
+    return `${name}, ${localize('FABRICATE.App.Alchemy.MatchedState')}`;
   }
 </script>
 
@@ -134,7 +134,7 @@
           >
         {/snippet}
         {#snippet signature()}
-          <span class="alchemy-recipe-sig">{sig}</span>
+          <span class="alchemy-recipe-sig" title={sig}>{sig}</span>
         {/snippet}
         {#snippet result()}
           <span class="alchemy-recipe-result">
@@ -275,18 +275,22 @@
     text-overflow: ellipsis;
   }
 
+  /* The bench match, in the positive status tone (the accent edge means selected only, D7). It
+     keeps to the name's line: its 4px overhang above and below adds no height. */
   .alchemy-recipe-badge {
+    box-sizing: border-box;
     width: 22px;
     height: 22px;
     flex: 0 0 auto;
+    margin-block: -4px;
     border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--fab-accent-soft);
-    border: 1px solid var(--fab-accent-border);
-    color: var(--fab-accent);
-    font-size: 8px;
+    background: var(--fab-success-soft);
+    border: 1px solid var(--fab-success-border);
+    color: var(--fab-success-text);
+    font-size: 11px;
   }
 
   .alchemy-recipe-result {

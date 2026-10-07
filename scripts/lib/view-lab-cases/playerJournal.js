@@ -76,7 +76,7 @@ export const CASES = Object.freeze([
     // it presses the row and loads the bench, which the bench then matches (issue 1778).
     query: { tab: 'alchemy', journalCaseState: 'alchemy' },
     steps: [{ selector: '[data-alchemy-recipe="al-r-fire"]' }],
-    expectSelector: '[data-alchemy-recipe="al-r-fire"].is-selected',
+    expectSelector: '[data-alchemy-recipe="al-r-fire"].is-selected.is-match',
     kinds: ['player', 'alchemy'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
   }),
