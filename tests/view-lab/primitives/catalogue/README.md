@@ -71,7 +71,7 @@ A drawing a row replaces may not contain a drawing another row claims, because
 the page resolves every address before it places anything, and a replaced
 drawing takes the inner one out of the document with it.
 A drawing whose specimen stands beside it stays, so a row may claim a drawing
-inside it: the `<Card>` drawing keeps its well, and `<Well>`'s row replaces it.
+inside it: the `<Card>` drawing keeps its well, and `<Well>`'s row replaces it, so the Card drawing beside the live Card contains the live Well.
 
 ## `slot` — when a specimen needs a real box
 

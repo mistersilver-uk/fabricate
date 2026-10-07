@@ -165,7 +165,7 @@
     "cap": "collapsible card, body in a well",
     "draws": ".k-well",
     "path": "src/ui/svelte/components/Well.svelte",
-    "note": "The card row above stands beside its drawing rather than replacing it, so the drawing, and this well inside it, stays on the page.",
+    "note": "The card row above stands beside its drawing rather than replacing it, so the drawing, and this well inside it, stays on the page: the Card drawing beside the live Card contains this live Well.",
     "props": {
       "label": "Ingredients"
     },

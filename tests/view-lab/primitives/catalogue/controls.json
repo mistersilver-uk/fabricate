@@ -611,9 +611,9 @@
     "spec": "<Field> <Select> <Search>",
     "draws": ".k-lbl",
     "path": "src/ui/svelte/components/Select.svelte",
+    "note": "The drawing carries no hint, so the live Select has none. The disabled Downtime option with its Premium badge is kept: it is the only place the unavailable state shows.",
     "props": {
       "label": "Resolution",
-      "hint": "Applies to every recipe here.",
       "value": "routed",
       "options": [
         {
