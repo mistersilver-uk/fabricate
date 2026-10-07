@@ -737,6 +737,17 @@
     ]
   },
   {
+    "spec": "<Typeahead>",
+    "cap": "what a pick writes — the caller’s own list, beside the field",
+    "draws": ".k-field",
+    "path": "src/ui/svelte/components/Typeahead.svelte",
+    "props": {
+      "ariaLabel": "Search recipes",
+      "placeholder": "Search recipes…"
+    },
+    "note": "The resting field, at its default 38 shell. The open unit stays drawn: a plain-JSON row can pass neither the `source` and `itemLabel` functions its list needs nor the focus that opens it."
+  },
+  {
     "spec": "<Checkbox>",
     "cap": "off",
     "draws": ".k-cb",
