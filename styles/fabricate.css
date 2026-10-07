@@ -11197,6 +11197,7 @@
   width: 64px;
   height: 64px;
   flex: 0 0 64px;
+  border-radius: 6px;
   object-fit: cover;
   align-self: center;
 }
