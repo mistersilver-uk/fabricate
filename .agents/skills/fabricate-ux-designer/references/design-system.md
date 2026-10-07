@@ -112,12 +112,10 @@ The spacing scale is canonically specified in `openspec/specs/ui-visual-style/sp
   /* spacing — 4px base */
   --fab-space-2xs:2px; --fab-space-1:4px; --fab-space-chip:6px; --fab-space-2:8px;
   --fab-space-3:12px; --fab-space-4:16px; --fab-space-5:20px; --fab-space-6:24px;
-  /* radius — the two the Books & Scrolls tab and the item-page inspector share.
-     OFF the canonical ladder below FOR THE ELEMENTS THEY PAINT: 5px is not a rung at
-     all, and 6px is the chip rung carried by a panel, which takes 11. They are carried
-     at their shipped values because correcting them moves pixels. */
-  --fab-books-control-radius:5px;      /* Books & Scrolls + inspector only */
-  --fab-books-panel-radius:6px;        /* Books & Scrolls + inspector only */
+  /* radius — the two the Books & Scrolls tab and the item-page inspector share,
+     on the canonical ladder below: a control at 7 and a panel at 11. */
+  --fab-books-control-radius:7px;      /* Books & Scrolls + inspector only */
+  --fab-books-panel-radius:11px;       /* Books & Scrolls + inspector only */
 }
 ```
 
@@ -230,12 +228,11 @@ sans; mono is only for dice formulas and run IDs.
 - **Radius:** the canonical ladder is in `openspec/specs/design-system/spec.md` — **6** for chips
   at or below 24px, **7** for controls of 26–32px, **9** for controls of 34–38px and for rows and
   wells, **11** for a 44px control and for cards and panels, **999** for pills and tracks.
-  Two shipped tokens, `--fab-books-control-radius` (5px) and `--fab-books-panel-radius` (6px),
-  are off that ladder **for the elements they paint** — 5px is not a rung at all, and 6px is the
-  chip rung carried by a panel, which takes 11.
+  Two shipped tokens, `--fab-books-control-radius` (7px) and `--fab-books-panel-radius` (11px),
+  carry the control and panel rungs of that ladder.
   They are read by the Books & Scrolls tab and the item-page inspector and by nothing else, and
-  they are named for the surface that carries them, not for a control class, precisely so they
-  read as that surface's debt rather than as a second ladder.
+  they are named for the surface that carries them, not for a control class, so they never read
+  as a second ladder.
 - **Sizing rhythm:** control and icon-button **34** · thumb-sm **40** · thumb-md **58** ·
   row **72**, written as literals.
 - **Elevation** (`--fab-shadow-*`): `-sm` 0 8 18 · `-md` 0 10 24 · `-lg` 0 14 38 (windows).
