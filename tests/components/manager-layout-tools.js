@@ -117,7 +117,7 @@ test('manager character modifier search suggestions keep icons in row flow', () 
   // The compact typeahead keeps the absolute glyph; the default shell draws it in flow (issue 1782).
   const searchIconBlock = blockFor('.fabricate-search.fabricate-search:where(.is-compact) > i');
   const characterModifierSuggestionBlock = blockFor(
-    '.fabricate-manager .manager-tag-suggestion.manager-character-modifier-add-suggestion'
+    '.fabricate-manager .fabricate-typeahead-option.manager-character-modifier-add-suggestion'
   );
   const characterModifierSuggestionIconBlock = blockFor(
     '.fabricate-manager .manager-character-modifier-add-suggestion > i'
@@ -216,12 +216,12 @@ test('manager character modifier search suggestions render with availability-sty
             </div>
             <!-- The list as it renders: portalled out of its label to the application root, with
                  the placement the typeahead panel action writes inline. -->
-            <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" role="listbox" aria-label="Character modifiers" style="left: 376px; right: auto; width: 320px; min-width: 320px; max-width: 320px; max-height: 144px; top: 62px; bottom: auto;">
-              <button type="button" class="manager-tag-suggestion manager-character-modifier-add-suggestion" role="option" tabindex="-1" aria-selected="false">
+            <div class="fabricate-typeahead-list manager-character-modifier-add-suggestions" role="listbox" aria-label="Character modifiers" style="left: 376px; right: auto; width: 320px; min-width: 320px; max-width: 320px; max-height: 144px; top: 62px; bottom: auto;">
+              <button type="button" class="fabricate-typeahead-option manager-character-modifier-add-suggestion" role="option" tabindex="-1" aria-selected="false">
                 <i class="fa-solid fa-user" aria-hidden="true"></i>
                 <span>Wisdom modifier</span>
               </button>
-              <button type="button" class="manager-tag-suggestion manager-character-modifier-add-suggestion" role="option" tabindex="-1" aria-selected="false">
+              <button type="button" class="fabricate-typeahead-option manager-character-modifier-add-suggestion" role="option" tabindex="-1" aria-selected="false">
                 <i class="fa-solid fa-hand-fist" aria-hidden="true"></i>
                 <span>Strength modifier</span>
               </button>

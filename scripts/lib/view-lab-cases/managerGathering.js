@@ -7,6 +7,7 @@ import {
   ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
   GATHERING_ROUTE_MODEL_PATTERN,
   GATHERING_TASK_EDITOR_PATTERN,
+  TYPEAHEAD_COMBOBOX_SOURCE,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
 
@@ -1097,6 +1098,57 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
       // Its drop row sits on the Results tab (issue 1522).
       GATHERING_TASK_EDITOR_PATTERN,
+    ],
+  }),
+  // The two compact typeaheads' lists open (issue 1782), which no case drew: the component browser's
+  // tag filter and the drop's character-modifier search, each a `Typeahead` over the search field.
+  managerCase({
+    id: 'manager-gathering-task-component-tag-suggestions',
+    label: 'Manager — Gathering task component browser, the tag list open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      ...OPEN_SLOWBLOOM_TASK,
+      taskTab('results'),
+      { selector: '[data-gathering-component-tag-search]', scroll: true },
+      { selector: '[data-gathering-component-tag-search] input', fill: 'p' },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager > .fabricate-typeahead-list[data-gathering-component-tag-suggestions]' +
+      ' [data-gathering-component-tag-suggestion]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      GATHERING_TASK_EDITOR_PATTERN,
+      TYPEAHEAD_COMBOBOX_SOURCE,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-drop-modifier-suggestions',
+    label: 'Manager — Gathering task drop, the character-modifier list open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      ...OPEN_SLOWBLOOM_TASK,
+      taskTab('results'),
+      SELECT_SLOWBLOOM_DROP,
+      { selector: '[data-gathering-drop-character-modifiers]', scroll: true },
+      { selector: '[data-gathering-drop-character-modifier-search] input', fill: 'i' },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector:
+      '.fabricate-manager > .fabricate-typeahead-list[data-gathering-drop-character-modifier-suggestions]' +
+      ' [data-gathering-drop-character-modifier-suggestion]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
+      TYPEAHEAD_COMBOBOX_SOURCE,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({

@@ -31,7 +31,7 @@ const CLASS_PROPS = Object.freeze([
 ]);
 
 /**
- * Twenty-four shared primitives, each with the namespace roots it writes and the class family it owns.
+ * Twenty-seven shared primitives, each with the namespace roots it writes and the class family it owns.
  */
 const PRIMITIVES = Object.freeze([
   Object.freeze({
@@ -748,6 +748,33 @@ const PRIMITIVES = Object.freeze([
     familyFloor: 48,
     ownedFloor: 37,
     mirrored: Object.freeze([Object.freeze({ anchor: 'manager-nav', root: 'fabricate-nav' })]),
+  }),
+  Object.freeze({
+    // `Typeahead` (issue 1782): the suggestion list and option rules, rooted at `.fabricate-manager`
+    // under `manager-tag-suggestion(s)`, re-rooted at the classes the typeahead writes.
+    name: 'Typeahead',
+    components: Object.freeze(['src/ui/svelte/components/Typeahead.svelte']),
+    roots: Object.freeze([
+      'fabricate-typeahead',
+      'fabricate-typeahead-list',
+      'fabricate-typeahead-option',
+      'fabricate-typeahead-note',
+    ]),
+    family: String.raw`fabricate-typeahead[\w-]*`,
+    namespacedFamily: true,
+    anchors: Object.freeze([
+      'fabricate-typeahead',
+      'fabricate-typeahead-list',
+      'fabricate-typeahead-option',
+      'fabricate-typeahead-note',
+    ]),
+    composesClasses: true,
+    // Measured at this commit: 4 written, 7 family selectors, 6 owned; the seventh is the modifier
+    // editor's own option row, a caller rule.
+    writtenFloor: 4,
+    familyFloor: 7,
+    ownedFloor: 6,
+    mirrored: Object.freeze([]),
   }),
 ]);
 

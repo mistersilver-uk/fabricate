@@ -2,7 +2,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { definePrimitiveAdoptionContract } from '../helpers/primitiveAdoptionContract.js';
+import {
+  componentCallSites,
+  definePrimitiveAdoptionContract,
+} from '../helpers/primitiveAdoptionContract.js';
 
 const TOOLBAR_PATH = 'src/ui/svelte/components/FilterBar.svelte';
 const FIELD_PATH = 'src/ui/svelte/components/SearchField.svelte';
@@ -10,32 +13,11 @@ const FIELD_PATH = 'src/ui/svelte/components/SearchField.svelte';
 /** The bar has NO allowlist, and the empty array is the claim rather than an omission. */
 const RAW_TOOLBAR_ALLOWLIST = Object.freeze([]);
 
-/** The two `.fabricate-search` sites that are not this primitive, with their exact counts. */
-const RAW_SEARCH_ALLOWLIST = Object.freeze([
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
-    sites: 1,
-    why:
-      'one character-modifier combobox. The root held two — near-identical duplicates of one ' +
-      'another, one on the gathering drop inspector and one on the event inspector — and this row ' +
-      'said a root de-duplication that merged them would legitimately take the pin to 1 rather ' +
-      'than read as a regression. Issue 1707 did exactly that: the panel is written once and ' +
-      'rendered at both subjects, so the second was de-duplicated rather than converted. It still ' +
-      'writes a `.manager-tag-suggestions` list inside the label, which the primitive has no ' +
-      'slot for; the open list is portalled out of the label to the application root (issue ' +
-      '2157), so the label is where the source writes it and not where it renders.',
-  }),
-  Object.freeze({
-    path: 'src/ui/svelte/apps/manager/gathering-task/GatheringTaskComponentBrowserCard.svelte',
-    sites: 1,
-    why:
-      'The component TAG search, which writes a `.manager-tag-suggestions` list inside its label ' +
-      'and swaps the glyph to `fa-tags`. Its three siblings in the task editor converted; this one ' +
-      'is a typeahead combobox, which `design-system` adjudicates as not a picker, so it is an ' +
-      'adjudicated opt-out rather than deferred work. The open list is portalled out of the label ' +
-      'to the application root (issue 2157).',
-  }),
-]);
+/** No raw `.fabricate-search` site is left: the two typeaheads became `Typeahead` (issue 1782). */
+const RAW_SEARCH_ALLOWLIST = Object.freeze([]);
+
+/** `Typeahead` forwards its caller's one route to the field, so its callers are read instead. */
+const TYPEAHEAD_PATH = 'src/ui/svelte/components/Typeahead.svelte';
 
 /**
  * A synthetic source for the raw-element detector.
@@ -102,7 +84,7 @@ const field = definePrimitiveAdoptionContract({
   primitive: FIELD_PATH,
   contractClass: 'fabricate-search',
   allowlist: RAW_SEARCH_ALLOWLIST,
-  // 34 sites in 31 components at issue 1782; the floors below keep headroom under that count.
+  // 34 sites in 33 components and the typeahead's forward (issue 1782); the floors keep headroom.
   callSiteFloor: 14,
   fileFloor: 12,
   detectorFixture: {
@@ -161,20 +143,45 @@ test('every filter bar passes an accessible name', () => {
   );
 });
 
+/** Every site of `tag` that does not pass exactly one of the three naming routes. */
+function namingOffenders(tag, sites) {
+  return sites
+    .map((site) => [site, namingRoutesOf(site, ['label', 'ariaLabel', 'ariaLabelledBy'])])
+    .filter(([, routes]) => routes.length !== 1)
+    .map(([site, routes]) => `${site.file}: <${tag}> ${routes.join(' + ') || 'no route'}`)
+    .sort((a, b) => a.localeCompare(b));
+}
+
 test('every search field takes exactly one naming route (issue 1782)', () => {
   assert.ok(field.callSites.length >= 14, 'the field has lost most of its call sites');
-  const offenders = [];
-  for (const site of field.callSites) {
-    const routes = namingRoutesOf(site, ['label', 'ariaLabel', 'ariaLabelledBy']);
-    if (routes.length !== 1) offenders.push(`${site.file}: <SearchField> ${routes.join(' + ') || 'no route'}`);
-  }
+  const offenders = namingOffenders(
+    'SearchField',
+    field.callSites.filter((site) => site.file !== TYPEAHEAD_PATH)
+  );
   assert.deepEqual(
-    offenders.sort((a, b) => a.localeCompare(b)),
+    offenders,
     [],
     'a `<SearchField>` with no route renders a `<label>` wrapping a glyph and an input and no ' +
       'text, so it is announced as "search" and nothing else; with two, one name is dead text ' +
       'free to drift from the one that is read. Pass exactly one of `label`, `ariaLabel` and ' +
       `\`ariaLabelledBy\`:\n  ${offenders.join('\n  ')}`
+  );
+});
+
+test('every typeahead takes exactly one naming route, which also names its list (issue 1782)', () => {
+  const sites = componentCallSites('Typeahead');
+  assert.ok(sites.length >= 4, `only ${sites.length} <Typeahead> call sites were found`);
+  assert.ok(
+    field.callSites.some((site) => site.file === TYPEAHEAD_PATH),
+    'the typeahead no longer composes the search field, so excusing its forward hides nothing'
+  );
+  const offenders = namingOffenders('Typeahead', sites);
+  assert.deepEqual(
+    offenders,
+    [],
+    'a `<Typeahead>` forwards its route to its field and names its list by it, so with none both ' +
+      'are unnamed and with two the list and the field may read differently:\n  ' +
+      offenders.join('\n  ')
   );
 });
 
@@ -207,5 +214,40 @@ test('no call site restates the class the primitive emits itself', () => {
     [],
     'the primitive emits its contract class itself and APPENDS the `class` prop after it, so ' +
       `restating it emits the token twice:\n  ${offenders.join('\n  ')}`
+  );
+});
+
+/** The ruled compact exception (issue 1782, maintainer ruling 2): four fields, two typeaheads. */
+const RULED_COMPACT_SITES = Object.freeze([
+  'SearchField src/ui/svelte/apps/manager/gathering-task/GatheringTaskComponentBrowserCard.svelte',
+  'SearchField src/ui/svelte/apps/manager/gathering-task/GatheringTaskDropsCard.svelte',
+  'SearchField src/ui/svelte/apps/manager/gathering-task/GatheringTaskRequiredToolsCard.svelte',
+  'SearchField src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
+  'Typeahead src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
+  'Typeahead src/ui/svelte/apps/manager/gathering-task/GatheringTaskComponentBrowserCard.svelte',
+]);
+
+test('only the ruled sites take the compact density, each as a literal (issue 1782)', () => {
+  const forward = field.callSites.find((site) => site.file === TYPEAHEAD_PATH);
+  assert.equal(forward?.attribute('density'), '{density}', 'the typeahead forwards its own');
+  const declared = [
+    ...field.callSites.map((site) => ['SearchField', site]),
+    ...componentCallSites('Typeahead').map((site) => ['Typeahead', site]),
+  ]
+    .filter(([, site]) => site !== forward && site.attribute('density'))
+    .map(([tag, site]) => ({ name: `${tag} ${site.file}`, density: site.attribute('density') }));
+  const unread = declared
+    .filter(({ density }) => !/^density="(?:compact|default)"$/.test(density))
+    .map(({ name, density }) => `${name}: ${density}`);
+  assert.deepEqual(unread, [], 'a density this clause cannot read hides a compact site');
+  const compact = declared
+    .filter(({ density }) => density === 'density="compact"')
+    .map(({ name }) => name)
+    .sort((a, b) => a.localeCompare(b));
+  assert.deepEqual(
+    compact,
+    [...RULED_COMPACT_SITES],
+    'every non-compact search is the 38 shell (maintainer ruling 2); a new compact site, or a ' +
+      'ruled one moving to the shell, is a ruling change and lands with one'
   );
 });

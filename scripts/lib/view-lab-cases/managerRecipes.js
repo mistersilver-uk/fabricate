@@ -7,6 +7,7 @@ import {
   BULK_DELETE_CARD_PATTERN,
   CHECKS_ROUTE_MODEL_PATTERN,
   RECIPE_BULK_EDIT_MATCHES,
+  TYPEAHEAD_COMBOBOX_SOURCE,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
@@ -830,6 +831,53 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+    ],
+  }),
+  // The Limits tab no case landed on (issue 1782): a learning book's two typeaheads, which grow to
+  // the 38px search shell under maintainer ruling 2, and the Required Knowledge list open.
+  managerCase({
+    id: 'manager-recipe-item-limits',
+    label: 'Manager — Recipe item limits, the learning typeaheads',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="limits"]' },
+    ],
+    expectView: 'recipe-item-edit',
+    expectSelector:
+      '[data-recipe-item-tab="limits"] [data-recipe-item-character-prereqs] .fabricate-typeahead',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-item-limits-suggestions',
+    label: 'Manager — Recipe item limits, the Required Knowledge list open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="limits"]' },
+      { selector: '[data-recipe-item-required-knowledge-search]', fill: 'brew' },
+    ],
+    expectView: 'recipe-item-edit',
+    expectSelector:
+      '.fabricate-manager > .fabricate-typeahead-list [data-recipe-item-required-knowledge-option]',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+      TYPEAHEAD_COMBOBOX_SOURCE,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({

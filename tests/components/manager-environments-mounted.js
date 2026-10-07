@@ -3696,6 +3696,15 @@ export function registerEnvironmentsCases() {
       assert.ok(Boolean(suggestion), `the suggestion must carry the ${subject} prefix`);
       assert.equal(suggestion.getAttribute('role'), 'option');
       assert.equal(suggestion.getAttribute('tabindex'), '-1', 'no suggestion is a tab stop');
+      search.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+      );
+      flushSync();
+      assert.equal(
+        search.getAttribute('aria-activedescendant'),
+        list.querySelector('[role="option"]').id,
+        `the ${subject} field names its active option rather than moving focus to it`
+      );
       assert.ok(
         !root.querySelector(
           `[data-gathering-${other}-character-modifier-suggestion="mod-training"]`

@@ -3837,7 +3837,7 @@
   width: 100%;
 }
 
-.fabricate-manager .manager-tag-suggestion.manager-character-modifier-add-suggestion {
+.fabricate-manager .fabricate-typeahead-option.manager-character-modifier-add-suggestion {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
   align-items: center;
@@ -4169,26 +4169,8 @@
   min-width: 144px;
 }
 
-.fabricate-manager .manager-tag-search {
-  position: relative;
-  display: grid;
-  gap: var(--fab-space-chip);
-  flex: 1 1 210px;
-  min-width: 180px;
-  max-width: 320px;
-}
-
-.fabricate-manager .manager-tag-search input {
-  min-width: 0;
-  height: 34px;
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-}
-
-/* No offsets here: `typeaheadPanel` portals the list to the application root and writes its placement inline, at the popover family's stacking level. */
-.fabricate-manager .manager-tag-suggestions {
+/* THE TYPEAHEAD'S LIST (issue 1782), re-rooted at the class it writes from `.fabricate-manager .manager-tag-suggestions`, doubled to keep that (0,2,0). No offsets here: `typeaheadPanel` portals the list to the application root and writes its placement inline, at the popover family's stacking level. */
+.fabricate-typeahead-list.fabricate-typeahead-list {
   position: absolute;
   z-index: 4000;
   display: grid;
@@ -4202,7 +4184,9 @@
   overflow-y: auto;
 }
 
-.fabricate-manager .manager-tag-suggestion {
+/* The roll-data chips (`WorldModifiersTab`) keep the option's box under their own class. */
+.fabricate-manager .manager-tag-suggestion,
+.fabricate-typeahead-option.fabricate-typeahead-option {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
   align-items: center;
@@ -4218,15 +4202,25 @@
 }
 
 .fabricate-manager .manager-tag-suggestion:hover,
-.fabricate-manager .manager-tag-suggestion:focus-visible {
+.fabricate-manager .manager-tag-suggestion:focus-visible,
+.fabricate-typeahead-option.fabricate-typeahead-option:hover,
+.fabricate-typeahead-option.fabricate-typeahead-option:focus-visible {
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
 }
 
 /* The keyboard cursor: the field keeps DOM focus, so the active option is drawn from its state. */
-.fabricate-manager .manager-tag-suggestion[aria-selected='true'] {
+.fabricate-typeahead-option.fabricate-typeahead-option[aria-selected='true'] {
   outline: 2px solid var(--fab-accent);
   outline-offset: -2px;
+}
+
+/* An empty list's note: one quiet line at the panel's own scale (`design-system/spec.md`). */
+.fabricate-typeahead-note {
+  padding: var(--fab-space-2);
+  color: var(--fab-text-subtle);
+  font-size: 0.66rem;
+  text-align: center;
 }
 
 .fabricate-manager .manager-selected-tag-row {
@@ -11471,9 +11465,10 @@
   font: inherit;
 }
 
+/* `[type="search"]` is excluded so the compact search's own 34px inline padding, below, clears its glyph (issue 1782). */
 .fabricate-manager
   .manager-gathering-task-edit-view
-  input:not([type="checkbox"]):not([type="radio"]):not([data-recipe-option-formula]):not([data-recipe-option-search]) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="search"]):not([data-recipe-option-formula]):not([data-recipe-option-search]) {
   min-height: 32px;
   padding: var(--fab-space-1) var(--fab-space-2);
 }
@@ -11942,10 +11937,6 @@
   max-width: 320px;
 }
 
-.fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact input {
-  padding-left: 36px;
-}
-
 .fabricate-manager .manager-task-drop-controls > .fabricate-button {
   flex: 0 0 auto;
   white-space: nowrap;
@@ -11964,10 +11955,6 @@
   position: relative;
   width: 100%;
   min-width: 0;
-}
-
-.fabricate-manager .manager-task-component-browser-controls .fabricate-search.is-compact input {
-  padding-left: 36px;
 }
 
 .fabricate-manager .manager-task-component-tag-suggestions {
@@ -13626,11 +13613,6 @@
 
   .fabricate-search.fabricate-search {
     flex-basis: 100%;
-  }
-
-  .fabricate-manager .manager-tag-search {
-    flex-basis: 100%;
-    max-width: none;
   }
 
   .fabricate-manager .manager-edit-card-heading,

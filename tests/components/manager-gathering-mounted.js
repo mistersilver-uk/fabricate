@@ -1605,6 +1605,10 @@ export function registerGatheringCases() {
     flushSync();
     const tagList = target.querySelector('[data-gathering-component-tag-suggestions]');
     assert.equal(tagSearch.getAttribute('role'), 'combobox');
+    assert.ok(
+      tagSearch.closest('.fabricate-search').querySelector(':scope > i.fas.fa-tags'),
+      'the tag filter draws the tag glyph, so it reads apart from the name search beside it'
+    );
     assert.equal(tagSearch.getAttribute('aria-controls'), tagList.id, 'the field names its list');
     assert.equal(tagList.getAttribute('role'), 'listbox');
     assert.ok(
@@ -1612,6 +1616,15 @@ export function registerGatheringCases() {
       'the list floats in the application root rather than inside the browser card'
     );
     assert.equal(tagList.querySelector('[role="option"]').getAttribute('tabindex'), '-1');
+    tagSearch.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+    );
+    flushSync();
+    assert.equal(
+      tagSearch.getAttribute('aria-activedescendant'),
+      tagList.querySelector('[role="option"]').id,
+      'the field names its active option rather than moving focus to it'
+    );
     Array.from(target.querySelectorAll('[data-gathering-component-tag-suggestion]'))
       .find((button) => button.textContent.includes('herb'))
       .click();

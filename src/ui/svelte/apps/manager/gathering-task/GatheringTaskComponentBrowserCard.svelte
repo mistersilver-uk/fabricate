@@ -8,8 +8,7 @@
   import EmptyState from '../../../components/EmptyState.svelte';
   import Pagination from '../../../components/Pagination.svelte';
   import SearchField from '../../../components/SearchField.svelte';
-  import { typeaheadPanel } from '../../../actions/typeaheadPanel.js';
-  import { createTypeaheadCombobox } from '../../../util/typeaheadCombobox.svelte.js';
+  import Typeahead from '../../../components/Typeahead.svelte';
 
   let {
     text,
@@ -26,16 +25,13 @@
   const componentTagOptions = $derived(
     uniqueSorted(componentCards.flatMap((item) => (Array.isArray(item.tags) ? item.tags : [])))
   );
-  const normalizedComponentTagSearchTerm = $derived(componentTagSearchTerm.trim().toLowerCase());
-  const componentTagSuggestions = $derived(
-    normalizedComponentTagSearchTerm
-      ? componentTagOptions.filter(
-          (tag) =>
-            !selectedComponentTags.includes(tag) &&
-            tag.toLowerCase().includes(normalizedComponentTagSearchTerm)
-        )
-      : []
-  );
+  function componentTagSuggestions(query) {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return [];
+    return componentTagOptions.filter(
+      (tag) => !selectedComponentTags.includes(tag) && tag.toLowerCase().includes(needle)
+    );
+  }
   const filteredComponentCards = $derived(
     componentCards.filter((item) => {
       const name = String(item?.name || '').toLowerCase();
@@ -107,16 +103,6 @@
     componentPageIndex = 0;
   }
 
-  const tagSearch = createTypeaheadCombobox({
-    component: 'GatheringTaskComponentBrowserCard',
-    anchor: '.manager-task-component-tag-search',
-    query: () => componentTagSearchTerm,
-    setQuery: (value) => (componentTagSearchTerm = value),
-    count: () => componentTagSuggestions.length,
-    onChoose: (index) => addComponentTag(componentTagSuggestions[index]),
-    maxHeightCap: 132,
-    rows: { pitch: 30, gap: 2, chrome: 10 },
-  });
   const tagSearchLabel = $derived(
     text('FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentTags', 'Search component tags')
   );
@@ -163,43 +149,25 @@
         )}
         data-gathering-component-name-search=""
       />
-      <label
-        class="fabricate-search is-compact manager-task-component-tag-search"
-        data-gathering-component-tag-search
-      >
-        <i class="fas fa-tags" aria-hidden="true"></i>
-        <input
-          type="search"
-          value={componentTagSearchTerm}
-          placeholder={text(
-            'FABRICATE.Admin.Manager.Environment.Tasks.SearchTagsPlaceholder',
-            'Search tags...'
-          )}
-          aria-label={tagSearchLabel}
-          {...tagSearch.field}
-        />
-        {#if tagSearch.listed}
-          <div
-            class="manager-tag-suggestions manager-task-component-tag-suggestions"
-            data-gathering-component-tag-suggestions
-            aria-label={tagSearchLabel}
-            {...tagSearch.list}
-            use:typeaheadPanel={tagSearch.panel}
-          >
-            {#each componentTagSuggestions as tag, index (tag)}
-              <button
-                type="button"
-                data-keyboard-focus="true"
-                class="manager-tag-suggestion"
-                data-gathering-component-tag-suggestion={tag}
-                {...tagSearch.option(index)}
-              >
-                {tag}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </label>
+      <Typeahead
+        class="manager-task-component-tag-search"
+        density="compact"
+        icon="fas fa-tags"
+        bind:query={componentTagSearchTerm}
+        source={componentTagSuggestions}
+        itemLabel={(tag) => tag}
+        onChoose={addComponentTag}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Environment.Tasks.SearchTagsPlaceholder',
+          'Search tags...'
+        )}
+        ariaLabel={tagSearchLabel}
+        listClass="manager-task-component-tag-suggestions"
+        listProps={{ 'data-gathering-component-tag-suggestions': '' }}
+        listMaxHeight={132}
+        optionDataAttr="data-gathering-component-tag-suggestion"
+        data-gathering-component-tag-search=""
+      />
     </div>
   </div>
 

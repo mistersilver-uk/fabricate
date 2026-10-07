@@ -9,8 +9,9 @@ const PART = (name) => `src/ui/svelte/apps/manager/gathering-task/GatheringTask$
 export const GATHERING_TASK_EDITOR_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
-  // The drop rules card's table (issue 1782).
+  // The drop rules card's table, and the component browser's tag typeahead (issue 1782).
   'src/ui/svelte/components/DataTable.svelte',
+  'src/ui/svelte/components/Typeahead.svelte',
   ...[
     'Card',
     'AvailabilityCard',

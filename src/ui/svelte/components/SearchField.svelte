@@ -12,6 +12,7 @@
   | `placeholder` | localized string | `undefined` | The hint inside the empty field. |
   | `label` / `ariaLabel` / `ariaLabelledBy` | localized string / string / id list | `''` | EXACTLY ONE names the input; see the invariants. |
   | `density` | `'default'` \| `'compact'` | `'default'` | `compact` emits `is-compact`. |
+  | `icon` | Font Awesome class | `'fas fa-search'` | The glyph before the input. |
   | `class` | class string | `''` | Appended to the root's own class. |
   | `inputProps` | attribute object | `undefined` | Attributes and handlers for the input, which the rest spread cannot reach. |
 
@@ -36,6 +37,7 @@
     ariaLabel = '',
     ariaLabelledBy = '',
     density = 'default',
+    icon = 'fas fa-search',
     class: extraClass = '',
     inputProps = undefined,
     ...rest
@@ -67,7 +69,7 @@
 </script>
 
 {#snippet control()}
-  <i class="fas fa-search" aria-hidden="true"></i>
+  <i class={icon || 'fas fa-search'} aria-hidden="true"></i>
   <input
     {...inputAttributes}
     type="search"

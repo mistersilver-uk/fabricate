@@ -84,16 +84,16 @@ const FAMILIES = Object.freeze([
     surface: 'Required Knowledge, under the recipe-item tab panel',
     clip: '.manager-editor-tab-panel',
     input: '[data-recipe-item-required-knowledge-search]',
-    field: '.manager-tag-search',
-    panel: '.manager-tag-suggestions',
+    field: '.fabricate-search',
+    panel: '.fabricate-typeahead-list',
   }),
   Object.freeze({
     name: 'prerequisite',
     surface: 'Learning prerequisites, under the recipe-item tab panel',
     clip: '.manager-editor-tab-panel',
     input: '[data-recipe-item-character-prereq-search]',
-    field: '.manager-tag-search',
-    panel: '.manager-tag-suggestions',
+    field: '.fabricate-search',
+    panel: '.fabricate-typeahead-list',
   }),
   Object.freeze({
     name: 'modifier',
@@ -101,7 +101,7 @@ const FAMILIES = Object.freeze([
     clip: '.manager-drop-inspector-scroll',
     input: '[data-gathering-drop-character-modifier-search] input',
     field: '',
-    panel: '.manager-tag-suggestions',
+    panel: '.fabricate-typeahead-list',
   }),
   Object.freeze({
     name: 'task',
@@ -112,7 +112,7 @@ const FAMILIES = Object.freeze([
     resize: Object.freeze({ edge: 'scroller', viewport: NARROWER }),
     input: '[data-gathering-component-tag-search] input',
     field: '.manager-task-component-tag-search',
-    panel: '.manager-tag-suggestions',
+    panel: '.fabricate-typeahead-list',
   }),
 ]);
 
@@ -431,39 +431,66 @@ describe('typeahead suggestion list: the root’s clamp', () => {
   });
 });
 
-describe('typeahead suggestion list: the panel’s own scroll', () => {
-  const family = FAMILIES.find((entry) => entry.name === 'knowledge');
+/**
+ * Each `Typeahead` family's own `listMaxHeight` and `optionHeight`, as its call site passes them
+ * (issue 1782). The primitive hands the panel a `pitch` of the row plus its 2px gap and 10px of
+ * chrome, so the panel is the cap floored to whole rows.
+ */
+const LONG_LISTS = Object.freeze([
+  Object.freeze({ name: 'knowledge', cap: 148, optionHeight: 28 }),
+  Object.freeze({ name: 'modifier', cap: 148, optionHeight: 32 }),
+  Object.freeze({ name: 'task', cap: 132, optionHeight: 28 }),
+]);
 
-  it('shows whole rows of a list longer than its cap, and scrolls the active option into view', async () => {
-    const { page, open } = await openList(family, { matching: 9 });
-    try {
-      assert.equal(open.optionCount, 9);
-      assert.ok(
-        open.panelScroll.height > open.panelScroll.client,
-        'nine options fit the panel, so it has nothing to scroll'
-      );
-      // The last row whose centre shows is whole. A following row may begin inside the panel's
-      // own bottom padding, which is scrolled content's to cross and shows none of its label.
-      const lastVisible = open.options.findLast(
-        (option) => option.top + option.height / 2 < open.panel.bottom
-      );
-      assert.ok(
-        lastVisible.bottom <= open.panel.bottom + EPSILON,
-        `the panel slices a row: it ends at ${open.panel.bottom}px through a row ending at ${lastVisible.bottom}px`
-      );
+function flooredPanelHeight({ cap, optionHeight }) {
+  const pitch = optionHeight + 2;
+  return Math.floor((cap - 10) / pitch) * pitch - 2 + 10;
+}
 
-      for (let press = 0; press < 9; press += 1) await page.keyboard.press('ArrowDown');
-      await twoFrames(page);
-      const scrolled = await measure(page, family);
-      const active = scrolled.options.at(-1);
-      assert.ok(scrolled.panelScroll.top > 0, 'the panel did not scroll to its active option');
-      assert.ok(
-        active.top >= scrolled.panel.top - EPSILON &&
-          active.bottom <= scrolled.panel.bottom + EPSILON,
-        'the active option is outside the panel’s visible rows'
-      );
-    } finally {
-      await page.close();
-    }
+for (const list of LONG_LISTS) {
+  const family = FAMILIES.find((entry) => entry.name === list.name);
+
+  describe(`typeahead suggestion list: the panel’s own scroll, ${family.surface}`, () => {
+    it('shows whole rows of a list longer than its cap, and scrolls the active option into view', async () => {
+      const { page, open } = await openList(family, { matching: 9 });
+      try {
+        assert.equal(open.optionCount, 9);
+        assert.ok(
+          open.panelScroll.height > open.panelScroll.client,
+          'nine options fit the panel, so it has nothing to scroll'
+        );
+        assert.equal(
+          open.options[1].top - open.options[0].top,
+          list.optionHeight + 2,
+          'a row is not the `optionHeight` its call site passes, plus the gap'
+        );
+        assert.ok(
+          Math.abs(open.panel.height - flooredPanelHeight(list)) <= EPSILON,
+          `the panel is ${open.panel.height}px, not its ${list.cap}px cap floored to whole rows`
+        );
+        // The last row whose centre shows is whole. A following row may begin inside the panel's
+        // own bottom padding, which is scrolled content's to cross and shows none of its label.
+        const lastVisible = open.options.findLast(
+          (option) => option.top + option.height / 2 < open.panel.bottom
+        );
+        assert.ok(
+          lastVisible.bottom <= open.panel.bottom + EPSILON,
+          `the panel slices a row: it ends at ${open.panel.bottom}px through a row ending at ${lastVisible.bottom}px`
+        );
+
+        for (let press = 0; press < 9; press += 1) await page.keyboard.press('ArrowDown');
+        await twoFrames(page);
+        const scrolled = await measure(page, family);
+        const active = scrolled.options.at(-1);
+        assert.ok(scrolled.panelScroll.top > 0, 'the panel did not scroll to its active option');
+        assert.ok(
+          active.top >= scrolled.panel.top - EPSILON &&
+            active.bottom <= scrolled.panel.bottom + EPSILON,
+          'the active option is outside the panel’s visible rows'
+        );
+      } finally {
+        await page.close();
+      }
+    });
   });
-});
+}

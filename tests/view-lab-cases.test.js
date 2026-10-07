@@ -2725,10 +2725,10 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The thirty-five frames a change to the shared positioning seam must publish: every case whose
+// The forty-four frames a change to the shared positioning seam must publish: every case whose
 // walk leaves a panel measured, clamped and portaled, across both application roots and the two GM
 // canvas windows (issues 1500, 1503, 1504, 1520). Issue 2157's two leave a typeahead combobox's
-// suggestion list open over the scroller that used to clip it. Issue 1510's thirteen are the converted manager
+// suggestion list open over the scroller that used to clip it, and issue 1782's three a `Typeahead`'s. Issue 1510's thirteen are the converted manager
 // selects whose panel sits somewhere no other frame puts one: inside a card or a row the walk
 // authors, in an editor, in an inspector rail, in a browse toolbar row of siblings, under a trigger
 // wider than its rung's ceiling at a one-column window, addressed by a caption id, or at a panel
@@ -2748,6 +2748,8 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-condition-current-list',
   'manager-gathering-rules-select-open',
   'manager-gathering-task-availability-menu',
+  'manager-gathering-task-component-tag-suggestions',
+  'manager-gathering-task-drop-modifier-suggestions',
   'manager-gathering-task-node-respawn-list',
   'manager-gathering-task-stamina-modifier-list',
   'manager-gathering-tasks-availability-filter-list',
@@ -2760,6 +2762,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipe-edit-tag-picker',
   'manager-recipe-item-contents-picker',
   'manager-recipe-item-contents-picker-staged',
+  'manager-recipe-item-limits-suggestions',
   'manager-recipes-bulk-edit-check-tier',
   'manager-recipes-bulk-edit-picker',
   'manager-recipes-inspector-route-list',
@@ -2782,7 +2785,8 @@ const ANCHORED_POPOVER_FRAMES = [
 // The anchored-panel class families a member's own `expectSelector` can name: every portaled panel
 // in the tree is a `*-popover`, the action menu's `fabricate-action-menu-panel`, or a typeahead
 // combobox's suggestion list addressed as a child of the application root.
-const ANCHORED_PANEL_CLAIM = /popover|action-menu-panel|> \.manager-recipe-option-suggestions/u;
+const ANCHORED_PANEL_CLAIM =
+  /popover|action-menu-panel|> \.(?:manager-recipe-option-suggestions|fabricate-typeahead-list)/u;
 
 // The one member whose selector claims no panel. Its walk DOES open the shared icon picker, but its
 // `expectSelector` was spent on issue 1117's bounds pair, so it is listed here by name rather than

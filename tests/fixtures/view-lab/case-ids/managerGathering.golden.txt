@@ -52,6 +52,8 @@ manager-environment-edit-events-ranked
 manager-gathering-events-normal
 manager-gathering-event-editor-normal
 manager-gathering-task-drop-modifiers-normal
+manager-gathering-task-component-tag-suggestions
+manager-gathering-task-drop-modifier-suggestions
 manager-gathering-task-drop-condition-modifier-attached
 manager-gathering-task-drop-character-modifier-attached
 manager-gathering-task-editor-check-fixed-over

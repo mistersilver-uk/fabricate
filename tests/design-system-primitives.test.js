@@ -204,6 +204,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
+  // Issue 1782: the typeahead, on the limits tab and each site's open list.
+  'src/ui/svelte/components/Typeahead.svelte',
   // Issue 2008: the well below a card, a primitive ARRIVING, on the Formula card's option groups.
   'src/ui/svelte/components/Well.svelte',
   // Issue 1515: THE SHEET, and the first key here that is not a component path. It sorts last
