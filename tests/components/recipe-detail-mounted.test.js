@@ -392,6 +392,16 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(radios[0].name, 'the routes share a group name');
     assert.ok(radios.every((radio) => radio.name === radios[0].name), 'one group, not two');
     assert.equal(section.querySelectorAll(':scope button').length, 0, 'no route is a button');
+    const group = section.querySelector(':scope fieldset');
+    assert.deepEqual(
+      [
+        group.classList.contains('is-config-cards'),
+        group.classList.contains('is-legend-visible'),
+        group.querySelector(':scope > legend')?.textContent.trim(),
+      ],
+      [true, true, 'FABRICATE.App.Crafting.Detail.IngredientSetsTitle'],
+      'config cards, as the Journal draws routes, under a shown "Ingredient options" legend'
+    );
 
     const cardA = section.querySelector('[data-set-id="set-a"]');
     const cardB = section.querySelector('[data-set-id="set-b"]');
@@ -441,10 +451,37 @@ describe('RecipeDetail mounted behavior', () => {
 
     // An arrow key moves a native radio group's selection and fires `change` (measured in
     // Chromium by `crafting-rows-rendered`); the change is what chooses the route.
+    assert.equal(radios[1].disabled, false, 'the blocked route stays choosable');
     radios[1].checked = true;
     radios[1].dispatchEvent(new globalThis.Event('change', { bubbles: true }));
     flushSync();
     assert.deepEqual(onChoose, ['set-b'], 'choosing a route radio selects that route');
+  });
+
+  it('names each route selector its own radio group, so two never share one', async () => {
+    const names = [];
+    for (const pass of [1, 2]) {
+      const target = await harness.mount({
+        recipe: recipe({
+          modeToken: 'routedByIngredients',
+          defaultSetId: 'set-a',
+          ingredientSets: ['set-a', 'set-b'].map((id) => ({
+            id,
+            label: `Route ${id} (${pass})`,
+            craftability: craftability({ canCraft: true }),
+            products: [],
+          })),
+        }),
+        selectedSetId: 'set-a',
+        craftability: craftability({ canCraft: true }),
+      });
+      const radios = target.querySelectorAll(':scope [data-recipe-section="ingredient-sets"] input');
+      names.push(...new Set([...radios].map((radio) => radio.name)));
+      harness.remount();
+    }
+    assert.equal(names.length, 2, `one name per selector: ${names.join(', ')}`);
+    assert.ok(names.every(Boolean), 'and neither is empty');
+    assert.notEqual(names[0], names[1], 'two selectors, two radio groups');
   });
 
   it('routes the Produces output to the selected ingredient set', async () => {

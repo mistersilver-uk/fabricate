@@ -12,6 +12,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { recipe } from '../helpers/crafting-fixtures.js';
 import { chipToneOf } from '../helpers/chipTone.js';
+import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
 import {
   chooseSelectOption,
   openSelectPanel,
@@ -264,8 +265,7 @@ describe('RecipeBrowser mounted behavior', () => {
     assert.ok(r2Fav.classList.contains('is-active'), 'favourited row star is active');
     assert.equal(r2Fav.getAttribute('aria-pressed'), 'true', 'the star keeps its own pressed state');
 
-    // Issue 1778: the star sits BESIDE the row's button rather than nested in it, so its click
-    // reaches no row handler and needs no stopPropagation to keep from selecting.
+    // The star sits beside the row's button, so its click reaches no row handler (issue 1778).
     assert.ok(!r1Fav.closest('.crafting-recipe-row-main'), 'the star is not inside the row button');
     r1Fav.click();
     flushSync();
@@ -274,8 +274,7 @@ describe('RecipeBrowser mounted behavior', () => {
   });
 
   it('keeps Enter and Space on the favourite and cart controls from selecting the row', async () => {
-    // The row's own key handler used to sit on the element wrapping these buttons, so a key on
-    // either bubbled to it and selected the recipe as well (issue 1778).
+    // A key on a trailing control reaches no row handler, so it does not select the recipe.
     const selected = [];
     const target = await harness.mount({
       recipes: [recipe({ id: 'r1' })],
@@ -287,6 +286,8 @@ describe('RecipeBrowser mounted behavior', () => {
 
     for (const control of ['.crafting-recipe-row-fav', '.crafting-recipe-row-add']) {
       const button = target.querySelector(`:scope [data-recipe-id="r1"] ${control}`);
+      // Declared, so Foundry's keyboard manager leaves Space to the button rather than pausing.
+      assert.equal(button.getAttribute('data-keyboard-focus'), 'true', `${control} declares focus`);
       for (const key of ['Enter', ' ']) {
         button.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key, bubbles: true }));
       }
@@ -332,9 +333,21 @@ describe('RecipeBrowser mounted behavior', () => {
       'Antitoxin, FABRICATE.App.Crafting.Status.MissingMaterials',
       'the name, then the status the row only draws as a glyph'
     );
+    assert.equal(
+      target
+        .querySelector(':scope [data-recipe-id="r1"] .crafting-recipe-row-main')
+        .getAttribute('aria-label'),
+      'Healing Potion, FABRICATE.App.Crafting.Status.Available',
+      'a craftable row is named by its status too'
+    );
     assert.ok(
       !control.querySelector('[role="button"], button'),
       'no control nests inside the row button'
+    );
+    assert.deepEqual(
+      [...control.querySelectorAll(NON_PHRASING_CONTENT)].map((node) => node.tagName),
+      [],
+      'the row button holds phrasing content only'
     );
     assert.equal(target.querySelectorAll(':scope [role="button"]').length, 0, 'no role=button');
 
@@ -342,6 +355,27 @@ describe('RecipeBrowser mounted behavior', () => {
     control.click();
     flushSync();
     assert.deepEqual(selected, ['r2'], 'the button opens the recipe');
+  });
+
+  it('gives a redacted row its button alone, and an unredacted row its favourite and cart', async () => {
+    const target = await harness.mount({
+      recipes: [
+        recipe({ id: 'r1', name: 'Healing Potion' }),
+        recipe({ id: 'r2', name: 'Antitoxin', redaction: { redacted: true, hiddenFields: [] } }),
+      ],
+      totalCount: 2,
+    });
+
+    const stops = (id) =>
+      [...target.querySelectorAll(`:scope [data-recipe-id="${id}"] button`)]
+        .filter((button) => button.tabIndex >= 0 && !button.disabled)
+        .map((button) => button.className.match(/crafting-recipe-row-\w+/)?.[0]);
+    assert.deepEqual(
+      stops('r1'),
+      ['crafting-recipe-row-main', 'crafting-recipe-row-fav', 'crafting-recipe-row-add'],
+      'three Tab stops on an unredacted row'
+    );
+    assert.deepEqual(stops('r2'), ['crafting-recipe-row-main'], 'one on a redacted row');
   });
 
   it('hides the system dropdown when no systems are supplied', async () => {
