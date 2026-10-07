@@ -895,7 +895,7 @@ describe('craftingStore', () => {
     assert.equal(store.selectedCraftability.marker, 'baked', 'back to the baked craftability');
   });
 
-  it('chooseIngredientSet clears the option overrides (they are set-scoped)', async () => {
+  it('chooseIngredientSet keeps the overrides when the set in force is chosen again', async () => {
     const { services } = makeServices({ listing: optionListing() });
     const store = createCraftingStore({ services });
     await store.load();
@@ -905,7 +905,7 @@ describe('craftingStore', () => {
 
     store.chooseIngredientSet('r1-set');
     flushSync();
-    assert.deepEqual(store.selectedIngredientOptions, {}, 'switching sets clears overrides');
+    assert.deepEqual(store.selectedIngredientOptions, { g1: { optionIndex: 1, heldItemId: null } });
   });
 
   it('threads the option overrides into the craft call', async () => {

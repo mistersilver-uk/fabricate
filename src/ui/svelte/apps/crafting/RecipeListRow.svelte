@@ -1,17 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  RecipeListRow is one selectable recipe in the left-column browser list. It shows
-  the recipe thumbnail, name, mode chip, and a status chip (from
-  craftingRecipeStatus). Clicking it selects the recipe (drives the centre detail)
-  and highlights the row. An "add to shopping list" affordance is exposed via a
-  trailing button so a player can queue materials without opening the detail.
+  RecipeListRow is one selectable recipe in the left-column browser list, drawn as ListRow's
+  selectable form (issue 1778): the 38px thumbnail leads, the system, status chip and category are
+  its meta, and the favourite and add-to-shopping-list buttons are its trailing controls, beside
+  the row's button rather than inside it. Opening the row selects the recipe.
 
   An uncraftable recipe (the danger tone — missing materials, or a check that refuses this
-  character) is called out more emphatically: the whole row takes a theme-appropriate error
-  tint and the status icon moves onto the (dimmed) thumbnail as a pip, rather than sitting as a
-  small meta chip. Warning/neutral/info blockers keep the compact meta badge.
+  character) is called out more emphatically: the row takes ListRow's danger tone, and the status
+  icon moves onto the (dimmed) thumbnail as a pip, rather than sitting as a small meta chip.
+  Warning/neutral/info blockers keep the compact meta chip.
 -->
 <script>
+  import ListRow from '../../components/ListRow.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { localize } from '../../util/foundryBridge.js';
@@ -45,164 +45,111 @@
   // stays the single source of truth for which statuses read as an error.
   const uncraftable = $derived(descriptor.tone === 'danger');
   const statusLabel = $derived(localize(descriptor.labelKey));
-
-  function select() {
-    onSelect?.(id);
-  }
-  function onRowKey(event) {
-    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
-      event.preventDefault();
-      select();
-    }
-  }
-  function addToList(event) {
-    event.stopPropagation();
-    onAddToShoppingList?.(id);
-  }
-  function toggleFavourite(event) {
-    event.stopPropagation();
-    onToggleFavourite?.(id);
-  }
+  const favouriteLabel = $derived(
+    localize(
+      favourite
+        ? 'FABRICATE.App.Crafting.Browser.Unfavourite'
+        : 'FABRICATE.App.Crafting.Browser.Favourite'
+    )
+  );
+  const addLabel = $derived(localize('FABRICATE.App.Crafting.Shopping.AddToList'));
 </script>
 
-<div
-  class="crafting-recipe-row"
-  class:is-selected={selected}
-  class:is-uncraftable={uncraftable}
+{#snippet thumb()}
+  <span class="crafting-recipe-row-thumb" class:is-uncraftable={uncraftable}>
+    <span class="crafting-recipe-row-thumb-media">
+      <Medallion {...resolveCraftingArt(recipe?.img)} alt="" size={38} />
+    </span>
+    {#if uncraftable}
+      <span class="crafting-recipe-row-thumb-scrim" aria-hidden="true"></span>
+      <span
+        class="crafting-recipe-row-pip"
+        data-crafting-status={status}
+        role="img"
+        aria-label={statusLabel}
+        title={statusLabel}
+      >
+        <i class={descriptor.icon} aria-hidden="true"></i>
+      </span>
+    {/if}
+  </span>
+{/snippet}
+
+{#snippet meta()}
+  <span class="crafting-recipe-row-meta">
+    <span class="crafting-recipe-row-system" title={systemName}>{systemName}</span>
+    {#if !uncraftable}
+      <!-- The row has already said the status in words on the recipe beside it, so this is
+           the chip's icon-only face: a square with the label as its accessible NAME rather
+           than as a tooltip, which is all the retired badge ever gave it. -->
+      <Chip
+        density="list"
+        iconOnly
+        tone={statusChipTone(descriptor.tone)}
+        icon={descriptor.icon}
+        data-crafting-status={status}
+        aria-label={statusLabel}
+        title={statusLabel}
+      />
+    {/if}
+    {#if showCategory}
+      <span class="crafting-recipe-row-category" title={categoryLabel}>{categoryLabel}</span>
+    {/if}
+  </span>
+{/snippet}
+
+{#snippet actions()}
+  <span class="crafting-recipe-row-actions">
+    <button
+      type="button"
+      class="crafting-recipe-row-fav"
+      class:is-active={favourite}
+      aria-pressed={favourite}
+      title={favouriteLabel}
+      aria-label={favouriteLabel}
+      data-keyboard-focus="true"
+      onclick={() => onToggleFavourite?.(id)}
+    >
+      <i class="fas fa-star" aria-hidden="true"></i>
+    </button>
+    <button
+      type="button"
+      class="crafting-recipe-row-add"
+      title={addLabel}
+      aria-label={addLabel}
+      data-keyboard-focus="true"
+      onclick={() => onAddToShoppingList?.(id)}
+    >
+      <i class="fas fa-cart-plus" aria-hidden="true"></i>
+    </button>
+  </span>
+{/snippet}
+
+<ListRow
+  class={['crafting-recipe-row', { 'is-selected': selected, 'is-uncraftable': uncraftable }]}
   role="listitem"
   data-recipe-id={id}
   data-selected={selected ? 'true' : 'false'}
   data-recipe-status={status}
->
-  <div
-    class="crafting-recipe-row-main is-toggle"
-    role="button"
-    tabindex="0"
-    aria-pressed={selected}
-    onclick={select}
-    onkeydown={onRowKey}
-  >
-    <span class="crafting-recipe-row-thumb" class:is-uncraftable={uncraftable}>
-      <span class="crafting-recipe-row-thumb-media">
-        <Medallion {...resolveCraftingArt(recipe?.img)} alt="" size={44} />
-      </span>
-      {#if uncraftable}
-        <span class="crafting-recipe-row-thumb-scrim" aria-hidden="true"></span>
-        <span
-          class="crafting-recipe-row-pip"
-          data-crafting-status={status}
-          role="img"
-          aria-label={statusLabel}
-          title={statusLabel}
-        >
-          <i class={descriptor.icon} aria-hidden="true"></i>
-        </span>
-      {/if}
-    </span>
-    <span class="crafting-recipe-row-copy">
-      <span class="crafting-recipe-row-name" title={name}>{name}</span>
-      <span class="crafting-recipe-row-meta">
-        <span class="crafting-recipe-row-system">{systemName}</span>
-        {#if !uncraftable}
-          <!-- The row has already said the status in words on the recipe beside it, so this is
-               the chip's icon-only face: a square with the label as its accessible NAME rather
-               than as a tooltip, which is all the retired badge ever gave it. -->
-          <Chip
-            density="list"
-            iconOnly
-            tone={statusChipTone(descriptor.tone)}
-            icon={descriptor.icon}
-            data-crafting-status={status}
-            aria-label={statusLabel}
-            title={statusLabel}
-          />
-        {/if}
-        {#if showCategory}
-          <span class="crafting-recipe-row-category" title={categoryLabel}>{categoryLabel}</span>
-        {/if}
-      </span>
-    </span>
-    {#if !redacted}
-      <div class="crafting-recipe-row-actions">
-        <button
-          type="button"
-          class="crafting-recipe-row-fav"
-          class:is-active={favourite}
-          aria-pressed={favourite}
-          title={localize(
-            favourite
-              ? 'FABRICATE.App.Crafting.Browser.Unfavourite'
-              : 'FABRICATE.App.Crafting.Browser.Favourite'
-          )}
-          aria-label={localize(
-            favourite
-              ? 'FABRICATE.App.Crafting.Browser.Unfavourite'
-              : 'FABRICATE.App.Crafting.Browser.Favourite'
-          )}
-          onclick={toggleFavourite}
-        >
-          <i class="fas fa-star" aria-hidden="true"></i>
-        </button>
-        <button
-          type="button"
-          class="crafting-recipe-row-add"
-          title={localize('FABRICATE.App.Crafting.Shopping.AddToList')}
-          aria-label={localize('FABRICATE.App.Crafting.Shopping.AddToList')}
-          onclick={addToList}
-        >
-          <i class="fas fa-cart-plus" aria-hidden="true"></i>
-        </button>
-      </div>
-    {/if}
-  </div>
-</div>
+  {name}
+  density="default"
+  tone={uncraftable ? 'danger' : 'neutral'}
+  truncateName
+  {selected}
+  onOpen={() => onSelect?.(id)}
+  openProps={{ class: 'crafting-recipe-row-main', 'aria-label': `${name}, ${statusLabel}` }}
+  leading={thumb}
+  {meta}
+  trailing={redacted ? undefined : actions}
+/>
 
 <style>
-  .crafting-recipe-row {
+  /* Keep natural row height inside the scrolling list flex column, so the list scrolls rather
+     than squashing its rows. */
+  :global(.crafting-recipe-row) {
     box-sizing: border-box;
-    /* Keep natural row height inside the scrolling list flex column: without this
-       the row shrinks to fit and its overflow:hidden clips the content, collapsing
-       the rows instead of letting .crafting-browser-list scroll. */
     flex: 0 0 auto;
     width: 100%;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text);
-    overflow: hidden;
-  }
-
-  .crafting-recipe-row.is-selected {
-    border-color: var(--fab-accent);
-    background: var(--fab-accent-soft);
-  }
-
-  /* Uncraftable (missing materials, or a check that refuses this character): tint the whole row with the error family.
-     Declared after .is-selected so the error identity survives selection. */
-  .crafting-recipe-row.is-uncraftable {
-    border-color: var(--fab-danger-border);
-    background: var(--fab-danger-soft);
-  }
-
-  .crafting-recipe-row.is-uncraftable.is-selected {
-    border-color: var(--fab-danger);
-  }
-
-  .crafting-recipe-row-main {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-2);
-    min-height: 60px;
-  }
-
-  .crafting-recipe-row-main.is-toggle {
-    cursor: pointer;
-  }
-
-  .crafting-recipe-row-main.is-toggle:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: -2px;
   }
 
   /* Thumbnail wrapper: a positioning context for the uncraftable scrim + pip. */
@@ -256,23 +203,9 @@
     line-height: 1;
   }
 
-  .crafting-recipe-row-copy {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .crafting-recipe-row-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 600;
-  }
-
+  /* One line that never wraps: the system name gives up width first. */
   .crafting-recipe-row-meta {
+    flex: 1 1 auto;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -281,8 +214,9 @@
 
   .crafting-recipe-row-system {
     /* The lower-value meta token: it gives up width FIRST so the category badge
-       (issue 514) keeps its floor before the system name truncates. */
-    flex: 1 1 auto;
+       (issue 514) keeps its floor before the system name truncates. It does not
+       grow, so the chip and the category follow it on a wide row. */
+    flex: 0 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -292,12 +226,14 @@
   }
 
   /* Neutral category badge (issue 514): grouping metadata, explicitly NOT a status
-     tone. Neutral theme tokens only. Holds a small floor and truncates with an
-     ellipsis + hover title so a long custom category name cannot blow out the row. */
+     tone. Neutral theme tokens only. It does not shrink and holds at least 6ch, and
+     truncates with an ellipsis + hover title at half the meta line so a long custom category name
+     cannot blow out the row. */
   .crafting-recipe-row-category {
-    flex: 0 1 auto;
-    min-width: 2rem;
-    max-width: 9rem;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    min-width: 6ch;
+    max-width: min(9rem, 50%);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -310,7 +246,6 @@
   }
 
   .crafting-recipe-row-actions {
-    flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     gap: var(--fab-space-1);

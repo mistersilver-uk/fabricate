@@ -344,7 +344,7 @@ describe('RecipeDetail mounted behavior', () => {
     );
   });
 
-  it('renders routed ingredient options as cards under the check with status + products', async () => {
+  it('compares routed ingredient options as radio cards under the check, with status + products', async () => {
     const onChoose = [];
     const target = await harness.mount({
       recipe: recipe({
@@ -386,30 +386,61 @@ describe('RecipeDetail mounted behavior', () => {
 
     const section = target.querySelector('[data-recipe-section="ingredient-sets"]');
     assert.ok(section, 'ingredient options section rendered');
-    const cards = section.querySelectorAll('.crafting-option-card');
-    assert.equal(cards.length, 2, 'one card per option');
+    // One radio group, so the arrow keys move between routes; no route is a button.
+    const radios = [...section.querySelectorAll(':scope fieldset input[type="radio"]')];
+    assert.equal(radios.length, 2, 'one route radio per option');
+    assert.ok(radios[0].name, 'the routes share a group name');
+    assert.ok(radios.every((radio) => radio.name === radios[0].name), 'one group, not two');
+    assert.equal(section.querySelectorAll(':scope button').length, 0, 'no route is a button');
+    const group = section.querySelector(':scope fieldset');
+    assert.deepEqual(
+      [
+        group.classList.contains('is-config-cards'),
+        group.classList.contains('is-legend-visible'),
+        group.querySelector(':scope > legend')?.textContent.trim(),
+      ],
+      [true, true, 'FABRICATE.App.Crafting.Detail.IngredientSetsTitle'],
+      'config cards, as the Journal draws routes, under a shown "Ingredient options" legend'
+    );
 
     const cardA = section.querySelector('[data-set-id="set-a"]');
     const cardB = section.querySelector('[data-set-id="set-b"]');
-    assert.equal(cardA.getAttribute('aria-pressed'), 'true', 'selected option marked');
-    assert.equal(cardA.getAttribute('data-option-status'), 'craftable');
-    assert.equal(cardB.getAttribute('data-option-status'), 'blocked', 'missing tool → blocked');
-    assert.ok(
-      cardA.querySelector('.crafting-option-status.tone-success'),
-      'craftable status is green'
+    assert.deepEqual(
+      [cardA.tagName, cardA.querySelector('input').checked, cardB.querySelector('input').checked],
+      ['LABEL', true, false],
+      'each route is a radio card, and the chosen one is checked'
     );
-    assert.ok(cardB.querySelector('.crafting-option-status.tone-danger'), 'blocked status is red');
+    assert.match(cardA.textContent, /SelectedRoute/, 'the chosen route says so');
+    assert.doesNotMatch(cardB.textContent, /SelectedRoute/, 'and only the chosen one');
 
-    // Product tile with a quantity pip.
-    assert.ok(
-      cardA.querySelector('.crafting-option-product [data-medallion="image"] img'),
-      'product image'
+    const statusA = cardA.querySelector('[data-option-status]');
+    const statusB = cardB.querySelector('[data-option-status]');
+    assert.deepEqual(
+      [statusA.dataset.optionStatus, statusA.dataset.optionStatusTone, chipToneOf(statusA)],
+      ['craftable', 'success', 'positive'],
+      'craftable status is the green chip'
     );
-    assert.equal(
-      cardA.querySelector('.crafting-option-product-pip').textContent.trim(),
-      '×1',
-      'quantity pip'
+    assert.deepEqual(
+      [statusB.dataset.optionStatus, chipToneOf(statusB)],
+      ['blocked', 'danger'],
+      'missing tool → the blocked, red chip'
     );
+
+    // Each route's products are dense list rows with a 22px mark, chosen or not.
+    for (const [card, quantity] of [
+      [cardA, '×1'],
+      [cardB, '×2'],
+    ]) {
+      const rows = card.querySelectorAll(':scope .fabricate-list-row');
+      assert.equal(rows.length, 1, 'one row per product');
+      const [row] = rows;
+      assert.equal(row.dataset.listRow, 'dense');
+      assert.equal(row.querySelector('.fabricate-list-row-name').textContent, 'Warding Shield Boss');
+      assert.equal(row.querySelector('.fabricate-list-row-quantity').textContent, quantity);
+      const mark = row.querySelector('[data-medallion="image"]');
+      assert.match(mark.getAttribute('style'), /width: ?22px; ?height: ?22px/, 'the dense row’s mark');
+      assert.ok(mark.querySelector('img'), 'product image');
+    }
 
     // The options render AFTER the crafting check in document order.
     const check = target.querySelector('[data-recipe-section="check"]');
@@ -418,9 +449,39 @@ describe('RecipeDetail mounted behavior', () => {
       'ingredient options come after the crafting check'
     );
 
-    cardB.click();
+    // An arrow key moves a native radio group's selection and fires `change` (measured in
+    // Chromium by `crafting-rows-rendered`); the change is what chooses the route.
+    assert.equal(radios[1].disabled, false, 'the blocked route stays choosable');
+    radios[1].checked = true;
+    radios[1].dispatchEvent(new globalThis.Event('change', { bubbles: true }));
     flushSync();
-    assert.deepEqual(onChoose, ['set-b'], 'clicking a card selects that route');
+    assert.deepEqual(onChoose, ['set-b'], 'choosing a route radio selects that route');
+  });
+
+  it('names each route selector its own radio group, so two never share one', async () => {
+    const names = [];
+    for (const pass of [1, 2]) {
+      const target = await harness.mount({
+        recipe: recipe({
+          modeToken: 'routedByIngredients',
+          defaultSetId: 'set-a',
+          ingredientSets: ['set-a', 'set-b'].map((id) => ({
+            id,
+            label: `Route ${id} (${pass})`,
+            craftability: craftability({ canCraft: true }),
+            products: [],
+          })),
+        }),
+        selectedSetId: 'set-a',
+        craftability: craftability({ canCraft: true }),
+      });
+      const radios = target.querySelectorAll(':scope [data-recipe-section="ingredient-sets"] input');
+      names.push(...new Set([...radios].map((radio) => radio.name)));
+      harness.remount();
+    }
+    assert.equal(names.length, 2, `one name per selector: ${names.join(', ')}`);
+    assert.ok(names.every(Boolean), 'and neither is empty');
+    assert.notEqual(names[0], names[1], 'two selectors, two radio groups');
   });
 
   it('routes the Produces output to the selected ingredient set', async () => {

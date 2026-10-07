@@ -17,7 +17,6 @@ const LIST_ROW = 'src/ui/svelte/components/ListRow.svelte';
 /** Player templates with an element carrying `role="button"`, after this change (not prose). */
 const ROLE_BUTTON_SITES = Object.freeze([
   'src/ui/svelte/apps/alchemy/Workbench.svelte',
-  'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
   'src/ui/svelte/components/LogList.svelte',
 ]);
 
@@ -26,7 +25,6 @@ const OWN_PRESSED_SITES = Object.freeze([
   'src/ui/svelte/apps/InteractableConfigRoot.svelte',
   'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
-  'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
   'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
 ]);
 

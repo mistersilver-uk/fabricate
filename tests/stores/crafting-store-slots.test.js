@@ -412,6 +412,69 @@ describe('craftingStore requirement rail and essence pool', () => {
     flushSync();
     assert.deepEqual(store.selectedEssenceAllocation, {});
     assert.equal(store.selectedCraftability.marker, 'baked-b');
+
+    // The chooser is reset, not merely out of scope: back on set-a it does not reopen g-herb.
+    store.chooseIngredientSet('set-a');
+    flushSync();
+    assert.equal(store.openSlotId, ESSENCE_POOL_SLOT_ID, 'the first unsatisfied slot is open');
+  });
+
+  // The route radios choose each route an arrow key lands on (issue 1778), so a switch must not
+  // discard a pick. set-b repeats set-a's group ids, which is why the picks are held per set.
+  it("keeps each set's option picks across a set switch, and sends only the chosen set's", async () => {
+    const { store, calls } = await loadedStore({ recomputed: evaluateForAllocation });
+    const pick = { 'g-herb': { optionIndex: 1, heldItemId: null } };
+    store.chooseIngredientOption('g-herb', { optionIndex: 1 });
+    flushSync();
+
+    store.chooseIngredientSet('set-b');
+    flushSync();
+    assert.deepEqual(store.selectedIngredientOptions, {}, "set-b's own g-herb is untouched");
+    assert.equal(store.selectedCraftability.marker, 'baked-b', 'so set-b is not re-evaluated');
+
+    store.chooseIngredientSet('set-a');
+    flushSync();
+    assert.deepEqual(store.selectedIngredientOptions, pick, 'the set-a pick survives the round trip');
+    assert.equal(store.selectedCraftability.marker, 'recomputed', 'and still drives set-a');
+    await store.craft(store.selectedRecipe);
+    assert.deepEqual(calls.craftRecipe.at(-1).ingredientOptionOverrides, pick);
+    store.chooseIngredientSet('set-b');
+    flushSync();
+    store.chooseIngredientSet('set-a');
+    flushSync();
+    assert.deepEqual(store.selectedIngredientOptions, pick, 'the crafted set keeps its own picks');
+  });
+
+  // A craft spends stacks, so a pick held for another route may name a stack that is gone.
+  it("drops every other set's picks when a craft lands, and crafts with none of them", async () => {
+    const { store, calls } = await loadedStore({ recomputed: evaluateForAllocation });
+    store.chooseIngredientOption('g-herb', { optionIndex: 1, heldItemId: 'Item.stack' });
+    flushSync();
+
+    store.chooseIngredientSet('set-b');
+    flushSync();
+    await store.craft(store.selectedRecipe);
+    assert.deepEqual(calls.craftRecipe.at(-1).ingredientOptionOverrides, {}, 'nor crafted with it');
+
+    store.chooseIngredientSet('set-a');
+    flushSync();
+    assert.deepEqual(store.selectedIngredientOptions, {}, "set-a's stale stack pick is gone");
+  });
+
+  it('keeps every choice when the set in force is chosen again', async () => {
+    const { store } = await loadedStore();
+    store.chooseIngredientOption('g-herb', { optionIndex: 1 });
+    store.setEssenceAllocation(CARRIER, 2);
+    store.openSlot('g-herb');
+    flushSync();
+
+    store.chooseIngredientSet('set-a');
+    flushSync();
+    assert.deepEqual(store.selectedIngredientOptions, {
+      'g-herb': { optionIndex: 1, heldItemId: null },
+    });
+    assert.deepEqual(store.selectedEssenceAllocation, { 'set-a::step-1': { [CARRIER]: 2 } });
+    assert.equal(store.openSlotId, 'g-herb', 'the open chooser stays open');
   });
 
   it('drops the allocation and the open chooser when the recipe changes', async () => {
