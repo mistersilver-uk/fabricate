@@ -4462,8 +4462,7 @@
 
 /* One column, so one flex line: a wrapping column would size its line to the widest child and stretch the button past the card. */
 .fabricate-list-row.is-card {
-  flex-direction: column;
-  flex-wrap: nowrap;
+  flex-flow: column nowrap;
   align-items: stretch;
   gap: var(--fab-space-2);
   padding: var(--fab-space-3);

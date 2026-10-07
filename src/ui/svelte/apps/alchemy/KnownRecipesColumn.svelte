@@ -276,13 +276,13 @@
   }
 
   /* The bench match, in the positive status tone (the accent edge means selected only, D7). It
-     keeps to the name's line: its 4px overhang above and below adds no height. */
+     keeps to the name's line: its space-1 overhang above and below adds no height. */
   .alchemy-recipe-badge {
     box-sizing: border-box;
     width: 22px;
     height: 22px;
     flex: 0 0 auto;
-    margin-block: -4px;
+    margin-block: calc(-1 * var(--fab-space-1));
     border-radius: 6px;
     display: flex;
     align-items: center;
