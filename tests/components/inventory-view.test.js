@@ -3256,6 +3256,11 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     await settle();
 
     const card = target.querySelector('[data-inventory-card="sys:c1"] button');
+    fire(card, 'keydown', { key: 'Enter' });
+    await settle();
+    assert.equal(selected, 'sys:c1', 'POSITIVE CONTROL: a plain Enter reaches select');
+    selected = null;
+
     fire(card, 'keydown', { key: 'Enter', shiftKey: true });
     await settle();
 
