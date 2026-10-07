@@ -35,7 +35,9 @@
   // The stop falls back to the first tab so the rail never leaves the Tab order, while
   // `aria-selected` stays bound to `current` alone.
   const stopId = $derived((items.find((item) => item.current) ?? items[0])?.id);
-  const tabNodes = [];
+  // Reactive so `bind:this` on an indexed slot is a reactive write (Svelte's dev build warns
+  // `binding_property_non_reactive` on a plain array) and a removed tab's slot is cleared.
+  const tabNodes = $state([]);
 
   function onTabKeydown(event, index) {
     const last = items.length - 1;

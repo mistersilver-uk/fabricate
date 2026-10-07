@@ -169,6 +169,25 @@ describe('NavSidebar, icon variant', () => {
     }
   });
 
+  it('binds each tab node into reactive state, so the dev build raises no binding warning', async () => {
+    const warnings = [];
+    const warn = console.warn;
+    console.warn = (...args) => {
+      warnings.push(args.map(String).join(' '));
+    };
+    try {
+      await mountIcon('crafting');
+      await tick();
+    } finally {
+      console.warn = warn;
+    }
+    assert.deepEqual(
+      warnings.filter((text) => text.includes('binding_property_non_reactive')),
+      [],
+      '`bind:this={tabNodes[index]}` writes into a plain array'
+    );
+  });
+
   it('falls the stop back to the first tab when no tab is current, and selects none', async () => {
     const { root } = await mountIcon('nothing');
     assert.deepEqual(
