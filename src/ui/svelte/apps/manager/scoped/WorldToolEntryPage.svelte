@@ -1272,7 +1272,7 @@
     gap: var(--fab-space-3);
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--fab-bg-1);
     min-width: 0;
   }
@@ -1367,7 +1367,7 @@
     flex: 0 0 30px;
     width: 30px;
     height: 30px;
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-danger-soft);
     font-size: 0.68rem;
   }
@@ -1377,7 +1377,7 @@
   .manager-world-tool-entry-source-description {
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-bg-0);
     color: var(--fab-text-muted);
     font-size: 0.68rem;
@@ -1421,7 +1421,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-bg-0);
     min-width: 0;
   }

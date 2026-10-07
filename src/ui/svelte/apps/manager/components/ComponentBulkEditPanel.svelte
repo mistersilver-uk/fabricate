@@ -939,7 +939,7 @@
     min-width: 0;
     padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 

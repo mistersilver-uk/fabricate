@@ -402,7 +402,7 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   // Matched to the reference prototype.
   assert.ok(
     emptyPanelBlock.includes('border: 1.5px dashed var(--fab-border);') &&
-      emptyPanelBlock.includes('border-radius: 12px;'),
+      emptyPanelBlock.includes('border-radius: 11px;'),
     'the no-state panel should be a rounded 1.5px dashed panel'
   );
   // A shared primitive must be portable across app areas. `--fab-manager-*` is the prefix
@@ -1311,12 +1311,12 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
     assert.ok(chipBlock.includes(declaration), `the chip declares the compact ${declaration}`);
   }
 
-  // 10px is the SAME as 999px at the 20px single-line height (999px clamps to half the
-  // shorter side), so a normal chip is unchanged; they diverge only once a chip wraps,
+  // 11px, the ladder rung, is the SAME as 999px at the 20px single-line height (both clamp to
+  // half the shorter side), so a normal chip is a stadium; they diverge only once a chip wraps,
   // where a stadium around two lines reads as broken. The pill returns for `truncate`,
   // which is single-line by construction.
   assert.ok(
-    chipBlock.includes('border-radius: 10px;'),
+    chipBlock.includes('border-radius: 11px;'),
     'the chip radius must follow a wrap rather than drawing a stadium around two lines'
   );
   assert.ok(

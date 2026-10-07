@@ -459,7 +459,7 @@
     column-gap: var(--fab-space-3);
     padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 
@@ -482,7 +482,7 @@
     min-width: 0;
     padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 
@@ -493,7 +493,7 @@
     flex: none;
     width: 34px;
     height: 34px;
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
     color: var(--fab-text-secondary);
   }

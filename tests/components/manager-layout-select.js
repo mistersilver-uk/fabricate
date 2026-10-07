@@ -562,7 +562,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
       '#111a23',
       'and that IS `--fab-bg-0` in the default theme, read off the same document'
     );
-    assert.equal(panel['border-top-left-radius'].computed, '10px');
+    assert.equal(panel['border-top-left-radius'].computed, '11px');
     assert.equal(panel['padding-left'].computed, '6px');
     assert.equal(panel['max-width'].computed, '340px');
     assert.equal(panel['row-gap'].computed, '4px');

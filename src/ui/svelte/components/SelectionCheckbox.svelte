@@ -121,7 +121,7 @@
   .fab-selection-check.is-sm {
     width: 16px;
     height: 16px;
-    border-radius: 5px;
+    border-radius: 6px;
     font-size: 8px;
   }
 

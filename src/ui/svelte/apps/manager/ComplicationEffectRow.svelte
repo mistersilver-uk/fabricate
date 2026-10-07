@@ -105,7 +105,7 @@
      ones read as a set against the card behind them. */
   .fab-complication-effect.is-form-condition {
     padding: 9px 11px;
-    border-radius: 8px;
+    border-radius: 9px;
     background: none;
   }
 

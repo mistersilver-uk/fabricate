@@ -1166,7 +1166,7 @@
   .fab-complication-card {
     padding: 12px;
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--fab-bg-0);
   }
 

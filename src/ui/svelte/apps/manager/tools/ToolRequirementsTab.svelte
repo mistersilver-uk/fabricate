@@ -544,7 +544,7 @@
     min-width: 0;
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
   }
 
   /* THE HAIRLINE BETWEEN THE TWO SECTIONS, and NOT a gap, written on the SECOND section so a tab

@@ -92,7 +92,7 @@
     height: 30px;
     padding: 0 10px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--fab-text);
     background: var(--fab-bg-0);
     font-family: var(--fab-font-serif);

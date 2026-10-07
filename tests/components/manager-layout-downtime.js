@@ -148,7 +148,7 @@ test('the rail Downtime premium mark renders as the shared gold badge chip', asy
       read.count.color,
       'the chip must beat the later nav-count rules that re-tone every trailing marker'
     );
-    assert.equal(read.chip.radius, '4px', 'at the rail scale the design draws a 4px chip');
+    assert.equal(read.chip.radius, '6px', 'the design draws a 4px chip; the chip rung is 6');
     // 5px, one pixel tighter each side than the design's own `2px 6px`.
     assert.equal(read.chip.padding, '5px', 'the rail chip keeps its filled-chip padding');
     assert.ok(

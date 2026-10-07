@@ -567,7 +567,7 @@
     gap: 14px;
     padding: 14px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 11px;
     background: var(--fab-overlay-light-035);
   }
 
@@ -611,7 +611,7 @@
     align-items: center;
     gap: 8px;
     padding: 8px 14px;
-    border-radius: 8px;
+    border-radius: 9px;
     border: 1px solid var(--fab-border);
     background: var(--fab-overlay-light-035);
     color: var(--fab-text);
@@ -717,7 +717,7 @@
     gap: 8px;
     padding: 6px 8px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-overlay-light-035);
   }
 

@@ -195,7 +195,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--fab-bg-0);
     min-width: 0;
   }
@@ -217,7 +217,7 @@
     min-width: 0;
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
   }
 
@@ -279,7 +279,7 @@
     flex: 0 0 30px;
     width: 30px;
     height: 30px;
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-danger-soft);
     font-size: 0.68rem;
   }
@@ -295,7 +295,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-4) var(--fab-space-3);
     border: 2px dashed var(--fab-border-strong);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
     min-width: 0;
     text-align: center;
@@ -341,7 +341,7 @@
     min-height: 28px;
     padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border-strong);
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--fab-text-secondary);
     background: var(--fab-bg-0);
     font-size: 0.66rem;

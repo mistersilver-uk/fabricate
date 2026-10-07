@@ -194,7 +194,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-bg-1);
     color: var(--fab-text-subtle);
     font-size: 0.62rem;
