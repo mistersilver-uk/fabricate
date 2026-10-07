@@ -1,6 +1,6 @@
 <!--
-  A fieldset of radio CARDS for a closed mode set: one card per option, with an optional inline
-  second datum and a sentence line beneath the name. Nine callers, all closed mode sets.
+  A fieldset of radio CARDS for one choice among a few options: one card per option, with an
+  optional inline second datum, a sentence line beneath the name, and an optional `optionBody`.
 
   Rest spread:
   - `{...rest}` lands on the `<Field>` fieldset root, written after `class`, and carries the
