@@ -36,7 +36,7 @@ import { readLibrarySections } from './helpers/designLibrarySections.js';
 import { declaredPropNames, PROP_NAME } from './helpers/sveltePropsDeclaration.js';
 import { resolveSlots } from './view-lab/primitives/inject.js';
 import { normalize, specBlocks, unitsOf } from './view-lab/primitives/library.js';
-import { BESIDE, REPLACE } from './view-lab/primitives/liveness.js';
+import { BESIDE, REPLACE, libraryNamesByPath } from './view-lab/primitives/liveness.js';
 import { SPECIMEN_SNIPPET_NAMES } from './view-lab/primitives/specimenSnippets.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -308,6 +308,81 @@ test('every catalogue row addresses a drawing the library actually has', () => {
     `${CATALOGUE.length} rows resolved to ${matched} drawing(s); one row stands one drawing up`
   );
   assert.ok(matched > 50, `${matched} drawings matched, which is not the whole catalogue`);
+});
+
+/**
+ * The rows whose component is not named by the entry that owns their drawing: a row repathed to
+ * another component still resolves, mounts and passes every other rule, and draws the wrong thing.
+ *
+ * @param {{host: Element, entry: object}[]} hosts Each claimed drawing with its row.
+ * @param {Map<string, string[]>} namesByPath `libraryNamesByPath` of the manifest.
+ * @returns {string[]} One problem per row outside its entry.
+ */
+function rowsOutsideTheirEntry(hosts, namesByPath) {
+  return hosts.flatMap(({ host, entry }) => {
+    const names = namesByPath.get(entry.row.path) ?? [];
+    const heading =
+      host.closest('.spec')?.querySelector(':scope > .spec-head > h4')?.textContent ?? '';
+    const owned = primitiveNamesIn(heading);
+    // A prose entry's heading names no primitive; its unit's caption does, as a word.
+    const caption = (entry.row.cap ?? '').toLowerCase();
+    const named = (name) =>
+      owned.length > 0
+        ? owned.includes(name)
+        : new RegExp(String.raw`\b${name.toLowerCase()}\b`).test(caption);
+    return names.some(named)
+      ? []
+      : [
+          `${where(entry)}: ${entry.row.path} ships ` +
+            `${names.map((name) => `<${name}>`).join(', ') || 'no library name'}, which the ` +
+            `entry drawing it (${JSON.stringify(heading)}) does not name`,
+        ];
+  });
+}
+
+test('every catalogue row stands up a component its drawing’s own entry names', () => {
+  const namesByPath = libraryNamesByPath(MANIFEST_ROWS);
+  const hosts = RESOLVED.flatMap((resolved) =>
+    resolved.targets.map((host, index) => ({ host, entry: resolved.address.entries[index] }))
+  );
+  assert.ok(hosts.length > 50, `${hosts.length} drawings claimed, so this rule has no domain`);
+  assert.deepEqual(rowsOutsideTheirEntry(hosts, namesByPath), []);
+
+  const [{ host, entry }] = hosts;
+  const own = namesByPath.get(entry.row.path);
+  const stranger = [...namesByPath].find(([, names]) => names.every((n) => !own.includes(n)))[0];
+  const repathed = [{ host, entry: { ...entry, row: { ...entry.row, path: stranger } } }];
+  assert.equal(rowsOutsideTheirEntry(repathed, namesByPath).length, 1);
+});
+
+/**
+ * The inline `repeat(auto-fit` grids directly inside a column stage that do not size themselves at the
+ * stage's width: a column stage is a shrink-to-fit flex column, so such a grid is as wide as its
+ * widest track needs and the rows stretch to fill the height it leaves.
+ *
+ * @param {Element} root The library body.
+ * @returns {{checked: number, unsized: string[]}} How many grids, and the entry of each unsized one.
+ */
+function unsizedStageGrids(root) {
+  const grids = [...root.querySelectorAll(':scope .stage.col > [style*="repeat(auto-fit"]')];
+  const unsized = grids
+    .filter((grid) => !/(^|;)\s*width:\s*100%\s*(;|$)/.test(grid.getAttribute('style')))
+    .map(
+      (grid) => grid.closest('.spec')?.querySelector(':scope > .spec-head > h4')?.textContent ?? '?'
+    );
+  return { checked: grids.length, unsized };
+}
+
+test('every auto-fit grid in a column stage is sized at the stage width', () => {
+  const { checked, unsized } = unsizedStageGrids(LIBRARY_BODY);
+  assert.ok(checked >= 2, `${checked} grid(s) found, so this rule has no domain`);
+  assert.deepEqual(unsized, [], 'add `;width:100%` to the inline style of each');
+
+  const probe = new Window().document;
+  probe.write(
+    '<body><div class="stage col"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9px,1fr))"></div></div></body>'
+  );
+  assert.equal(unsizedStageGrids(probe.body).unsized.length, 1);
 });
 
 /**
