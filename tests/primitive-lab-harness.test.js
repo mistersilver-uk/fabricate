@@ -20,6 +20,7 @@ import {
   describePartialMismatch,
   describeSectionMismatch,
   describeUnstableSizes,
+  describeUnwidenedInsetSpecimens,
   describeWideBesideSpecimens,
   emptyCatalogueMessage,
   expectedSpecimenCount,
@@ -555,6 +556,17 @@ test('a filling specimen beside its drawing is no wider than the drawing', () =>
     describeWideBesideSpecimens([{ ...pair, width: 300 }]),
     /<NavSidebar> \/ NavSidebar\.svelte: 300px beside a 72px drawing/
   );
+});
+
+test('a slot whose row has an inset is widened by it unless its drawing is capped', () => {
+  const slot = { entry: '<SlotTile>', specimen: 'SlotTile.svelte', width: 72, drawn: 56, inset: 8 };
+  assert.equal(describeUnwidenedInsetSpecimens([slot, { ...slot, width: 71.5 }]), null);
+  assert.match(
+    describeUnwidenedInsetSpecimens([{ ...slot, width: 56 }]),
+    /<SlotTile> \/ SlotTile\.svelte: 56px for a 56px drawing with a 8px inset/
+  );
+  assert.equal(describeUnwidenedInsetSpecimens([{ ...slot, width: 56, capped: true }]), null);
+  assert.equal(describeUnwidenedInsetSpecimens([{ ...slot, width: 56, inset: undefined }]), null);
 });
 
 test('lab:check expects every library section and every catalogued beside specimen', () => {

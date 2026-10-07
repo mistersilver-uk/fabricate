@@ -35,6 +35,10 @@ const ERROR_ATTRIBUTE = 'data-primitive-lab-error';
 /** The identity marker `npm run lab:check` reads off each specimen's `<iframe>`. */
 const SPECIMEN_ATTRIBUTE = 'data-primitive-lab-specimen';
 
+/** The drawing's width as measured before it was replaced, and `capped` when it has a `max-width`. */
+const DRAWN_ATTRIBUTE = 'data-primitive-lab-drawn';
+const CAPPED_ATTRIBUTE = 'data-primitive-lab-capped';
+
 /** Applied once an iframe's measured size has been read and applied. See `page.css`. */
 const SIZED_CLASS = 'pl-specimen-sized';
 
@@ -213,6 +217,8 @@ function standUpSpecimen(slot, problems, results) {
   iframe.setAttribute(SPECIMEN_ATTRIBUTE, slot.row.path);
   iframe.title = `${slot.row.spec}: ${slot.row.path}`;
   const host = readHostLayout(slot.host, slot.row);
+  iframe.setAttribute(DRAWN_ATTRIBUTE, String(slot.host.getBoundingClientRect().width));
+  if (host.maxInlineSize !== 'none') iframe.setAttribute(CAPPED_ATTRIBUTE, '');
   // Before READY, so the first report is measured at the width the specimen will keep.
   if (host.presize) iframe.style.width = host.presize;
   presizeBoxedSlot(iframe, slot.row);

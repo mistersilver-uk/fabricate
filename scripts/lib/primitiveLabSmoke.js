@@ -9,6 +9,7 @@ import path from 'node:path';
 import { Window } from 'happy-dom';
 
 import { readLibrarySections } from '../../tests/helpers/designLibrarySections.js';
+import { insetOf } from '../../tests/view-lab/primitives/hostLayout.js';
 import { resolveSlots } from '../../tests/view-lab/primitives/inject.js';
 import {
   BESIDE,
@@ -193,7 +194,9 @@ export function readLabExpectations(root) {
     const beside = slots.filter((slot) => slot.mode === BESIDE);
     const besideByEntry = {};
     const partialByEntry = {};
+    const insetByPath = {};
     for (const slot of slots) {
+      if (insetOf(slot.row) > 0) insetByPath[slot.row.path] = insetOf(slot.row);
       const heading = slot.host
         .closest('.spec')
         ?.querySelector(':scope > .spec-head > h4')?.textContent;
@@ -207,6 +210,7 @@ export function readLabExpectations(root) {
       beside: beside.length,
       besideByEntry,
       partialByEntry,
+      insetByPath,
     };
   } finally {
     window.close();
@@ -351,6 +355,30 @@ export function describeWideBesideSpecimens(pairs) {
         `${entry} / ${specimen}: ${Math.round(width)}px beside a ${Math.round(drawn)}px drawing`
     );
   return wide.length === 0 ? null : wide.join('; ');
+}
+
+/**
+ * Report a specimen whose row has an `inset` but whose slot is not widened by it: the primitive
+ * pads itself by the inset on both sides, so a slot no wider than the drawing clips it. A drawing
+ * with its own `max-width` is exempt, as `layoutFor` exempts it: its width already holds the inset.
+ *
+ * @param {{entry: string, specimen: string, width: number, drawn: number, inset?: number,
+ *   capped?: boolean}[]} specimens Every specimen's slot width, its drawing's, its row's inset,
+ *   and whether the drawing was capped, as rendered.
+ * @returns {string|null} The unwidened specimens, or null when every inset row is widened.
+ */
+export function describeUnwidenedInsetSpecimens(specimens) {
+  const narrow = specimens
+    .filter(
+      ({ width, drawn, inset = 0, capped = false }) =>
+        inset > 0 && !capped && width < drawn + 2 * inset - WIDTH_TOLERANCE_PX
+    )
+    .map(
+      ({ entry, specimen, width, drawn, inset }) =>
+        `${entry} / ${specimen}: ${Math.round(width)}px for a ${Math.round(drawn)}px drawing ` +
+        `with a ${inset}px inset`
+    );
+  return narrow.length === 0 ? null : narrow.join('; ');
 }
 
 /** Opaque, because `eslint-plugin-import-x` crashes on Vite's exports map (see the View Lab CLI). */

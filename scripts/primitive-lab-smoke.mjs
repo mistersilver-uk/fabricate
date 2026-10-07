@@ -26,6 +26,7 @@ import {
   describePartialMismatch,
   describeSectionMismatch,
   describeUnstableSizes,
+  describeUnwidenedInsetSpecimens,
   describeWideBesideSpecimens,
   emptyCatalogueMessage,
   readLabExpectations,
@@ -178,6 +179,13 @@ function readSpecimenChips(page) {
           text: element.textContent,
           paired: leads(element.parentElement),
         })),
+        slots: all(specimen).map((frame) => ({
+          entry: entryOf(frame),
+          specimen: frame.dataset.primitiveLabSpecimen,
+          width: frame.getBoundingClientRect().width,
+          drawn: Number.parseFloat(frame.dataset.primitiveLabDrawn),
+          capped: frame.hasAttribute('data-primitive-lab-capped'),
+        })),
         beside: all(`${label} + .pl-specimen-fill${specimen}`).map((frame) => ({
           entry: entryOf(frame),
           specimen: frame.dataset.primitiveLabSpecimen,
@@ -247,6 +255,10 @@ async function run() {
     if (partial) throw new Error(`the partial specimens do not all say so:\n  ${partial}`);
     const wide = describeWideBesideSpecimens(chips.beside);
     if (wide) throw new Error(`a filling specimen is wider than the drawing beside it: ${wide}`);
+    const unwidened = describeUnwidenedInsetSpecimens(
+      chips.slots.map((slot) => ({ ...slot, inset: expectations.insetByPath[slot.specimen] }))
+    );
+    if (unwidened) throw new Error(`an inset row's slot is not widened by its inset: ${unwidened}`);
     if (failures.length > 0) {
       throw new Error(
         `the page reported ${failures.length} failure(s):\n  ${failures.join('\n  ')}`
