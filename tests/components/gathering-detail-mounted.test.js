@@ -21,8 +21,8 @@ import {
   FOUNDRY_BRIDGE_RAW_MODULES,
   LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/foundryBridgeModules.js';
-import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
+import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -198,7 +198,9 @@ function describedBy(control) {
 
 /** The block content inside a list-row control, which a native button may not hold. */
 function nonPhrasingIn(control) {
-  return [...control.querySelectorAll(NON_PHRASING_CONTENT)].map((node) => node.tagName.toLowerCase());
+  return [...control.querySelectorAll(NON_PHRASING_CONTENT)].map((node) =>
+    node.tagName.toLowerCase()
+  );
 }
 
 async function renderDetail(props = {}) {
@@ -1950,7 +1952,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     );
     // Event rows are selectable: each is a list row whose summary is its one button.
     assert.equal(
-      section.querySelectorAll('.gathering-event-row > button.gathering-event-summary').length,
+      section.querySelectorAll(':scope .gathering-event-row > button.gathering-event-summary')
+        .length,
       6,
       'event rows are selectable'
     );
@@ -2076,7 +2079,13 @@ describe('GatheringDetail (center column) mounted behavior', () => {
   it('draws a task as one list-row button, named by its name and chance, its chance beside it', async () => {
     const picked = [];
     const task = taskModel({ rich: { nodes: { current: 2, max: 3 }, stamina: { cost: 1 } } });
-    await renderRow({ task, selected: true, onSelect: (id) => picked.push(id) });
+    await renderRow({
+      task,
+      selected: true,
+      onSelect: (id) => {
+        picked.push(id);
+      },
+    });
 
     const row = target.querySelector('[data-task-id="task-1"]');
     assert.ok(
@@ -2085,7 +2094,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     );
     const control = row.querySelector(':scope > .gathering-task-summary');
     assert.equal(control.tagName, 'BUTTON', 'its summary is a native button');
-    assert.equal(row.querySelectorAll('button, [role="button"], [tabindex]').length, 1, 'and its one control');
+    assert.equal(
+      row.querySelectorAll('button, [role="button"], [tabindex]').length,
+      1,
+      'and its one control'
+    );
     assert.equal(control.getAttribute('data-keyboard-focus'), 'true');
     assert.equal(control.getAttribute('aria-pressed'), 'true');
     assert.deepEqual(nonPhrasingIn(control), [], 'the button holds phrasing content only');
@@ -2096,7 +2109,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const [economy, copy, chance] = describedBy(control);
     assert.ok(economy.querySelector('[data-gathering-node-count]'), 'described by its economy');
     assert.ok(copy.querySelector('[data-gathering-task-description]'), 'its description');
-    assert.ok(chance.querySelector('[data-gathering-success] [role="meter"]'), 'and its chance');
+    assert.ok(
+      chance.querySelector(':scope [data-gathering-success] [role="meter"]'),
+      'and its chance'
+    );
     assert.ok(row.contains(chance) && !control.contains(chance), 'which sits beside the button');
 
     control.click();
@@ -2111,13 +2127,20 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       successChance: null,
       blockedReasons: [{ code: 'TOOL_BLOCKED', message: 'Missing tools', data: {} }],
     });
-    await renderRow({ task, onSelect: (id) => picked.push(id) });
+    await renderRow({
+      task,
+      onSelect: (id) => {
+        picked.push(id);
+      },
+    });
 
-    const control = target.querySelector('[data-task-id="task-blocked"] > .gathering-task-summary');
+    const control = target.querySelector(
+      ':scope [data-task-id="task-blocked"] > .gathering-task-summary'
+    );
     assert.equal(control.disabled, false, 'it opens the inspector that explains the block');
     assert.equal(control.getAttribute('aria-pressed'), 'false');
     assert.ok(
-      control.querySelector('.fabricate-list-row-badges [data-gathering-callouts]'),
+      control.querySelector(':scope .fabricate-list-row-badges [data-gathering-callouts]'),
       'the callouts are badges after the name'
     );
     assert.deepEqual(control.getAttribute('aria-label').split(', '), [
@@ -2139,7 +2162,15 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       risk: 'deadly',
       chance: 0.3,
     };
-    await renderRow({ event, onSelect: (id) => picked.push(id) }, GatheringEventRow);
+    await renderRow(
+      {
+        event,
+        onSelect: (id) => {
+          picked.push(id);
+        },
+      },
+      GatheringEventRow
+    );
 
     const row = target.querySelector('[data-event-id="haz-1"]');
     assert.ok(row.matches('.gathering-event-row[role="listitem"][data-list-row="default"]'));
@@ -2148,7 +2179,9 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(row.querySelectorAll('button, [role="button"], [tabindex]').length, 1);
     assert.equal(control.getAttribute('aria-pressed'), 'false');
     assert.deepEqual(nonPhrasingIn(control), [], 'the button holds phrasing content only');
-    assert.ok(control.querySelector('.fabricate-list-row-badges .gathering-event-danger.risk-deadly'));
+    assert.ok(
+      control.querySelector(':scope .fabricate-list-row-badges .gathering-event-danger.risk-deadly')
+    );
     assert.deepEqual(control.getAttribute('aria-label').split(', '), [
       'Rockslide',
       'FABRICATE.App.Gathering.Detail.Pips.Danger:{"value":"FABRICATE.App.Gathering.Detail.Risk.deadly"}',
@@ -2156,7 +2189,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     ]);
     const [copy, chance] = describedBy(control);
     assert.ok(copy.querySelector('[data-gathering-event-description].is-fallback'));
-    assert.ok(chance.querySelector('[data-gathering-event-chance] [role="meter"]'));
+    assert.ok(chance.querySelector(':scope [data-gathering-event-chance] [role="meter"]'));
     assert.ok(!control.contains(chance), 'the chance sits beside the button');
     control.click();
     assert.deepEqual(picked, ['haz-1']);

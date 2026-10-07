@@ -29,7 +29,7 @@ const cardCss = compile(cardSource, { filename: 'EnvironmentCard.svelte', css: '
 
 /** The compiled declarations of the card rule whose selector starts with `selector`. */
 function cardRule(selector) {
-  const start = cardCss.indexOf(`${selector}`);
+  const start = cardCss.indexOf(selector);
   assert.ok(start >= 0, `no compiled rule for ${selector}`);
   return cardCss.slice(cardCss.indexOf('{', start) + 1, cardCss.indexOf('}', start));
 }
