@@ -570,6 +570,14 @@ Where the two disagree about the same view, the smoke is right.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+### Fidelity of the Primitive Lab
+
+The Primitive Lab (`npm run lab`, below) is a developer harness and not a normative artifact.
+It proves that each catalogued component mounts as the real Svelte component, styled by the real `styles/fabricate.css` inside Foundry's harvested chrome.
+It does not prove behaviour under a Foundry runtime: there is no booted `game`, no documents and no hooks.
+Props are plain JSON, so a member that needs a function, an element or live state cannot be mounted and stays in `AWAITING_SPECIMEN` in `tests/design-system-lab-coverage.test.js`, each line with its reason.
+Where the lab and the live smoke disagree, the smoke is right.
+
 ## The Primitive Lab (`npm run lab`)
 
 A second page in the View Lab's Vite app, at `/tests/view-lab/primitives.html`, renders `openspec/specs/design-system/library.html` and stands each catalogued drawing up as the real component it ships.
