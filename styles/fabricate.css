@@ -3615,10 +3615,11 @@
   min-width: 0;
 }
 
-/* Three classes (0,3,0) to clear the base chip's `border: 0` and transparent fill at (0,2,0). */
+/* Three classes (0,3,0) to clear the base chip's `border: 0`, transparent fill and in-panel 6px corner at (0,2,0); a standalone 28px chip takes 7. */
 .fabricate-manager .manager-tag-suggestion.manager-modifier-expression-suggestion {
   flex: 0 1 auto;
   border: 1px solid var(--fab-border);
+  border-radius: 7px;
   background: var(--fab-bg-2);
   font-family: var(--fab-font-mono, monospace);
   font-size: 0.72rem;
@@ -4195,7 +4196,7 @@
   min-height: 28px;
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   color: var(--fab-text);
   background: transparent;
   text-align: left;
@@ -5729,7 +5730,7 @@
   min-width: 0;
 }
 
-/* skin census (issue 1523): an unpinned carrier of the target tuple since the radius sweep put rows on 9 — zero hits under tests/ or scripts/; its emitters are `RecipeBrowserInspector.svelte` and `RecipeProduceRow.svelte`, and `.manager-component-flow-row` has none. */
+/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; its emitters are `RecipeBrowserInspector.svelte` and `RecipeProduceRow.svelte`, and `.manager-component-flow-row` has none. */
 .fabricate-manager .manager-recipe-flow-row,
 .fabricate-manager .manager-component-flow-row {
   display: flex;
@@ -9392,7 +9393,7 @@
   gap: var(--fab-space-1);
 }
 
-/* ONE REQUIREMENT ROW, ON ONE LINE (issue 1373, maintainer round 5; `proto:4658`). skin census (issue 1523): pinned by tests/components/picker-row-matrix-mounted.test.js and the recipe and component studio font-size suites; a carrier since the radius sweep put rows on 9. */
+/* ONE REQUIREMENT ROW, ON ONE LINE (issue 1373, maintainer round 5; `proto:4658`). skin census (issue 1523): a carrier pinned by tests/components/picker-row-matrix-mounted.test.js and the recipe and component studio font-size suites. */
 .fabricate-manager .manager-recipe-ingredient-option-row {
   display: flex;
   flex-wrap: wrap;
@@ -11707,7 +11708,7 @@
   min-height: 32px;
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 6px;
   color: var(--fab-text);
   background: transparent;
   text-align: left;
@@ -14094,7 +14095,7 @@
   background: var(--fab-surface-soft);
 }
 
-/* skin census (issue 1523): an unpinned carrier of the target tuple since the radius sweep put wells on 9 — zero hits under tests/ or scripts/; its sole emitter is `ToolSystemScopeCards.svelte`. */
+/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; its sole emitter is `ToolSystemScopeCards.svelte`. */
 .fabricate-manager .manager-tool-system-label {
   display: grid;
   gap: var(--fab-space-1);
@@ -14387,7 +14388,7 @@
   width: 100%;
 }
 
-/* skin census (issue 1523): an unpinned carrier of the target tuple since the radius sweep put rows on 9 — zero hits under tests/ or scripts/; its sole emitter is `ToolBehaviorPreview.svelte`. */
+/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; its sole emitter is `ToolBehaviorPreview.svelte`. */
 .fabricate-manager .manager-tool-required-row {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) max-content;
