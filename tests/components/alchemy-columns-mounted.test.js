@@ -144,7 +144,7 @@ describe('ComponentInventoryColumn (mounted)', () => {
     assert.deepEqual(nonPhrasingIn(control), [], 'the button holds phrasing content only');
     const leading = control.querySelector(':scope > .fabricate-list-row-leading');
     assert.deepEqual(
-      [...leading.children].map((child) => child.className.split(' ')[0]),
+      [...leading.children].map((child) => child.className.split(' ', 1)[0]),
       ['alchemy-inventory-grip', 'fab-medallion'],
       'the grip, then the mark, lead the row'
     );
@@ -167,8 +167,12 @@ describe('ComponentInventoryColumn (mounted)', () => {
         inventoryRow('ashbloom', 'Ashbloom', { available: 0 }),
       ],
       hasComponents: true,
-      onAdd: (id) => added.push(id),
-      onDragStart: (_event, id) => dragged.push(id),
+      onAdd: (id) => {
+        added.push(id);
+      },
+      onDragStart: (_event, id) => {
+        dragged.push(id);
+      },
     });
     const [enabled, disabled] = listRows(target, 'alchemy-inventory-list').map((row) => row.control);
     assert.deepEqual(
@@ -294,7 +298,9 @@ describe('KnownRecipesColumn (mounted)', () => {
       recipes: [knownRecipe('vigor', 'Elixir of Vigor'), venom],
       knownCount: 2,
       selectedRecipeId: 'vigor',
-      onSelect: (id) => selected.push(id),
+      onSelect: (id) => {
+        selected.push(id);
+      },
     });
     const rows = listRows(target, 'alchemy-known-list');
     assert.deepEqual(

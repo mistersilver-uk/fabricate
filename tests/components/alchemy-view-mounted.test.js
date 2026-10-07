@@ -214,7 +214,9 @@ describe('AlchemyView mounted behavior', () => {
             { id: 'sys-a', name: 'Herbalism', knownCount: 1, totalCount: 4, description: 'Roots.' },
             { id: 'sys-b', name: 'Poisoncraft', knownCount: 0, totalCount: 2 },
           ],
-          chooseSystem: (id) => chosen.push(id),
+          chooseSystem: (id) => {
+            chosen.push(id);
+          },
         })
       ),
     });
