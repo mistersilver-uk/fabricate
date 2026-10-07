@@ -642,7 +642,7 @@
                         art={resolveRecipeImage(recipe)}
                         alt=""
                         icon="fas fa-scroll"
-                        size={40}
+                        size={38}
                       />
                       <span class="manager-system-copy">
                         <span class="manager-recipe-name-row">

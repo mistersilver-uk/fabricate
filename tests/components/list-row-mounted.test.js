@@ -45,7 +45,7 @@ function serialize(node) {
 }
 
 const GLYPH =
-  '<span class="fab-medallion" data-medallion="glyph" style="width: 22px; height: 22px;">';
+  '<span class="fab-medallion is-corner-6" data-medallion="glyph" style="width: 22px; height: 22px;">';
 const BOX = `${GLYPH}<i aria-hidden="true" class="fas fa-box"></i></span>`;
 const NAME = (name) => `<span class="fabricate-list-row-name" title="${name}">${name}</span>`;
 
@@ -66,7 +66,7 @@ const DENSE_MATRIX = Object.freeze([
       trailing: snippet('<span class="probe-trailing">42%</span>'),
     },
     '<div class="fabricate-list-row" data-list-row="dense">' +
-      '<span class="fab-medallion" data-medallion="image" style="width: 22px; height: 22px;">' +
+      '<span class="fab-medallion is-corner-6" data-medallion="image" style="width: 22px; height: 22px;">' +
       '<img class="fab-medallion-img" src="icons/svg/item-bag.svg" alt=""></img></span>' +
       NAME('Steel Ingot') +
       '<span class="fabricate-list-row-detail">Stage 1</span>' +
@@ -77,7 +77,7 @@ const DENSE_MATRIX = Object.freeze([
     'a tinted glyph',
     { name: 'Ironwort', icon: 'fas fa-leaf', tint: 'sage', quantity: 3 },
     '<div class="fabricate-list-row" data-list-row="dense">' +
-      '<span class="fab-medallion" data-medallion="glyph" data-medallion-tint="sage" ' +
+      '<span class="fab-medallion is-corner-6" data-medallion="glyph" data-medallion-tint="sage" ' +
       'style="width: 22px; height: 22px; --fab-medallion-tint: var(--fab-tag-sage);">' +
       '<i aria-hidden="true" class="fas fa-leaf"></i></span>' +
       NAME('Ironwort') +

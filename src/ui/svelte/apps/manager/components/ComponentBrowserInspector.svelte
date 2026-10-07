@@ -188,7 +188,7 @@
           art={selectedComponent.img}
           alt=""
           icon="fas fa-cube"
-          size={40}
+          size={38}
           tint={selectedComponent.color || ''}
         />
         <div class="manager-component-inspector-identity-copy">

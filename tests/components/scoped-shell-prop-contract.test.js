@@ -926,8 +926,8 @@ describe('the catalogue shell FORWARDS what it declares', () => {
     );
     assert.match(
       source,
-      /variant=\{rowMedallionSpec\.variant\}[\s\S]{0,120}?size=\{rowMedallionSpec\.size\}[\s\S]{0,120}?glyph=\{rowMedallionSpec\.glyph\}/,
-      'and the ROW medallion takes all three of the descriptor’s arguments'
+      /variant=\{rowMedallionSpec\.variant\}[\s\S]{0,120}?size=\{38\}[\s\S]{0,120}?glyph=\{rowMedallionSpec\.glyph\}/,
+      'and the ROW medallion takes both of the descriptor’s arguments at the art ladder’s 38'
     );
   });
 
@@ -1276,12 +1276,8 @@ describe('the world Component entry header wires the borderless medallion', () =
   it('passes `variant="glyph-chip"` on the entry heading, keeping its own size and glyph', () => {
     const call = medallionUnder(sourceOf(ROOT), 'data-world-component-entry-heading');
     assert.match(call, /variant="glyph-chip"/, `the header chip asks for the borderless face`);
-    assert.match(
-      call,
-      /size=\{42\}/,
-      'and keeps `proto:5375`’s 42px, which the variant does not own'
-    );
-    assert.match(call, /glyph=\{22\}/);
+    assert.match(call, /size=\{38\}/, 'and takes the art ladder’s 38, which the variant does not own');
+    assert.match(call, /glyph=\{15\}/);
     assert.match(
       call,
       /art=\{worldComponentEntryImage\}/,

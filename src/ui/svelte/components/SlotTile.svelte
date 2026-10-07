@@ -42,6 +42,7 @@
     onclick={interactive && !disabled ? onActivate : undefined}
     {...attributes}
   >
+    <!-- ratchet-exempt(design-system): the library's 56px slot tile; its geometry against the specimen is issue 2257's to converge -->
     <Medallion {art} {icon} {tint} alt="" size={56} glyph={19} />
     {#if pip}
       <span class="fab-slot-pip is-{pipKind === 'candidate' ? 'candidate' : 'ratio'}">{pip}</span>

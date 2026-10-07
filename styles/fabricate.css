@@ -6342,6 +6342,18 @@
   gap: var(--fab-space-3);
 }
 
+/* A title row led by a `Medallion` gives its column to the art ladder's 38, and the wrapper around that tile draws no second frame. */
+.fabricate-manager .manager-inspector-title-row.is-art {
+  grid-template-columns: 38px minmax(0, 1fr);
+}
+
+.fabricate-manager .manager-inspector-icon.is-art {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  background: none;
+}
+
 /* The system row's identity is a real `<button>` since issue 1515 — the row itself was a handler-bearing `<div>` before it — so this reset now has to carry `height: auto` as well. */
 .fabricate-manager .manager-system-identity {
   appearance: none;

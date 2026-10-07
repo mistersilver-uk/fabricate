@@ -233,7 +233,7 @@
     {:else}
       <header class="manager-knowledge-detail-header" data-knowledge-detail-header>
         <div class="manager-knowledge-detail-identity">
-          <Avatar art={selectedCharacter.img} name={selectedCharacter.name} size={50} alt="" />
+          <Avatar art={selectedCharacter.img} name={selectedCharacter.name} size={32} alt="" />
           <div class="manager-knowledge-detail-copy">
             <p class="manager-kicker">{selectedSystemName}</p>
             <h2 class="manager-knowledge-detail-name" title={selectedCharacter.name}>

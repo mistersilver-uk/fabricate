@@ -594,6 +594,7 @@
                   <span class="manager-scoped-entry-label"
                     >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldIcon', 'Icon')}</span
                   >
+                  <!-- ratchet-exempt(design-system): a 150px preview of the GM's colour and icon choice, not a record tile; the art ladder's 38 would shrink it to a speck -->
                   <Medallion
                     icon={normalizedIcon}
                     tint={identity.colorToken || ''}

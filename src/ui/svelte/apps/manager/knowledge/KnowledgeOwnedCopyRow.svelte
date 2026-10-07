@@ -137,7 +137,7 @@
     title={matchTierTitle(copy)}
   >
     <span class="manager-knowledge-copy-identity">
-      <Medallion art={copy.img} icon="fas fa-book" size={44} alt="" />
+      <Medallion art={copy.img} icon="fas fa-book" size={38} alt="" />
       <span class="manager-knowledge-copy-copy">
         <!-- The prototype's rhythm — name, type, quantity — which leaves line 2 the state chips. -->
         <span class="manager-knowledge-copy-heading">

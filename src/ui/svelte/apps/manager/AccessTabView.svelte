@@ -233,11 +233,10 @@
               data-access-row={recipe.id}
               onclick={() => onSelectRecipe(recipe.id)}
             >
-              <!-- The shared tile, at the 46px the retired sheet selector for this row's raw
-                   `<img>` sized it to (issue 1506). Its `art` is the ONE shared recipe-image
+              <!-- The shared tile, at the art ladder's 38. Its `art` is the ONE shared recipe-image
                    chokepoint, so a row still shows the recipe's own artwork and never a
                    containing book's. -->
-              <Medallion art={resolveRecipeImage(recipe)} alt="" icon="fas fa-scroll" size={46} />
+              <Medallion art={resolveRecipeImage(recipe)} alt="" icon="fas fa-scroll" size={38} />
               <span class="manager-access-copy">
                 <span class="manager-access-heading">
                   <span class="manager-access-name" title={recipe.name}>{recipe.name}</span>

@@ -206,9 +206,9 @@
     <p class="manager-kicker">
       {text('FABRICATE.Admin.Manager.Access.GrantTitle', 'Grant access')}
     </p>
-    <div class="manager-inspector-title-row">
-      <span class="manager-inspector-icon" aria-hidden="true"
-        ><Medallion art={resolveRecipeImage(recipe)} alt="" icon="fas fa-scroll" size={46} /></span
+    <div class="manager-inspector-title-row is-art">
+      <span class="manager-inspector-icon is-art" aria-hidden="true"
+        ><Medallion art={resolveRecipeImage(recipe)} alt="" icon="fas fa-scroll" size={38} /></span
       >
       <div class="manager-inspector-copy">
         <span class="manager-inspector-name" title={recipe.name}>{recipe.name}</span>

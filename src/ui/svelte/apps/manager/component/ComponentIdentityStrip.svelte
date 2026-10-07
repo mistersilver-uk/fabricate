@@ -73,7 +73,7 @@
     art={component?.img}
     alt=""
     icon="fas fa-cube"
-    size={44}
+    size={38}
     tint={component?.color || ''}
   />
 

@@ -93,7 +93,7 @@
         <!-- The recipe editor's identity header: the recipe's own image, its name and the
              "<category> · <resolution mode>" subline. -->
         <div class="manager-recipe-edit-heading" data-recipe-edit-heading>
-          <Medallion art={resolveRecipeImage(recipeDraft)} alt="" icon="fas fa-scroll" size={44} />
+          <Medallion art={resolveRecipeImage(recipeDraft)} alt="" icon="fas fa-scroll" size={38} />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={recipeDraft.name || ''}>
               {recipeDraft.name || header.title}
@@ -105,7 +105,7 @@
         <!-- The component editor's identity header, which must match the recipe editor's
              exactly, so it reuses that block's classes wholesale (issue 676). -->
         <div class="manager-recipe-edit-heading" data-component-edit-heading>
-          <Medallion art={componentForEdit.img} alt="" icon="fas fa-cube" size={44} />
+          <Medallion art={componentForEdit.img} alt="" icon="fas fa-cube" size={38} />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={componentForEdit.name || ''}>
               {componentForEdit.name || header.title}
@@ -122,7 +122,7 @@
             art={downtimeHeaderArtwork.image ?? ''}
             alt=""
             icon={downtimeHeaderArtwork.icon ?? 'fas fa-hourglass-half'}
-            size={44}
+            size={38}
           />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={header.title}>{header.title}</h1>
@@ -132,14 +132,13 @@
       {:else if header.headingVariant === 'world-essence-entry'}
         <!-- The essence's own identity header, from the recipe editor's block. `tint` recolours
              the glyph alone since issue 1506 and resolves to the accent when unset; `glyph` is
-             passed because the primitive's default is sized for the 40px row tiles, not for this
-             44px one (`essEntry.png`). -->
+             the art ladder's 15 at the 38 rung. -->
         <div class="manager-recipe-edit-heading" data-world-essence-entry-heading>
           <Medallion
             icon={worldEssenceEntryIcon || 'fas fa-mortar-pestle'}
             tint={worldEssenceEntryTint}
-            size={44}
-            glyph={22}
+            size={38}
+            glyph={15}
           />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={worldEssenceEntryName}>
@@ -154,7 +153,7 @@
         <!-- The same identity header on the system rules route, from the same block rather
              than a fifth implementation of one meaning. -->
         <div class="manager-recipe-edit-heading" data-essence-edit-heading>
-          <Medallion icon={essenceEditIcon} tint={essenceEditTint} size={44} glyph={22} />
+          <Medallion icon={essenceEditIcon} tint={essenceEditTint} size={38} glyph={15} />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={essenceEditName}>
               {essenceEditName || header.title}
@@ -166,15 +165,14 @@
         <!-- The component's own identity header, the twin of the two above (issue 1371). The
              medallion falls back to the glyph when the entry links no Item. -->
         <div class="manager-recipe-edit-heading" data-world-component-entry-heading>
-          <!-- 42px rather than the siblings' 44 because `proto:814` draws this chip at 42 and an
-               art size is its own ladder; the `glyph-chip` variant is the borderless face
-               `proto:5375` draws, which no other prop can ask for (issue 1371). -->
+          <!-- The `glyph-chip` variant is the borderless face `proto:5375` draws, which no other
+               prop can ask for (issue 1371). -->
           <Medallion
             art={worldComponentEntryImage}
             alt=""
             icon="fas fa-cube"
-            size={42}
-            glyph={22}
+            size={38}
+            glyph={15}
             variant="glyph-chip"
           />
           <div class="manager-recipe-edit-heading-copy">
@@ -194,8 +192,8 @@
             art={worldToolEntryRecord.entity?.img ?? ''}
             alt=""
             icon="fas fa-screwdriver-wrench"
-            size={44}
-            glyph={22}
+            size={38}
+            glyph={15}
           />
           <div class="manager-recipe-edit-heading-copy">
             <h1 class="manager-title" title={worldToolEntryName}>

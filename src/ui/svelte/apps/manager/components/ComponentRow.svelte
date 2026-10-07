@@ -82,7 +82,7 @@
       art={component?.img}
       alt=""
       icon="fas fa-cube"
-      size={40}
+      size={38}
       tint={component?.color || ''}
       variant="glyph-chip"
     />
