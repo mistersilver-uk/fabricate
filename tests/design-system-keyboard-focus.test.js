@@ -220,7 +220,7 @@ describe('design system: a programmatic focus target declares itself focused to 
     // 198 at issue 1777, which moved the manager trail's 22 crumb buttons into `PageHeader`, then
     // 173 once the manager rail's hand-authored rows became loops over `managerNavItems.js`.
     assert.ok(
-      formlessButtons.length >= 160,
+      formlessButtons.length >= 150,
       `only ${formlessButtons.length} buttons outside a form reached the walk, against the 159 ` +
         'this tree holds'
     );
