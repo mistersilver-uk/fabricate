@@ -356,7 +356,7 @@
       listClass="manager-character-modifier-add-suggestions"
       listProps={hook('characterModifierSuggestions')}
       optionClass="manager-character-modifier-add-suggestion"
-      optionHeight={32}
+      optionHeight={30}
       optionDataAttr={hookName('characterModifierSuggestion')}
       {...hook('characterModifierSearch')}
     />

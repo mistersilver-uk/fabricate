@@ -68,9 +68,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    flex: 0 0 32px;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
     border-radius: 7px;
     background: var(--fab-bg-3);
     color: var(--fab-text-secondary);

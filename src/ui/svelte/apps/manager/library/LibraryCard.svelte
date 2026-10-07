@@ -139,7 +139,7 @@
     min-width: 0;
     flex-direction: column;
     justify-content: center;
-    min-height: 40px;
+    min-height: 38px;
   }
 
   .fab-library-card-name {

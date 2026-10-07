@@ -1486,7 +1486,7 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
     'system edit fields should use a stable two-column grid'
   );
   assert.ok(
-    fieldInputBlock.includes('height: 36px;'),
+    fieldInputBlock.includes('height: 38px;'),
     'system edit inputs and selects should have stable control height'
   );
   assert.ok(
@@ -1498,7 +1498,7 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
     'feature tiles should seat the state icon beside the copy'
   );
   assert.ok(
-    featureTileIconBlock.includes('flex: 0 0 40px;'),
+    featureTileIconBlock.includes('flex: 0 0 38px;'),
     'feature tile icon should hold the resolution card chip width without shrinking'
   );
   assert.ok(

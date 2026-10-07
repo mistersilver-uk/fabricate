@@ -341,7 +341,7 @@
     display: flex;
     box-sizing: border-box;
     width: 100%;
-    height: var(--fab-stepper-fill-height, 36px);
+    height: var(--fab-stepper-fill-height, 38px);
   }
 
   .fab-stepper.is-fill:not(.is-vertical) .fab-stepper-input {

@@ -619,7 +619,7 @@ test('the Downtime parent rollup keeps the row’s label on one line, and surviv
     );
     assert.ok(
       collapsed.rollup.markInsideRow,
-      'and stays inside the parent button, which grows from its 36px floor to hold it'
+      'and stays inside the parent button, which grows from its 34px floor to hold it'
     );
   } finally {
     await context.close();

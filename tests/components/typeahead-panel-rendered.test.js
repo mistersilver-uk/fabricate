@@ -438,7 +438,7 @@ describe('typeahead suggestion list: the root’s clamp', () => {
  */
 const LONG_LISTS = Object.freeze([
   Object.freeze({ name: 'knowledge', cap: 148, optionHeight: 28 }),
-  Object.freeze({ name: 'modifier', cap: 148, optionHeight: 32 }),
+  Object.freeze({ name: 'modifier', cap: 148, optionHeight: 30 }),
   Object.freeze({ name: 'task', cap: 132, optionHeight: 28 }),
 ]);
 

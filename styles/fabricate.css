@@ -1686,7 +1686,7 @@
 }
 
 .fabricate-manager .manager-checks-sections .manager-environment-tab-button {
-  min-height: 40px;
+  min-height: 38px;
   gap: 7px;
   padding: 11px 14px;
   font-size: 12.5px;
@@ -2923,7 +2923,7 @@
   .fabricate-rule-row-body
   .fabricate-field
   input:not(.fab-stepper-input):not([type="radio"]):not([type="range"]) {
-  height: 32px;
+  height: 30px;
   padding: 0 8px;
   border: 1px solid var(--fab-border);
   border-radius: 7px;
@@ -3191,7 +3191,7 @@
   justify-content: center;
   width: 100%;
   min-width: 0;
-  min-height: 32px;
+  min-height: 30px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 6px;
@@ -3843,7 +3843,7 @@
   grid-template-columns: 22px minmax(0, 1fr);
   align-items: center;
   gap: var(--fab-space-2);
-  min-height: 32px;
+  min-height: 30px;
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
@@ -5607,7 +5607,7 @@
 .fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-copy,
 .fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-unlink {
   width: 100%;
-  min-height: 36px;
+  min-height: 38px;
   justify-content: center;
   font-size: 0.78rem;
   font-weight: 700;
@@ -5649,7 +5649,7 @@
 .fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-delete,
 .fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-delete {
   width: 100%;
-  min-height: 36px;
+  min-height: 38px;
   justify-content: center;
   font-size: 0.78rem;
   font-weight: 700;
@@ -6415,12 +6415,11 @@
   font-size: 0.62rem;
 }
 
-/* The rail card's full width, which the `inline` rung's trigger never declares, at the 32px the native select drew so the nav below it does not move; the system's name is set in the display face wherever it is named, including as this select's value. */
+/* The rail card's full width, which no rung declares, at the `toolbar` rung's 34px and 9px corner on the `inline` rung's fill: the toolbar's bg-1 would sink into the rail's bg-0. The system's name is set in the display face wherever it is named, including as this select's value. */
 .fabricate-manager .manager-scope-select .fabricate-select-trigger {
   width: 100%;
-
-  /* ratchet-exempt(design-system): off the ladder on purpose, the native select's 32px: the 30px rung lifts the rail 2px and the 34px rung drops it 2px; issue 1523 snaps it */
-  min-height: 32px;
+  min-height: 34px;
+  border-radius: 9px;
   font-family: var(--fab-font-serif);
   font-weight: 600;
 }
@@ -8255,12 +8254,12 @@
 /* The tile is a rung above the card, not the ramp's top. `proto:2637` fills this glyph `--bg2` — our `--fab-bg-1` — inside a card the same screen draws over a `--bg1` pane (issue 1373). The library's icon chip is a fill with no edge, so the border is transparent. */
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option-icon {
   order: 1;
-  flex: 0 0 40px;
+  flex: 0 0 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border: 1px solid transparent;
   border-radius: 9px;
   background: var(--fab-bg-1);
@@ -8370,9 +8369,9 @@
   background: var(--fab-bg-1);
 }
 
-/* Same exclusion, same reason, and this half is why the event editor's slider also stood 36px tall with 8px of side padding instead of the 28px/0 the control asks for (issue 1523). */
+/* Same exclusion, same reason: a range input keeps the slider's own 28px box and no side padding. */
 .fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox'], [type='search']):not([type='range']) {
-  height: 36px;
+  height: 38px;
   padding: 0 var(--fab-space-2);
 }
 
@@ -8655,8 +8654,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 7px;
   color: var(--fab-accent);
   background: var(--fab-bg-3);
@@ -9036,6 +9035,7 @@
 .fabricate-manager .manager-tool-replacement-component-trigger .manager-travel-portrait {
   width: 24px;
   height: 24px;
+  border-radius: 6px;
 }
 
 /* The name INSIDE the trigger. It grows with the (max-content) trigger and ellipsizes once the trigger hits its cap, so a long name degrades to a truncation rather than to a row-wide button. */
@@ -9233,7 +9233,7 @@
 .fabricate-manager .manager-recipe-ingredient-set-name {
   flex: 1 1 auto;
   min-width: 0;
-  height: 36px;
+  height: 34px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 6px;
@@ -10185,17 +10185,17 @@
   opacity: 0.55;
 }
 
-/* Mirrors the resolution mode card's 40px chip so the two surfaces read alike. */
+/* Mirrors the resolution mode card's 38px chip so the two surfaces read alike. */
 .fabricate-manager .manager-feature-tile-icon {
   box-sizing: border-box;
-  flex: 0 0 40px;
+  flex: 0 0 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
 
-  /* The transparent border reserves the off state's outline, so the chip stays 40x40 and the glyph stays put across states. */
+  /* The transparent border reserves the off state's outline, so the chip stays 38x38 and the glyph stays put across states. */
   border: 1px solid transparent;
   border-radius: 9px;
   font-size: 0.95rem;
@@ -10325,7 +10325,7 @@
   gap: var(--fab-space-2);
   width: 100%;
   min-width: 0;
-  min-height: 36px;
+  min-height: 34px;
   padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid transparent;
   border-radius: 7px;
@@ -10873,7 +10873,7 @@
   text-align: center;
 }
 
-/* The select fills its field at the `form` rung; 38 against the retired 36 is issue 1523's. */
+/* The select fills its field at the `form` rung's 38. */
 .fabricate-manager .manager-condition-shortcut .fabricate-select-trigger {
   width: 100%;
 }
@@ -11176,10 +11176,10 @@
 }
 
 .fabricate-manager .manager-gathering-event-thumb {
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
-  border-radius: 6px;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 9px;
   object-fit: cover;
   background: var(--fab-overlay-dark-18);
 }
@@ -11197,6 +11197,7 @@
   width: 64px;
   height: 64px;
   flex: 0 0 64px;
+  border-radius: 6px;
   object-fit: cover;
   align-self: center;
 }
@@ -11382,10 +11383,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   object-fit: cover;
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-06);
@@ -11427,8 +11428,9 @@
   font: inherit;
 }
 
-.fabricate-manager .manager-gathering-event-edit-view input:not([type="checkbox"]):not([type="radio"]) {
-  min-height: 32px;
+.fabricate-manager .manager-gathering-event-edit-view input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  min-height: 34px;
+  border-radius: 9px;
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
@@ -11476,8 +11478,9 @@
 /* `[type="search"]` is excluded so the compact search's own 34px inline padding, below, clears its glyph (issue 1782). */
 .fabricate-manager
   .manager-gathering-task-edit-view
-  input:not([type="checkbox"]):not([type="radio"]):not([type="search"]):not([data-recipe-option-formula]):not([data-recipe-option-search]) {
-  min-height: 32px;
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="search"]):not([data-recipe-option-formula]):not([data-recipe-option-search]) {
+  min-height: 34px;
+  border-radius: 9px;
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
@@ -11711,7 +11714,7 @@
   grid-template-columns: 22px minmax(0, 1fr);
   gap: var(--fab-space-2);
   align-items: center;
-  min-height: 32px;
+  min-height: 30px;
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
   border-radius: 6px;
@@ -11927,6 +11930,8 @@
 
 .fabricate-search.fabricate-search.is-compact {
   width: min(220px, 30%);
+
+  /* ratchet-exempt(design-system): the compact search's 32, the one exception to the retired 32 the geometry requirement names */
   min-height: 32px;
 }
 
@@ -12287,7 +12292,7 @@
 .fabricate-manager .manager-drop-empty-component {
   grid-template-columns: 42px minmax(0, 1fr);
   gap: var(--fab-space-2);
-  min-height: 40px;
+  min-height: 38px;
 }
 
 .fabricate-manager .manager-drop-empty-component {
@@ -12582,7 +12587,7 @@
 
 .fabricate-manager .manager-drop-empty-component .manager-inline-drop-zone {
   width: 42px;
-  min-height: 40px;
+  min-height: 38px;
   padding: 0;
   border: 0;
   border-radius: 9px;
@@ -12713,10 +12718,9 @@
   padding: var(--fab-space-2xs) var(--fab-space-2);
 }
 
-/* The condition picker fills its cell at 28px, the inspector's compact control height; 28 against the `inline` rung's 30 is issue 1523's. */
+/* The condition picker fills its cell at the `inline` rung's 30. */
 .fabricate-manager .manager-condition-modifier-picker .fabricate-select-trigger {
   width: 100%;
-  min-height: 28px;
 }
 
 /* `[type="number"]`, not `[type="text"]`: the inspector's rate field is rendered by `ChanceSlider` now, and the shared control uses a real number input (issue 883). */
@@ -12893,26 +12897,26 @@
 /* The trailing track holds the Add button and is `max-content`, not a number (issue 1118). */
 .fabricate-manager .manager-condition-add {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) max-content;
+  grid-template-columns: 38px minmax(0, 1fr) max-content;
   gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
 
 .fabricate-manager .manager-biome-add {
-  grid-template-columns: 36px 36px minmax(0, 1fr) max-content;
+  grid-template-columns: 38px 38px minmax(0, 1fr) max-content;
 }
 
 /* What is left of `.manager-add-button` after issue 1118: its HEIGHT, which matches the sibling input at `.manager-condition-add input` below and is the only reason the row's controls line up. */
 .fabricate-manager .manager-add-button {
-  height: 36px;
+  height: 38px;
 }
 
 .fabricate-manager .manager-condition-add input {
-  height: 36px;
+  height: 38px;
 }
 
-/* The current-value picker fills its card, as the native select did from `.fabricate-field.fabricate-field select`, which is element-typed and reaches no `<button>` (issue 1510). Its height is the `form` rung's 38 rather than the retired 36 the add row keeps: the two sit in separate stacked rows of the card, so they never stand side by side. */
+/* The current-value picker fills its card, as the native select did from `.fabricate-field.fabricate-field select`, which is element-typed and reaches no `<button>` (issue 1510). Its height is the `form` rung's 38, the add row's height too. */
 .fabricate-manager .manager-condition-current .fabricate-select-trigger {
   width: 100%;
 }
@@ -13017,7 +13021,7 @@
 }
 
 .fabricate-manager .manager-condition-add .manager-color-picker-trigger {
-  height: 36px;
+  height: 38px;
   border: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-06);
 }
@@ -13086,7 +13090,7 @@
 }
 
 .fabricate-manager .manager-condition-add .essence-icon-picker-trigger.icon-only {
-  height: 36px;
+  height: 38px;
   border: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-06);
 }
@@ -13198,7 +13202,7 @@
   font-weight: 400;
 }
 
-/* The rule's `<Select>` fills the description column at the `form` rung; 38 against the retired 36 is issue 1523's. */
+/* The rule's `<Select>` fills the description column at the `form` rung's 38. */
 .fabricate-manager .manager-rule-field .fabricate-select-trigger {
   width: 100%;
 }
@@ -15080,7 +15084,7 @@
 
 /* The empty currency-macro drop zone must match the height of the linked-macro card (.manager-environment-scene-linked) so dropping or selecting a macro does not resize the zone. */
 .fabricate-manager .manager-currency-macro-drop-zone {
-  min-height: calc(40px + (2 * var(--fab-space-3)) + 2px);
+  min-height: calc(38px + (2 * var(--fab-space-3)) + 2px);
 }
 
 /* A fixed FOUR-up grid (brief §C5). `auto-fill, minmax(260px, 1fr)` gave 2–3 columns at the manager's width, so the same system rendered a different grid depending on the window (issue 772). */
@@ -15554,10 +15558,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   object-fit: cover;
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-06);
@@ -17667,8 +17671,10 @@
   align-items: center;
   justify-content: center;
   width: 32px;
+
+  /* ratchet-exempt(design-system): an actor portrait, the portrait ladder's 32 single mark, not a control */
   height: 32px;
-  border-radius: 6px;
+  border-radius: 9px;
   overflow: hidden;
   background: var(--fab-surface-raised);
   color: var(--fab-text-muted);
@@ -17720,9 +17726,10 @@
   min-width: 0;
 }
 
-/* The recipe bulk panel's book picker. Its trigger sits in a 300px rail whose other controls are full-width selects, so a content-hugging button would read as a stray chip in a column of fields (issue 1010). */
+/* The recipe bulk panel's book picker. Its trigger sits in a 300px rail whose other controls are full-width selects, so a content-hugging button would read as a stray chip in a column of fields (issue 1010); it takes their `form` rung's 38 for the same reason. */
 .fabricate-manager .fab-bulk-book-picker .fab-bulk-book-trigger {
   width: 100%;
+  min-height: 38px;
 }
 
 /* AND THE SAME JOB FOR THE SAME RAIL, one control along. `BulkEditSelect` was a native `<select>` whose own scoped rule carried `width: 100%` for exactly the reason above; it is a shared `<Select>` now, whose trigger is rendered by `SearchablePopover` and whose API deliberately exposes no trigger-box prop (issue 1504). */
@@ -17733,7 +17740,7 @@
 .fabricate-picker .manager-travel-picker-trigger {
   justify-content: flex-start;
   height: auto;
-  min-height: 36px;
+  min-height: 34px;
 }
 
 /* THE PANEL, AT THE DESIGN'S OWN FIGURES. `proto:2258` states it as `padding:7px; border-radius:10px; background:var(--bg0); border:1px solid var(--border-strong); box-shadow` (a deep 16/38 drop, which `--fab-shadow-lg` already answers for); `display:flex; flex-direction:column; gap:5px` (issue 1373). */
@@ -18471,10 +18478,10 @@
   outline-offset: 2px;
 }
 
-/* `proto:4763`: a 40px tile at `border-radius: 9px` and NO border. The design draws the thumbnail as an image, not as a framed one — the 1px edge here made every row carry two concentric outlines, its own and the tile's. */
+/* `proto:4763`: a tile at `border-radius: 9px` and NO border, at the art ladder's 38 where the prototype drew 40. The design draws the thumbnail as an image, not as a framed one — the 1px edge here made every row carry two concentric outlines, its own and the tile's. */
 .fabricate-manager .manager-tools-select-target > img {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border: 0;
   border-radius: 9px;
   object-fit: cover;

@@ -988,7 +988,7 @@
 
      A cap, not a dropped `fill`: this is a `flex-direction: column` parent, so an unfilled
      `.fab-stepper` (a flex item with `width: auto`) is stretched to exactly the same box by
-     `align-items: stretch` - measured at 600/600px - while losing the 36px height that
+     `align-items: stretch` - measured at 600/600px - while losing the 38px height that
      matches the controls above it and leaving its 48px input marooned mid-border. 160px is
      the width the `fill` variant was measured against and leaves a 106px typeable field.
 

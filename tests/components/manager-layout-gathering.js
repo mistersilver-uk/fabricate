@@ -268,7 +268,7 @@ test('manager gathering settings condition panels use a two-column responsive gr
   );
   // The trailing track is `max-content`.
   assert.ok(
-    addBlock.includes('grid-template-columns: 36px minmax(0, 1fr) max-content;'),
+    addBlock.includes('grid-template-columns: 38px minmax(0, 1fr) max-content;'),
     'condition add controls should reserve icon picker, label input, and a content-sized Add column'
   );
   assert.equal(
@@ -277,18 +277,27 @@ test('manager gathering settings condition panels use a two-column responsive gr
     'the dead region-add grid override must not come back'
   );
   assert.ok(
-    biomeAddBlock.includes('grid-template-columns: 36px 36px minmax(0, 1fr) max-content;'),
+    biomeAddBlock.includes('grid-template-columns: 38px 38px minmax(0, 1fr) max-content;'),
     'biome add controls should align icon, colour, input, and a content-sized Add column'
   );
   // The one declaration `.manager-add-button` keeps.
   assert.ok(
-    blockFor('.fabricate-manager .manager-add-button').includes('height: 36px;'),
+    blockFor('.fabricate-manager .manager-add-button').includes('height: 38px;'),
     'the Add button still matches the sibling input height'
   );
   assert.equal(
     blockFor('.fabricate-manager .manager-add-button').includes('width: 48px;'),
     false,
     'and no longer pins itself to the retired 48px box'
+  );
+  const conditionPickerBlock = blockFor(
+    '.fabricate-manager .manager-condition-modifier-picker .fabricate-select-trigger'
+  );
+  assert.ok(conditionPickerBlock.includes('width: 100%;'), 'the condition picker fills its cell');
+  assert.equal(
+    conditionPickerBlock.includes('min-height'),
+    false,
+    'the condition picker declares no floor of its own, so the `inline` rung’s 30 applies'
   );
   assert.ok(
     css.includes('.fabricate-manager .manager-condition-pill-list {\n  display: grid;'),
@@ -893,7 +902,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     dropComponentButtonBlock.includes('grid-template-columns: 42px minmax(0, 1fr);') &&
-      dropComponentButtonBlock.includes('min-height: 40px;'),
+      dropComponentButtonBlock.includes('min-height: 38px;'),
     'drop component cells should keep compact thumbnail/name geometry'
   );
   assert.ok(
@@ -1202,7 +1211,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
       dropInspectorCharacterFieldBlock.includes(
         'padding: var(--fab-space-2xs) var(--fab-space-2);'
       ),
-    'selected drop inspector character modifier fields should override shared 36px field height'
+    'selected drop inspector character modifier fields should override shared 38px field height'
   );
   assert.ok(
     dropInspectorCharacterOperatorBlock.includes('border-color: var(--fab-danger-border);') &&
@@ -1596,12 +1605,12 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
     },
     {
       name: 'gathering event editor',
-      // 36px, and deliberately NOT normalised to the inspector's 28px. This field is a
+      // 38px, and deliberately NOT normalised to the inspector's 28px. This field is a
       // full-width form control in a normal editor card, so it takes the manager standard
       // `.fabricate-field` height; 28px is the DENSE treatment for a table cell and the
       // inspector rail. The divergence pre-dates this conversion and is a real difference
       // of context, not a second spelling of one control (issue 883).
-      percentHeight: 36,
+      percentHeight: 38,
       markup:
         '<main class="manager-main manager-gathering-event-edit-view" style="width:640px">' +
         '<section class="manager-task-availability-card" data-gathering-event-drop-rate>' +

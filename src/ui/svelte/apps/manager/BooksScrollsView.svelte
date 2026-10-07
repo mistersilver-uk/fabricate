@@ -711,9 +711,9 @@
   }
 
   .manager-books-scrolls-thumb {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--fab-books-control-radius);
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
     object-fit: cover;
     flex: none;
   }
