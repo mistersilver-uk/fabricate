@@ -25,7 +25,6 @@ const OWN_PRESSED_SITES = Object.freeze([
   'src/ui/svelte/apps/InteractableConfigRoot.svelte',
   'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
-  'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
 ]);
 
 const MANAGER = 'src/ui/svelte/apps/manager/';

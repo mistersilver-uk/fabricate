@@ -123,6 +123,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     // The REAL player essence/component tile the behaviour preview now mounts (issue 1036,
     // round 3). A `.svelte` in the declared closure but absent HANGS the suite (# cancelled).
+    // It is a ListRow card (issue 1778).
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/manager/EssenceEditView.svelte',
   ],

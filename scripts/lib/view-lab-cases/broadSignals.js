@@ -125,8 +125,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The dense result rows, then one frame per selectable site (issue 1778): the Journal's Active
   // runs, the gathering environments, tasks and events, a selected uncraftable recipe, the alchemy
-  // recipe and component rows, and the alchemy chooser's cards; then the crafting routes' dense
-  // product rows.
+  // recipe and component rows, the alchemy chooser's cards, the inventory's inspected and
+  // bulk-selected cards, and the essence editor's inert preview card; then the crafting routes'
+  // dense product rows.
   'src/ui/svelte/components/ListRow.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-finished-success',
@@ -137,6 +138,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-gathering-task-ready',
     'player-gathering-events',
     'player-crafting-check-unrollable-status',
+    'player-inventory',
+    'player-inventory-bulk-mixed',
+    'manager-essence-edit-first-state',
     'player-crafting-ingredient-routed',
     'player-alchemy-known-recipe',
     'player-alchemy-workbench',
