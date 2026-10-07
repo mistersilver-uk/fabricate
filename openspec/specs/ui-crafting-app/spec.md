@@ -960,8 +960,11 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   compact duration in a non-shrinking clock chip at the end of the label row.
   Instant recipes and steps, time-feature-disabled systems, and Discovery-Mode
   teasers show no duration value.
-- Show an ingredient-set selector when the recipe has more than one set; the
-  detail reflects the chosen set's per-set craftability.
+- When a recipe or stage has more than one ingredient set, the player chooses among them as an ingredient-route comparison.
+  - The comparison is a RadioCardGroup in which each set is a route, labelled by its name, or by its ordinal when unnamed.
+  - Each route states its status: its craftability, meaning craftable, a shortage of N entries, or a blocking tool.
+  - Each route shows its products as dense ListRows, including routes not chosen.
+  - The detail reflects the chosen set.
 - Show the `check` descriptor (DC / skill / roll formula) when present, marking it
   optional or mandatory per mode and unusable when no roll formula is authored.
 - Show the outcome-tier table for `routedByCheck` recipes, with each tier's
