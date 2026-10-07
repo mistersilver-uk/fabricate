@@ -10,7 +10,7 @@ The set itself is ENUMERATED in `openspec/specs/design-system/library.html`, one
 That file is part of this capability rather than a companion to it: it is the same normative content with specimens attached, and it is the artifact to open when a written geometry needs to be seen rather than read.
 The machine-readable half is `scripts/lib/designSystemPrimitives.json`, one row per SHIPPED primitive keyed on the implementation path a diff names.
 `tests/design-system-coverage.test.js` reads both and fails when they describe different vocabularies.
-`npm run lab` opens a live harness that mounts every shipped member as the real component it ships, derived from these same two artifacts rather than a third record of them.
+`npm run lab` opens the Primitive Lab, a developer harness that renders this library with each catalogued drawing replaced by, or standing beside, the real component it names, derived from these same two artifacts rather than a third record of them; it is not normative.
 
 Measured facts about the tree are written in the PAST TENSE with the commit they were measured on, because a measurement is true of a commit rather than for ever.
 Target text is written as MUST or SHOULD.
