@@ -11447,7 +11447,6 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
@@ -11495,7 +11494,6 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
