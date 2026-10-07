@@ -701,8 +701,7 @@ export function createCraftingStore({ services } = {}) {
         actorId: currentActorId(),
         recipeId,
         ingredientSetId: selectedIngredientSetId ?? recipe?.defaultSetId ?? null,
-        // Per-group option overrides (issue 552) so the engine consumes the same
-        // option/stack the tiles show. Empty map keeps the default resolution.
+        // Per-group overrides (issue 552): the engine consumes the option/stack the tiles show.
         ingredientOptionOverrides: selectedIngredientOptions,
         // The player's essence funding for the ACTIVE step's set (issue 917), so the
         // block consumes exactly the carriers the pool bars showed.
@@ -731,8 +730,8 @@ export function createCraftingStore({ services } = {}) {
         }
         return result;
       }
-      // A resolved failure falls THROUGH to the success tail on purpose: the check ran, the
-      // attempt may have spent materials under the failure policy, and the listing is stale.
+      // A resolved failure falls THROUGH: the check ran and may have spent materials, so the
+      // listing is stale, and so is any stack another route's picks name.
       const failed = result?.success === false;
       const notice = failed ? resolvedFailureMessage(services?.localize) : '';
       if (notice) services?.notify?.(notice);
@@ -741,6 +740,7 @@ export function createCraftingStore({ services } = {}) {
         [recipeId]: failed ? { ...result, message: notice } : (result ?? null),
       };
       await load(true);
+      ingredientOptionsBySet = { [selectedSet?.id ?? '']: selectedIngredientOptions };
       return result ?? null;
     } catch (err) {
       const message = services?.craftErrorMessage?.() ?? '';
