@@ -9,6 +9,7 @@ import { Window } from 'happy-dom';
  * @property {string} id The `section[id]`.
  * @property {string|null} number Its `.sec-head .num` text, `"08"`, or `null` when it has none.
  * @property {string|null} title Its `.sec-head h2` text, decoded.
+ * @property {string[]} ledes Its own `p.lede` texts, whitespace-collapsed; a section may have none.
  */
 
 /**
@@ -27,6 +28,9 @@ export function readLibrarySections(html) {
     id: section.id,
     number: section.querySelector(':scope > .sec-head .num')?.textContent ?? null,
     title: section.querySelector(':scope > .sec-head h2')?.textContent ?? null,
+    ledes: [...section.querySelectorAll(':scope > p.lede')].map((lede) =>
+      lede.textContent.replaceAll(/\s+/g, ' ').trim()
+    ),
   }));
   // Each heading's own nearest ancestor: a document walk tracking position answers differently.
   const headingSections = [...document.querySelectorAll('div.spec-head > h4')].map(

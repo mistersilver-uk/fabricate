@@ -6,6 +6,12 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
+import { Window } from 'happy-dom';
+
+import { readLibrarySections } from '../../tests/helpers/designLibrarySections.js';
+import { resolveSlots } from '../../tests/view-lab/primitives/inject.js';
+import { BESIDE, LIVE_LABEL_CLASS } from '../../tests/view-lab/primitives/liveness.js';
+
 /** The lab page, relative to the Vite dev root (the repository root). */
 export const LAB_PAGE_PATH = '/tests/view-lab/primitives.html';
 
@@ -30,8 +36,15 @@ export const SPECIMEN_ATTRIBUTE = 'data-primitive-lab-specimen';
 /** The attribute as a constant selector, so `unicorn/require-css-escape` sees nothing dynamic. */
 export const SPECIMEN_SELECTOR = `[${SPECIMEN_ATTRIBUTE}]`;
 
+/** The label `liveness.js` puts before a specimen standing beside its drawing, as a selector. */
+export const LIVE_LABEL_SELECTOR = `.${LIVE_LABEL_CLASS.trim().replaceAll(/\s+/g, '.')}`;
+
 /** The catalogue directory, relative to the repository root. */
 export const CATALOGUE_DIRECTORY = 'tests/view-lab/primitives/catalogue';
+
+/** The library the page renders, and the manifest whose names decide each specimen's liveness. */
+const LIBRARY_PATH = 'openspec/specs/design-system/library.html';
+const MANIFEST_PATH = 'scripts/lib/designSystemPrimitives.json';
 
 /** The one file in the catalogue directory that is not a catalogue file. */
 export const CATALOGUE_README = 'README.md';
@@ -146,6 +159,101 @@ export function describeMountFailure({ expected, mounted, reported }) {
     );
   }
   return lines.join('\n  ');
+}
+
+/**
+ * What the page must show, derived in Node from the library, catalogue and manifest it renders:
+ * each section's number, title and ledes, and how many specimens stand beside their drawing.
+ *
+ * @param {string} root Absolute repository root.
+ * @returns {{sections: {id: string, number: string|null, title: string|null, ledes: string[]}[],
+ *   beside: number}} The expectations `lab:check` holds the page to.
+ */
+export function readLabExpectations(root) {
+  const html = readFileSync(path.join(root, LIBRARY_PATH), 'utf8');
+  const manifest = JSON.parse(readFileSync(path.join(root, MANIFEST_PATH), 'utf8'));
+  const window = new Window();
+  try {
+    window.document.write(html);
+    const { slots } = resolveSlots(
+      window.document.body,
+      catalogueEntries(root).map((entry) => entry.row),
+      [...manifest.designSystemPrimitives, ...manifest.notAPrimitive]
+    );
+    return {
+      sections: readLibrarySections(html).sections,
+      beside: slots.filter((slot) => slot.mode === BESIDE).length,
+    };
+  } finally {
+    window.close();
+  }
+}
+
+/** Collapse whitespace, so a rendered text compares with its source text. */
+function collapsed(text) {
+  return text === null ? null : text.replaceAll(/\s+/g, ' ').trim();
+}
+
+/**
+ * Compare the sections the page drew with the library's: the same ids in order, each drawing its
+ * number, its title and every lede the library authors, each with a visible box.
+ *
+ * @param {{id: string, number: string|null, title: string|null, ledes: string[]}[]} expected The
+ *   library's sections, from `readLabExpectations`.
+ * @param {{id: string, number: string|null, title: string|null, ledes: string[], unseen:
+ *   string[]}[]} rendered Read off the page; `unseen` names each part that drew no visible box.
+ * @returns {string|null} Every disagreement, or null when the page drew every section.
+ */
+export function describeSectionMismatch(expected, rendered) {
+  if (expected.length === 0) return 'the library yielded no `section[id]`, so nothing was checked';
+  const problems = [];
+  const order = (sections) => sections.map((section) => section.id).join(', ');
+  if (order(rendered) !== order(expected)) {
+    problems.push(`the page drew sections ${order(rendered)}; the library has ${order(expected)}`);
+  }
+  const drawn = new Map(rendered.map((section) => [section.id, section]));
+  for (const want of expected) {
+    const got = drawn.get(want.id);
+    if (!got) continue;
+    for (const part of ['number', 'title']) {
+      if (want[part] === null) problems.push(`#${want.id} has no ${part} in the library`);
+      else if (collapsed(got[part]) !== collapsed(want[part])) {
+        problems.push(`#${want.id} drew ${part} ${JSON.stringify(got[part])}, not ${want[part]}`);
+      }
+    }
+    if (JSON.stringify(got.ledes.map(collapsed)) !== JSON.stringify(want.ledes)) {
+      problems.push(
+        `#${want.id} drew ${got.ledes.length} lede(s); the library has ${want.ledes.length}`
+      );
+    }
+    if (got.unseen.length > 0)
+      problems.push(`#${want.id} drew no box for ${got.unseen.join(', ')}`);
+  }
+  return problems.length === 0 ? null : problems.join('\n  ');
+}
+
+/**
+ * Compare the `live` labels on the page with the specimens that stand beside their drawing: one
+ * label each, and each label directly before its specimen.
+ *
+ * @param {object} options Options.
+ * @param {number} options.expected The beside count, from `readLabExpectations`.
+ * @param {number} options.labels The labels the page carries.
+ * @param {string[]} options.unpaired The entry of each label not followed by a specimen.
+ * @returns {string|null} The disagreement, or null when every beside specimen is labelled.
+ */
+export function describeLiveLabelMismatch({ expected, labels, unpaired }) {
+  const problems = [];
+  if (labels !== expected) {
+    problems.push(
+      `${expected} specimen(s) stand beside their drawing and the page carries ${labels} ` +
+        '`live` label(s)'
+    );
+  }
+  if (unpaired.length > 0) {
+    problems.push(`a label is not directly before its specimen in ${unpaired.join(', ')}`);
+  }
+  return problems.length === 0 ? null : problems.join('\n  ');
 }
 
 /** Opaque, because `eslint-plugin-import-x` crashes on Vite's exports map (see the View Lab CLI). */
