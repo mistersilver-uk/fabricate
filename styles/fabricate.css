@@ -4600,6 +4600,11 @@
   box-shadow: inset 0 0 0 1px var(--fab-accent-border);
 }
 
+/* A selected row is a fill behind the edge, the multi-select rule; a danger row keeps its ground and takes the ring. */
+.fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true']) {
+  background: var(--fab-surface-active);
+}
+
 .fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open:enabled:hover:not([aria-pressed='true'])) {
   background: var(--fab-surface-raised);
 }

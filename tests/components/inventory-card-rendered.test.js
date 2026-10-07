@@ -1,8 +1,8 @@
 /**
  * Issue 1778 — inventory cards in Chromium, drawn from the real card's markup in the real grid
  * track under Foundry's fixed button height: each card's button grows to hold its square thumbnail
- * and its wrapped name, a row of cards matches its tallest, a press anywhere opens the card, and
- * the pressed edge, the broken ground and the ring are ListRow's. A live mount
+ * and its one-line name, every card stands the same height, a press anywhere opens the card, and
+ * the pressed fill and edge, the broken ground and the ring are ListRow's. A live mount
  * (`tests/fixtures/inventory-cards/`) presses real keys: Shift toggles the bulk selection alone.
  */
 import assert from 'node:assert/strict';
@@ -176,7 +176,13 @@ describe('inventory cards, rendered (issue 1778)', () => {
   });
 
   it("draws the thumbnail as a square across the card's width, holding every overlay", async () => {
-    for (const { key, control, thumb, overlays } of await cardsOf('bulk')) {
+    const cards = await cardsOf('bulk');
+    assert.deepEqual(
+      Object.fromEntries(cards.map(({ key, overlays }) => [key, overlays.length])),
+      { 'sys:gland': 3, 'sys:jig': 4, 'sys:ingot': 2 },
+      'the quantity or Broken pip, the badges and the chips, and the check on a bulk-selected card'
+    );
+    for (const { key, control, thumb, overlays } of cards) {
       assert.ok(
         Math.abs(thumb.width - control.width) < 0.5,
         `${key}: ${thumb.width} of ${control.width}`
@@ -192,18 +198,35 @@ describe('inventory cards, rendered (issue 1778)', () => {
     }
   });
 
-  it('wraps a long name whole, and its row of cards takes the tallest card’s height', async () => {
+  it('keeps a long name to one ellipsized line, whole in its title and its name, so every card stands even', async () => {
     const cards = await cardsOf('inspect');
-    const jigCard = cards.find(({ key }) => key === 'sys:jig');
-    assert.ok(jigCard.name.height > 20, 'the long name wraps onto more than one line');
-    for (const { key, name } of cards) assert.ok(!name.clipped, `${key}: its name is clipped`);
     const firstRow = cards.filter(({ root }) => Math.abs(root.top - cards[0].root.top) < 0.5);
     assert.equal(firstRow.length, 3, 'a 432px grid holds three 120px tracks');
-    assert.deepEqual(
-      [...new Set(firstRow.map(({ root }) => Math.round(root.height * 10) / 10))],
-      [Math.round(jigCard.root.height * 10) / 10],
-      'every card in the row matches the long name’s'
+    assert.equal(
+      new Set(cards.map(({ root }) => Math.round(root.height * 10) / 10)).size,
+      1,
+      'the long name’s row stands as tall as the short names’ row'
     );
+    for (const { key, name } of cards) assert.ok(!name.clipped, `${key}: its name is clipped`);
+    const jig = await tab.evaluate(() => {
+      const control = document.querySelector(
+        '[data-case="inspect"] [data-inventory-card="sys:jig"] .inventory-card-button'
+      );
+      const label = control.querySelector('.inventory-card-name');
+      const style = getComputedStyle(label);
+      return {
+        cut: label.scrollWidth > label.clientWidth,
+        oneLine: label.getBoundingClientRect().height < 2 * Number.parseFloat(style.fontSize),
+        flow: [style.textOverflow, style.whiteSpace, style.minWidth],
+        title: label.getAttribute('title'),
+        accessibleName: control.getAttribute('aria-label'),
+      };
+    });
+    assert.ok(jig.cut, 'the long name outruns its card, so the ellipsis is drawn');
+    assert.deepEqual(jig.flow, ['ellipsis', 'nowrap', '0px']);
+    assert.ok(jig.oneLine, 'on one line');
+    assert.equal(jig.title, "Masterwork Armorer's Jig of the Deep Seam");
+    assert.ok(jig.accessibleName.startsWith(`${jig.title}, `), jig.accessibleName);
   });
 
   it('opens a card from anywhere on it, its padding and the space under a short name included', async () => {
@@ -226,8 +249,9 @@ describe('inventory cards, rendered (issue 1778)', () => {
     assert.deepEqual(misses, [], 'a press there reaches something other than the card’s button');
   });
 
-  it('draws the pressed edge, the broken ground and the focus ring through ListRow', async () => {
-    const paint = await tab.evaluate(() => {
+  /** Each token's computed value for `property`, and each card's paint, by grid and key. */
+  const paintOf = () =>
+    tab.evaluate(() => {
       const resolved = (property, value) => {
         const probe = document.createElement('div');
         probe.style.setProperty(property, value);
@@ -236,28 +260,52 @@ describe('inventory cards, rendered (issue 1778)', () => {
         probe.remove();
         return out;
       };
-      const card = (grid, key) =>
-        getComputedStyle(
-          document.querySelector(`[data-case="${grid}"] [data-inventory-card="${key}"]`)
-        );
+      const cards = {};
+      for (const root of document.querySelectorAll('[data-case] [data-inventory-card]')) {
+        const style = getComputedStyle(root);
+        cards[`${root.closest('[data-case]').dataset.case} ${root.dataset.inventoryCard}`] = {
+          edge: style.borderTopColor,
+          fill: style.backgroundColor,
+          ring: style.boxShadow,
+        };
+      }
       return {
         accent: resolved('border-top-color', 'var(--fab-accent-border)'),
         border: resolved('border-top-color', 'var(--fab-border)'),
+        active: resolved('background-color', 'var(--fab-surface-active)'),
+        raised: resolved('background-color', 'var(--fab-surface-raised)'),
+        ground: resolved('background-color', 'var(--fab-bg-2)'),
         dangerSoft: resolved('background-color', 'var(--fab-danger-soft)'),
-        inspected: card('inspect', 'sys:gland').borderTopColor,
-        resting: card('inspect', 'sys:ingot').borderTopColor,
-        bulk: card('bulk', 'sys:ingot').borderTopColor,
-        notBulk: card('bulk', 'sys:gland').borderTopColor,
-        brokenGround: card('inspect', 'sys:jig').backgroundColor,
+        cards,
       };
     });
+
+  it('draws the pressed fill and edge, the broken ground and the focus ring through ListRow', async () => {
+    const paint = await paintOf();
+    const { cards } = paint;
     assert.notEqual(paint.accent, paint.border, 'NON-VACUITY: the two edges differ');
+    assert.notEqual(paint.active, paint.ground, 'NON-VACUITY: the two fills differ');
     assert.deepEqual(
-      [paint.inspected, paint.resting, paint.bulk, paint.notBulk],
-      [paint.accent, paint.border, paint.accent, paint.border],
-      'the accent edge marks the pressed card alone: the inspected one, or each bulk-selected one'
+      ['inspect sys:gland', 'inspect sys:ingot', 'bulk sys:ingot', 'bulk sys:gland'].map((key) => [
+        cards[key].edge,
+        cards[key].fill,
+      ]),
+      [
+        [paint.accent, paint.active],
+        [paint.border, paint.ground],
+        [paint.accent, paint.active],
+        [paint.border, paint.ground],
+      ],
+      'the fill and the accent edge mark the pressed card alone: the inspected one, or each bulk-selected one'
     );
-    assert.equal(paint.brokenGround, paint.dangerSoft, 'a broken card keeps the danger ground');
+    assert.equal(
+      cards['inspect sys:jig'].fill,
+      paint.dangerSoft,
+      'a broken card keeps the danger ground'
+    );
+    const pressedBroken = cards['bulk sys:jig'];
+    assert.equal(pressedBroken.fill, paint.dangerSoft, 'and keeps it when pressed, with no fill');
+    assert.match(pressedBroken.ring, /inset/u, 'taking the inset ring instead');
 
     await tab.keyboard.press('Tab');
     await tab.focus(
@@ -272,6 +320,19 @@ describe('inventory cards, rendered (issue 1778)', () => {
       { style: 'solid', offset: '-2px', inset: '0px' },
       'the ring sits inside the card'
     );
+  });
+
+  it('lights a resting card on hover, and leaves a pressed card its fill', async () => {
+    const hovered = async (key) => {
+      await tab.hover(
+        `[data-case="inspect"] [data-inventory-card="${key}"] .inventory-card-button`
+      );
+      return (await paintOf()).cards[`inspect ${key}`].fill;
+    };
+    const { active, raised } = await paintOf();
+    assert.equal(await hovered('sys:ingot'), raised, 'POSITIVE CONTROL: the hover fill');
+    assert.equal(await hovered('sys:gland'), active, 'the pressed fill outlasts the hover');
+    await tab.mouse.move(0, 0);
   });
 });
 

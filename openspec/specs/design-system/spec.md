@@ -73,7 +73,7 @@ The inventory grid's cards render through ListRow's card layout and keep Shift s
 
 - **WHEN** the player Shift-clicks an inventory card, or presses Shift+Enter or Shift+Space on it
 - **THEN** the card joins or leaves the bulk selection and does not become the inspected card
-- **AND** while the bulk selection is open, each bulk-selected card is pressed and the inspected card is not
+- **AND** while the bulk selection is open, each bulk-selected card is pressed, and the inspected card is pressed only if it is bulk-selected too
 
 ### Requirement: Compact Journal geometry is owned by the existing primitives
 

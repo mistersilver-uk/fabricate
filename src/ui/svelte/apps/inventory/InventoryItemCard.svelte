@@ -3,9 +3,10 @@
   InventoryItemCard is one selectable owned item in the grid: a square thumbnail
   carrying every at-a-glance signal, with the item name beneath. Selecting it
   drives the right-hand inspector. It is ListRow's card layout (issue 1778): the
-  thumbnail leads, the button is pressed by the inspected card or, while a bulk
-  selection is open, by each bulk-selected card, and its name folds in every state
-  the thumbnail only draws. A preview (`interactive={false}`) is the inert form.
+  thumbnail leads over a one-line name, the button is pressed by the inspected card
+  or, while a bulk selection is open, by each bulk-selected card, and its name folds
+  in every state the thumbnail only draws. A preview (`interactive={false}`) is the
+  inert form.
 
   SLOT GEOMETRY (issue 675). Every overlay sits INSIDE the thumbnail bounds and
   above it (`z-index: 2`), not floating outside the frame:
@@ -219,6 +220,7 @@
 <ListRow
   {name}
   layout="card"
+  truncateName
   tone={broken ? 'danger' : 'neutral'}
   nameClass="inventory-card-name"
   class={[
@@ -247,10 +249,8 @@
 />
 
 <style>
-  /* The card, its button, its hover, ring, pressed edge and broken (danger) ground are ListRow's
-     card layout (issue 1778). The name wraps rather than truncates, since most authored names
-     outrun a 120px card, and the grid stretches each card to its row, so the tallest name sets
-     the row. The thumbnail takes the card's width, as it did when the button centred it. */
+  /* The card, its button, its hover, ring, pressed fill and edge, broken (danger) ground and
+     one-line name are ListRow's card layout (issue 1778). The thumbnail takes the card's width. */
   :global(.inventory-card > .fabricate-list-row-open > .fabricate-list-row-leading) {
     align-self: stretch;
   }

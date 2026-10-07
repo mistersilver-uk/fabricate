@@ -331,11 +331,19 @@ describe('ListRow selectable form, as the sheet declares it (issue 1778)', () =>
     );
   });
 
-  it('draws the selected edge from the pressed state alone', () => {
+  it('draws the selected fill and edge from the pressed state alone', () => {
     const edge = declarationsFor(
       ".fabricate-list-row:has(> .fabricate-list-row-open[aria-pressed='true'])"
     );
     assert.equal(edge.get('border-color'), 'var(--fab-accent-border)');
+    const fill = declarationsFor(
+      ".fabricate-list-row:not(.is-danger):has(> .fabricate-list-row-open[aria-pressed='true'])"
+    );
+    assert.equal(
+      fill.get('background'),
+      'var(--fab-surface-active)',
+      'a selected row is a fill behind the edge; a danger row keeps its ground'
+    );
   });
 });
 
