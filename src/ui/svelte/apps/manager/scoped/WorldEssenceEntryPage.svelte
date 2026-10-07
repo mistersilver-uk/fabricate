@@ -1050,7 +1050,7 @@
     gap: var(--fab-space-4);
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
     /* NO FILL (issue 1372). See the essence surface-ladder block in `styles/fabricate.css`: the
        prototype draws every card in the content area on the pane's own surface and separates
        them with the border alone. */
@@ -1123,7 +1123,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
     /* NO FILL (issue 1372). See the essence surface-ladder block in `styles/fabricate.css`: the
        prototype draws every card in the content area on the pane's own surface and separates
        them with the border alone. */
@@ -1182,7 +1182,7 @@
     gap: var(--fab-space-3);
     padding: var(--fab-space-3) var(--fab-space-4);
     border: 1px solid var(--fab-danger-border);
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--fab-danger-soft);
     min-width: 0;
   }

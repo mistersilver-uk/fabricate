@@ -883,10 +883,7 @@ function offLadderRadii(corpus) {
 const RADIUS_GATE = styleGate(offLadderRadii);
 
 test('a radius written into a token still resolves, so the ladder cannot be paid by renaming', () => {
-  // THE RESOLUTION HALF, PROVED IN BOTH DIRECTIONS AGAINST SYNTHETIC DEFINITIONS. The live corpus
-  // exercises it — `--fab-books-control-radius` is 5px and is counted at its resolved
-  // value — but relying on that makes the capability depend on the tree happening to contain a
-  // non-compliant token, and paying that row down would silently take the proof with it.
+  // The proof runs on synthetic definitions so it never depends on the tree.
   const definitions = new Map([
     ['--fixture-off', ['5px']],
     ['--fixture-on', ['6px']],
@@ -1202,8 +1199,11 @@ const WITHDRAWN_UTILITIES = Object.freeze([
   {
     name: 'fab-field-skin',
     why:
-      'measured at twelve carriers of the target tuple: three are PINNED by a test or a script ' +
-      'that reads their selectors, five are recorded non-adopters and four are unpinned. Issue ' +
+      'measured at sixteen carriers of the target tuple: four are PINNED by a test or a script ' +
+      'that reads their selectors, five are recorded non-adopters and seven are unpinned. The ' +
+      'radius sweep added four when it put rows and wells on 9: the requirement option ' +
+      'row, pinned by the picker-row and studio font-size suites, and the unpinned recipe flow ' +
+      'row, Tool system label and Tool required row. Issue ' +
       "1777 deleted the sixth non-adopter, the manager's element-level `select` baseline, with " +
       'the last native select a template rendered. Issue ' +
       "2005's Studio parity pass added the outcome tier row, pinned by the Checks mounted suite, " +
@@ -1478,9 +1478,9 @@ test('every carrier of the withdrawn skin tuple carries its census marker', () =
 
   assert.equal(
     carriers.length,
-    12,
-    'the census is twelve carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
-      'its three-pinned / five-non-adopter / four-unpinned split as prose, so a carrier arriving ' +
+    16,
+    'the census is sixteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
+      'its four-pinned / five-non-adopter / seven-unpinned split as prose, so a carrier arriving ' +
       'or ' +
       'leaving means re-deriving that `why` text with it rather than moving this number alone.'
   );

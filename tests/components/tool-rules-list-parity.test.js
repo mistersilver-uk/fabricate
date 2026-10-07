@@ -879,7 +879,7 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
     // `proto:2559-2562` — the rules inset RECESSES below the aside now that the aside has
     // moved up a rung. It had been painted lighter than its own container.
     assert.equal(measured['rule-row'].background, resolved.bg0, 'proto:2559 inset fill');
-    assert.equal(measured['rule-row'].borderRadius, '10px', 'proto:2559 radius');
+    assert.equal(measured['rule-row'].borderRadius, '9px', 'proto:2559 draws 10px; the well rung is 9');
     assert.equal(measured['rule-title'].fontSize, '11.5px', 'proto:2561 title size');
     assert.equal(measured['rule-title'].fontWeight, '600', 'proto:2561 title weight');
     assert.equal(measured['rule-subtitle'].fontSize, '9.5px', 'proto:2561 subtitle size');
@@ -898,7 +898,7 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
 
     // `proto:2576` — the world-Tool route is a bordered secondary at the toolbar rung.
     assert.equal(measured['edit-world'].height, 30, 'proto:2576 height, on the ladder');
-    assert.equal(measured['edit-world'].borderRadius, '8px', 'proto:2576 radius');
+    assert.equal(measured['edit-world'].borderRadius, '7px', 'proto:2576 draws 8px; the 30px rung is 7');
     assert.equal(measured['edit-world'].fontSize, '10.5px', 'proto:2576 label size');
     assert.equal(measured['edit-world-glyph'].fontSize, '9px', 'proto:2576 glyph size');
 

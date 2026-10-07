@@ -146,6 +146,11 @@ Moved to [`.agents/docs/foundry-and-architecture.md`](.agents/docs/foundry-and-a
 Read it before writing code that calls a Foundry API, hooks into its lifecycle, or touches the manager shell, the gathering data model or the design system.
 It carries rules, not background: the imperatives moved with the evidence rather than being summarised here.
 
+- A new named member of the design-system library adds a catalogue row under `tests/view-lab/primitives/catalogue/`, or an `AWAITING_SPECIMEN` line with its reason in `tests/design-system-lab-coverage.test.js`.
+The coverage gate enforces this, and `AWAITING_SPECIMEN` only shrinks.
+- `npm run lab` opens the Primitive Lab, and `npm run lab:check` mounts every catalogued row and fails on any console, page or request error.
+A specimen sits in a `plinth`, never a `stage`, because `stage` is the workflow's keyed dimension.
+
 ## Markdown & Prose Conventions
 
 These rules apply to every agent (Claude and Codex) and to how all Markdown is authored.

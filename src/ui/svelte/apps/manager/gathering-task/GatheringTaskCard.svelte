@@ -34,8 +34,7 @@
     /* ratchet-exempt(design-system): moved unchanged from GatheringTaskEditView, which carried it at base */
     padding: 13px 16px;
     border: 1px solid var(--fab-border);
-    /* ratchet-exempt(design-system): moved unchanged from GatheringTaskEditView, which carried it at base */
-    border-radius: 8px;
+    border-radius: 11px;
     background: var(--fab-bg-3);
   }
 

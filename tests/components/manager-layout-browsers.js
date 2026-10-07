@@ -1237,8 +1237,8 @@ test('manager environment inspector evidence table wraps compact pills without h
     );
     assert.equal(
       report.pillStyle.borderRadius,
-      '4px',
-      'value pills should use compact chip corners'
+      '6px',
+      'value pills should use the chip rung’s corners'
     );
     assert.equal(
       report.pillStyle.overflowWrap,
@@ -1764,7 +1764,7 @@ test('every manager browser row joins ONE edge, corner and fill treatment', () =
   const treatment = blockIn(css, shared.slice(0, -2));
   for (const declaration of [
     'border: 1px solid var(--fab-border);',
-    'border-radius: 8px;',
+    'border-radius: 9px;',
     'background: var(--fab-overlay-light-03);',
   ]) {
     assert.ok(treatment.includes(declaration), `the shared row treatment declares ${declaration}`);

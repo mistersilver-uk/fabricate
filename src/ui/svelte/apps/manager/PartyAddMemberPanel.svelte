@@ -193,7 +193,7 @@
   .manager-party-add-panel {
     padding: 10px;
     border: 1px solid var(--fab-accent-border);
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--fab-bg-1);
   }
 
@@ -259,7 +259,7 @@
     width: 100%;
     padding: 7px 10px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-2);
     text-align: left;
   }

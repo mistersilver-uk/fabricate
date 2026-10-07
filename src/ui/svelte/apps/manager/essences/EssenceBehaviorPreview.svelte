@@ -230,7 +230,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-overlay-light-03);
     color: var(--fab-text-muted);
     font-size: 0.7rem;

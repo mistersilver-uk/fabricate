@@ -10,6 +10,7 @@ The set itself is ENUMERATED in `openspec/specs/design-system/library.html`, one
 That file is part of this capability rather than a companion to it: it is the same normative content with specimens attached, and it is the artifact to open when a written geometry needs to be seen rather than read.
 The machine-readable half is `scripts/lib/designSystemPrimitives.json`, one row per SHIPPED primitive keyed on the implementation path a diff names.
 `tests/design-system-coverage.test.js` reads both and fails when they describe different vocabularies.
+`npm run lab` opens the Primitive Lab, a developer harness that renders this library with each catalogued drawing replaced by, or standing beside, the real component it names, derived from these same two artifacts rather than a third record of them; it is not normative.
 
 Measured facts about the tree are written in the PAST TENSE with the commit they were measured on, because a measurement is true of a commit rather than for ever.
 Target text is written as MUST or SHOULD.
@@ -669,8 +670,8 @@ Padding, margin and gap MUST derive from the spacing scale in `ui-visual-style`,
 `tests/components/spacing-scale-ratchet.test.js` is what holds that rule, over the same two corpora and with the published scale held opaque, since deriving FROM the scale is what the rule asks for.
 Radius, width, height, border widths, font sizes, grid track sizes and breakpoints are NOT spacing-scale members and MUST NOT be derived from `--fab-space-*`.
 They are written as literals by default, and a token is minted for one of them only where the value is SHARED across surfaces or DERIVED from another, in which case the token's declaration MUST record which it is.
-Two shipped pairs illustrate the two kinds, as examples rather than as a closed list a further token would have to join: `--fab-icon-picker-chip`/`--fab-icon-picker-row`, whose row height is computed from the chip, and `--fab-books-control-radius`/`--fab-books-panel-radius`, which carry two radii off the ladder for the elements they paint, shared by the Books & Scrolls tab and the item-page inspector so that correcting them onto the ladder stays a one-line edit.
-A token of this kind is a local convenience and never a ladder: naming one for a control class rather than for its surface asserts a rung, and 5px is not one.
+Two shipped pairs illustrate the two kinds, as examples rather than as a closed list a further token would have to join: `--fab-icon-picker-chip`/`--fab-icon-picker-row`, whose row height is computed from the chip, and `--fab-books-control-radius`/`--fab-books-panel-radius`, which carry the ladder's control and panel rungs, 7 and 11, shared by the Books & Scrolls tab and the item-page inspector.
+A token of this kind is a local convenience and never a ladder: naming one for a control class rather than for its surface asserts a rung.
 
 Type follows the ladder in `ui-visual-style`: the serif face names things, the mono face carries every number a GM compares or tunes, and the interface face stays host-owned and untokenized.
 The mono face ships weights 400 and 500 ONLY, so a mono step MUST NOT specify 600 or 700 — those synthesize as faux-bold.

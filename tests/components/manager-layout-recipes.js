@@ -743,7 +743,7 @@ test('the picker popover is the design’s panel, field and rows, not a heavy sh
       };
     });
 
-    assert.equal(report.panel.radius, '10px', 'proto:2258 corners the panel at 10px');
+    assert.equal(report.panel.radius, '11px', 'proto:2258 draws 10px; the panel rung is 11');
     assert.equal(report.panel.padding, '6px', 'proto:2258 insets it by 7px, nearest step 6');
     assert.equal(report.panel.gap, '4px', 'proto:2258 gaps its column by 5px, nearest step 4');
     assert.equal(

@@ -65,7 +65,7 @@
     min-height: 32px;
     padding: var(--fab-space-1) var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--fab-text-secondary);
     background: var(--fab-surface-soft);
     font-size: 0.72rem;

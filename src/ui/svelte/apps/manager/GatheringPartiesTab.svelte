@@ -468,7 +468,7 @@
   .manager-travel-parties-row {
     padding: 13px;
     border: 1px solid var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--fab-bg-2);
   }
 
@@ -483,7 +483,7 @@
     height: 34px;
     padding: 0 15px;
     border: 1px solid var(--fab-accent-border);
-    border-radius: 8px;
+    border-radius: 9px;
     color: var(--fab-on-accent);
     background: var(--fab-accent);
     font-family: var(--font-primary);

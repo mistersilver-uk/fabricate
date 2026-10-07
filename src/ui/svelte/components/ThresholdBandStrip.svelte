@@ -388,7 +388,7 @@
     width: 6px;
     height: 20px;
     border: 1px solid var(--fab-border-strong);
-    border-radius: 3px;
+    border-radius: 999px;
     background: var(--fab-surface);
     box-shadow: var(--fab-shadow-sm);
   }

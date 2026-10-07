@@ -53,9 +53,9 @@
   --fab-icon-picker-chip: 28px;
   --fab-icon-picker-row: calc(var(--fab-icon-picker-chip) + (2 * var(--fab-space-1)) + 2px);
 
-  /* The two radii the Books & Scrolls tab and the item-page inspector share, carried across at their shipped off-ladder values rather than corrected here. THE SURFACE IS IN THE NAME because 5px and 6px are not the system's answer: a third surface reaching for one of these is reaching for the published radius ladder instead (issue 1399). */
-  --fab-books-control-radius: 5px;
-  --fab-books-panel-radius: 6px;
+  /* The two radii the Books & Scrolls tab and the item-page inspector share (issue 1399), on the published radius ladder: a control at 7 and a panel at 11. A third surface reads the ladder rung for its kind, not these names. */
+  --fab-books-control-radius: 7px;
+  --fab-books-panel-radius: 11px;
 
   /* Component Studio token mapping, kept as the record of the calls: it adds ZERO colour tokens and edits NONE of the theme blocks, mapping its prototype's ramp index-aligned onto the existing one (issue 676). */
 }
@@ -1070,7 +1070,7 @@
   overflow: hidden;
   max-width: 220px;
   padding: var(--fab-space-2xs) var(--fab-space-2);
-  border-radius: 5px;
+  border-radius: 6px;
   font-size: 0.62rem;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
@@ -1891,7 +1891,7 @@
   flex: 0 0 28px;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: 7px;
   color: var(--fab-text-subtle);
   background: var(--fab-surface-active);
   font-size: 11px;
@@ -2049,7 +2049,7 @@
   height: 30px;
   min-height: 0;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: 7px;
 }
 
 /* The fill is SPLIT OUT and qualified, and the split is the whole point (issue 1118). */
@@ -2246,7 +2246,7 @@
   min-width: 0;
   height: 30px;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 7px;
   color: var(--fab-text-muted);
   background: var(--fab-bg-1);
   font-size: 10.5px;
@@ -2660,7 +2660,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: 7px;
   color: var(--fab-accent);
   background: var(--fab-bg-1);
   font-size: 12px;
@@ -2727,7 +2727,7 @@
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--fab-border);
-  border-radius: 10px;
+  border-radius: 11px;
   background: var(--fab-bg-2);
 }
 
@@ -2781,7 +2781,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: 7px;
   font-size: 12px;
 }
 
@@ -3421,7 +3421,7 @@
   gap: var(--fab-space-1);
   padding-left: var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 5px;
+  border-radius: 7px;
   background: var(--fab-bg-3);
 }
 
@@ -3615,10 +3615,11 @@
   min-width: 0;
 }
 
-/* Three classes (0,3,0) to clear the base chip's `border: 0` and transparent fill at (0,2,0). */
+/* Three classes (0,3,0) to clear the base chip's `border: 0`, transparent fill and in-panel 6px corner at (0,2,0); a standalone 28px chip takes 7. */
 .fabricate-manager .manager-tag-suggestion.manager-modifier-expression-suggestion {
   flex: 0 1 auto;
   border: 1px solid var(--fab-border);
+  border-radius: 7px;
   background: var(--fab-bg-2);
   font-family: var(--fab-font-mono, monospace);
   font-size: 0.72rem;
@@ -3695,7 +3696,7 @@
   height: 25px;
   padding: 0 var(--fab-space-2xs);
   border: 1px solid var(--fab-border);
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--fab-text);
   background: var(--fab-bg-1);
   font-size: 0.74rem;
@@ -4195,7 +4196,7 @@
   min-height: 28px;
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--fab-text);
   background: transparent;
   text-align: left;
@@ -4247,7 +4248,7 @@
   min-width: 18px;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--fab-text-muted);
   background: transparent;
 }
@@ -5309,7 +5310,7 @@
   gap: var(--fab-space-3);
   padding: var(--fab-space-4);
   border: 1px solid var(--fab-border);
-  border-radius: 12px;
+  border-radius: 11px;
   background: var(--fab-surface-soft);
 }
 
@@ -5735,6 +5736,7 @@
   min-width: 0;
 }
 
+/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; its emitters are `RecipeBrowserInspector.svelte` and `RecipeProduceRow.svelte`, and `.manager-component-flow-row` has none. */
 .fabricate-manager .manager-recipe-flow-row,
 .fabricate-manager .manager-component-flow-row {
   display: flex;
@@ -5743,7 +5745,7 @@
   min-width: 0;
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-bg-1);
 }
 
@@ -5765,7 +5767,7 @@
   min-width: 0;
   padding: var(--fab-space-2);
   border: 1px solid var(--fab-accent-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-accent-soft);
 }
 
@@ -6008,7 +6010,7 @@
   margin: 0;
   padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-danger-border);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
   font-size: 0.7rem;
@@ -6266,7 +6268,7 @@
 .fabricate-manager .manager-gathering-event-row,
 .fabricate-manager .manager-essence-row {
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-overlay-light-03);
 }
 
@@ -6409,7 +6411,7 @@
   flex: 0 0 auto;
   width: 22px;
   height: 22px;
-  border-radius: 5px;
+  border-radius: 6px;
   font-size: 0.62rem;
 }
 
@@ -6597,7 +6599,7 @@
   width: 44px;
   height: 44px;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   color: var(--fab-accent);
   background: var(--fab-overlay-light-06);
   flex: 0 0 auto;
@@ -6616,7 +6618,7 @@
   width: 46px;
   height: 46px;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-06);
   object-fit: cover;
   flex: 0 0 auto;
@@ -6626,7 +6628,7 @@
   width: 56px;
   height: 56px;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-06);
   object-fit: cover;
   flex: 0 0 auto;
@@ -6642,7 +6644,7 @@
 .fabricate-manager .manager-environment-preview {
   width: 100%;
   height: 150px;
-  border-radius: 8px;
+  border-radius: 11px;
 }
 
 .fabricate-manager .manager-environment-thumb.is-fallback,
@@ -6745,7 +6747,7 @@
   margin: var(--fab-space-3);
   padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px dashed var(--fab-border-strong);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--fab-text);
   background: var(--fab-success-soft);
 }
@@ -6833,7 +6835,7 @@
   margin: 0;
   padding: var(--fab-space-2);
   border: 1px solid var(--fab-info-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-info-soft);
   color: var(--fab-info-text);
   min-width: 0;
@@ -6905,7 +6907,7 @@
   .essence-icon-picker-preview {
   width: 100%;
   height: 100%;
-  border-radius: 8px;
+  border-radius: 7px;
   color: inherit;
   background: transparent;
 }
@@ -7123,7 +7125,7 @@
   min-width: 0;
   padding: var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-overlay-dark-14);
 }
 
@@ -7354,7 +7356,7 @@
 .fabricate-source-picker-popover .essence-source-picker-option img {
   width: 34px;
   height: 34px;
-  border-radius: 5px;
+  border-radius: 9px;
 }
 
 .fabricate-icon-picker-popover .essence-icon-picker-option span:last-child,
@@ -7725,7 +7727,7 @@
 
 /* THE TWO TEXT ACTIONS' TRAILING-EDGE GROUPING IS NOT HERE, AND IT CANNOT BE. */
 
-/* The list and its rows. The skin matches the ONE browser-row treatment above — hairline edge, 8px corner, translucent overlay fill — and the geometry matches the recipe and component rows' denser 11px/12px card, because a scoped list is the same kind of library at the same density. */
+/* The list and its rows. The skin matches the ONE browser-row treatment above — hairline edge, 9px corner, translucent overlay fill — and the geometry matches the recipe and component rows' denser 11px/12px card, because a scoped list is the same kind of library at the same density. */
 .fabricate-manager .manager-scoped-list {
   display: flex;
   flex-direction: column;
@@ -7746,7 +7748,7 @@
   min-height: 62px;
   padding: 11px 12px;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--fab-text);
   background: var(--fab-overlay-light-03);
 }
@@ -7907,7 +7909,7 @@
   min-width: 0;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-04);
 }
 
@@ -8002,7 +8004,7 @@
   margin: 0;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-04);
 }
 
@@ -8441,7 +8443,7 @@
   max-width: none;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border-strong);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-bg-3);
   box-shadow: var(--fab-shadow-lg);
 }
@@ -8638,7 +8640,7 @@
   gap: var(--fab-space-3);
   padding: var(--fab-space-4);
   border: 1px solid var(--fab-accent-border);
-  border-radius: 12px;
+  border-radius: 11px;
   background: var(--fab-accent-soft);
 }
 
@@ -8655,7 +8657,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: 7px;
   color: var(--fab-accent);
   background: var(--fab-bg-3);
 }
@@ -8738,7 +8740,7 @@
   min-width: 0;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 12px;
+  border-radius: 11px;
 }
 
 .fabricate-validation .manager-recipe-rail-summary-medallion {
@@ -8748,7 +8750,7 @@
   justify-content: center;
   width: 52px;
   height: 52px;
-  border-radius: 13px;
+  border-radius: 11px;
   font-size: 1.35rem;
 }
 
@@ -8873,7 +8875,7 @@
   margin: 0;
   padding: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 10px;
+  border-radius: 11px;
   list-style: none;
   overflow: hidden;
 }
@@ -9190,7 +9192,7 @@
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-04);
 }
 
@@ -9359,7 +9361,7 @@
 .fabricate-manager .manager-recipe-ingredient-requirement.has-alternatives {
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-accent-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-surface-soft);
 }
 
@@ -9397,7 +9399,7 @@
   gap: var(--fab-space-1);
 }
 
-/* ONE REQUIREMENT ROW, ON ONE LINE (issue 1373, maintainer round 5; `proto:4658`). */
+/* ONE REQUIREMENT ROW, ON ONE LINE (issue 1373, maintainer round 5; `proto:4658`). skin census (issue 1523): a carrier pinned by tests/components/picker-row-matrix-mounted.test.js and the recipe and component studio font-size suites. */
 .fabricate-manager .manager-recipe-ingredient-option-row {
   display: flex;
   flex-wrap: wrap;
@@ -9406,7 +9408,7 @@
   min-width: 0;
   padding: var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-bg-1);
 }
 
@@ -9512,7 +9514,7 @@
   width: 20px;
   height: 20px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   object-fit: cover;
 }
 
@@ -9736,7 +9738,7 @@
   align-items: center;
   padding: 2px var(--fab-space-chip);
   border: 1px solid var(--fab-border);
-  border-radius: 5px;
+  border-radius: 6px;
   color: var(--fab-text-subtle);
   font-size: 0.56rem;
   font-weight: 700;
@@ -10173,7 +10175,7 @@
   min-width: 0;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-surface);
 }
 
@@ -10402,7 +10404,7 @@
   height: 28px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 7px;
   color: var(--fab-text-muted);
   background: transparent;
   cursor: pointer;
@@ -10465,7 +10467,7 @@
   min-height: 30px;
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 7px;
   color: var(--fab-text-muted);
   background: transparent;
   text-align: left;
@@ -10515,7 +10517,7 @@
 .fabricate-button.fabricate-button.fab-manager-button.manager-downtime-unlock {
   min-height: 34px;
   padding: 0 14px;
-  border-radius: 8px;
+  border-radius: 9px;
   font-size: 11.5px;
   font-weight: 600;
 }
@@ -10558,7 +10560,7 @@
 
   /* `2px 5px`, one pixel tighter each side than the design's `2px 6px`. The design's rail row ends in an inert chevron; this one ends in a real 28px expand/collapse BUTTON, so the same chip on the same 175px row leaves the label a pixel short and it breaks mid-word. */
   padding: 2px 5px;
-  border-radius: 4px;
+  border-radius: 6px;
 
   /* A lettered mark, not a numeral, so it takes the body face rather than the mono one. */
   font-family: inherit;
@@ -10577,7 +10579,7 @@
   margin: 0 var(--fab-space-chip) var(--fab-space-chip);
   padding: 9px 10px;
   border: 1px solid var(--fab-accent-border);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--fab-text-muted);
   font-size: 0.6rem;
   line-height: 1.4;
@@ -10781,8 +10783,8 @@
 .fabricate-card.fabricate-card {
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-04);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-fact-grid {
@@ -11251,7 +11253,7 @@
   max-width: 100%;
   padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 5px;
+  border-radius: 7px;
   background: var(--fab-bg-2);
   color: var(--fab-text);
   font-family: inherit;
@@ -11352,7 +11354,7 @@
   min-height: 48px;
   padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px dashed var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--fab-text-muted);
   font-size: 0.82rem;
   text-align: center;
@@ -11371,7 +11373,7 @@
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-bg-2);
 }
 
@@ -11542,7 +11544,7 @@
 .fabricate-manager .manager-selected-drop-editor {
   min-width: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-bg-3);
   box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
 }
@@ -11712,7 +11714,7 @@
   min-height: 32px;
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 6px;
   color: var(--fab-text);
   background: transparent;
   text-align: left;
@@ -11757,7 +11759,7 @@
   max-width: 100%;
   padding: var(--fab-space-2xs) var(--fab-space-1) var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-warning-border);
-  border-radius: 5px;
+  border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-warning-soft);
   font-size: 0.76rem;
@@ -11996,7 +11998,7 @@
   min-height: 72px;
   padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
   cursor: grab;
@@ -12103,7 +12105,7 @@
   min-height: 340px;
   max-height: 340px;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-bg-3);
   box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
   overflow: hidden;
@@ -12130,7 +12132,7 @@
 .fabricate-manager .manager-required-tool-thumb {
   width: 18px;
   height: 18px;
-  border-radius: 4px;
+  border-radius: 6px;
   object-fit: cover;
   background: var(--fab-surface-raised);
 }
@@ -12292,14 +12294,14 @@
   min-height: 52px;
   padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px dashed var(--fab-border-strong);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-overlay-light-03);
 }
 
 .fabricate-manager .manager-drop-component-button .manager-gathering-task-thumb {
   width: 42px;
   height: 42px;
-  border-radius: 8px;
+  border-radius: 9px;
 }
 
 .fabricate-manager .manager-drop-component-button .manager-system-copy,
@@ -12572,7 +12574,7 @@
   min-height: 46px;
   padding: var(--fab-space-2);
   border: 1px dashed var(--fab-border-strong);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-06);
   text-align: center;
@@ -12583,7 +12585,7 @@
   min-height: 40px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-overlay-light-06);
 }
 
@@ -12849,7 +12851,7 @@
   min-width: 0;
   padding: var(--fab-space-4);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-035);
 }
 
@@ -12955,7 +12957,7 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--fab-bg-0);
   background: var(--manager-color-swatch, var(--fab-tag-sage));
 }
@@ -12971,7 +12973,7 @@
   min-height: 30px;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: 7px;
   background: transparent;
 }
 
@@ -13010,7 +13012,7 @@
   min-height: 30px;
   padding: var(--fab-space-2xs);
   border: 0;
-  border-radius: 4px;
+  border-radius: 7px;
   background: transparent;
 }
 
@@ -13093,7 +13095,7 @@
 .fabricate-manager .manager-condition-pill .essence-icon-picker-trigger.icon-only .essence-icon-picker-preview {
   width: 100%;
   height: 100%;
-  border-radius: 4px;
+  border-radius: 7px;
   background: transparent;
 }
 
@@ -13121,7 +13123,7 @@
 }
 
 .fabricate-manager .manager-condition-label-input:focus-visible {
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .fabricate-manager .manager-condition-remove {
@@ -13221,7 +13223,7 @@
   align-content: start;
   padding: var(--fab-space-4);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-035);
 }
 
@@ -13240,7 +13242,7 @@
   width: 38px;
   height: 38px;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--fab-accent);
   background: var(--fab-success-soft);
 }
@@ -13766,7 +13768,7 @@
   width: 44px;
   height: 44px;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   object-fit: cover;
 }
 
@@ -13877,7 +13879,7 @@
   min-width: 0;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-bg-0);
 }
 
@@ -13939,7 +13941,7 @@
   min-width: 0;
   padding: 10px var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-04);
   font-size: 0.78rem;
   line-height: 1.35;
@@ -13977,7 +13979,7 @@
   gap: var(--fab-space-2);
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-info-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-info-soft);
 }
 
@@ -13989,7 +13991,7 @@
   gap: 10px;
   padding: 10px 12px;
   border: 1px solid var(--fab-info-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-info-soft);
 }
 
@@ -14099,13 +14101,14 @@
   background: var(--fab-surface-soft);
 }
 
+/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; its sole emitter is `ToolSystemScopeCards.svelte`. */
 .fabricate-manager .manager-tool-system-label {
   display: grid;
   gap: var(--fab-space-1);
   min-width: 0;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 10px;
+  border-radius: 9px;
   background: var(--fab-bg-1);
 }
 
@@ -14120,7 +14123,7 @@
   flex-direction: column;
   min-width: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 10px;
+  border-radius: 11px;
   background: var(--fab-bg-1);
 }
 
@@ -14270,7 +14273,7 @@
   min-width: 0;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 10px;
+  border-radius: 9px;
   background: var(--fab-surface-soft);
 }
 
@@ -14323,7 +14326,7 @@
   width: 110px;
   height: 110px;
   border: 1px solid var(--fab-border);
-  border-radius: 10px;
+  border-radius: 11px;
   background: var(--fab-bg-2);
 }
 
@@ -14391,6 +14394,7 @@
   width: 100%;
 }
 
+/* skin census (issue 1523): an unpinned carrier of the target tuple — zero hits under tests/ or scripts/; its sole emitter is `ToolBehaviorPreview.svelte`. */
 .fabricate-manager .manager-tool-required-row {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) max-content;
@@ -14399,7 +14403,7 @@
   min-width: 0;
   padding: var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-bg-1);
 }
 
@@ -14427,7 +14431,7 @@
   min-height: 70px;
   padding: var(--fab-space-3);
   border: 1px dashed var(--fab-border-strong);
-  border-radius: 10px;
+  border-radius: 9px;
   box-sizing: border-box;
   background: var(--fab-overlay-light-04);
 }
@@ -14491,7 +14495,7 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  border-radius: 8px;
+  border-radius: 11px;
   overflow: hidden;
   background: var(--fab-surface-soft);
   color: var(--fab-accent);
@@ -14598,7 +14602,7 @@
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-bg-0);
 }
 
@@ -14612,7 +14616,7 @@
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-bg-0);
 }
 
@@ -14877,7 +14881,7 @@
   min-width: 0;
   padding: var(--fab-space-4);
   border: 1px solid var(--fab-border);
-  border-radius: 12px;
+  border-radius: 11px;
   background: var(--fab-surface-soft);
 }
 
@@ -15062,7 +15066,7 @@
   min-height: 48px;
   padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px dashed var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--fab-text-muted);
   font-size: 0.82rem;
   text-align: center;
@@ -15205,7 +15209,7 @@
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-bg-3);
 }
 
@@ -15224,7 +15228,7 @@
 .fabricate-manager .manager-environment-card {
   min-width: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-04);
   padding: var(--fab-space-3);
   display: flex;
@@ -15276,7 +15280,7 @@
   min-height: 34px;
   padding: var(--fab-space-chip) var(--fab-space-2);
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   background: none;
   color: var(--fab-text-muted);
   font-weight: 700;
@@ -16007,7 +16011,7 @@
   min-width: 0;
   padding: var(--fab-space-chip) var(--fab-space-2);
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   background: none;
   color: var(--fab-text);
   cursor: pointer;
@@ -16074,7 +16078,7 @@
   align-items: center;
   gap: var(--fab-space-1);
   padding: 1px var(--fab-space-chip);
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 0.72rem;
   border: 1px solid var(--fab-border);
   background: var(--fab-overlay-dark-16);
@@ -16167,7 +16171,7 @@
   min-width: 0;
   padding: 1px var(--fab-space-chip);
   border: 1px solid var(--fab-border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--fab-text-muted);
   font-size: 0.74rem;
@@ -16442,7 +16446,7 @@
   padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid var(--fab-overlay-dark-12);
   border-left: 3px solid var(--fab-accent-strong);
-  border-radius: 5px;
+  border-radius: 9px;
   background: var(--fab-overlay-dark-05);
 }
 
@@ -16645,7 +16649,7 @@
   min-width: 0;
   padding: var(--fab-space-2xs) var(--fab-space-chip);
   border: 1px solid var(--fab-overlay-dark-10);
-  border-radius: 4px;
+  border-radius: 7px;
   background: var(--fab-overlay-dark-05);
 }
 
@@ -16655,7 +16659,7 @@
   width: 22px;
   height: 22px;
   border: none;
-  border-radius: 3px;
+  border-radius: 6px;
   object-fit: cover;
 }
 
@@ -16943,7 +16947,7 @@
   gap: var(--fab-space-2);
   padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 10px;
+  border-radius: 11px;
   background: var(--fab-bg-2);
   color: var(--fab-text);
   box-shadow: var(--fab-shadow-lg);
@@ -17076,7 +17080,7 @@
   flex-direction: column;
   position: relative;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-overlay-light-03);
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
@@ -17095,7 +17099,7 @@
   align-items: center;
   gap: var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-overlay-light-03);
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
@@ -17119,7 +17123,7 @@
   cursor: pointer;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: 9px;
   text-align: left;
   color: inherit;
 }
@@ -17133,7 +17137,7 @@
   display: inline-block;
   width: 18px;
   height: 18px;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid var(--fab-border-strong);
 
   /* Themed default; the scene region's own colour overrides this inline. */
@@ -17219,7 +17223,7 @@
   border: none;
   text-align: left;
   color: inherit;
-  border-radius: 8px;
+  border-radius: 9px;
   font: inherit;
   text-rendering: inherit;
 }
@@ -17289,8 +17293,8 @@
   padding: var(--fab-space-4);
   border-top: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-04);
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
+  border-bottom-left-radius: 9px;
+  border-bottom-right-radius: 9px;
 }
 
 /* The selected/expanded region row uses the same neutral treatment as the Parties tab — no fill highlight; the expanded body itself signals selection. */
@@ -17410,7 +17414,7 @@
   width: 28px;
   height: 28px;
   flex: 0 0 auto;
-  border-radius: 5px;
+  border-radius: 7px;
   border: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-04);
   color: var(--fab-text-muted);
@@ -17476,7 +17480,7 @@
 
 /* The drop affordance for the travel-actor tile. It lives here, not in `PartyTravelActorPanel`'s scoped block, because `dragDrop` adds the class at runtime. */
 .fabricate-manager .manager-party-actor-tile.is-drop-active {
-  border-radius: 12px;
+  border-radius: 11px;
   background: var(--fab-accent-soft);
   box-shadow: inset 0 0 0 2px var(--fab-accent-border);
 }
@@ -17515,7 +17519,7 @@
   height: 30px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 7px;
   color: var(--fab-text-secondary);
   background: var(--fab-surface-soft);
   font-size: 10.5px;
@@ -17536,7 +17540,7 @@
   height: 30px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-accent-border);
-  border-radius: 8px;
+  border-radius: 7px;
   background: var(--fab-bg-0);
 }
 
@@ -17747,7 +17751,7 @@
   max-height: min(50vh, 360px);
   padding: var(--fab-space-chip);
   border: 1px solid var(--fab-border-strong);
-  border-radius: 10px;
+  border-radius: 11px;
   background: var(--fab-bg-0);
   box-shadow: var(--fab-shadow-lg);
   overflow: hidden;
@@ -18244,7 +18248,7 @@
   gap: var(--fab-space-2);
   padding: 10px var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-04);
 }
 
@@ -18347,7 +18351,7 @@
   height: 30px;
   padding: 0 var(--fab-space-3);
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--fab-text-muted);
   cursor: pointer;
 }
@@ -18535,7 +18539,7 @@
   .manager-tool-browser-inspector
   [data-tool-inspector-edit-world] {
   min-height: 30px;
-  border-radius: 8px;
+  border-radius: 7px;
   font-size: 10.5px;
   font-weight: 600;
 }
@@ -18591,7 +18595,7 @@
   width: 52px;
   height: 52px;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 11px;
   object-fit: cover;
 }
 
@@ -18725,7 +18729,7 @@
   min-height: 52px;
   padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   color: inherit;
   background: var(--fab-overlay-light-03);
   font-family: inherit;
