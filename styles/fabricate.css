@@ -53,9 +53,9 @@
   --fab-icon-picker-chip: 28px;
   --fab-icon-picker-row: calc(var(--fab-icon-picker-chip) + (2 * var(--fab-space-1)) + 2px);
 
-  /* The two radii the Books & Scrolls tab and the item-page inspector share, carried across at their shipped off-ladder values rather than corrected here. THE SURFACE IS IN THE NAME because 5px and 6px are not the system's answer: a third surface reaching for one of these is reaching for the published radius ladder instead (issue 1399). */
-  --fab-books-control-radius: 5px;
-  --fab-books-panel-radius: 6px;
+  /* The two radii the Books & Scrolls tab and the item-page inspector share (issue 1399), on the published radius ladder since issue 1523: a control at 7 and a panel at 11. A third surface reads the ladder rung for its kind, not these names. */
+  --fab-books-control-radius: 7px;
+  --fab-books-panel-radius: 11px;
 
   /* Component Studio token mapping, kept as the record of the calls: it adds ZERO colour tokens and edits NONE of the theme blocks, mapping its prototype's ramp index-aligned onto the existing one (issue 676). */
 }
@@ -7740,7 +7740,7 @@
   min-height: 62px;
   padding: 11px 12px;
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--fab-text);
   background: var(--fab-overlay-light-03);
 }
@@ -10775,8 +10775,8 @@
 .fabricate-card.fabricate-card {
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-overlay-light-04);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-fact-grid {
