@@ -5,16 +5,37 @@
     "path": "src/ui/svelte/components/EditorTabs.svelte",
     "props": {
       "tabs": [
-        { "id": "tiers", "label": "Tiers" },
-        { "id": "businesses", "label": "Businesses" },
-        { "id": "validation", "label": "Validation" },
-        { "id": "settings", "label": "Settings" }
+        {
+          "id": "tiers",
+          "label": "Tiers"
+        },
+        {
+          "id": "businesses",
+          "label": "Businesses"
+        },
+        {
+          "id": "validation",
+          "label": "Validation"
+        },
+        {
+          "id": "settings",
+          "label": "Settings"
+        }
       ],
       "activeTab": "tiers",
       "badges": {
-        "tiers": { "vehicle": "count", "label": 3 },
-        "businesses": { "vehicle": "count", "label": 23 },
-        "validation": { "tone": "warning", "label": 3 }
+        "tiers": {
+          "vehicle": "count",
+          "label": 3
+        },
+        "businesses": {
+          "vehicle": "count",
+          "label": 23
+        },
+        "validation": {
+          "tone": "warning",
+          "label": 3
+        }
       },
       "ariaLabel": "Frontier Outpost sections"
     }
@@ -44,14 +65,28 @@
       {
         "tag": "label",
         "children": [
-          { "tag": "span", "text": "Category" },
+          {
+            "tag": "span",
+            "text": "Category"
+          },
           {
             "tag": "select",
-            "attrs": { "aria-label": "Category" },
+            "attrs": {
+              "aria-label": "Category"
+            },
             "children": [
-              { "tag": "option", "text": "Leave unchanged" },
-              { "tag": "option", "text": "Metal" },
-              { "tag": "option", "text": "Reagent" }
+              {
+                "tag": "option",
+                "text": "Leave unchanged"
+              },
+              {
+                "tag": "option",
+                "text": "Metal"
+              },
+              {
+                "tag": "option",
+                "text": "Reagent"
+              }
             ]
           }
         ]
@@ -66,7 +101,10 @@
     "spec": "<Modal>",
     "draws": ".stage.b0 > div",
     "path": "src/ui/svelte/components/Modal.svelte",
-    "slot": { "width": 640, "height": 300 },
+    "slot": {
+      "width": 640,
+      "height": 300
+    },
     "props": {
       "open": true,
       "title": "Map imported folders",
@@ -77,11 +115,15 @@
       "body": [
         {
           "tag": "div",
-          "attrs": { "style": "display:flex;align-items:center;gap:10px" },
+          "attrs": {
+            "style": "display:flex;align-items:center;gap:10px"
+          },
           "children": [
             {
               "tag": "strong",
-              "attrs": { "style": "flex:1;font-size:12px" },
+              "attrs": {
+                "style": "flex:1;font-size:12px"
+              },
               "text": "Karrun / Metals"
             },
             {
@@ -95,11 +137,15 @@
         },
         {
           "tag": "div",
-          "attrs": { "style": "display:flex;align-items:center;gap:10px" },
+          "attrs": {
+            "style": "display:flex;align-items:center;gap:10px"
+          },
           "children": [
             {
               "tag": "strong",
-              "attrs": { "style": "flex:1;font-size:12px" },
+              "attrs": {
+                "style": "flex:1;font-size:12px"
+              },
               "text": "Karrun / Hafts"
             },
             {
@@ -157,13 +203,23 @@
     "content": [
       {
         "tag": "div",
-        "attrs": { "class": "manager-recipe-filter-row" },
+        "attrs": {
+          "class": "manager-recipe-filter-row"
+        },
         "children": [
           {
             "tag": "label",
-            "attrs": { "class": "fabricate-search" },
+            "attrs": {
+              "class": "fabricate-search"
+            },
             "children": [
-              { "tag": "i", "attrs": { "class": "fas fa-search", "aria-hidden": "true" } },
+              {
+                "tag": "i",
+                "attrs": {
+                  "class": "fas fa-search",
+                  "aria-hidden": "true"
+                }
+              },
               {
                 "tag": "input",
                 "attrs": {
@@ -181,14 +237,700 @@
               "aria-label": "Filter recipes by category"
             },
             "children": [
-              { "tag": "option", "text": "All categories" },
-              { "tag": "option", "text": "Metal" },
-              { "tag": "option", "text": "Reagent" }
+              {
+                "tag": "option",
+                "text": "All categories"
+              },
+              {
+                "tag": "option",
+                "text": "Metal"
+              },
+              {
+                "tag": "option",
+                "text": "Reagent"
+              }
             ]
           },
-          { "tag": "span", "attrs": { "class": "manager-recipe-count" }, "text": "1–18 of 412" }
+          {
+            "tag": "span",
+            "attrs": {
+              "class": "manager-recipe-count"
+            },
+            "text": "1–18 of 412"
+          }
         ]
       }
     ]
+  },
+  {
+    "spec": "<NavSidebar>",
+    "cap": "app rail 72",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/NavSidebar.svelte",
+    "note": "The icon variant, the player rail. The sidebar and collapsed units stay drawn: the labelled variant draws its rows through `content(rows)`, a snippet handed the rows to draw, which a row cannot carry.",
+    "props": {
+      "variant": "icon",
+      "label": "Fabricate sections",
+      "panelId": "pl-player-nav-panel",
+      "items": [
+        {
+          "id": "crafting",
+          "domId": "pl-player-nav-tab-crafting",
+          "icon": "fas fa-hammer",
+          "label": "Crafting",
+          "current": true
+        },
+        {
+          "id": "alchemy",
+          "domId": "pl-player-nav-tab-alchemy",
+          "icon": "fas fa-flask",
+          "label": "Alchemy"
+        },
+        {
+          "id": "gathering",
+          "domId": "pl-player-nav-tab-gathering",
+          "icon": "fas fa-leaf",
+          "label": "Gather"
+        },
+        {
+          "id": "journal",
+          "domId": "pl-player-nav-tab-journal",
+          "icon": "fas fa-book-open",
+          "label": "Journal",
+          "markers": [
+            {
+              "kind": "count",
+              "value": 4
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<PageHeader> <TabBar>",
+    "draws": ".stage.b0.col > div > div:nth-child(1)",
+    "path": "src/ui/svelte/components/PageHeader.svelte",
+    "note": "The header block above the tab bar, its two actions passed as the `actions` snippet. The Progression badge and the \"used by 2 settlements\" hint beside the title stay drawn: the header has no slot beside its title, only an `identity` snippet that replaces the title and subtitle.",
+    "props": {
+      "breadcrumbs": [
+        {
+          "label": "World"
+        },
+        {
+          "label": "Economy"
+        },
+        {
+          "label": "Templates"
+        },
+        {
+          "label": "Frontier Outpost"
+        }
+      ],
+      "title": "Frontier Outpost",
+      "subtitle": "Curate the growth path: which businesses a tier activates, how far they are granted free, and the gates that advance or decline the settlement."
+    },
+    "snippets": {
+      "actions": [
+        {
+          "tag": "div",
+          "attrs": {
+            "class": "manager-header-actions"
+          },
+          "children": [
+            {
+              "tag": "button",
+              "attrs": {
+                "type": "button",
+                "class": "fabricate-button fab-manager-button is-ghost",
+                "data-keyboard-focus": "true"
+              },
+              "children": [
+                {
+                  "tag": "i",
+                  "attrs": {
+                    "class": "fas fa-arrow-left",
+                    "aria-hidden": "true"
+                  }
+                },
+                "All templates"
+              ]
+            },
+            {
+              "tag": "button",
+              "attrs": {
+                "type": "button",
+                "class": "fabricate-button fab-manager-button is-primary",
+                "data-keyboard-focus": "true"
+              },
+              "children": ["Save"]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "cap": "default — 38px chip, serif name",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "note": "The default density at the 38 mark, its facts passed as the `meta` snippet. The badges and the trailing status toggle and menu stay drawn: each is a component, a Chip or a button whose styles are its own, which a node array cannot stand up. The selected edge is not drawn either: the row draws selection only as the pressed state of its open button, which renders only beside an `onOpen` handler, and a row passes no function.",
+    "props": {
+      "name": "Riverbridge",
+      "icon": "fas fa-book",
+      "tint": "peach",
+      "density": "default",
+      "markSize": 38
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-table-cells-large",
+                "aria-hidden": "true"
+              }
+            },
+            " Frontier Mining Town"
+          ]
+        },
+        {
+          "tag": "span",
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-leaf",
+                "aria-hidden": "true"
+              }
+            },
+            " Ironvale"
+          ]
+        },
+        {
+          "tag": "span",
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-star",
+                "aria-hidden": "true"
+              }
+            },
+            " 3 businesses"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "cap": "default — 38px chip, serif name",
+    "draws": ".k-row",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "props": {
+      "name": "Oakhollow",
+      "icon": "fas fa-leaf",
+      "tint": "sage",
+      "density": "default",
+      "markSize": 38
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-table-cells-large",
+                "aria-hidden": "true"
+              }
+            },
+            " Farming Hamlet"
+          ]
+        },
+        {
+          "tag": "span",
+          "children": [
+            {
+              "tag": "i",
+              "attrs": {
+                "class": "fas fa-leaf",
+                "aria-hidden": "true"
+              }
+            },
+            " Greenmarch"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "cap": "dense — the cross-reference and result form",
+    "draws": ".k-row.dense",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "props": {
+      "name": "Karrun Warblade",
+      "icon": "fas fa-hammer",
+      "tint": "mist",
+      "quantity": "×2"
+    }
+  },
+  {
+    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "cap": "dense — the cross-reference and result form",
+    "draws": ".k-row.dense",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "props": {
+      "name": "Ironvale Plate",
+      "icon": "fas fa-hammer",
+      "tint": "mist",
+      "quantity": "×4"
+    }
+  },
+  {
+    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "cap": "card grid — same row model, one track",
+    "draws": ".k-card",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "note": "The card layout, the same row model on one track, its facts passed as the `meta` snippet. The list and grid switcher above stays drawn: it is ViewToggle, which is not built.",
+    "props": {
+      "name": "Steel Ingot",
+      "icon": "fas fa-hammer",
+      "tint": "mist",
+      "layout": "card",
+      "density": "default",
+      "markSize": 38
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "text": "Metal"
+        },
+        {
+          "tag": "span",
+          "text": "#Refined"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<ListRow> <BrowseCard> <ViewToggle> <XrefList>",
+    "cap": "card grid — same row model, one track",
+    "draws": ".k-card",
+    "path": "src/ui/svelte/components/ListRow.svelte",
+    "props": {
+      "name": "Ingotwort Oil",
+      "icon": "fas fa-flask",
+      "tint": "lavender",
+      "layout": "card",
+      "density": "default",
+      "markSize": 38
+    },
+    "snippets": {
+      "meta": [
+        {
+          "tag": "span",
+          "text": "Reagent"
+        },
+        {
+          "tag": "span",
+          "text": "#Alchemy"
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<BulkStagingInset>",
+    "cap": "check rows — systems, one staged, paged",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
+    "props": {
+      "id": "systems",
+      "kind": "check",
+      "placeholder": "Search systems",
+      "rows": [
+        {
+          "id": "karrun",
+          "name": "Karrun Forgecraft",
+          "state": "on",
+          "meta": "Staged"
+        },
+        {
+          "id": "wildwood",
+          "name": "Wildwood Alchemy",
+          "state": "off"
+        },
+        {
+          "id": "glassworks",
+          "name": "Glassworks",
+          "state": "off"
+        },
+        {
+          "id": "herbcraft",
+          "name": "Herbcraft",
+          "state": "off"
+        },
+        {
+          "id": "jewelcraft",
+          "name": "Jewelcraft",
+          "state": "off"
+        }
+      ],
+      "page": {
+        "pageIndex": 0,
+        "pageCount": 2,
+        "rangeStart": 1,
+        "rangeEnd": 5,
+        "total": 7
+      }
+    }
+  },
+  {
+    "spec": "<BulkStagingInset>",
+    "cap": "tri rows — tags, one added and one removed, with n/N",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
+    "note": "The drawing shows the rows alone. The inset always draws its search well and pager around them, and its window holds five rows, so the live one stands taller than the three drawn.",
+    "props": {
+      "id": "tags",
+      "kind": "tri",
+      "placeholder": "Search tags",
+      "rows": [
+        {
+          "id": "ore",
+          "name": "ore",
+          "state": "add",
+          "meta": "1/2"
+        },
+        {
+          "id": "ingot",
+          "name": "ingot",
+          "state": "remove",
+          "meta": "2/2"
+        },
+        {
+          "id": "moss",
+          "name": "moss",
+          "state": "off",
+          "meta": "0/2"
+        }
+      ],
+      "page": {
+        "pageIndex": 0,
+        "pageCount": 1,
+        "rangeStart": 1,
+        "rangeEnd": 3,
+        "total": 3
+      }
+    }
+  },
+  {
+    "spec": "<BulkStagingInset>",
+    "cap": "stepper rows — essence values, one set",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
+    "note": "The drawing shows the rows alone. The inset always draws its search well and pager around them, and its window holds five rows, so the live one stands taller than the two drawn.",
+    "props": {
+      "id": "essences",
+      "kind": "stepper",
+      "placeholder": "Search essences",
+      "rows": [
+        {
+          "id": "fire",
+          "name": "Fire",
+          "icon": "fas fa-flask",
+          "colorToken": "rose",
+          "meta": "1/2",
+          "value": 2,
+          "state": "set",
+          "active": true,
+          "min": 0
+        },
+        {
+          "id": "earth",
+          "name": "Earth",
+          "icon": "fas fa-leaf",
+          "colorToken": "sage",
+          "meta": "0/2",
+          "value": null,
+          "state": "unchanged",
+          "min": 0
+        }
+      ],
+      "page": {
+        "pageIndex": 0,
+        "pageCount": 1,
+        "rangeStart": 1,
+        "rangeEnd": 2,
+        "total": 2
+      }
+    }
+  },
+  {
+    "spec": "<ValidationSummary>",
+    "draws": ".k-card",
+    "path": "src/ui/svelte/components/EditorValidationSurface.svelte",
+    "note": "No title and no intro, so no head block, as drawn. The count tiles and the status pills keep the surface's own words, which no caller passes.",
+    "props": {
+      "title": "",
+      "summary": {
+        "status": "warn",
+        "icon": "fas fa-triangle-exclamation",
+        "title": "Nearly ready",
+        "sub": "Three warnings, one blocking issue. Players cannot craft this until the blocker clears."
+      },
+      "counts": {
+        "passing": 12,
+        "warnings": 3,
+        "blocking": 1
+      },
+      "groups": [
+        {
+          "id": "steps",
+          "icon": "fas fa-clipboard-check",
+          "label": "Steps",
+          "rows": [
+            {
+              "id": "step-ingredients",
+              "status": "block",
+              "title": "Step 2 has no ingredients",
+              "detail": "A step must consume at least one component, tag or essence.",
+              "target": "steps",
+              "viewLabel": "Fix"
+            },
+            {
+              "id": "critical-tier",
+              "status": "warn",
+              "title": "Critical routes to a missing tier",
+              "detail": "The result set will never be produced.",
+              "target": "results",
+              "viewLabel": "Fix"
+            },
+            {
+              "id": "counting-formula",
+              "status": "warn",
+              "title": "This formula counts successes, but the check adds the dice",
+              "detail": "The total of 2d20cs<=@skills.survival.value is a count, so every bonus and DC here is measured against the wrong number.",
+              "action": {
+                "labelKey": "FABRICATE.Admin.Manager.Checks.Count.Convert.Action"
+              }
+            },
+            {
+              "id": "ingredients-resolve",
+              "status": "pass",
+              "title": "Every ingredient resolves"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<DataTable>",
+    "draws": ".stage.col ~ .stage.col > div",
+    "path": "src/ui/svelte/components/DataTable.svelte",
+    "note": "The empty table. The populated one above stays drawn: its rows need `rowKey`, a function, and its outcome badges and search need the `cell` and `search` snippets, which a row cannot carry.",
+    "props": {
+      "heading": "Craft history",
+      "count": 0,
+      "empty": {
+        "hint": "No crafts recorded yet. A row lands here each time a character completes a craft with this system."
+      }
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "inspector rail section",
+    "draws": ":scope > div > section:nth-child(1)",
+    "path": "src/ui/svelte/components/Rail.svelte",
+    "note": "The first section, its three stats in the shipped inspector stat grid at three columns, as drawn. The \"Appears in\" section stays drawn: its body is a list row, a component a node array cannot stand up.",
+    "props": {
+      "label": "Settlement snapshot"
+    },
+    "content": [
+      {
+        "tag": "div",
+        "attrs": {
+          "class": "manager-essence-stat-grid",
+          "style": "grid-template-columns:repeat(3,minmax(0,1fr))"
+        },
+        "children": [
+          {
+            "tag": "div",
+            "attrs": {
+              "class": "manager-essence-stat"
+            },
+            "children": [
+              {
+                "tag": "strong",
+                "attrs": {
+                  "class": "manager-essence-stat-value"
+                },
+                "text": "2"
+              },
+              {
+                "tag": "span",
+                "attrs": {
+                  "class": "manager-essence-stat-label"
+                },
+                "text": "Active"
+              }
+            ]
+          },
+          {
+            "tag": "div",
+            "attrs": {
+              "class": "manager-essence-stat"
+            },
+            "children": [
+              {
+                "tag": "strong",
+                "attrs": {
+                  "class": "manager-essence-stat-value"
+                },
+                "text": "2"
+              },
+              {
+                "tag": "span",
+                "attrs": {
+                  "class": "manager-essence-stat-label"
+                },
+                "text": "Extract"
+              }
+            ]
+          },
+          {
+            "tag": "div",
+            "attrs": {
+              "class": "manager-essence-stat"
+            },
+            "children": [
+              {
+                "tag": "strong",
+                "attrs": {
+                  "class": "manager-essence-stat-value"
+                },
+                "text": "1"
+              },
+              {
+                "tag": "span",
+                "attrs": {
+                  "class": "manager-essence-stat-label"
+                },
+                "text": "Craft"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "log list",
+    "draws": ":scope > div[role=\"list\"]",
+    "path": "src/ui/svelte/components/LogList.svelte",
+    "note": "Each entry's dismiss is the caller's `action(entry)` snippet, handed the entry it draws beside, which a row cannot carry, so the live list draws none.",
+    "props": {
+      "ariaLabel": "History",
+      "selectedKey": "warblade",
+      "entries": [
+        {
+          "key": "warblade",
+          "text": "Karrun Warblade",
+          "when": "Today",
+          "art": "icons/weapons/swords/greatsword-crossguard-blue.webp",
+          "outcome": {
+            "icon": "fa-circle-check",
+            "label": "Succeeded",
+            "tone": "success"
+          }
+        },
+        {
+          "key": "draught",
+          "text": "Healing draught",
+          "when": "2 days ago",
+          "tone": "danger",
+          "art": "icons/consumables/potions/bottle-bulb-corked-glowing-red.webp",
+          "outcome": {
+            "icon": "fa-circle-xmark",
+            "label": "Failed",
+            "tone": "danger"
+          }
+        },
+        {
+          "key": "moonpetal",
+          "text": "Moonpetal harvest",
+          "when": "Yesterday",
+          "art": "icons/commodities/flowers/blooms-purple.webp",
+          "outcome": {
+            "icon": "fa-ban",
+            "label": "Cancelled",
+            "tone": "neutral"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "avatar, stack, member row",
+    "draws": ":scope > div > div:nth-child(1)",
+    "path": "src/ui/svelte/components/Avatar.svelte",
+    "note": "Each name is the initials the drawing shows, the only words it gives a person.",
+    "props": {
+      "name": "BK",
+      "tint": "rose"
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "avatar, stack, member row",
+    "draws": ":scope > div > div:nth-child(2)",
+    "path": "src/ui/svelte/components/Avatar.svelte",
+    "props": {
+      "name": "VK",
+      "tint": "mist",
+      "shape": "square"
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "avatar, stack, member row",
+    "draws": ":scope > div > div:nth-child(3) > div",
+    "path": "src/ui/svelte/components/Avatar.svelte",
+    "note": "The stacked rung. The overlap and the ground ring belong to the stack and are drawn on each replaced tile, so the live tiles sit side by side.",
+    "props": {
+      "name": "IA",
+      "size": 26
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "avatar, stack, member row",
+    "draws": ":scope > div > div:nth-child(3) > div",
+    "path": "src/ui/svelte/components/Avatar.svelte",
+    "props": {
+      "name": "VK",
+      "size": 26
+    }
+  },
+  {
+    "spec": "<Rail> <LogList> <TierTrack> <Avatar>",
+    "cap": "avatar, stack, member row",
+    "draws": ":scope > div > div:nth-child(3) > div",
+    "path": "src/ui/svelte/components/Avatar.svelte",
+    "props": {
+      "name": "BK",
+      "size": 26
+    }
   }
 ]

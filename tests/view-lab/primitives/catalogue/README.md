@@ -195,6 +195,9 @@ shape:
 Only the names `specimenSnippets.js` lists are rendered, because a Svelte snippet
 cannot be built from a name at runtime; any other name is refused rather than
 dropped, and the coverage gate checks each name is a prop the component declares.
+They are `actions`, `body`, `footer` and `meta`, and each takes no argument.
+A snippet a component hands an item, such as `<LogList>`'s `action(entry)`, draws
+once per item, which one node array cannot, so a row leaves that unit drawn.
 
 ## What a row deliberately cannot say
 

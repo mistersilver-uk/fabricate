@@ -606,33 +606,29 @@ const AWAITING_SPECIMEN = Object.freeze({
     '<SearchPopover> src/ui/svelte/components/SearchablePopoverPanel.svelte',
   ],
   structures: [
-    '<Avatar> src/ui/svelte/components/Avatar.svelte',
-    '<BulkStagingInset> src/ui/svelte/apps/manager/BulkStagingInset.svelte',
-    '<DataTable> src/ui/svelte/components/DataTable.svelte',
-    '<ListRow> src/ui/svelte/components/ListRow.svelte',
-    '<LogList> src/ui/svelte/components/LogList.svelte',
-    '<NavSidebar> src/ui/svelte/components/NavSidebar.svelte',
+    // The labelled variant's rows: `NavSidebar` hands them to its `content(rows)` snippet, a
+    // snippet given the rows to draw, and the sheet roots their family at `.fabricate-nav`, so
+    // standing alone they draw unstyled buttons. The icon variant stands up `NavSidebar` itself.
     '<NavSidebar> src/ui/svelte/components/NavSidebarRows.svelte',
-    '<PageHeader> src/ui/svelte/components/PageHeader.svelte',
-    '<Rail> src/ui/svelte/components/Rail.svelte',
-    '<ValidationSummary> src/ui/svelte/components/EditorValidationSurface.svelte',
   ],
   composites: [
-    '<ChoiceGroup> src/ui/svelte/apps/manager/recipe/ChoiceGroup.svelte',
+    // Each candidate's held count, claim and reading come from the `held`, `claimed` and
+    // `candidateReading` functions; without them every candidate reads short, dimmed and blank.
     '<ChoiceOptionList> src/ui/svelte/components/ChoiceOptionList.svelte',
+    // Every bar, source row and stepper is read through `yield`, `spare`, `held` and six label
+    // functions, and the allocation is bindable state.
     '<EssencePool> src/ui/svelte/components/EssencePool.svelte',
-    '<OutcomeLadder> src/ui/svelte/components/OutcomeLadder.svelte',
-    '<PickerRow> src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
-    '<RequirementChooser> src/ui/svelte/components/RequirementChooser.svelte',
-    '<RuleRow> src/ui/svelte/components/RuleRow.svelte',
-    '<RuleSentence> src/ui/svelte/components/RuleSentence.svelte',
-    '<RunProgress> src/ui/svelte/components/RunProgress.svelte',
-    '<SetPicker> src/ui/svelte/components/SetPicker.svelte',
+    // A tile's held-over-needed pip and its met or short state are read through `held`, so with
+    // none every fixed tile reads 0 and short; its candidate list needs the readings above.
     '<SlotRow> src/ui/svelte/components/SlotRow.svelte',
-    '<SlotTile> src/ui/svelte/components/SlotTile.svelte',
+    // A row's content is the `row(item, index)` snippet and its name `itemLabel(item)`, so with
+    // neither every row is an empty numbered shell.
     '<SortableList> src/ui/svelte/components/SortableList.svelte',
-    '<StageCard> src/ui/svelte/components/StageCard.svelte',
+    // The "Stage 3 of 8" line and the return button's words come from the `positionLabel` and
+    // `returnLabel` functions; without them the line is absent and the button has no name.
     '<StageNav> src/ui/svelte/components/StageNav.svelte',
+    // Every reading, chance and cut note is worded by a `labels` callback, so with none the
+    // chances read as bare numbers and the readings are empty.
     '<YieldScale> src/ui/svelte/components/YieldScale.svelte',
   ],
 });
