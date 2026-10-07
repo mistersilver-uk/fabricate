@@ -3,6 +3,9 @@
     "spec": "<PageHeader> <TabBar>",
     "draws": ".stage.b0.col > div > div:nth-child(2)",
     "path": "src/ui/svelte/components/EditorTabs.svelte",
+    "undrawn": {
+      "Frontier Outpost sections": "the tab list’s accessible name; the drawing draws no name"
+    },
     "props": {
       "tabs": [
         {
@@ -56,46 +59,20 @@
     "draws": ".stage.col > div:nth-child(2)",
     "path": "src/ui/svelte/apps/manager/BulkEditPanelShell.svelte",
     "inset": 12,
+    "partial": "no Status axis",
+    "note": "The drawing’s words: the count, Apply’s label, and the blocked notice, which the shell draws from `subjectCount` and `blocked`. The Status axis stays unshown: it is a `SegmentedControl` under a `BulkEditSection` label, scoped components a node array cannot stand up, so the panel stages no axis.",
     "props": {
-      "heading": "4 components selected",
-      "applyLabel": "Apply to 3",
-      "canApply": true
-    },
-    "content": [
-      {
-        "tag": "label",
-        "children": [
-          {
-            "tag": "span",
-            "text": "Category"
-          },
-          {
-            "tag": "select",
-            "attrs": {
-              "aria-label": "Category"
-            },
-            "children": [
-              {
-                "tag": "option",
-                "text": "Leave unchanged"
-              },
-              {
-                "tag": "option",
-                "text": "Metal"
-              },
-              {
-                "tag": "option",
-                "text": "Reagent"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        "tag": "p",
-        "text": "1 of 4 cannot be changed: Moonsilver is referenced by a locked compendium and will be skipped."
-      }
-    ]
+      "heading": "4 essences selected",
+      "applyLabel": "Apply to 3 essences",
+      "canApply": true,
+      "subjectCount": 4,
+      "blocked": [
+        {
+          "id": "moonsilver",
+          "reason": "Moonsilver is referenced by a locked compendium."
+        }
+      ]
+    }
   },
   {
     "spec": "<Modal>",
@@ -104,6 +81,9 @@
     "slot": {
       "width": 640,
       "height": 300
+    },
+    "undrawn": {
+      "Close": "the close button’s accessible name; the drawing draws its glyph"
     },
     "props": {
       "open": true,
@@ -197,6 +177,11 @@
     "cap": "filter bar — inline form, with sort",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/FilterBar.svelte",
+    "partial": "search and count only",
+    "note": "The search and the count, in the shipped recipe toolbar’s classes and the drawing’s words. The status chips, the scope switch and the sort stay drawn: each is a component, Chip, SegmentedControl or Select, whose styles are its own, which a node array cannot stand up.",
+    "undrawn": {
+      "Recipe filters": "the toolbar’s accessible name, the shipped recipe browser’s; the drawing draws no name"
+    },
     "props": {
       "ariaLabel": "Recipe filters"
     },
@@ -224,30 +209,9 @@
                 "tag": "input",
                 "attrs": {
                   "type": "search",
-                  "placeholder": "Search recipes…",
+                  "placeholder": "Search recipes",
                   "aria-label": "Search recipes"
                 }
-              }
-            ]
-          },
-          {
-            "tag": "select",
-            "attrs": {
-              "class": "manager-recipe-category-filter",
-              "aria-label": "Filter recipes by category"
-            },
-            "children": [
-              {
-                "tag": "option",
-                "text": "All categories"
-              },
-              {
-                "tag": "option",
-                "text": "Metal"
-              },
-              {
-                "tag": "option",
-                "text": "Reagent"
               }
             ]
           },
@@ -256,7 +220,7 @@
             "attrs": {
               "class": "manager-recipe-count"
             },
-            "text": "1–18 of 412"
+            "text": "18 of 412"
           }
         ]
       }
@@ -267,7 +231,11 @@
     "cap": "app rail 72",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/NavSidebar.svelte",
-    "note": "The icon variant, the player rail. The sidebar and collapsed units stay drawn: the labelled variant draws its rows through `content(rows)`, a snippet handed the rows to draw, which a row cannot carry.",
+    "window": "player",
+    "note": "The icon variant, the player rail. The sidebar and collapsed units stay drawn: the labelled variant draws its rows through `content(rows)`, a snippet handed the rows to draw, which a row cannot carry. It stands in the player window’s area class, as `SvelteFabricateApp` frames the rail: in the manager’s frame, Foundry core’s `button.active` ring drew an orange outline on Crafting, which `fabricate.css` removes only under `.fabricate-app`. The square, full-bleed ground is the shipped rail’s own; the drawing frames the rail as a rounded panel.",
+    "undrawn": {
+      "Fabricate sections": "the tab list’s accessible name; the drawing draws no name"
+    },
     "props": {
       "variant": "icon",
       "label": "Fabricate sections",
@@ -311,6 +279,7 @@
     "spec": "<PageHeader> <TabBar>",
     "draws": ".stage.b0.col > div > div:nth-child(1)",
     "path": "src/ui/svelte/components/PageHeader.svelte",
+    "partial": "badge and hint stay drawn",
     "note": "The header block above the tab bar, its two actions passed as the `actions` snippet. The Progression badge and the \"used by 2 settlements\" hint beside the title stay drawn: the header has no slot beside its title, only an `identity` snippet that replaces the title and subtitle.",
     "props": {
       "breadcrumbs": [
@@ -375,7 +344,8 @@
     "cap": "default — 38px chip, serif name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
-    "note": "The default density at the 38 mark, its facts passed as the `meta` snippet. The badges and the trailing status toggle and menu stay drawn: each is a component, a Chip or a button whose styles are its own, which a node array cannot stand up. The selected edge is not drawn either: the row draws selection only as the pressed state of its open button, which renders only beside an `onOpen` handler, and a row passes no function.",
+    "partial": "badges and trailing controls stay drawn",
+    "note": "The default density at the 38 mark, its facts passed as the `meta` snippet. The badges, the level chip, and the trailing status toggle and menu stay drawn: each is a component, a Chip or a button whose styles are its own, which a node array cannot stand up; raw `manager-chip` markup was tried and rendered unstyled, because Chip’s styles are scoped. The selected edge is not drawn either: the row draws selection only as the pressed state of its open button, which renders only beside an `onOpen` handler, and a row passes no function.",
     "props": {
       "name": "Riverbridge",
       "icon": "fas fa-book",
@@ -432,6 +402,7 @@
     "cap": "default — 38px chip, serif name",
     "draws": ".k-row",
     "path": "src/ui/svelte/components/ListRow.svelte",
+    "partial": "badges and trailing controls stay drawn",
     "props": {
       "name": "Oakhollow",
       "icon": "fas fa-leaf",
@@ -598,7 +569,11 @@
     "cap": "tri rows — tags, one added and one removed, with n/N",
     "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
+    "partial": "a fixed five-row window",
     "note": "The drawing shows the rows alone. The inset always draws its search well and pager around them, and its window holds five rows, so the live one stands taller than the three drawn.",
+    "undrawn": {
+      "Search tags": "the well’s placeholder, the bulk panel’s own; the drawing shows the rows alone"
+    },
     "props": {
       "id": "tags",
       "kind": "tri",
@@ -637,7 +612,11 @@
     "cap": "stepper rows — essence values, one set",
     "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/BulkStagingInset.svelte",
+    "partial": "a fixed five-row window",
     "note": "The drawing shows the rows alone. The inset always draws its search well and pager around them, and its window holds five rows, so the live one stands taller than the two drawn.",
+    "undrawn": {
+      "Search essences": "the well’s placeholder, the bulk panel’s own; the drawing shows the rows alone"
+    },
     "props": {
       "id": "essences",
       "kind": "stepper",
@@ -678,7 +657,7 @@
     "spec": "<ValidationSummary>",
     "draws": ".k-card",
     "path": "src/ui/svelte/components/EditorValidationSurface.svelte",
-    "note": "No title and no intro, so no head block, as drawn. The count tiles and the status pills keep the surface's own words, which no caller passes.",
+    "note": "No title and no intro, so no head block, as drawn. The count tiles and the status pills keep the surface's own words, which no caller passes. Each row’s `viewLabel` is the plain word “Fix” where the API takes a lang key: it renders through `localize`’s fallback, which returns an unknown key as written.",
     "props": {
       "title": "",
       "summary": {
@@ -737,7 +716,8 @@
     "spec": "<DataTable>",
     "draws": ".stage.col ~ .stage.col > div",
     "path": "src/ui/svelte/components/DataTable.svelte",
-    "note": "The empty table. The populated one above stays drawn: its rows need `rowKey`, a function, and its outcome badges and search need the `cell` and `search` snippets, which a row cannot carry.",
+    "partial": "empty state only",
+    "note": "The empty table. The populated one above stays drawn: its rows need `rowKey`, a function with no default, and every cell is the `cell(row, column, index)` snippet, handed the cell it draws, which a row cannot carry.",
     "props": {
       "heading": "Craft history",
       "count": 0,
@@ -751,6 +731,7 @@
     "cap": "inspector rail section",
     "draws": ":scope > div > section:nth-child(1)",
     "path": "src/ui/svelte/components/Rail.svelte",
+    "partial": "first section only",
     "note": "The first section, its three stats in the shipped inspector stat grid at three columns, as drawn. The \"Appears in\" section stays drawn: its body is a list row, a component a node array cannot stand up.",
     "props": {
       "label": "Settlement snapshot"
@@ -838,7 +819,8 @@
     "cap": "log list",
     "draws": ":scope > div[role=\"list\"]",
     "path": "src/ui/svelte/components/LogList.svelte",
-    "note": "Each entry's dismiss is the caller's `action(entry)` snippet, handed the entry it draws beside, which a row cannot carry, so the live list draws none.",
+    "partial": "no dismiss buttons",
+    "note": "Each entry's dismiss is the caller's `action(entry)` snippet, handed the entry it draws beside, which a row cannot carry, so the live list draws none. The first entry’s `selectedKey` draws the accent border on an inert div, with no `aria-pressed`: the list announces selection only through its open button, which renders only beside an `onOpen` handler.",
     "props": {
       "ariaLabel": "History",
       "selectedKey": "warblade",

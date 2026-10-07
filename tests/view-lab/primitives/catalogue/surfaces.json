@@ -121,6 +121,8 @@
     "cap": "card — radius 11, padding 16, bg-2",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/InspectorCard.svelte",
+    "partial": "title only",
+    "note": "The card with its title, as the drawing writes it. Its icon tile and “per tick” badge stay drawn: they are library marks with no shipped markup a node array can carry.",
     "content": [
       {
         "tag": "h3",
@@ -128,13 +130,6 @@
           "style": "margin:0;font-family:var(--fab-font-serif);font-size:15px;font-weight:600"
         },
         "text": "Wages & upkeep"
-      },
-      {
-        "tag": "p",
-        "attrs": {
-          "style": "margin:4px 0 0;color:var(--fab-text-subtle);font-size:11.5px"
-        },
-        "text": "Paid automatically at the top of each tick, before any recipe resolves."
       }
     ]
   },
@@ -168,22 +163,16 @@
     "note": "The card row above stands beside its drawing rather than replacing it, so the drawing, and this well inside it, stays on the page: the Card drawing beside the live Card contains this live Well.",
     "props": {
       "label": "Ingredients"
-    },
-    "content": [
-      {
-        "tag": "p",
-        "attrs": {
-          "style": "margin:0;font-size:11.5px;color:var(--fab-text-secondary)"
-        },
-        "text": "Iron Ingot ×2 · Charcoal ×1"
-      }
-    ]
+    }
   },
   {
     "spec": "<Card> <Well> <RowDisclosure>",
     "cap": "row disclosure — not the same primitive",
     "draws": ":scope .k-row > .k-btn",
     "path": "src/ui/svelte/components/RowDisclosure.svelte",
+    "undrawn": {
+      "Show the ingredients for Steel Ingot": "the disclosure’s accessible name; the drawing draws the chevron alone"
+    },
     "props": {
       "expanded": false,
       "controls": "pl-steel-ingot-ingredients",

@@ -91,11 +91,6 @@
             "id": "#Seasoned",
             "label": "#Seasoned",
             "icon": "fas fa-tag"
-          },
-          {
-            "id": "#Softwood",
-            "label": "#Softwood",
-            "icon": "fas fa-tag"
           }
         ]
       },
@@ -631,6 +626,12 @@
     "draws": ".k-lbl",
     "path": "src/ui/svelte/components/SetPicker.svelte",
     "note": "Seven members, so three tokens and \"+4 more\". The open panel stays drawn: it opens on a press, which a row cannot carry.",
+    "undrawn": {
+      "#Smithy": "a member behind “+4 more”, named from the list of the picker it opens",
+      "#Blacksmith": "a member behind “+4 more”, named from the list of the picker it opens",
+      "#Raw": "a member behind “+4 more”, named from the list of the picker it opens",
+      "#Hardwood": "the fourth member behind “+4 more”; the picker it opens names only three more"
+    },
     "props": {
       "label": "Tags",
       "value": ["#Refined", "#Metal", "#Smithing", "#Smithy", "#Blacksmith", "#Raw", "#Hardwood"],
@@ -764,6 +765,7 @@
     "cap": "collapsible — one rule open, the next collapsed",
     "draws": "p > span:nth-of-type(2)",
     "path": "src/ui/svelte/components/RuleSentence.svelte",
+    "note": "The quote’s sentence, in the type the shipped `.fabricate-rule-row-quote` gives it, 11px at 1.5 and muted, passed as `style` because a lone specimen has no quote box to inherit it from: in the frame’s body face it wrapped inside the drawn width. The opening quote beside it is the drawing’s own 10px glyph.",
     "props": {
       "sentence": {
         "frameKey": "FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence",
@@ -791,7 +793,8 @@
             "steps": "1"
           }
         }
-      }
+      },
+      "style": "font-size: 11px; line-height: 1.5; color: var(--fab-text-muted)"
     }
   },
   {
@@ -800,6 +803,9 @@
     "draws": ":scope > div:nth-of-type(1)",
     "path": "src/ui/svelte/components/RequirementChooser.svelte",
     "note": "The tile row, the haft slot open, as its accent outline draws it. The \"This craft will use\" well below stays drawn; the tag and essence units do too, because each draws an open panel with no tile row above it, and the chooser always draws the row of the slot that opens it.",
+    "undrawn": {
+      "Requirements": "the tile row’s accessible name; the drawing draws no name"
+    },
     "props": {
       "ariaLabel": "Requirements",
       "openSlotId": "haft",
@@ -999,6 +1005,11 @@
     "draws": ".k-stage-row",
     "path": "src/ui/svelte/components/RunProgress.svelte",
     "note": "Beside the tracks. The live run progress draws its own Progress kicker above them, and names its stages from the stage cards below.",
+    "undrawn": {
+      "Draw the billet": "a stage’s name, from the stage cards below; the drawn tracks carry no names",
+      "Hammer the rivets": "a stage’s name, from the stage cards below; the drawn tracks carry no names",
+      "Quench and temper": "a stage’s name, from the stage cards below; the drawn tracks carry no names"
+    },
     "props": {
       "label": "Progress",
       "current": 1,
@@ -1025,7 +1036,8 @@
     "cap": "the worked stage — the only one with controls",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/StageCard.svelte",
-    "note": "The worked stage states its output only. Its body, the slot row, is the caller's `body(stage)` snippet, handed the stage it draws, which a row cannot carry.",
+    "partial": "no body",
+    "note": "The worked stage states its output only. Its body, the slot row, is the caller's `body(stage)` snippet, handed the stage it draws, which a row cannot carry. Its io groups are the shipped four-track grid (`StageCard.svelte:154`, issue 1648), which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane; the drawing wraps its chips at `minmax(190px)` (`library.html:2333`, `:2347`).",
     "props": {
       "stage": {
         "name": "Hammer the rivets"
@@ -1092,6 +1104,7 @@
     "cap": "a stage you are only looking at — dashed, muted, inert",
     "draws": ":scope > div > div",
     "path": "src/ui/svelte/components/StageCard.svelte",
+    "note": "The past stage, consumed and produced. Its io groups are the shipped four-track grid (`StageCard.svelte:154`, issue 1648), which truncates a name at a quarter of the card, as it does in the Journal’s 580px detail pane; the drawing wraps its chips at `minmax(190px)` (`library.html:2333`, `:2347`).",
     "props": {
       "stage": {
         "name": "Draw the billet",
@@ -1132,6 +1145,9 @@
     "draws": ":scope > div:nth-of-type(2)",
     "path": "src/ui/svelte/components/OutcomeLadder.svelte",
     "note": "Beside the tiers. The live ladder draws its own kicker and hint above them.",
+    "undrawn": {
+      "Success": "the status glyph’s accessible name; the drawing draws the glyph"
+    },
     "props": {
       "label": "What each outcome brings back",
       "hint": "one roll of 1d20 + 3 lands in a single tier",
@@ -1182,6 +1198,10 @@
     "cap": "after a successful roll — the one tier it reached",
     "draws": ":scope > div",
     "path": "src/ui/svelte/components/OutcomeLadder.svelte",
+    "undrawn": {
+      "Success": "the status glyph’s accessible name; the drawing draws the glyph",
+      "Failure": "the status glyph’s accessible name; the drawing draws the glyph"
+    },
     "props": {
       "reachedId": "fruitful",
       "reachedLabel": "Your roll",

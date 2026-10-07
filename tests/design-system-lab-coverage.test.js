@@ -246,6 +246,7 @@ test('the catalogue is alive and every row carries an address', () => {
       snippets,
       inset,
       note,
+      partial,
       slot,
     } = entry.row;
     assert.ok(
@@ -293,6 +294,10 @@ test('the catalogue is alive and every row carries an address', () => {
     assert.ok(
       note === undefined || (typeof note === 'string' && note.length > 0),
       `${where(entry)}: \`note\` is a non-empty string`
+    );
+    assert.ok(
+      partial === undefined || (typeof partial === 'string' && partial.trim().length > 0),
+      `${where(entry)}: \`partial\` says on the page what the specimen leaves drawn`
     );
   }
 });
