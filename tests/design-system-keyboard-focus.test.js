@@ -196,7 +196,7 @@ describe('design system: a programmatic focus target declares itself focused to 
     assert.ok(
       roleZero.length >= 9,
       `only ${roleZero.length} elements carry both a static \`tabindex="0"\` and an interactive ` +
-        'role, against the 11 this tree holds. An absence check over an empty population passes ' +
+        'role, against the 10 this tree holds. An absence check over an empty population passes ' +
         'forever.'
     );
 
