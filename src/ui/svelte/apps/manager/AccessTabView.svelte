@@ -311,7 +311,7 @@
     width: 100%;
     padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-surface-soft);
     text-align: left;
     cursor: pointer;

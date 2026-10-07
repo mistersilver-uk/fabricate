@@ -403,7 +403,7 @@
     justify-content: center;
     width: 30px;
     height: 30px;
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--fab-accent);
     background: var(--fab-bg-0);
     font-size: 13px;
@@ -435,7 +435,7 @@
     height: 30px;
     padding: 0 11px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--fab-text-subtle);
     background: var(--fab-surface-soft);
     font-family: var(--font-primary);
@@ -461,7 +461,7 @@
     width: 30px;
     height: 30px;
     border: 1px solid var(--fab-danger-border);
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--fab-danger-text);
     background: var(--fab-danger-soft);
     font-size: 11px;

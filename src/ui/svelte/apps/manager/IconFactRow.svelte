@@ -113,7 +113,7 @@
     width: 28px;
     height: 28px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     font-size: 0.7rem;
   }
 
@@ -167,7 +167,7 @@
   .manager-icon-fact-row.is-rule {
     gap: var(--fab-space-3);
     padding: var(--fab-space-3);
-    border-radius: 10px;
+    border-radius: 9px;
     background: var(--fab-bg-0);
   }
 

@@ -570,11 +570,11 @@
     min-width: 0;
     /* Match the component-library drop-zone exactly (issue 844 follow-up): the
        surrounding `margin` gives it whitespace off the panel edges, and the
-       success-soft fill + 8px radius mirror `.manager-component-drop-zone`. */
+       success-soft fill + 9px radius mirror `.manager-component-drop-zone`. */
     margin: var(--fab-space-3);
     padding: var(--fab-space-3) var(--fab-space-3);
     border: 1px dashed var(--fab-border-strong);
-    border-radius: 8px;
+    border-radius: 9px;
     color: var(--fab-text);
     background: var(--fab-success-soft);
   }

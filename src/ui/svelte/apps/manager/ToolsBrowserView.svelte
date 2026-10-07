@@ -772,7 +772,7 @@
     min-height: 30px;
     padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-surface-soft);
     color: var(--fab-text-secondary);
     font-size: 11.5px;

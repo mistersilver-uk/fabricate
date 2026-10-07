@@ -136,7 +136,7 @@
     gap: 18px;
     padding: 22px;
     border: 1px solid var(--fab-accent-border);
-    border-radius: 14px;
+    border-radius: 11px;
     background: var(--fab-surface);
     box-shadow: var(--fab-shadow-lg);
   }
@@ -259,7 +259,7 @@
     align-self: center;
     padding: 13px;
     border: 1px solid var(--fab-border-strong);
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--fab-bg-0);
   }
 
@@ -308,7 +308,7 @@
     width: 30px;
     height: 30px;
     place-items: center;
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-accent-soft);
 
     /* The tile carries the colour and the glyph inherits it, so a tinted slot follows its row. */
@@ -416,7 +416,7 @@
     margin-top: 10px;
     padding: 8px 9px;
     border: 1px dashed var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     color: var(--fab-text-subtle);
     font-size: 9px;
     line-height: 1.4;
@@ -479,7 +479,7 @@
   .downtime-feature-icon {
     width: 32px;
     height: 32px;
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-bg-0);
     font-size: 13px;
   }

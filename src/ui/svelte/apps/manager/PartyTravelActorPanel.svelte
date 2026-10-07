@@ -333,7 +333,7 @@
     min-height: 96px;
     padding: 0;
     border: 0;
-    border-radius: 12px;
+    border-radius: 11px;
     background: var(--fab-bg-1);
     text-align: inherit;
   }
@@ -413,7 +413,7 @@
     width: 30px;
     height: 30px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     color: var(--fab-danger-text);
     background: var(--fab-surface-soft);
     font-size: 10px;

@@ -631,7 +631,7 @@
     margin-block: 0;
     padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-warning-border);
-    border-radius: 8px;
+    border-radius: 9px;
     color: var(--fab-warning-text);
     background: var(--fab-warning-soft);
     font-size: 0.7rem;

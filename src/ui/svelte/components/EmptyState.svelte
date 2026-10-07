@@ -105,7 +105,7 @@
     place-items: center;
     padding: 44px 20px;
     border: 1.5px dashed var(--fab-border);
-    border-radius: 12px;
+    border-radius: 11px;
     color: var(--fab-text-subtle);
     text-align: center;
   }
@@ -124,7 +124,7 @@
     justify-content: center;
     width: 46px;
     height: 46px;
-    border-radius: 12px;
+    border-radius: 11px;
     color: var(--fab-text-subtle);
     background: var(--fab-surface-soft);
     font-size: 18px;
@@ -276,7 +276,7 @@
     padding: var(--fab-space-6);
     border-width: 1px;
     border-color: var(--fab-border);
-    border-radius: 10px;
+    border-radius: 9px;
     color: var(--fab-text-muted);
   }
 

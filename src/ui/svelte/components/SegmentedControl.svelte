@@ -116,7 +116,7 @@
   .manager-segmented.is-compact {
     gap: 3px;
     padding: 3px;
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 

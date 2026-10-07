@@ -2334,11 +2334,11 @@ test('the filter bar and the card declare their own box rather than inheriting i
       'or a bar outside the manager renders the grid form no screen in the product uses'
   );
 
-  // THE CARD. Padding, a hairline border on all four edges, the 8px corner.
+  // THE CARD. Padding, a hairline border on all four edges, the 11px corner.
   assert.equal(card['padding-top'], '12px');
   assert.equal(card['border-top-width'], '1px');
   assert.equal(card['border-top-style'], 'solid');
-  assert.equal(card['border-radius'], '8px');
+  assert.equal(card['border-radius'], '11px');
   assert.equal(card.display, 'flex');
   assert.equal(card['flex-direction'], 'column');
   assert.equal(card.gap, '8px');

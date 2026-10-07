@@ -194,7 +194,7 @@
     min-height: 20px;
     padding: var(--fab-space-1) var(--fab-space-chip);
     border: 1px solid var(--fab-border);
-    border-radius: 10px;
+    border-radius: 11px;
     color: var(--fab-text);
     background: var(--fab-overlay-light-06);
     font-size: 0.62rem;

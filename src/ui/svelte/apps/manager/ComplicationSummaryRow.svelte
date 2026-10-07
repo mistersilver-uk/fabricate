@@ -240,7 +240,7 @@
     width: 30px;
     height: 30px;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     font-size: 11px;
   }
 

@@ -104,8 +104,7 @@
     min-height: 0;
     padding: 0;
     border: 1px solid var(--fab-border);
-    /* ratchet-exempt(design-system): moved unchanged from the retired sheet family; a 9px rung moves every filled and locked frame */
-    border-radius: 8px;
+    border-radius: 11px;
     background: var(--fab-bg-2);
     overflow: hidden;
   }

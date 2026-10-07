@@ -365,7 +365,7 @@
     margin-top: var(--fab-space-3);
     padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     /* AND ITS FILL (`proto:2037`): the pager is part of the card in the ASIDE, not in the pane. */
     background: var(--fab-bg-0);
     font-size: 0.62rem;

@@ -335,7 +335,7 @@
     padding: 0 8px;
     border: 1px solid var(--fab-accent-border);
     border-bottom: 1px solid var(--fab-accent-border);
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-bg-0);
   }
 

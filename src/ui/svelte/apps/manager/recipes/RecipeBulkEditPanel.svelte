@@ -1050,7 +1050,7 @@
     gap: var(--fab-space-2);
     padding: var(--fab-space-2);
     border: 1px solid var(--fab-accent);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 
@@ -1120,7 +1120,7 @@
     height: 22px;
     padding: 0;
     border: none;
-    border-radius: 5px;
+    border-radius: 6px;
     background: transparent;
     color: var(--fab-text-muted);
     font-size: 0.68rem;

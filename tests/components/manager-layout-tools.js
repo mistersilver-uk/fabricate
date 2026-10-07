@@ -613,16 +613,10 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
       page,
       'fabricate-card'
     );
-    assert.notEqual(
-      broken.cardRadius,
-      fixed.cardRadius,
-      `expected the bare card shell to fall back off the studio's 11px radius (bare: ${broken.cardRadius}px)`
-    );
-    assert.notEqual(
-      broken.cardBackground,
-      fixed.cardBackground,
-      'expected the bare card shell to fall back to the generic translucent fill'
-    );
+    // The shared card took the studio card's 11px corner and `--fab-bg-2` fill, so the shell
+    // no longer differs there; the combination-rule gap below carries the proof.
+    assert.equal(broken.cardRadius, 11, 'the shared card is on the 11px card rung too');
+    assert.equal(broken.cardBackground, fixed.cardBackground, 'and on the same fill');
     assert.notEqual(
       broken.optionGap,
       fixed.optionGap,
@@ -839,7 +833,7 @@ test('the small selection box is the reference box', () => {
   const smDeclarations = flat.slice(start, flat.indexOf('}', start));
   assert.match(smDeclarations, /width: 16px/, '`proto:4740` sizes the box at 16px');
   assert.match(smDeclarations, /height: 16px/);
-  assert.match(smDeclarations, /border-radius: 5px/);
+  assert.match(smDeclarations, /border-radius: 6px/, 'the reference draws 5px; the chip rung is 6');
   assert.match(
     smDeclarations,
     /font-size: 8px/,
