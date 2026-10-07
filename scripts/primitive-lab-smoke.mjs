@@ -147,18 +147,19 @@ function readRenderedSections(page) {
   });
 }
 
-/** How many `live` labels the page carries, and the entry of each not directly before a specimen. */
+/** Every `live` label on the page: its entry heading, its text, and whether a specimen follows. */
 function readLiveLabels(page) {
   return page.evaluate(
-    ([label, specimen]) => {
-      const labels = [...document.querySelectorAll(label)];
-      return {
-        labels: labels.length,
-        unpaired: labels
-          .filter((element) => !element.nextElementSibling?.matches(specimen))
-          .map((element) => element.closest('.spec')?.querySelector('h4')?.textContent ?? '?'),
-      };
-    },
+    ([label, specimen]) =>
+      [...document.querySelectorAll(label)].map((element) => ({
+        entry: (
+          element.closest('.spec')?.querySelector(':scope > .spec-head > h4')?.textContent ?? '?'
+        )
+          .replaceAll(/\s+/g, ' ')
+          .trim(),
+        text: element.textContent,
+        paired: element.nextElementSibling?.matches(specimen) ?? false,
+      })),
     [LIVE_LABEL_SELECTOR, SPECIMEN_SELECTOR]
   );
 }
@@ -204,8 +205,8 @@ async function run() {
     );
     if (sections) throw new Error(`the page did not draw the library's sections:\n  ${sections}`);
     const labels = describeLiveLabelMismatch({
-      expected: expectations.beside,
-      ...(await readLiveLabels(page)),
+      expected: expectations.besideByEntry,
+      labels: await readLiveLabels(page),
     });
     if (labels) throw new Error(`the beside specimens are not all labelled:\n  ${labels}`);
     if (failures.length > 0) {

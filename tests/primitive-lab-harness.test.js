@@ -397,20 +397,50 @@ test('a missing section, a wrong title, a lost lede and a part with no box are e
   assert.match(describeSectionMismatch([], []), /yielded no `section\[id\]`/);
 });
 
-test('every beside specimen carries one live label, directly before it', () => {
-  assert.equal(describeLiveLabelMismatch({ expected: 2, labels: 2, unpaired: [] }), null);
-  assert.match(
-    describeLiveLabelMismatch({ expected: 2, labels: 1, unpaired: [] }),
-    /2 specimen\(s\) stand beside their drawing and the page carries 1/
+test('every beside specimen carries one live label, directly before it, keyed by entry', () => {
+  const label = (entry, extra = {}) => ({ entry, text: 'live', paired: true, ...extra });
+  const expected = { '<Stepper>': 1, '<Chip>': 1 };
+  assert.equal(
+    describeLiveLabelMismatch({ expected, labels: [label('<Stepper>'), label('<Chip>')] }),
+    null
   );
   assert.match(
-    describeLiveLabelMismatch({ expected: 1, labels: 1, unpaired: ['<Stepper>'] }),
+    describeLiveLabelMismatch({ expected, labels: [label('<Stepper>')] }),
+    /<Chip> has 1 specimen\(s\) beside their drawing and 0 "live" label/
+  );
+  assert.match(
+    describeLiveLabelMismatch({
+      expected: { '<Stepper>': 1 },
+      labels: [label('<Stepper>', { paired: false })],
+    }),
     /not directly before its specimen in <Stepper>/
   );
 });
 
+test('a doubled label on one entry does not stand in for a missing one on another', () => {
+  const labels = [1, 2].map(() => ({ entry: '<Stepper>', text: 'live', paired: true }));
+  const problem = describeLiveLabelMismatch({ expected: { '<Stepper>': 1, '<Chip>': 1 }, labels });
+  assert.equal(labels.length, 2, 'the page total matches the expected total of 2');
+  assert.match(problem, /<Stepper> has 1 specimen\(s\) beside their drawing and 2 "live"/);
+  assert.match(problem, /<Chip> has 1 specimen\(s\) beside their drawing and 0 "live"/);
+  assert.match(
+    describeLiveLabelMismatch({ expected: {}, labels }),
+    /<Stepper> has 0 specimen\(s\) beside their drawing and 2/
+  );
+});
+
+test('a label that does not read live is reported', () => {
+  assert.match(
+    describeLiveLabelMismatch({
+      expected: { '<Stepper>': 1 },
+      labels: [{ entry: '<Stepper>', text: '', paired: true }],
+    }),
+    /a label in <Stepper> reads "", not "live"/
+  );
+});
+
 test('lab:check expects every library section and every catalogued beside specimen', () => {
-  const { sections, beside } = readLabExpectations(REPO_ROOT);
+  const { sections, beside, besideByEntry } = readLabExpectations(REPO_ROOT);
   assert.deepEqual(sections, readLibrarySections(readDesignLibrary()).sections);
   assert.ok(sections.length > 10, `${sections.length} sections, so the reader is not reading`);
   assert.ok(
@@ -421,6 +451,12 @@ test('lab:check expects every library section and every catalogued beside specim
     beside > 0 && beside < expectedSpecimenCount(REPO_ROOT),
     `${beside} beside specimens, so the liveness decision is not deciding`
   );
+  assert.equal(
+    Object.values(besideByEntry).reduce((total, count) => total + count, 0),
+    beside,
+    'the per-entry keys must account for every beside specimen'
+  );
+  assert.ok(Object.keys(besideByEntry).length > 1, 'one key, so the keying is not keying');
 });
 
 test('the lab watcher ignores the worktrees of the served root and never the served tree itself', () => {

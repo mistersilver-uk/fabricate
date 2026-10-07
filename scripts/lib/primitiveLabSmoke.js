@@ -10,7 +10,11 @@ import { Window } from 'happy-dom';
 
 import { readLibrarySections } from '../../tests/helpers/designLibrarySections.js';
 import { resolveSlots } from '../../tests/view-lab/primitives/inject.js';
-import { BESIDE, LIVE_LABEL_CLASS } from '../../tests/view-lab/primitives/liveness.js';
+import {
+  BESIDE,
+  LIVE_LABEL_CLASS,
+  LIVE_LABEL_TEXT,
+} from '../../tests/view-lab/primitives/liveness.js';
 
 /** The lab page, relative to the Vite dev root (the repository root). */
 export const LAB_PAGE_PATH = '/tests/view-lab/primitives.html';
@@ -163,11 +167,12 @@ export function describeMountFailure({ expected, mounted, reported }) {
 
 /**
  * What the page must show, derived in Node from the library, catalogue and manifest it renders:
- * each section's number, title and ledes, and how many specimens stand beside their drawing.
+ * each section's number, title and ledes, and how many specimens stand beside their drawing,
+ * in all and per entry heading.
  *
  * @param {string} root Absolute repository root.
  * @returns {{sections: {id: string, number: string|null, title: string|null, ledes: string[]}[],
- *   beside: number}} The expectations `lab:check` holds the page to.
+ *   beside: number, besideByEntry: Record<string, number>}} The expectations `lab:check` holds the page to.
  */
 export function readLabExpectations(root) {
   const html = readFileSync(path.join(root, LIBRARY_PATH), 'utf8');
@@ -180,10 +185,16 @@ export function readLabExpectations(root) {
       catalogueEntries(root).map((entry) => entry.row),
       [...manifest.designSystemPrimitives, ...manifest.notAPrimitive]
     );
-    return {
-      sections: readLibrarySections(html).sections,
-      beside: slots.filter((slot) => slot.mode === BESIDE).length,
-    };
+    const beside = slots.filter((slot) => slot.mode === BESIDE);
+    const besideByEntry = {};
+    for (const slot of beside) {
+      const heading = slot.host
+        .closest('.spec')
+        ?.querySelector(':scope > .spec-head > h4')?.textContent;
+      const entry = collapsed(heading ?? '?');
+      besideByEntry[entry] = (besideByEntry[entry] ?? 0) + 1;
+    }
+    return { sections: readLibrarySections(html).sections, beside: beside.length, besideByEntry };
   } finally {
     window.close();
   }
@@ -233,25 +244,40 @@ export function describeSectionMismatch(expected, rendered) {
 }
 
 /**
- * Compare the `live` labels on the page with the specimens that stand beside their drawing: one
- * label each, and each label directly before its specimen.
+ * Compare the "live" labels on the page with the specimens that stand beside their drawing, entry
+ * by entry: each entry carries exactly as many labels directly before a specimen as it has beside
+ * specimens, and each label reads "live". A total alone would let a doubled label on one entry
+ * stand in for a missing one on another.
  *
  * @param {object} options Options.
- * @param {number} options.expected The beside count, from `readLabExpectations`.
- * @param {number} options.labels The labels the page carries.
- * @param {string[]} options.unpaired The entry of each label not followed by a specimen.
- * @returns {string|null} The disagreement, or null when every beside specimen is labelled.
+ * @param {Record<string, number>} options.expected Beside specimens per entry heading, from
+ *   `readLabExpectations`.
+ * @param {{entry: string, text: string, paired: boolean}[]} options.labels Every label on the
+ *   page, with its entry heading, its text, and whether a specimen follows it directly.
+ * @returns {string|null} The disagreement, or null when every beside specimen is labelled once.
  */
-export function describeLiveLabelMismatch({ expected, labels, unpaired }) {
+export function describeLiveLabelMismatch({ expected, labels }) {
   const problems = [];
-  if (labels !== expected) {
-    problems.push(
-      `${expected} specimen(s) stand beside their drawing and the page carries ${labels} ` +
-        '`live` label(s)'
-    );
+  const entries = new Set([...Object.keys(expected), ...labels.map((label) => label.entry)]);
+  for (const entry of [...entries].sort((left, right) =>
+    left < right ? -1 : Number(left > right)
+  )) {
+    const want = expected[entry] ?? 0;
+    const paired = labels.filter((label) => label.entry === entry && label.paired).length;
+    if (paired !== want) {
+      problems.push(
+        `${entry} has ${want} specimen(s) beside their drawing and ${paired} "live" label(s)` +
+          'directly before one'
+      );
+    }
   }
+  const unpaired = labels.filter((label) => !label.paired).map((label) => label.entry);
   if (unpaired.length > 0) {
     problems.push(`a label is not directly before its specimen in ${unpaired.join(', ')}`);
+  }
+  for (const label of labels) {
+    if (collapsed(label.text) === LIVE_LABEL_TEXT) continue;
+    problems.push(`a label in ${label.entry} reads ${JSON.stringify(label.text)}, not "live"`);
   }
   return problems.length === 0 ? null : problems.join('\n  ');
 }
