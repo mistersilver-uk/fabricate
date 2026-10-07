@@ -344,7 +344,7 @@ describe('RecipeDetail mounted behavior', () => {
     );
   });
 
-  it('renders routed ingredient options as cards under the check with status + products', async () => {
+  it('compares routed ingredient options as radio cards under the check, with status + products', async () => {
     const onChoose = [];
     const target = await harness.mount({
       recipe: recipe({
@@ -386,30 +386,51 @@ describe('RecipeDetail mounted behavior', () => {
 
     const section = target.querySelector('[data-recipe-section="ingredient-sets"]');
     assert.ok(section, 'ingredient options section rendered');
-    const cards = section.querySelectorAll('.crafting-option-card');
-    assert.equal(cards.length, 2, 'one card per option');
+    // One radio group, so the arrow keys move between routes; no route is a button.
+    const radios = [...section.querySelectorAll(':scope fieldset input[type="radio"]')];
+    assert.equal(radios.length, 2, 'one route radio per option');
+    assert.ok(radios[0].name, 'the routes share a group name');
+    assert.ok(radios.every((radio) => radio.name === radios[0].name), 'one group, not two');
+    assert.equal(section.querySelectorAll(':scope button').length, 0, 'no route is a button');
 
     const cardA = section.querySelector('[data-set-id="set-a"]');
     const cardB = section.querySelector('[data-set-id="set-b"]');
-    assert.equal(cardA.getAttribute('aria-pressed'), 'true', 'selected option marked');
-    assert.equal(cardA.getAttribute('data-option-status'), 'craftable');
-    assert.equal(cardB.getAttribute('data-option-status'), 'blocked', 'missing tool → blocked');
-    assert.ok(
-      cardA.querySelector('.crafting-option-status.tone-success'),
-      'craftable status is green'
+    assert.deepEqual(
+      [cardA.tagName, cardA.querySelector('input').checked, cardB.querySelector('input').checked],
+      ['LABEL', true, false],
+      'each route is a radio card, and the chosen one is checked'
     );
-    assert.ok(cardB.querySelector('.crafting-option-status.tone-danger'), 'blocked status is red');
+    assert.match(cardA.textContent, /SelectedRoute/, 'the chosen route says so');
+    assert.doesNotMatch(cardB.textContent, /SelectedRoute/, 'and only the chosen one');
 
-    // Product tile with a quantity pip.
-    assert.ok(
-      cardA.querySelector('.crafting-option-product [data-medallion="image"] img'),
-      'product image'
+    const statusA = cardA.querySelector('[data-option-status]');
+    const statusB = cardB.querySelector('[data-option-status]');
+    assert.deepEqual(
+      [statusA.dataset.optionStatus, statusA.dataset.optionStatusTone, chipToneOf(statusA)],
+      ['craftable', 'success', 'positive'],
+      'craftable status is the green chip'
     );
-    assert.equal(
-      cardA.querySelector('.crafting-option-product-pip').textContent.trim(),
-      '×1',
-      'quantity pip'
+    assert.deepEqual(
+      [statusB.dataset.optionStatus, chipToneOf(statusB)],
+      ['blocked', 'danger'],
+      'missing tool → the blocked, red chip'
     );
+
+    // Each route's products are dense list rows with a 22px mark, chosen or not.
+    for (const [card, quantity] of [
+      [cardA, '×1'],
+      [cardB, '×2'],
+    ]) {
+      const rows = card.querySelectorAll(':scope .fabricate-list-row');
+      assert.equal(rows.length, 1, 'one row per product');
+      const [row] = rows;
+      assert.equal(row.dataset.listRow, 'dense');
+      assert.equal(row.querySelector('.fabricate-list-row-name').textContent, 'Warding Shield Boss');
+      assert.equal(row.querySelector('.fabricate-list-row-quantity').textContent, quantity);
+      const mark = row.querySelector('[data-medallion="image"]');
+      assert.match(mark.getAttribute('style'), /width: ?22px; ?height: ?22px/, 'the dense row’s mark');
+      assert.ok(mark.querySelector('img'), 'product image');
+    }
 
     // The options render AFTER the crafting check in document order.
     const check = target.querySelector('[data-recipe-section="check"]');
@@ -418,9 +439,12 @@ describe('RecipeDetail mounted behavior', () => {
       'ingredient options come after the crafting check'
     );
 
-    cardB.click();
+    // An arrow key moves a native radio group's selection and fires `change` (measured in
+    // Chromium by `crafting-rows-rendered`); the change is what chooses the route.
+    radios[1].checked = true;
+    radios[1].dispatchEvent(new window.Event('change', { bubbles: true }));
     flushSync();
-    assert.deepEqual(onChoose, ['set-b'], 'clicking a card selects that route');
+    assert.deepEqual(onChoose, ['set-b'], 'choosing a route radio selects that route');
   });
 
   it('routes the Produces output to the selected ingredient set', async () => {

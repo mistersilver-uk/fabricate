@@ -15,6 +15,10 @@ export const LIST_ROW_ADOPTERS = Object.freeze([
     file: 'src/ui/svelte/apps/gathering/GatheringEventRow.svelte',
     frame: 'player-gathering-events',
   }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
+    frame: 'player-crafting-check-unrollable-status',
+  }),
 ]);
 
 /** Content a native button may not hold: flow and grouping elements, and widget roles. */

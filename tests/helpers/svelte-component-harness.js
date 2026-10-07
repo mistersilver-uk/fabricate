@@ -564,6 +564,9 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/CraftButton.svelte',
   'src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientSetSelector.svelte',
+  // Its route comparison (issue 1778), and the fieldset that group draws, flat for the guard below.
+  'src/ui/svelte/components/RadioCardGroup.svelte',
+  'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
   // Issue 1644: the stack picker adapts the shared candidate radiogroup.
   'src/ui/svelte/components/ChoiceOptionList.svelte',

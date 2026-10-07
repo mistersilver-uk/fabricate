@@ -243,12 +243,14 @@ describe('RecipeBrowser mounted behavior', () => {
     assert.deepEqual(systems, ['sys-b'], 'system change forwards the selected id');
   });
 
-  it('marks favourited rows and forwards the row favourite toggle', async () => {
+  it('marks favourited rows and forwards the row favourite toggle without selecting', async () => {
     const toggled = [];
+    const selected = [];
     const target = await harness.mount({
       recipes: [recipe({ id: 'r1' }), recipe({ id: 'r2', name: 'Antitoxin' })],
       totalCount: 2,
       favouriteIds: ['r2'],
+      onSelect: (id) => selected.push(id),
       onToggleFavourite: (id) => toggled.push(id),
     });
 
@@ -256,10 +258,80 @@ describe('RecipeBrowser mounted behavior', () => {
     const r2Fav = target.querySelector('[data-recipe-id="r2"] .crafting-recipe-row-fav');
     assert.equal(r1Fav.classList.contains('is-active'), false, 'unfavourited row star is inactive');
     assert.ok(r2Fav.classList.contains('is-active'), 'favourited row star is active');
+    assert.equal(r2Fav.getAttribute('aria-pressed'), 'true', 'the star keeps its own pressed state');
 
+    // Issue 1778: the star sits BESIDE the row's button rather than nested in it, so its click
+    // reaches no row handler and needs no stopPropagation to keep from selecting.
+    assert.ok(!r1Fav.closest('.crafting-recipe-row-main'), 'the star is not inside the row button');
     r1Fav.click();
     flushSync();
     assert.deepEqual(toggled, ['r1'], 'row star forwards onToggleFavourite with the recipe id');
+    assert.deepEqual(selected, [], 'and does not select the row');
+  });
+
+  it('keeps Enter and Space on the favourite and cart controls from selecting the row', async () => {
+    // The row's own key handler used to sit on the element wrapping these buttons, so a key on
+    // either bubbled to it and selected the recipe as well (issue 1778).
+    const selected = [];
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1' })],
+      totalCount: 1,
+      onSelect: (id) => selected.push(id),
+    });
+
+    for (const control of ['.crafting-recipe-row-fav', '.crafting-recipe-row-add']) {
+      const button = target.querySelector(`[data-recipe-id="r1"] ${control}`);
+      for (const key of ['Enter', ' ']) {
+        button.dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true }));
+      }
+    }
+    flushSync();
+    assert.deepEqual(selected, [], 'a key on a trailing control selected the row');
+  });
+
+  it('draws each recipe as one list-row button, named by the recipe and its status', async () => {
+    const selected = [];
+    const target = await harness.mount({
+      recipes: [
+        recipe({ id: 'r1', name: 'Healing Potion' }),
+        recipe({ id: 'r2', name: 'Antitoxin', browseStatus: 'missingMaterials' }),
+      ],
+      totalCount: 2,
+      selectedRecipeId: 'r2',
+      onSelect: (id) => selected.push(id),
+    });
+
+    const row = target.querySelector('[data-recipe-id="r2"]');
+    assert.ok(row.matches('.fabricate-list-row[role="listitem"]'), 'the row root is the listitem');
+    assert.ok(row.classList.contains('is-danger'), 'an uncraftable row takes the danger tone');
+    assert.ok(
+      !target.querySelector('[data-recipe-id="r1"]').classList.contains('is-danger'),
+      'a craftable row does not'
+    );
+    const buttons = row.querySelectorAll(':scope > button');
+    assert.equal(buttons.length, 1, 'one control per row');
+    const [control] = buttons;
+    assert.ok(control.classList.contains('crafting-recipe-row-main'), 'the control keeps its hook');
+    assert.equal(control.getAttribute('aria-pressed'), 'true', 'pressed while selected');
+    assert.equal(
+      target.querySelector('[data-recipe-id="r1"] .crafting-recipe-row-main').getAttribute('aria-pressed'),
+      'false'
+    );
+    assert.equal(
+      control.getAttribute('aria-label'),
+      'Antitoxin, FABRICATE.App.Crafting.Status.MissingMaterials',
+      'the name, then the status the row only draws as a glyph'
+    );
+    assert.ok(
+      !control.querySelector('[role="button"], button'),
+      'no control nests inside the row button'
+    );
+    assert.equal(target.querySelectorAll(':scope [role="button"]').length, 0, 'no role=button');
+
+    // A click on the root lands on its button, which covers the row.
+    control.click();
+    flushSync();
+    assert.deepEqual(selected, ['r2'], 'the button opens the recipe');
   });
 
   it('hides the system dropdown when no systems are supplied', async () => {
