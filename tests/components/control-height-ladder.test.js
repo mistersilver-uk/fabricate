@@ -210,8 +210,8 @@ test('var() resolution is running, and stays well inside its depth cap', () => {
  * RESTATED because its subject changed: every one of those declarations sizes a THUMBNAIL — a
  * record's art tile, an actor's portrait, or the inventory header's shell around one — and the
  * geometry requirement exempts art and portraits from the control ladder outright, now naming
- * their own published size ladder rather than promising one. That is the same clause that lets
- * `BooksScrollsView.svelte:706` stay at 40px. Closing the gap would also mean
+ * their own published size ladder rather than promising one. That is the same clause that puts
+ * `BooksScrollsView.svelte`'s thumbnail on the art ladder's 38. Closing the gap would also mean
  * reading a `style` attribute built by an interpolation, which is a different scanner from this
  * one. So "no new retired control height has been introduced" is a claim about what the two
  * stylesheet corpora DECLARE, not about what the product renders.

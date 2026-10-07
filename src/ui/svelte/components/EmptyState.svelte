@@ -158,6 +158,7 @@
 
   .manager-empty.is-compact > div > i {
     width: 32px;
+    /* ratchet-exempt(design-system): a tile, not a control: the portrait ladder's 32, the slot PartyTravelActorPanel fills with an actor portrait on link */
     height: 32px;
     border-radius: 9px;
     font-size: 14px;

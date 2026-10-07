@@ -225,7 +225,7 @@
   }
 
   .manager-recipe-item-readonly.is-name {
-    min-height: 40px;
+    min-height: 38px;
     display: flex;
     align-items: center;
     font-weight: 600;

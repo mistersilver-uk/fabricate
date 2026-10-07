@@ -268,8 +268,8 @@
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: 9px;
     background: var(--fab-bg-0);
     color: var(--fab-accent);

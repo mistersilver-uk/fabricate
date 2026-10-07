@@ -2061,13 +2061,13 @@ test('the issue-1508 families declare their own control chrome rather than inher
   }
 
   // FIELD. `min-height: 34px` and `appearance: none` come from the family's element-typed chrome
-  // rule — the one that restates the area baseline's predicate leg for leg — and `height: 36px`,
+  // rule — the one that restates the area baseline's predicate leg for leg — and `height: 38px`,
   // the 6px corner, the border and the fill from the family's own re-rooted control block. All
   // six are values the manager used to supply and the family now declares for itself.
   assert.equal(field['min-height'], '34px');
   assert.equal(field.appearance, 'none');
   assert.equal(field['-webkit-appearance'], 'none');
-  assert.equal(field.height, '36px');
+  assert.equal(field.height, '38px');
   assert.equal(field['border-radius'], '6px');
   assert.equal(field['border-top-width'], '1px');
   assert.equal(field['border-top-style'], 'solid');

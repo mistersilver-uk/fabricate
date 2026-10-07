@@ -357,6 +357,7 @@
     align-items: center;
     justify-content: center;
     width: 32px;
+    /* ratchet-exempt(design-system): an actor portrait, the portrait ladder's 32 single mark, not a control */
     height: 32px;
     border-radius: 9px;
     color: var(--fab-text-subtle);

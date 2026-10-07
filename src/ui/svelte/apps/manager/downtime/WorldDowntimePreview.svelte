@@ -477,8 +477,8 @@
   }
 
   .downtime-feature-icon {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border-radius: 7px;
     background: var(--fab-bg-0);
     font-size: 13px;

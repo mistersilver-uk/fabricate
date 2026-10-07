@@ -853,7 +853,7 @@
   }
 
   .manager-recipe-item-limits-divider.is-vertical {
-    min-height: 40px;
+    min-height: 38px;
   }
 
   .manager-recipe-item-learn-explain {

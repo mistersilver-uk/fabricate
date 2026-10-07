@@ -134,7 +134,7 @@ test('manager character modifier search suggestions keep icons in row flow', () 
   );
   assert.ok(
     characterModifierSuggestionBlock.includes('grid-template-columns: 22px minmax(0, 1fr);') &&
-      characterModifierSuggestionBlock.includes('min-height: 32px;') &&
+      characterModifierSuggestionBlock.includes('min-height: 30px;') &&
       characterModifierSuggestionBlock.includes('padding: var(--fab-space-1) var(--fab-space-2);'),
     'character modifier suggestions should use the same icon column and row rhythm as availability menu options'
   );
