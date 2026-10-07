@@ -9034,6 +9034,7 @@
 .fabricate-manager .manager-tool-replacement-component-trigger .manager-travel-portrait {
   width: 24px;
   height: 24px;
+  border-radius: 6px;
 }
 
 /* The name INSIDE the trigger. It grows with the (max-content) trigger and ellipsizes once the trigger hits its cap, so a long name degrades to a truncation rather than to a row-wide button. */
@@ -11177,7 +11178,7 @@
   width: 38px;
   height: 38px;
   flex: 0 0 38px;
-  border-radius: 6px;
+  border-radius: 9px;
   object-fit: cover;
   background: var(--fab-overlay-dark-18);
 }
@@ -11383,7 +11384,7 @@
   width: 38px;
   height: 38px;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   object-fit: cover;
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-06);
@@ -11418,7 +11419,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
@@ -11464,7 +11465,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
@@ -15556,7 +15557,7 @@
   width: 38px;
   height: 38px;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   object-fit: cover;
   color: var(--fab-text-muted);
   background: var(--fab-overlay-light-06);
@@ -17669,7 +17670,7 @@
 
   /* ratchet-exempt(design-system): an actor portrait, the portrait ladder's 32 single mark, not a control */
   height: 32px;
-  border-radius: 6px;
+  border-radius: 9px;
   overflow: hidden;
   background: var(--fab-surface-raised);
   color: var(--fab-text-muted);

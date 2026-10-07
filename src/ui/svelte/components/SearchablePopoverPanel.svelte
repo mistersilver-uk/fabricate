@@ -392,6 +392,7 @@
   .manager-travel-popover.is-compact-option-rows .manager-travel-portrait {
     width: 24px;
     height: 24px;
+    border-radius: 6px;
   }
 
   .manager-travel-popover.is-compact-option-rows
