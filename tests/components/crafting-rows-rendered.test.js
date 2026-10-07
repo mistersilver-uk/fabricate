@@ -152,13 +152,12 @@ describe('crafting rows, rendered (issue 1778)', () => {
   it('moves the chosen route with an arrow key, firing the change that chooses it', async () => {
     const focused = await tab.evaluate(() => {
       const group = document.querySelector('[data-case="routes"] fieldset');
-      globalThis.routeChanges = [];
-      group?.addEventListener('change', (event) =>
-        globalThis.routeChanges.push(event.target.value)
-      );
+      group?.addEventListener('change', (event) => {
+        group.dataset.changes = `${group.dataset.changes ?? ''}${event.target.value};`;
+      });
       // The serialized markup loses the `checked` property, so it is restored from the card the
       // group marked as the chosen one.
-      const chosen = group?.querySelector('.is-active input[type="radio"]');
+      const chosen = group?.querySelector(':scope .is-active input[type="radio"]');
       if (chosen) chosen.checked = true;
       chosen?.focus();
       return document.activeElement?.value ?? null;
@@ -170,11 +169,11 @@ describe('crafting rows, rendered (issue 1778)', () => {
         ...document.querySelectorAll('[data-case="routes"] input[type="radio"]:checked'),
       ].map((radio) => radio.value),
       focused: document.activeElement?.value ?? null,
-      changes: globalThis.routeChanges,
+      changes: document.querySelector('[data-case="routes"] fieldset').dataset.changes,
     }));
     assert.deepEqual(
       moved,
-      { checked: ['set-b'], focused: 'set-b', changes: ['set-b'] },
+      { checked: ['set-b'], focused: 'set-b', changes: 'set-b;' },
       'ArrowDown moved the one checked route to the next and fired its change'
     );
   });

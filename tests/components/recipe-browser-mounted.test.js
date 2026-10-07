@@ -250,8 +250,12 @@ describe('RecipeBrowser mounted behavior', () => {
       recipes: [recipe({ id: 'r1' }), recipe({ id: 'r2', name: 'Antitoxin' })],
       totalCount: 2,
       favouriteIds: ['r2'],
-      onSelect: (id) => selected.push(id),
-      onToggleFavourite: (id) => toggled.push(id),
+      onSelect: (id) => {
+        selected.push(id);
+      },
+      onToggleFavourite: (id) => {
+        toggled.push(id);
+      },
     });
 
     const r1Fav = target.querySelector('[data-recipe-id="r1"] .crafting-recipe-row-fav');
@@ -276,13 +280,15 @@ describe('RecipeBrowser mounted behavior', () => {
     const target = await harness.mount({
       recipes: [recipe({ id: 'r1' })],
       totalCount: 1,
-      onSelect: (id) => selected.push(id),
+      onSelect: (id) => {
+        selected.push(id);
+      },
     });
 
     for (const control of ['.crafting-recipe-row-fav', '.crafting-recipe-row-add']) {
-      const button = target.querySelector(`[data-recipe-id="r1"] ${control}`);
+      const button = target.querySelector(`:scope [data-recipe-id="r1"] ${control}`);
       for (const key of ['Enter', ' ']) {
-        button.dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true }));
+        button.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key, bubbles: true }));
       }
     }
     flushSync();
@@ -298,7 +304,9 @@ describe('RecipeBrowser mounted behavior', () => {
       ],
       totalCount: 2,
       selectedRecipeId: 'r2',
-      onSelect: (id) => selected.push(id),
+      onSelect: (id) => {
+        selected.push(id);
+      },
     });
 
     const row = target.querySelector('[data-recipe-id="r2"]');
@@ -314,7 +322,9 @@ describe('RecipeBrowser mounted behavior', () => {
     assert.ok(control.classList.contains('crafting-recipe-row-main'), 'the control keeps its hook');
     assert.equal(control.getAttribute('aria-pressed'), 'true', 'pressed while selected');
     assert.equal(
-      target.querySelector('[data-recipe-id="r1"] .crafting-recipe-row-main').getAttribute('aria-pressed'),
+      target
+        .querySelector(':scope [data-recipe-id="r1"] .crafting-recipe-row-main')
+        .getAttribute('aria-pressed'),
       'false'
     );
     assert.equal(

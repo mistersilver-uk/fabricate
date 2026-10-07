@@ -442,7 +442,7 @@ describe('RecipeDetail mounted behavior', () => {
     // An arrow key moves a native radio group's selection and fires `change` (measured in
     // Chromium by `crafting-rows-rendered`); the change is what chooses the route.
     radios[1].checked = true;
-    radios[1].dispatchEvent(new window.Event('change', { bubbles: true }));
+    radios[1].dispatchEvent(new globalThis.Event('change', { bubbles: true }));
     flushSync();
     assert.deepEqual(onChoose, ['set-b'], 'choosing a route radio selects that route');
   });
