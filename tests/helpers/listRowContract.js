@@ -19,6 +19,18 @@ export const LIST_ROW_ADOPTERS = Object.freeze([
     file: 'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
     frame: 'player-crafting-check-unrollable-status',
   }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte',
+    frame: 'player-alchemy-workbench',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte',
+    frame: 'player-alchemy-workbench',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte',
+    frame: 'player-alchemy-chooser',
+  }),
 ]);
 
 /** Content a native button may not hold: flow and grouping elements, and widget roles. */

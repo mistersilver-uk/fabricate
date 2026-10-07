@@ -124,8 +124,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-history-multi-success',
   ]),
   // The dense result rows, then one frame per selectable site (issue 1778): the Journal's Active
-  // runs, the gathering environments, tasks and events, and a selected uncraftable recipe; then
-  // the crafting routes' dense product rows.
+  // runs, the gathering environments, tasks and events, a selected uncraftable recipe, the alchemy
+  // recipe and component rows, and the alchemy chooser's cards; then the crafting routes' dense
+  // product rows.
   'src/ui/svelte/components/ListRow.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-finished-success',
@@ -137,6 +138,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-gathering-events',
     'player-crafting-check-unrollable-status',
     'player-crafting-ingredient-routed',
+    'player-alchemy-workbench',
+    'player-alchemy-chooser',
   ]),
   // The preview scale, the two historical branches no other frame draws, and the gathering
   // preview's authored-order scale, closed and with its breakdown open (issue 1644).

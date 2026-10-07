@@ -1,13 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
   AlchemyDisciplineChooser — shown when more than one enabled alchemy discipline
-  exists. A card per discipline (icon, name, "N known . M total", blurb, Enter).
-  Cards and the heading are real buttons/headings; on mount (i.e. when a Switch
+  exists. A card per discipline (icon, name, "N known . M total", blurb, Enter), each
+  ListRow's card layout, the merged browse card (issue 1778): an action button with no
+  pressed state, since choosing enters the discipline. On mount (i.e. when a Switch
   returns here) focus moves to the heading. "Discipline" is player-facing copy for
   an alchemy (crafting) system.
 -->
 <script>
-  import Medallion from '../../components/Medallion.svelte';
+  import ListRow from '../../components/ListRow.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let { systems = [], onChoose = null } = $props();
@@ -40,24 +41,15 @@
 
     <div class="alchemy-chooser-grid">
       {#each systems as system (system.id)}
-        <button
-          type="button"
-          class="alchemy-chooser-card"
-          data-alchemy-chooser-card={system.id}
-          onclick={() => onChoose?.(system.id)}
-        >
-          <span class="alchemy-chooser-card-top">
-            <Medallion art={system.img} alt="" size={44} glyph={18} icon="fas fa-flask" />
-            <span class="alchemy-chooser-card-heading">
-              <span class="alchemy-chooser-card-name">{system.name}</span>
-              <span class="alchemy-chooser-card-count">
-                {localize('FABRICATE.App.Alchemy.SystemSummary', {
-                  known: system.knownCount,
-                  total: system.totalCount,
-                })}
-              </span>
-            </span>
+        {#snippet count()}
+          <span class="alchemy-chooser-card-count">
+            {localize('FABRICATE.App.Alchemy.SystemSummary', {
+              known: system.knownCount,
+              total: system.totalCount,
+            })}
           </span>
+        {/snippet}
+        {#snippet blurbAndEnter()}
           {#if system.description}
             <span class="alchemy-chooser-card-blurb">{system.description}</span>
           {/if}
@@ -65,7 +57,24 @@
             {localize('FABRICATE.App.Alchemy.EnterDiscipline')}
             <i class="fas fa-arrow-right-long" aria-hidden="true"></i>
           </span>
-        </button>
+        {/snippet}
+        <ListRow
+          name={system.name}
+          art={system.img}
+          icon="fas fa-flask"
+          markSize={38}
+          layout="card"
+          truncateName
+          nameClass="alchemy-chooser-card-name"
+          onOpen={() => onChoose?.(system.id)}
+          openProps={{
+            class: 'alchemy-chooser-card',
+            'data-alchemy-chooser-card': system.id,
+            'aria-label': system.name,
+          }}
+          meta={count}
+          children={blurbAndEnter}
+        />
       {/each}
     </div>
   </div>
@@ -143,63 +152,7 @@
     }
   }
 
-  .alchemy-chooser-card {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    min-height: 152px;
-    padding: 18px;
-    border-radius: 14px;
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface-soft);
-    color: var(--fab-text);
-    cursor: pointer;
-    text-align: left;
-    transition:
-      border-color 120ms ease,
-      background-color 120ms ease,
-      transform 120ms ease,
-      box-shadow 120ms ease;
-  }
-
-  .alchemy-chooser-card:hover {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-surface-active);
-    transform: translateY(-2px);
-    box-shadow: var(--fab-shadow-md);
-  }
-
-  .alchemy-chooser-card:focus-visible {
-    outline: none;
-    border-color: var(--fab-accent-border);
-    box-shadow: 0 0 0 2px var(--fab-accent-soft);
-  }
-
-  .alchemy-chooser-card-top {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .alchemy-chooser-card-heading {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 0;
-  }
-
-  .alchemy-chooser-card-name {
-    font-family: var(--font-primary);
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.2;
-    color: var(--fab-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
+  /* The card, its button, its hover and its ring are ListRow's card layout (issue 1778). */
   .alchemy-chooser-card-count {
     font-size: 11px;
     letter-spacing: 0.02em;
@@ -218,16 +171,16 @@
   }
 
   .alchemy-chooser-card-enter {
-    margin-top: auto;
     display: inline-flex;
     align-items: center;
     gap: 7px;
+    margin-top: var(--fab-space-2);
     font-size: 12px;
     font-weight: 600;
     color: var(--fab-accent);
   }
 
-  .alchemy-chooser-card:hover .alchemy-chooser-card-enter i {
+  :global(.alchemy-chooser-card:hover) .alchemy-chooser-card-enter i {
     transform: translateX(2px);
   }
 
@@ -237,12 +190,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .alchemy-chooser-card,
     .alchemy-chooser-card-enter i {
       transition: none;
-    }
-    .alchemy-chooser-card:hover {
-      transform: none;
     }
   }
 </style>

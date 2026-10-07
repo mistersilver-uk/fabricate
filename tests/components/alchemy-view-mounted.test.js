@@ -4,14 +4,13 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import {
-  createMountedComponentHarness,
-  PLAYER_APP_COMPILED_MODULES,
-} from '../helpers/svelte-component-harness.js';
+  ALCHEMY_VIEW_HARNESS,
+  alchemyServices as services,
+  fakeAlchemyStore,
+} from '../helpers/alchemyViewFixtures.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
-import {
-  FOUNDRY_BRIDGE_RAW_MODULES,
-  LOCALIZE_OR_RAW_MODULES,
-} from '../helpers/foundryBridgeModules.js';
+import { NON_PHRASING_CONTENT } from '../helpers/listRowContract.js';
 import { primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -19,74 +18,8 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-alchemy-view-',
-  rawModules: [
-    ...FOUNDRY_BRIDGE_RAW_MODULES,
-    ...LOCALIZE_OR_RAW_MODULES,
-    'src/ui/svelte/actions/dragDrop.js',
-    'src/ui/svelte/util/rollPromptOrigin.js',
-    'src/ui/svelte/util/overlayHost.js',
-  ],
-  compiledModules: [
-    // The shared not-yet-ready chrome, the standing statement the workbench composes.
-    ...PLAYER_APP_COMPILED_MODULES,
-    'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
-    'src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte',
-    'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte',
-    'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte',
-    'src/ui/svelte/apps/alchemy/Workbench.svelte',
-    'src/ui/svelte/apps/alchemy/AlchemyView.svelte',
-  ],
-  // THE PRODUCTION HOST IS THE PLAYER WINDOW, not the manager.
-  rootClass: 'fabricate-app',
-  componentPath: 'src/ui/svelte/apps/alchemy/AlchemyView.svelte',
+  ...ALCHEMY_VIEW_HARNESS,
 });
-
-/** A POJO standing in for the alchemy store, at the branch the caller names. */
-function fakeAlchemyStore(overrides = {}) {
-  return {
-    loading: false,
-    loadedOnce: true,
-    error: null,
-    denied: false,
-    needsChooser: false,
-    listing: { selectedActorId: 'actor-1', activeSystemName: 'Alchemy' },
-    systems: [],
-    knownRecipes: [],
-    knownCount: 0,
-    undiscoveredCount: 0,
-    search: '',
-    selectedRecipeId: null,
-    canSwitch: false,
-    mode: 'empty',
-    target: null,
-    benchChips: [],
-    benchEmpty: true,
-    benchEssences: [],
-    missing: [],
-    brewEnabled: false,
-    brewInFlight: false,
-    lastBrew: null,
-    components: [],
-    componentSearch: '',
-    hasOwnedComponents: false,
-    load() {},
-    chooseSystem() {},
-    setSearch() {},
-    selectRecipe() {},
-    switchDiscipline() {},
-    clear() {},
-    add() {},
-    removeOne() {},
-    removeAll() {},
-    brew() {},
-    setComponentSearch() {},
-    ...overrides,
-  };
-}
-
-function services(store) {
-  return { alchemy: store, craftingSources: null, actorBar: null };
-}
 
 describe('AlchemyView mounted behavior', () => {
   before(harness.setup);
@@ -268,6 +201,93 @@ describe('AlchemyView mounted behavior', () => {
     assert.ok(
       target.textContent.includes('Herbalism'),
       'the chooser renders the selectable disciplines'
+    );
+  });
+
+  it('draws each discipline as a list-row card: one unpressed button that enters it', async () => {
+    const chosen = [];
+    const target = await harness.mount({
+      services: services(
+        fakeAlchemyStore({
+          needsChooser: true,
+          systems: [
+            { id: 'sys-a', name: 'Herbalism', knownCount: 1, totalCount: 4, description: 'Roots.' },
+            { id: 'sys-b', name: 'Poisoncraft', knownCount: 0, totalCount: 2 },
+          ],
+          chooseSystem: (id) => chosen.push(id),
+        })
+      ),
+    });
+    const cards = [
+      ...target.querySelectorAll(':scope .alchemy-chooser-grid > .fabricate-list-row'),
+    ];
+    assert.deepEqual(
+      cards.map((card) => {
+        const control = card.querySelector(':scope > button.fabricate-list-row-open');
+        return [
+          card.classList.contains('is-card'),
+          card.querySelectorAll('button').length,
+          control.classList.contains('alchemy-chooser-card'),
+          control.getAttribute('data-alchemy-chooser-card'),
+          control.getAttribute('aria-label'),
+          control.hasAttribute('aria-pressed'),
+          control.getAttribute('data-keyboard-focus'),
+          control.querySelectorAll(NON_PHRASING_CONTENT).length,
+        ];
+      }),
+      [
+        [true, 1, true, 'sys-a', 'Herbalism', false, 'true', 0],
+        [true, 1, true, 'sys-b', 'Poisoncraft', false, 'true', 0],
+      ],
+      'each card is one named action button holding phrasing content, pressed by nothing'
+    );
+    const herbalism = cards[0].querySelector(':scope > button');
+    assert.match(
+      herbalism.querySelector(':scope > .fab-medallion')?.getAttribute('style') ?? '',
+      /width:\s*38px/u,
+      "the card leads with the art ladder's 38px mark"
+    );
+    const described = (herbalism.getAttribute('aria-describedby') ?? '')
+      .split(/\s+/u)
+      .map((id) =>
+        target.querySelector(`[id="${id}"]`)?.textContent.replaceAll(/\s+/gu, ' ').trim()
+      );
+    assert.deepEqual(
+      described,
+      [
+        'FABRICATE.App.Alchemy.SystemSummary:{"known":1,"total":4}',
+        'Roots. FABRICATE.App.Alchemy.EnterDiscipline',
+      ],
+      'its count, then its blurb and its enter cue, describe it'
+    );
+    cards[1].querySelector(':scope > button').click();
+    assert.deepEqual(chosen, ['sys-b'], 'choosing a card enters that discipline');
+  });
+
+  it('presses the known recipe the store selected and marks the one the bench matches', async () => {
+    const recipe = (id, name) => ({ id, name, img: null, result: null, signatureSummary: [] });
+    const target = await harness.mount({
+      services: services(
+        fakeAlchemyStore({
+          knownRecipes: [recipe('vigor', 'Elixir of Vigor'), recipe('venom', 'Blade Venom')],
+          knownCount: 2,
+          selectedRecipeId: 'vigor',
+          mode: 'ready',
+          target: { id: 'venom', name: 'Blade Venom' },
+        })
+      ),
+    });
+    const rows = [...target.querySelectorAll(':scope [data-alchemy-recipe]')];
+    assert.deepEqual(
+      rows.map((row) => [
+        row.getAttribute('data-alchemy-recipe'),
+        row.getAttribute('aria-pressed'),
+        row.classList.contains('is-match'),
+      ]),
+      [
+        ['vigor', 'true', false],
+        ['venom', 'false', true],
+      ]
     );
   });
 });
