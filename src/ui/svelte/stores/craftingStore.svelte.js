@@ -93,11 +93,10 @@ export function createCraftingStore({ services } = {}) {
   let selectedRecipeId = $state(null);
   let search = $state('');
   let selectedIngredientSetId = $state(null);
-  // Per-group option overrides for the selected set (issue 552), keyed by group id:
-  // `{ [groupId]: { optionIndex, heldItemId } }`. Empty means the default
-  // first-satisfiable resolution (single-option groups and non-interacting players
-  // see no change). Reset whenever the recipe or ingredient set changes.
-  let selectedIngredientOptions = $state({});
+  // Option overrides (issue 552) per set, then group: `{ [setId]: { [groupId]: { optionIndex,
+  // heldItemId } } }`, empty for the default resolution. Kept across a set switch and reset with
+  // the recipe; readers take `selectedIngredientOptions`, the selected set's alone.
+  let ingredientOptionsBySet = $state({});
   // The player's essence funding (issue 917), keyed by the COMPOSED scope key
   // (`setId` plus the model's active step id) → `{ [itemKey]: units }`. The engine
   // consumes per set per step, so the pool is scoped the same way; a set-only key
@@ -336,6 +335,7 @@ export function createCraftingStore({ services } = {}) {
     const targetId = selectedIngredientSetId ?? selectedRecipe?.defaultSetId ?? null;
     return sets.find((set) => set?.id === targetId) ?? sets[0];
   });
+  const selectedIngredientOptions = $derived(ingredientOptionsBySet[selectedSet?.id ?? ''] ?? {});
 
   // The pool's scope key. `craftability.essencePool.scopeKey` is the bare SET id;
   // only the store knows which step the model reports as active, so the step half is
@@ -439,7 +439,7 @@ export function createCraftingStore({ services } = {}) {
   function select(recipeId) {
     selectedRecipeId = recipeId ?? null;
     selectedIngredientSetId = null;
-    selectedIngredientOptions = {};
+    ingredientOptionsBySet = {};
     resetRequirementSelection();
     // Hydrate the exact detail HERE, on the click, rather than leaving it to the first
     // reader (issue 1075). The derive below would fetch it anyway, so this buys no
@@ -498,14 +498,15 @@ export function createCraftingStore({ services } = {}) {
     favouriteIds = Array.isArray(next) ? next : favouriteIds;
   }
 
+  // Re-choosing keeps every choice; a switch keeps each set's picks, dropping the pool and chooser.
   function chooseIngredientSet(setId) {
+    const unchanged = (setId ?? null) === (selectedSet?.id ?? null);
     selectedIngredientSetId = setId ?? null;
-    // Option overrides are keyed by group id (unique per set), so switching sets
-    // clears them — the new set's groups start at their first-satisfiable default.
-    selectedIngredientOptions = {};
-    // The essence pool and the open chooser are set-scoped for the same reason: a
-    // carrier allocated for one set funds requirements the new set does not have.
-    resetRequirementSelection();
+    if (!unchanged) resetRequirementSelection();
+  }
+
+  function writeSelectedOptions(options) {
+    ingredientOptionsBySet = { ...ingredientOptionsBySet, [selectedSet?.id ?? '']: options };
   }
 
   /**
@@ -570,14 +571,13 @@ export function createCraftingStore({ services } = {}) {
   function pickForMe(announcement = '') {
     const current = selectedCraftability;
     const suggestedOptions = suggestChoiceOverrides(current);
-    if (Object.keys(suggestedOptions).length > 0) {
-      selectedIngredientOptions = { ...selectedIngredientOptions, ...suggestedOptions };
-    }
+    const options = { ...selectedIngredientOptions, ...suggestedOptions };
+    if (Object.keys(suggestedOptions).length > 0) writeSelectedOptions(options);
     // Only a switch onto an essence alternative re-evaluates, to suggest the new pool.
     const setId = selectedSet?.id ?? null;
     const craftability =
       setId && switchesOntoEssence(current, suggestedOptions)
-        ? (evaluateSet(setId, selectedIngredientOptions, null) ?? current)
+        ? (evaluateSet(setId, options, null) ?? current)
         : current;
     // Adopting the suggestion is an edit, so any pool writes the scope even when the
     // suggestion is empty; otherwise a later manual zeroing would revert to it.
@@ -612,7 +612,7 @@ export function createCraftingStore({ services } = {}) {
         heldItemId: choice.heldItemId ?? null,
       };
     }
-    selectedIngredientOptions = next;
+    writeSelectedOptions(next);
   }
 
   /** Add (or bump) a recipe in the shopping list. */
