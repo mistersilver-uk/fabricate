@@ -674,9 +674,9 @@ Resizing to the nearest rung in the same change would smuggle a layout move into
 The scenario below therefore binds a NEW or RESIZED geometry and not a conversion that preserves one.
 Issue 1519's sweep discharged the six player identity tiles: `apps/PlayerDetailHeader.svelte` draws its record tile at the art ladder's 38.
 It also reconciled the census with the two ladders this requirement publishes: `design-system-debt-ratchets.test.js` holds each art-tile component to its own kind's ladder, `Medallion` to the art ladder and `Avatar` to the portrait ladder.
-The remaining population is 57 off-ladder art tiles across 39 files, at 14 distinct sizes and one non-literal size, and 4 off-ladder portraits at 34, 40 and 50; 36 of those 61 sites lie outside `apps/manager/`, and each keeps its shipped size until a change resizes it.
+The remaining population is 26 off-ladder art tiles across 16 files, at 9 distinct sizes and one non-literal size, and 2 off-ladder portraits at 40; 26 of those 28 sites lie outside `apps/manager/`, and each keeps its shipped size until a change resizes it.
 A conversion onto a shared primitive takes that primitive's shipped geometry, and a conflict the library's planned-migrations table records as open stays open: the conversion never settles it by drawing the specimen's value.
-The icon chip's own flat 9px radius and flat 0.9rem glyph are off the radius and glyph ladders above, are not corrected here, and are not visible to a ratchet counting tile sizes.
+The icon chip's corner follows its rung — 6 at 22, 7 at 26 and 30, 9 at 38 and at any size off the ladder — while its flat 0.9rem glyph is off the glyph ladder above, is not corrected here, and is not visible to a ratchet counting tile sizes.
 Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for a 44px control and for cards and panels, and 999 for pills and tracks.
 A fully rounded radius is for a shape whose contents are text alone.
 A pill that CONTAINS a square element — an icon chip, a thumbnail — takes the control radius for its height instead, and any button inside it squares off to match, because a circle wrapped around a square reads as two competing shapes.
