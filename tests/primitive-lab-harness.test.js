@@ -307,6 +307,16 @@ test('a stretched host leaves the width to the page and a sized host keeps its o
   assert.equal(describeHost({ ...HOST, maxWidth: '300px' }).maxInlineSize, '300px');
 });
 
+test('an uncapped sized host widens by its row inset on both sides; a capped one holds it', () => {
+  const tile = { ...HOST, drawnWidth: 56, availableWidth: 718, inset: 8 };
+  assert.equal(describeHost(tile).inlineSize, '72px');
+  assert.equal(describeHost(tile).presize, '72px');
+  const panel = { ...HOST, availableWidth: 718, maxWidth: '300px', inset: 12 };
+  assert.equal(describeHost(panel).inlineSize, '300px');
+  assert.equal(describeHost(panel).maxInlineSize, '300px');
+  assert.equal(describeHost({ ...HOST, inset: 12 }).inlineSize, '');
+});
+
 test('a host that drew no width (display: contents) is left to the page, never collapsed to 0px', () => {
   const host = describeHost({ ...HOST, display: 'contents', drawnWidth: 0 });
   assert.equal(host.inlineSize, '');

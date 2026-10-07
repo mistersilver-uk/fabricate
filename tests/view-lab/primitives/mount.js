@@ -18,7 +18,7 @@ import { MAX_APPLIED_RESIZES, createSizeGovernor, describeHost } from './hostLay
 import { resolveSlots } from './inject.js';
 import { LIVE_CLASS, PAGE_CLASS, readLibrary } from './library.js';
 import { placeSpecimen } from './liveness.js';
-import { readSlotBox } from './slot.js';
+import { readSlotBox, readSlotInset } from './slot.js';
 import {
   SPECIMEN_ASSIGN,
   SPECIMEN_ERROR,
@@ -162,8 +162,8 @@ function applySize(iframe, { width, height, fill = false }, host) {
   iframe.classList.add(SIZED_CLASS);
 }
 
-/** Read the live drawing's facts for `describeHost`. */
-function readHostLayout(host) {
+/** Read the live drawing's facts for `describeHost`, with the row's `inset` around them. */
+function readHostLayout(host, row) {
   const parent = host.parentElement;
   const parentStyle = getComputedStyle(parent);
   const style = getComputedStyle(host);
@@ -175,7 +175,17 @@ function readHostLayout(host) {
       parent.clientWidth -
       Number.parseFloat(parentStyle.paddingLeft) -
       Number.parseFloat(parentStyle.paddingRight),
+    inset: insetOf(row),
   });
+}
+
+/** The row's `inset`, or 0 for a malformed one, which the specimen reports itself. */
+function insetOf(row) {
+  try {
+    return readSlotInset(row);
+  } catch {
+    return 0;
+  }
 }
 
 /**
@@ -208,7 +218,7 @@ function standUpSpecimen(slot, problems, results) {
   iframe.className = LIVE_CLASS;
   iframe.setAttribute(SPECIMEN_ATTRIBUTE, slot.row.path);
   iframe.title = `${slot.row.spec}: ${slot.row.path}`;
-  const host = readHostLayout(slot.host);
+  const host = readHostLayout(slot.host, slot.row);
   // Before READY, so the first report is measured at the width the specimen will keep.
   if (host.presize) iframe.style.width = host.presize;
   presizeBoxedSlot(iframe, slot.row);

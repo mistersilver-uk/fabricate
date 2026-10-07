@@ -160,6 +160,11 @@ Standing alone, that bleed overflows the specimen.
 
 `inset` is the padding of the region the primitive is placed in, in CSS px; the
 specimen is laid out inside it, and it is measured with it.
+A block drawing that caps its own width (`max-width`) drew that region, so its
+slot keeps the drawn width; one with no cap drew the primitive alone, so its slot
+adds the inset on both sides.
+`<SlotTile>` is the second kind: its count pip sits 7px above the tile and its
+pressed outline 4px outside it.
 
 ## `content` — what a call site puts inside
 

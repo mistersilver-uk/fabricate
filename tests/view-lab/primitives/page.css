@@ -40,3 +40,12 @@
   align-self: center;
   width: max-content;
 }
+
+/*
+ * A filling specimen beside its drawing takes the width the drawing gives its region, and adds none:
+ * in a unit sized by its content, `width: 100%` would otherwise resolve against the iframe's own
+ * 300px default and widen the unit past the drawing.
+ */
+.pl-live-label + .pl-live.pl-specimen-sized.pl-specimen-fill {
+  contain: inline-size;
+}

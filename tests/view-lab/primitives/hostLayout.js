@@ -13,15 +13,19 @@ export const MAX_APPLIED_RESIZES = 40;
  * @param {string} facts.maxWidth The drawing's computed `max-width`.
  * @param {number} facts.drawnWidth The drawing's rendered border-box width.
  * @param {number} facts.availableWidth The parent's content-box width.
+ * @param {number} [facts.inset] The row's `inset`. A drawing that caps its own width drew the region
+ *   the primitive sits in, so its width already holds the inset; one with no cap drew the primitive
+ *   alone, so its slot adds the inset on both sides and the padded specimen still fits.
  * @returns {{fill: boolean, inlineSize: string, maxInlineSize: string, presize: string}} The
  *   slot's inline facts; `presize` is the width the iframe takes before the specimen first lays
  *   out, so its first report is already at its final width, or `''` for none.
  */
-export function describeHost({ display, maxWidth, drawnWidth, availableWidth }) {
+export function describeHost({ display, maxWidth, drawnWidth, availableWidth, inset = 0 }) {
   const fill = !display.startsWith('inline');
   const drawn = drawnWidth > 0;
   const stretched = !drawn || Math.abs(drawnWidth - availableWidth) < 1;
-  const width = drawn ? `${Math.ceil(drawnWidth)}px` : '';
+  const around = maxWidth === 'none' ? 2 * inset : 0;
+  const width = drawn ? `${Math.ceil(drawnWidth) + around}px` : '';
   return {
     fill,
     inlineSize: stretched ? '' : width,
