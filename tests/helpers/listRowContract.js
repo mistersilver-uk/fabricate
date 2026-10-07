@@ -21,7 +21,7 @@ export const LIST_ROW_ADOPTERS = Object.freeze([
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte',
-    frame: 'player-alchemy-workbench',
+    frame: 'player-alchemy-known-recipe',
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte',

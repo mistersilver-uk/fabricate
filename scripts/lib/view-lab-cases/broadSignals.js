@@ -138,6 +138,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-gathering-events',
     'player-crafting-check-unrollable-status',
     'player-crafting-ingredient-routed',
+    'player-alchemy-known-recipe',
     'player-alchemy-workbench',
     'player-alchemy-chooser',
   ]),
