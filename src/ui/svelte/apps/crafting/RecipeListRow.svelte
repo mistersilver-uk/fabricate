@@ -214,8 +214,9 @@
 
   .crafting-recipe-row-system {
     /* The lower-value meta token: it gives up width FIRST so the category badge
-       (issue 514) keeps its floor before the system name truncates. */
-    flex: 1 1 auto;
+       (issue 514) keeps its floor before the system name truncates. It does not
+       grow, so the chip and the category follow it on a wide row. */
+    flex: 0 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -225,12 +226,13 @@
   }
 
   /* Neutral category badge (issue 514): grouping metadata, explicitly NOT a status
-     tone. Neutral theme tokens only. Holds a small floor and truncates with an
-     ellipsis + hover title so a long custom category name cannot blow out the row. */
+     tone. Neutral theme tokens only. It does not shrink and holds at least 6ch, and
+     truncates with an ellipsis + hover title at half the meta line so a long custom category name
+     cannot blow out the row. */
   .crafting-recipe-row-category {
-    flex: 0 1 auto;
-    min-width: 2rem;
-    max-width: 9rem;
+    flex: 0 0 auto;
+    min-width: 6ch;
+    max-width: min(9rem, 50%);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
