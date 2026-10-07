@@ -57,8 +57,12 @@ async function mountCard(props = {}) {
   const calls = { select: [], bulk: [] };
   const target = await harness.mount({
     item: gland(),
-    onSelect: (key) => calls.select.push(key),
-    onBulkToggle: (key) => calls.bulk.push(key),
+    onSelect: (key) => {
+      calls.select.push(key);
+    },
+    onBulkToggle: (key) => {
+      calls.bulk.push(key);
+    },
     ...props,
   });
   const root = target.querySelector('[data-inventory-card]');
