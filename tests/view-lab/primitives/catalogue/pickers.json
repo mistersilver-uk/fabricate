@@ -90,6 +90,40 @@
     }
   },
   {
+    "spec": "<ArtPicker>",
+    "cap": "filled",
+    "draws": ":scope > div > div",
+    "path": "src/ui/svelte/components/ArtPicker.svelte",
+    "note": "Replaces the tile only. The drawn \"Remove image\" line under it is the clear action, which renders only beside an `onClear` handler, and a row passes no function.",
+    "props": {
+      "art": "icons/commodities/metal/ingot-plain-steel.webp",
+      "alt": "",
+      "ariaLabel": "Choose the image for Steel Ingot"
+    }
+  },
+  {
+    "spec": "<ArtPicker>",
+    "cap": "empty",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/ArtPicker.svelte",
+    "props": {
+      "ariaLabel": "Choose the image for Steel Ingot"
+    }
+  },
+  {
+    "spec": "<ArtPicker>",
+    "cap": "locked",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/ArtPicker.svelte",
+    "props": {
+      "art": "icons/environment/wilderness/cave-entrance-mountain.webp",
+      "alt": "",
+      "locked": true,
+      "lockedLabel": "Image provided by the linked scene",
+      "lockedHint": "This image comes from the linked scene and can't be edited. Unlink the scene on the Linked scene card below to choose a custom image."
+    }
+  },
+  {
     "spec": "<SearchPopover>",
     "cap": "list form",
     "draws": ":scope > div",
@@ -141,6 +175,42 @@
     "props": {
       "colorToken": "sage",
       "layout": "inline"
+    }
+  },
+  {
+    "spec": "<TintPicker> <Menu>",
+    "cap": "anchored menu",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/ActionMenu.svelte",
+    "note": "Open, so the panel the drawing shows is drawn. The box holds the trigger and the panel under it; the panel caps itself at the box width less 32px, so the box is wide enough for the longest label not to clip.",
+    "slot": {
+      "width": 260,
+      "height": 170
+    },
+    "props": {
+      "open": true,
+      "align": "start",
+      "ariaLabel": "Add an alternative",
+      "items": [
+        {
+          "id": "component",
+          "label": "Alternative component",
+          "icon": "fa-solid fa-cube",
+          "tone": "component"
+        },
+        {
+          "id": "tags",
+          "label": "Alternative tag",
+          "icon": "fa-solid fa-tag",
+          "tone": "tag"
+        },
+        {
+          "id": "currency",
+          "label": "Alternative currency",
+          "icon": "fa-solid fa-coins",
+          "tone": "currency"
+        }
+      ]
     }
   }
 ]

@@ -610,43 +610,32 @@
   {
     "spec": "<Field> <Select> <Search>",
     "draws": ".k-lbl",
-    "path": "src/ui/svelte/components/Field.svelte",
+    "path": "src/ui/svelte/components/Select.svelte",
+    "note": "The drawing carries no hint, so the live Select has none. The disabled Downtime option with its Premium badge is kept: it is the only place the unavailable state shows.",
     "props": {
-      "as": "label"
-    },
-    "content": [
-      {
-        "tag": "span",
-        "text": "Resolution"
-      },
-      {
-        "tag": "select",
-        "children": [
-          {
-            "tag": "option",
-            "attrs": {
-              "value": "simple"
-            },
-            "text": "Simple"
-          },
-          {
-            "tag": "option",
-            "attrs": {
-              "value": "routed",
-              "selected": true
-            },
-            "text": "Routed by check"
-          },
-          {
-            "tag": "option",
-            "attrs": {
-              "value": "progressive"
-            },
-            "text": "Progressive"
-          }
-        ]
-      }
-    ]
+      "label": "Resolution",
+      "value": "routed",
+      "options": [
+        {
+          "value": "simple",
+          "label": "Simple"
+        },
+        {
+          "value": "routed",
+          "label": "Routed by check"
+        },
+        {
+          "value": "progressive",
+          "label": "Progressive"
+        },
+        {
+          "value": "downtime",
+          "label": "Downtime",
+          "badge": "Premium",
+          "disabled": true
+        }
+      ]
+    }
   },
   {
     "spec": "<Field> <Select> <Search>",
@@ -673,23 +662,11 @@
   {
     "spec": "<Field> <Select> <Search>",
     "draws": ".k-lbl",
-    "path": "src/ui/svelte/components/Field.svelte",
+    "path": "src/ui/svelte/components/SearchField.svelte",
     "props": {
-      "as": "label"
-    },
-    "content": [
-      {
-        "tag": "span",
-        "text": "Search"
-      },
-      {
-        "tag": "input",
-        "attrs": {
-          "type": "search",
-          "placeholder": "Search the catalogue…"
-        }
-      }
-    ]
+      "label": "Search",
+      "placeholder": "Search the catalogue…"
+    }
   },
   {
     "spec": "<Field> <Select> <Search>",
@@ -807,6 +784,174 @@
     "props": {
       "checked": false,
       "ariaLabel": "Expert Crafter"
+    }
+  },
+  {
+    "spec": "<RunActionBar>",
+    "cap": "ready — the primary is live",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "props": {
+      "run": {
+        "id": "forge-iron-rivets"
+      },
+      "runLabel": "Forge Iron Rivets",
+      "cancel": {
+        "ariaLabel": "Cancel Forge Iron Rivets",
+        "confirmLabel": "Cancel the whole run",
+        "keepLabel": "Keep it",
+        "prompt": "Closes the run at stage 2; what earlier stages spent stays spent."
+      },
+      "pause": {
+        "label": "Pause"
+      },
+      "resume": {
+        "label": "Resume"
+      },
+      "primary": {
+        "label": "Roll check",
+        "icon": "fas fa-dice-d20",
+        "enabled": true
+      }
+    }
+  },
+  {
+    "spec": "<RunActionBar>",
+    "cap": "counting down — nothing to press, and the completion switch appears",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "props": {
+      "run": {
+        "id": "forge-iron-rivets"
+      },
+      "runLabel": "Forge Iron Rivets",
+      "cancel": {
+        "ariaLabel": "Cancel Forge Iron Rivets",
+        "confirmLabel": "Cancel the whole run",
+        "keepLabel": "Keep it",
+        "prompt": "Closes the run at stage 2; what earlier stages spent stays spent."
+      },
+      "pause": {
+        "label": "Pause"
+      },
+      "resume": {
+        "label": "Resume"
+      },
+      "primary": {
+        "label": "3h to wait",
+        "icon": "fas fa-clock",
+        "enabled": false,
+        "reason": "Waiting for enough world time to pass before the next step can be triggered."
+      },
+      "completion": {
+        "label": "Complete",
+        "value": "manual",
+        "ariaLabel": "How Forge Iron Rivets completes",
+        "options": [
+          {
+            "value": "manual",
+            "fallback": "By hand",
+            "icon": "fas fa-hand"
+          },
+          {
+            "value": "worldTime",
+            "fallback": "As time passes",
+            "icon": "fas fa-bolt"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "spec": "<RunActionBar>",
+    "cap": "paused — Resume is the action",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "props": {
+      "run": {
+        "id": "forge-iron-rivets",
+        "paused": true
+      },
+      "runLabel": "Forge Iron Rivets",
+      "cancel": {
+        "ariaLabel": "Cancel Forge Iron Rivets",
+        "confirmLabel": "Cancel the whole run",
+        "keepLabel": "Keep it",
+        "prompt": "Closes the run at stage 2; what earlier stages spent stays spent."
+      },
+      "pause": {
+        "label": "Pause"
+      },
+      "resume": {
+        "label": "Resume"
+      },
+      "primary": {
+        "label": "Roll check",
+        "icon": "fas fa-dice-d20",
+        "enabled": true
+      }
+    }
+  },
+  {
+    "spec": "<RunActionBar>",
+    "cap": "a stage waiting on a choice — the primary says which",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "props": {
+      "run": {
+        "id": "forge-iron-rivets"
+      },
+      "runLabel": "Forge Iron Rivets",
+      "cancel": {
+        "ariaLabel": "Cancel Forge Iron Rivets",
+        "confirmLabel": "Cancel the whole run",
+        "keepLabel": "Keep it",
+        "prompt": "Closes the run at stage 2; what earlier stages spent stays spent."
+      },
+      "pause": {
+        "label": "Pause",
+        "enabled": false,
+        "reason": "A run waiting on a choice is not counting down, so there is no time to hold."
+      },
+      "resume": {
+        "label": "Resume"
+      },
+      "primary": {
+        "label": "Materials needed",
+        "icon": "fas fa-triangle-exclamation",
+        "enabled": false,
+        "reason": "You do not hold everything this stage needs."
+      }
+    }
+  },
+  {
+    "spec": "<RunActionBar>",
+    "cap": "cancel armed — the siblings step aside",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/RunActionBar.svelte",
+    "props": {
+      "run": {
+        "id": "forge-iron-rivets"
+      },
+      "runLabel": "Forge Iron Rivets",
+      "cancel": {
+        "ariaLabel": "Cancel Forge Iron Rivets",
+        "confirmLabel": "Cancel the whole run",
+        "keepLabel": "Keep it",
+        "prompt": "Closes the run at stage 2; what earlier stages spent stays spent."
+      },
+      "pause": {
+        "label": "Pause"
+      },
+      "resume": {
+        "label": "Resume"
+      },
+      "primary": {
+        "label": "Roll check",
+        "icon": "fas fa-dice-d20",
+        "enabled": true
+      },
+      "armed": true
     }
   }
 ]

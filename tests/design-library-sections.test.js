@@ -15,6 +15,7 @@ const FIXTURE = [
   '<!doctype html><html><head><style>section{display:block}</style></head><body>',
   '<section id="controls">',
   '<div class="sec-head"><span class="num">06</span><h2>Controls &amp; inputs</h2></div>',
+  '<p class="lede">Every API\n  below.</p>',
   '<div class="spec"><div class="spec-head"><h4>&lt;Anchored&gt;</h4>',
   '<p class="why">Cites <code>&lt;CitedInWhy&gt;</code>.</p></div></div>',
   '</section>',
@@ -41,21 +42,22 @@ test('the section list is positional against the parser’s headings', () => {
   );
 });
 
-test('a section reports its number and decoded title, and null where it draws no head', () => {
+test('a section reports its number, decoded title and ledes, and null where it draws no head', () => {
   assert.deepEqual(read.sections, [
-    { id: 'controls', number: '06', title: 'Controls & inputs' },
-    { id: 'ruledout', number: null, title: null },
+    { id: 'controls', number: '06', title: 'Controls & inputs', ledes: ['Every API below.'] },
+    { id: 'ruledout', number: null, title: null, ledes: [] },
   ]);
 });
 
-test('a nested .sec-head or .num cannot stand in for the section’s own', () => {
+test('a nested .sec-head, .num or .lede cannot stand in for the section’s own', () => {
   const { sections } = readLibrarySections(
     [
       '<body><section id="outer">',
-      '<div class="spec"><div class="sec-head"><span class="num">99</span><h2>Nested</h2></div></div>',
+      '<div class="spec"><div class="sec-head"><span class="num">99</span><h2>Nested</h2></div>',
+      '<p class="lede">Nested</p></div>',
       '<div class="sec-head"><span class="num">07</span><h2>Own</h2></div>',
       '</section></body>',
     ].join('')
   );
-  assert.deepEqual(sections, [{ id: 'outer', number: '07', title: 'Own' }]);
+  assert.deepEqual(sections, [{ id: 'outer', number: '07', title: 'Own', ledes: [] }]);
 });
