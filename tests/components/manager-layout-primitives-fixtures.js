@@ -95,6 +95,7 @@ export async function readShortWindowRailGeometry({
       const value = trigger.querySelector('.fabricate-select-value');
       return {
         triggerHeight: trigger.getBoundingClientRect().height,
+        triggerRadius: getComputedStyle(trigger).borderTopLeftRadius,
         triggerRight: trigger.getBoundingClientRect().right,
         valueClipped: value.scrollWidth > value.clientWidth,
         valueTextOverflow: getComputedStyle(value).textOverflow,

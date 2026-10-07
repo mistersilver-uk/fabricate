@@ -231,6 +231,10 @@ test('the rail crafting-system card selects a system and links back to the libra
     'the trigger stands at the `toolbar` rung’s 34px'
   );
   assert.ok(
+    selectBlock.includes('border-radius: 9px;'),
+    'the trigger takes the 34px band’s 9px corner, not the `inline` rung’s 7'
+  );
+  assert.ok(
     blockFor('.fabricate-select-value').includes('text-overflow: ellipsis;'),
     'a long system name ellipsises rather than reflowing the nav'
   );
@@ -1002,11 +1006,12 @@ test('the stacked manager body sizes its regions to content instead of sharing i
   );
 });
 
-test('the scope trigger is 34px and ellipsises a long system name inside the 220px rail', async () => {
+test('the scope trigger is 34px at radius 9 and ellipsises a long system name inside the 220px rail', async () => {
   const report = await readShortWindowRailGeometry({
     systemName: 'The Grand Consolidated Guild of Artificers and Alchemists',
   });
   assert.equal(report.triggerHeight, 34, 'the trigger is the `toolbar` rung’s 34px');
+  assert.equal(report.triggerRadius, '9px', 'and its corner is the 34px band’s 9');
   assert.ok(report.valueClipped, 'the long name overflows its value span');
   assert.equal(report.valueTextOverflow, 'ellipsis', 'and the overflow is an ellipsis');
   assert.ok(report.triggerRight <= report.scopeRight, 'the trigger stays inside the card');

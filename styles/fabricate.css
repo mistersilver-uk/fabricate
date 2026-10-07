@@ -6415,10 +6415,11 @@
   font-size: 0.62rem;
 }
 
-/* The rail card's full width, which the `inline` rung's trigger never declares, at the `toolbar` rung's 34px; the system's name is set in the display face wherever it is named, including as this select's value. */
+/* The rail card's full width, which no rung declares, at the `toolbar` rung's 34px and 9px corner on the `inline` rung's fill: the toolbar's bg-1 would sink into the rail's bg-0. The system's name is set in the display face wherever it is named, including as this select's value. */
 .fabricate-manager .manager-scope-select .fabricate-select-trigger {
   width: 100%;
   min-height: 34px;
+  border-radius: 9px;
   font-family: var(--fab-font-serif);
   font-weight: 600;
 }
