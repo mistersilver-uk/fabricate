@@ -295,9 +295,8 @@
     pointer-events: none;
   }
 
-  /* Written explicitly, as every sibling selectable card does
-     (`.gathering-env-card.is-available:not(.is-selected):hover`, and ListRow's selectable form
-     on `:not([aria-pressed='true'])`): hover must not repaint over the selected fill. */
+  /* Written explicitly, as ListRow's selectable form does on `:not([aria-pressed='true'])`:
+     hover must not repaint over the selected fill. */
   .inventory-card:not(.is-selected) .inventory-card-button:hover {
     background: var(--fab-surface-raised);
   }
