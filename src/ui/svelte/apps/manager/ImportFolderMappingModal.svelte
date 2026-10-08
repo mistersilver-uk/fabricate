@@ -399,8 +399,8 @@
 
 <style>
   /* One control scale for the whole dialog (issue 772): it is dense, and it sits between surfaces
-     that read at `--fab-manager-recipe-control-font`, so the manager's default body size made it both the
-     largest type on screen and the one with the least room for it. */
+     that read at `--fab-manager-recipe-control-font`, so the manager's default body size made it
+     both the largest type on screen and the one with the least room for it. */
   .manager-import-mapping-match {
     display: flex;
     align-items: center;

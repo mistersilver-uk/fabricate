@@ -500,9 +500,9 @@
   }
 
   /*
-    EACH THRESHOLD IS THE WIDTH AT WHICH ITS OWN BLOCK STOPS FITTING, on this PANEL's content box (an
-    ordinary 1314px window gives it 1028px). The panel's own inset answers the manager instead,
-    because no container can query itself.
+    EACH THRESHOLD IS THE WIDTH AT WHICH ITS OWN BLOCK STOPS FITTING, on this PANEL's content
+    box (an ordinary 1314px window gives it 1028px). The panel's own inset answers the manager
+    instead, because no container can query itself.
 
       - 940px is the feature grid's: four cards plus three 9px gutters need 4x228px, and 228px is
         the narrowest a card reads at with a 32px tile above 10px copy.
