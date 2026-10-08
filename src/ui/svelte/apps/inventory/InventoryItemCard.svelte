@@ -2,7 +2,11 @@
 <!--
   InventoryItemCard is one selectable owned item in the grid: a square thumbnail
   carrying every at-a-glance signal, with the item name beneath. Selecting it
-  drives the right-hand inspector.
+  drives the right-hand inspector. It is ListRow's card layout (issue 1778): the
+  thumbnail leads over a one-line name, the button is pressed by the inspected card
+  or, while a bulk selection is open, by each bulk-selected card, and its name folds
+  in every state the thumbnail only draws. A preview (`interactive={false}`) is the
+  inert form.
 
   SLOT GEOMETRY (issue 675). Every overlay sits INSIDE the thumbnail bounds and
   above it (`z-index: 2`), not floating outside the frame:
@@ -40,6 +44,7 @@
   glyph. The glyph path is for ESSENCES only, which have an authored icon and no artwork.
 -->
 <script>
+  import ListRow from '../../components/ListRow.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_CRAFTING_IMAGE } from '../../util/craftingImageDefaults.js';
   import { essenceTintToken } from '../../util/essenceTint.js';
@@ -88,15 +93,24 @@
   const broken = $derived(item?.broken === true);
   const essencePips = $derived(Array.isArray(item?.essences) ? item.essences : []);
   const brokenLabel = $derived(localize('FABRICATE.App.Inventory.Card.Broken'));
+  const salvageableLabel = $derived(localize('FABRICATE.App.Inventory.Card.SalvageablePip'));
+  const toolLabel = $derived(localize('FABRICATE.App.Inventory.Card.ToolPip'));
   const selectedSuffixLabel = $derived(localize('FABRICATE.App.Inventory.Card.SelectedSuffix'));
   const bulkSelectedPipLabel = $derived(localize('FABRICATE.App.Inventory.Card.BulkSelectedPip'));
-  const baseAriaLabel = $derived(
-    broken ? `${name} — ${brokenLabel}` : `${name} — ${quantityLabel}`
-  );
-  // The bulk-selected suffix is ADDED to the existing label, never a replacement —
-  // a broken selected card must still announce its brokenness.
+  // The control's name is the visible name, then every state the thumbnail only draws (issue
+  // 1778): the quantity or Broken pip, the corner badges, each carried essence, and the bulk
+  // selection, which is added, never a replacement, so a broken selected card still says broken.
   const ariaLabel = $derived(
-    bulkSelected ? `${baseAriaLabel} — ${selectedSuffixLabel}` : baseAriaLabel
+    [
+      name,
+      broken ? brokenLabel : quantityLabel,
+      isSalvageable && salvageableLabel,
+      isTool && toolLabel,
+      ...essencePips.map((pip) => pip.name),
+      bulkSelected && selectedSuffixLabel,
+    ]
+      .filter(Boolean)
+      .join(', ')
   );
 
   // One handler serves click AND keydown: both MouseEvent and KeyboardEvent carry
@@ -123,210 +137,122 @@
   }
 </script>
 
-<div
-  class="inventory-card"
-  class:is-selected={selected}
-  class:is-essence={isEssence}
-  class:is-bulk-selected={bulkSelected}
-  class:is-broken={broken}
+{#snippet thumb()}
+  <!-- The name carries every state drawn here, so the thumbnail is drawn only; its titles stay. -->
+  <span class="inventory-card-thumb" aria-hidden="true">
+    <span class="inventory-card-art" class:is-dimmed={broken}>
+      {#if isEssence}
+        <span
+          class="inventory-card-essence"
+          class:has-tint={Boolean(essenceTint)}
+          data-inventory-essence-tint={essenceTint || undefined}
+          style={essenceTintStyle}
+        >
+          <i class={icon}></i>
+        </span>
+      {:else}
+        <img src={img || DEFAULT_CRAFTING_IMAGE} alt="" draggable="false" />
+      {/if}
+    </span>
+    {#if broken}
+      <!-- The broken wash tints the artwork itself, under every overlay. -->
+      <span class="inventory-card-broken-wash"></span>
+    {/if}
+
+    <!-- ONE top-right slot. A broken item reports its brokenness there instead of
+         its quantity: two elements in this slot would overlap. -->
+    {#if broken}
+      <span class="inventory-card-qty is-broken" data-inventory-qty data-inventory-qty-broken>
+        {brokenLabel}
+      </span>
+    {:else}
+      <span class="inventory-card-qty" data-inventory-qty>{quantityLabel}</span>
+    {/if}
+
+    {#if isSalvageable || isTool}
+      <span class="inventory-card-badges" data-inventory-badges>
+        {#if isSalvageable}
+          <span
+            class="inventory-card-badge is-salvageable"
+            data-inventory-pip="salvageable"
+            title={salvageableLabel}
+          >
+            <i class="fas fa-recycle"></i>
+          </span>
+        {/if}
+        {#if isTool}
+          <span class="inventory-card-badge is-tool" data-inventory-pip="tool" title={toolLabel}>
+            <i class="fas fa-screwdriver-wrench"></i>
+          </span>
+        {/if}
+      </span>
+    {/if}
+
+    {#if essencePips.length > 0}
+      <span class="inventory-card-pips" data-inventory-pips>
+        {#each essencePips as pip (pip.id)}
+          {@const pipTint = essenceTintToken(pip.colorToken)}
+          <span
+            class="inventory-card-pip"
+            data-inventory-pip="essence"
+            data-inventory-pip-tint={pipTint || undefined}
+            title={pip.name}
+            style={pipTint ? `--fab-pip-tint:var(--fab-tag-${pipTint})` : undefined}
+          >
+            <i class={pip.icon || 'fas fa-mortar-pestle'}></i>
+          </span>
+        {/each}
+      </span>
+    {/if}
+
+    {#if bulkSelected}
+      <span
+        class="inventory-card-bulk-badge"
+        data-inventory-bulk-badge
+        title={bulkSelectedPipLabel}
+      >
+        <i class="fas fa-check"></i>
+      </span>
+    {/if}
+  </span>
+{/snippet}
+
+<ListRow
+  {name}
+  layout="card"
+  truncateName
+  tone={broken ? 'danger' : 'neutral'}
+  nameClass="inventory-card-name"
+  class={[
+    'inventory-card',
+    {
+      'is-selected': selected,
+      'is-essence': isEssence,
+      'is-bulk-selected': bulkSelected,
+      'is-broken': broken,
+    },
+  ]}
   role="listitem"
   data-inventory-card={id}
   data-inventory-card-broken={broken ? 'true' : undefined}
   data-inventory-card-bulk-selected={bulkSelected ? 'true' : undefined}
->
-  {#snippet cardBody()}
-    <span class="inventory-card-thumb">
-      <span class="inventory-card-art" class:is-dimmed={broken}>
-        {#if isEssence}
-          <span
-            class="inventory-card-essence"
-            class:has-tint={Boolean(essenceTint)}
-            data-inventory-essence-tint={essenceTint || undefined}
-            style={essenceTintStyle}
-            aria-hidden="true"
-          >
-            <i class={icon}></i>
-          </span>
-        {:else}
-          <img src={img || DEFAULT_CRAFTING_IMAGE} alt="" draggable="false" />
-        {/if}
-      </span>
-      {#if broken}
-        <!-- The broken wash tints the artwork itself, under every overlay. -->
-        <span class="inventory-card-broken-wash" aria-hidden="true"></span>
-      {/if}
-
-      <!-- ONE top-right slot. A broken item reports its brokenness there instead of
-           its quantity: two elements in this slot would overlap. -->
-      {#if broken}
-        <span class="inventory-card-qty is-broken" data-inventory-qty data-inventory-qty-broken>
-          {brokenLabel}
-        </span>
-      {:else}
-        <span class="inventory-card-qty" data-inventory-qty>{quantityLabel}</span>
-      {/if}
-
-      {#if isSalvageable || isTool}
-        <span class="inventory-card-badges" data-inventory-badges>
-          {#if isSalvageable}
-            <span
-              class="inventory-card-badge is-salvageable"
-              data-inventory-pip="salvageable"
-              title={localize('FABRICATE.App.Inventory.Card.SalvageablePip')}
-              aria-label={localize('FABRICATE.App.Inventory.Card.SalvageablePip')}
-            >
-              <i class="fas fa-recycle" aria-hidden="true"></i>
-            </span>
-          {/if}
-          {#if isTool}
-            <span
-              class="inventory-card-badge is-tool"
-              data-inventory-pip="tool"
-              title={localize('FABRICATE.App.Inventory.Card.ToolPip')}
-              aria-label={localize('FABRICATE.App.Inventory.Card.ToolPip')}
-            >
-              <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-            </span>
-          {/if}
-        </span>
-      {/if}
-
-      {#if essencePips.length > 0}
-        <span class="inventory-card-pips" data-inventory-pips>
-          {#each essencePips as pip (pip.id)}
-            {@const pipTint = essenceTintToken(pip.colorToken)}
-            <span
-              class="inventory-card-pip"
-              data-inventory-pip="essence"
-              data-inventory-pip-tint={pipTint || undefined}
-              title={pip.name}
-              aria-label={pip.name}
-              style={pipTint ? `--fab-pip-tint:var(--fab-tag-${pipTint})` : undefined}
-            >
-              <i class={pip.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>
-            </span>
-          {/each}
-        </span>
-      {/if}
-
-      {#if bulkSelected}
-        <span
-          class="inventory-card-bulk-badge"
-          data-inventory-bulk-badge
-          title={bulkSelectedPipLabel}
-          aria-label={bulkSelectedPipLabel}
-        >
-          <i class="fas fa-check" aria-hidden="true"></i>
-        </span>
-      {/if}
-    </span>
-    <span class="inventory-card-name">{name}</span>
-  {/snippet}
-
-  {#if interactive}
-    <button
-      type="button"
-      class="inventory-card-button"
-      aria-pressed={bulkActive ? bulkSelected : selected}
-      aria-label={ariaLabel}
-      aria-keyshortcuts="Shift+Enter Shift+Space"
-      title={name}
-      onclick={activate}
-      onkeydown={onKey}
-    >
-      {@render cardBody()}
-    </button>
-  {:else}
-    <div class="inventory-card-button is-static" title={name}>
-      {@render cardBody()}
-    </div>
-  {/if}
-</div>
+  selected={bulkActive ? bulkSelected : selected}
+  onOpen={interactive ? activate : null}
+  openProps={{
+    class: ['inventory-card-button', { 'is-static': !interactive }],
+    'aria-label': interactive ? ariaLabel : undefined,
+    'aria-keyshortcuts': interactive ? 'Shift+Enter Shift+Space' : undefined,
+    title: name,
+    onkeydown: interactive ? onKey : undefined,
+  }}
+  leading={thumb}
+/>
 
 <style>
-  /* The grid stretches its ITEMS, but the item is this wrapper and the visible card is
-     the BUTTON inside it — so a wrapped name grew the wrapper while the button kept its
-     own short height, and a row of cards came out ragged. Making the wrapper a flex row
-     stretches the button to the wrapper's (row's) height on the cross axis, so the
-     tallest name in a row sets the row and every card in it matches. Done here rather
-     than with `height: 100%`, which the Foundry `height: auto` reset below would have
-     to undo. */
-  .inventory-card {
-    min-width: 0;
-    display: flex;
-  }
-
-  .inventory-card-button {
-    box-sizing: border-box;
-    width: 100%;
-    /* Foundry's global `.app button` pins a fixed height and centers content; a card
-       that sets only min-height gets cropped. Reset the inherited box (the
-       EnvironmentCard pattern) — mounted tests cannot see this. */
-    appearance: none;
-    -webkit-appearance: none;
-    height: auto;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 8px;
-    padding: 11px;
-    border: 1px solid var(--fab-border);
-    border-radius: 10px;
-    /* The RESTING card is the darker page fill, NOT --surface-soft. That baseline is
-       what makes selection's --accent-soft fill a visible change: filling a
-       --surface-soft card with --surface-soft is a no-op, and selection then collapses
-       to a 1px border shifting alpha. */
-    background: var(--fab-bg-2);
-    color: var(--fab-text);
-    font: inherit;
-    line-height: 1.15;
-    cursor: pointer;
-    text-align: center;
-  }
-
-  /* Non-interactive preview rendering (issue 1036): a plain, unfocusable `<div>` in place
-     of the button, so a "How players see it" preview never adds a no-op keyboard/screen-reader
-     trap to the host app's tab order. `pointer-events: none` matches the missing hover/focus
-     affordance a static tile should show. */
-  .inventory-card-button.is-static {
-    cursor: default;
-    pointer-events: none;
-  }
-
-  /* Written explicitly, as ListRow's selectable form does on `:not([aria-pressed='true'])`:
-     hover must not repaint over the selected fill. */
-  .inventory-card:not(.is-selected) .inventory-card-button:hover {
-    background: var(--fab-surface-raised);
-  }
-
-  .inventory-card-button:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  /* Full-strength accent border + a tinted fill, matching all four sibling selectable
-     surfaces. */
-  .inventory-card.is-selected .inventory-card-button {
-    border-color: var(--fab-accent);
-    background: var(--fab-accent-soft);
-  }
-
-  /* Bulk-selected treatment (issue 859): a softer fill than single-selection plus a
-     1px accent ring, so a multi-selected card reads distinctly from the single
-     inspected one. Declared BEFORE `.is-broken` so equal-specificity cascade order
-     lets the broken rule's border-color win when both classes are present — a
-     broken selected card keeps its danger border rather than being signalled by
-     the 19px check badge alone. */
-  .inventory-card.is-bulk-selected .inventory-card-button {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-surface-active);
-  }
-
-  /* A broken item's card border is the outermost signal; it survives selection. */
-  .inventory-card.is-broken .inventory-card-button {
-    border-color: var(--fab-danger-border);
+  /* The card, its button, its hover, ring, pressed fill and edge, broken (danger) ground and
+     one-line name are ListRow's card layout (issue 1778). The thumbnail takes the card's width. */
+  :global(.inventory-card > .fabricate-list-row-open > .fabricate-list-row-leading) {
+    align-self: stretch;
   }
 
   /* The thumbnail is the positioning context for every overlay: the pips sit INSIDE
@@ -528,21 +454,5 @@
   .inventory-card-bulk-badge i {
     font-size: 9px;
     line-height: 1;
-  }
-
-  /* The name WRAPS and the card grows to fit it (the prototype's behaviour). A card is
-     a 120px-wide column, so an ellipsis here is not an edge case — "Masterwork
-     Armorer's Jig" and most authored component names are longer than one line, and
-     truncating turned the grid's only text into "Smoke Cracked Am…". The grid's rows
-     stretch, so the taller card sets its row's height rather than overlapping. */
-  .inventory-card-name {
-    min-width: 0;
-    max-width: 100%;
-    /* `anywhere` so a single unbroken token longer than the card still breaks instead
-       of overflowing the frame it cannot be trimmed to fit. */
-    overflow-wrap: anywhere;
-    font-size: 11.5px;
-    font-weight: 600;
-    line-height: 1.25;
   }
 </style>

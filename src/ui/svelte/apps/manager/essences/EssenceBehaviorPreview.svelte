@@ -185,28 +185,11 @@
     font-size: 0.7rem;
   }
 
-  /* The mounted card fills its grid slot with `width: 100%`, so the cap keeps the thumbnail from
-     stretching to the rail's width and reading as a hero image. */
+  /* The mounted card stretches across its grid cell, so the cap keeps the thumbnail from
+     stretching to the rail's width and reading as a hero image. The card keeps its name to one
+     line itself (issue 1778), so the two samples stand the same height. */
   .manager-essence-preview-card {
     max-width: 132px;
-  }
-
-  /* A MATCHED PAIR, AND IT TAKES A RULE TO MAKE THEM ONE. Measured, the two cells and cards were
-     the same width and 154px against 169px TALL, because `InventoryItemCard`'s name wraps and one
-     of the two names is three words — so the right caption sat lower and the pair read as two
-     differently-sized samples rather than one before/after.
-
-     The name is clamped to ONE line HERE rather than in `InventoryItemCard`: in the player grid a
-     wrapped name is correct and the whole grid wraps with it, and what is specific to this panel is
-     that exactly two stand side by side, so the equality belongs to the comparison. `:global()`
-     because the element is the card's, scoped under this panel's class so it reaches no other. */
-  .manager-essence-preview-card :global(.inventory-card-name) {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
-    line-clamp: 1;
-    text-overflow: ellipsis;
   }
 
   .manager-essence-preview-rules {

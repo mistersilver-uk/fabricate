@@ -57,6 +57,24 @@ RadioCardGroup's optional `optionBody(option)` snippet MAY render read-only cons
 StageCard `io` groups MAY supply a `content` snippet in place of plain items so a future requirement group and its route/ladder output stay paired inside the stage.
 Their default absent-snippet forms retain existing geometry and behavior.
 
+### Requirement: A player-facing selectable list item renders through ListRow
+
+A player-facing selectable list item (a run, an environment, a gathering task or event, a recipe, a component or an inventory item) MUST render through ListRow's selectable form, so its one native button, its pressed state, its name and its focus ring are the primitive's.
+A choice among alternatives of one entity, such as a recipe's ingredient sets, is exempt and renders through RadioCardGroup.
+The inventory grid's cards render through ListRow's card layout and keep Shift selection of several cards: the inspected card is the pressed one, and while a bulk selection is open each bulk-selected card is the pressed one instead.
+
+#### Scenario: A player app draws its own selectable control
+
+- **WHEN** a player app template adds an element wearing `role="button"`, or writes its own `aria-pressed`, for a selectable list item
+- **THEN** the ListRow adoption scan's census of those templates fails, naming the file
+- **AND** the item renders through ListRow, its hooks on the row's root or its `openProps`
+
+#### Scenario: A player Shift-selects an inventory card
+
+- **WHEN** the player Shift-clicks an inventory card, or presses Shift+Enter or Shift+Space on it
+- **THEN** the card joins or leaves the bulk selection and does not become the inspected card
+- **AND** while the bulk selection is open, each bulk-selected card is pressed, and the inspected card is pressed only if it is bulk-selected too
+
 ### Requirement: Compact Journal geometry is owned by the existing primitives
 
 WorldClockChip MUST compose Chip's opt-in `presentation="clock"` with direct icon, label and value flex children aligned centrally inside a 28px border-box, 28px minimum height, radius 7, space-2 horizontal padding and gap.

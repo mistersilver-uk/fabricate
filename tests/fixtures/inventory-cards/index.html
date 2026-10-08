@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Inventory cards — live keyboard proof</title>
+    <!--
+      Served by `tests/components/inventory-card-rendered.test.js` from a Vite dev server, so
+      `mount.js` mounts the real cards and a real key reaches their buttons (issue 1778).
+    -->
+    <link rel="stylesheet" href="/@inventory-cards-styles/fabricate.css" />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+      }
+    </style>
+  </head>
+  <body class="vtt game theme-dark">
+    <script type="module" src="/tests/fixtures/inventory-cards/mount.js"></script>
+  </body>
+</html>

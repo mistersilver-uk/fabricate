@@ -3247,19 +3247,52 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
   });
 
   it('Shift+Enter reaches the SAME action as the shift-click', async () => {
-    const { services, calls } = makeServices(makeItem());
+    const { services, calls, store } = makeServices(makeItem());
+    let selected = null;
+    store.select = (key) => {
+      selected = key;
+    };
     const target = await harness.mount({ services });
     await settle();
 
     const card = target.querySelector('[data-inventory-card="sys:c1"] button');
+    fire(card, 'keydown', { key: 'Enter' });
+    await settle();
+    assert.equal(selected, 'sys:c1', 'POSITIVE CONTROL: a plain Enter reaches select');
+    selected = null;
+
     fire(card, 'keydown', { key: 'Enter', shiftKey: true });
     await settle();
 
     assert.deepEqual(calls.bulkToggle, ['sys:c1'], 'the keyboard gesture is not a second path');
+    assert.ok(!selected, 'and Shift+Enter never also inspects the card (issue 1778)');
     assert.equal(
       card.getAttribute('aria-keyshortcuts'),
       'Shift+Enter Shift+Space',
       'and the gesture is advertised to assistive tech'
+    );
+  });
+
+  it('presses the inspected card, and while a bulk selection is open the bulk-selected cards', async () => {
+    const second = { ...makeItem(), key: 'sys:c2', name: 'Bronze Ingot' };
+    const pressed = async (selectedKeys) => {
+      const { services, store } = makeServices(makeItem(), { selectedKeys });
+      store.pageItems = [store.selectedItem, second];
+      const target = await harness.mount({ services });
+      await settle();
+      const states = ['sys:c1', 'sys:c2'].map((key) =>
+        target
+          .querySelector(`[data-inventory-card="${key}"] .inventory-card-button`)
+          .getAttribute('aria-pressed')
+      );
+      harness.remount();
+      return states;
+    };
+    assert.deepEqual(await pressed([]), ['true', 'false'], 'the inspected card alone');
+    assert.deepEqual(
+      await pressed(['sys:c2']),
+      ['false', 'true'],
+      'the bulk selection, never the inspected card beside it'
     );
   });
 

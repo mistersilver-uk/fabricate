@@ -31,6 +31,10 @@ export const LIST_ROW_ADOPTERS = Object.freeze([
     file: 'src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte',
     frame: 'player-alchemy-chooser',
   }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
+    frame: 'player-inventory-bulk-mixed',
+  }),
 ]);
 
 /** Content a native button may not hold: flow and grouping elements, and widget roles. */
