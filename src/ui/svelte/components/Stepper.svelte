@@ -386,6 +386,7 @@
     height: 24px;
     margin: -1px;
     padding: 1px;
+    /* ratchet-exempt(design-system): the 22px button's 6px corner outset by the 1px hit-area padding, so the content-box background still draws 6; retires if the adjunct moves to the ::before form or a hit-area token lands */
     border-radius: 7px;
     background-clip: content-box;
   }
