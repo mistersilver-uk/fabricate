@@ -64,6 +64,7 @@ Where a run needs something from **you**, a second badge sits beside the status 
   A route, an option, or an essence allocation has not been made yet.
 - **Needs materials**, **Needs essences**, **Needs payment**, **Needs tools**.
   The stage is short of something you have to acquire.
+  **Needs tools** clears while a [tool station]({% link canvas-interactables.md %}#virtual-present-station-tools) you activated supplies the missing tool, and returns when that station is no longer active.
 
 You can sort the active list by **Soonest Ready** or by **Newest**.
 Soonest Ready puts the runs you can act on first, then the ones that will be ready soonest.
