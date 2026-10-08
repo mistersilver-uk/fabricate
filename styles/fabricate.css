@@ -11844,7 +11844,13 @@
   outline: none;
 }
 
-/* HIT AREAS (issue 1523): every pointer target offers at least 24 by 24 pixels (WCAG 2.2 section 2.5.8), the painted box unchanged. The glyph-sized removes above and below are 14-22px, so each lets its overflow show (Foundry clips a `button`'s) and carries an invisible `::before` centred on it and never smaller than 24px; it belongs to the button, so a click on it is the button's, and no gap beside these controls is under the 1px the 22px ones reach into. */
+/* HIT AREAS (issue 1523): every pointer target offers at least 24 by 24 pixels (WCAG 2.2 section 2.5.8), the painted box unchanged. The glyph-sized removes are 14-22px, so each lets its overflow show (Foundry clips a `button`'s) and carries an invisible `::before` centred on it and never smaller than 24px; it belongs to the button, so a click on it is the button's, and no gap beside these controls is under the 1px the 22px ones reach into. The rules above carry `position` and `overflow` themselves; `.fab-hit-area` is the same pair for a component's own button (`Chip`'s remove, the bulk inset's pager and unstage buttons, the essence filter clear), which sit in a `button` Foundry sizes and clips. */
+.fab-hit-area {
+  position: relative;
+  overflow: visible;
+}
+
+.fab-hit-area::before,
 .fabricate-manager .manager-selected-tag-pill button::before,
 .fabricate-manager .manager-recipe-chip-clear::before,
 .fabricate-manager .manager-component-chip-clear::before,

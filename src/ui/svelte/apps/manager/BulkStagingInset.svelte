@@ -216,7 +216,7 @@
            none, so a focused pager would otherwise leave Space pausing the game. -->
       <button
         type="button"
-        class="fab-bulk-inset-page"
+        class="fab-bulk-inset-page fab-hit-area"
         data-keyboard-focus="true"
         data-bulk-inset-prev={id}
         disabled={disabled || pageIndex === 0}
@@ -233,7 +233,7 @@
       </span>
       <button
         type="button"
-        class="fab-bulk-inset-page"
+        class="fab-bulk-inset-page fab-hit-area"
         data-keyboard-focus="true"
         data-bulk-inset-next={id}
         disabled={disabled || pageIndex >= pageCount - 1}
@@ -506,8 +506,6 @@
      which with the pager's `6px 8px` inset is the reference's 36px band (M24). */
   .fab-bulk-inset-page {
     appearance: none;
-    position: relative;
-    overflow: visible;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -522,17 +520,6 @@
     color: var(--fab-text-secondary);
     font-size: 0.56rem;
     cursor: pointer;
-  }
-
-  /* The 24px pointer target of the 22px square: a pixel into the 6px gap on every side. */
-  .fab-bulk-inset-page::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: max(100%, 24px);
-    height: max(100%, 24px);
-    transform: translate(-50%, -50%);
   }
 
   .fab-bulk-inset-page:disabled {

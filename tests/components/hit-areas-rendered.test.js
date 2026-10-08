@@ -88,6 +88,7 @@ const SHEET_CONTROLS = Object.freeze([
   ['manager-danger-tag-remove', '', 20, 20],
   ['manager-drop-rank-button', '', 18, 18],
   ['manager-condition-remove', '', 22, 22],
+  ['fab-hit-area', '', 22, 22],
 ]);
 
 /** The narrowest gap any of these sits beside another control: the chip rung's 6px. */
@@ -119,7 +120,7 @@ ${['Stepper', 'SelectionCheckbox', 'Chip']
   <div data-case="tagPill" class="row">${markup.tagPill}</div>
   ${SHEET_CONTROLS.map(
     ([cls, wrapper, width, height]) =>
-      `<div data-case="${cls}" class="row ${wrapper}"><button class="neighbour" data-neighbour="before"></button><button type="button" class="${cls}" style="--w:${width};--h:${height}">${GLYPH}</button><button class="neighbour" data-neighbour="after"></button></div>`
+      `<div data-case="${cls}" class="row ${wrapper}"><button class="neighbour" data-neighbour="before"></button><button type="button" class="${cls}" style="${cls === 'fab-hit-area' ? `width:${width}px;height:${height}px;padding:0` : ''}">${GLYPH}</button><button class="neighbour" data-neighbour="after"></button></div>`
   ).join('\n')}
   <div data-case="range" class="row manager-gathering-task-edit-view"><input type="range" min="0" max="10" value="5" /></div>
 </div></body></html>`;
@@ -371,6 +372,30 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
       assertTarget(`.${cls}`, control, { width, height });
     });
   }
+
+  it('puts the shared hit-area class on the buttons its components own', () => {
+    for (const [path, token, count] of [
+      [component('Chip'), 'manager-chip-remove fab-hit-area', 1],
+      ['src/ui/svelte/apps/manager/BulkStagingInset.svelte', 'fab-bulk-inset-page fab-hit-area', 2],
+      [
+        'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte',
+        'fab-bulk-book-pick-clear fab-hit-area',
+        1,
+      ],
+      [
+        'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte',
+        'fab-bulk-book-unstage fab-hit-area',
+        1,
+      ],
+      [
+        'src/ui/svelte/apps/manager/EssenceBrowserView.svelte',
+        'manager-essence-chip-clear fab-hit-area',
+        1,
+      ],
+    ]) {
+      assert.equal(read(path).split(`class="${token}"`).length - 1, count, `${path}: ${token}`);
+    }
+  });
 
   it('gives the task range a 24px track the row does not feel', async () => {
     const range = await tab.evaluate(() => {
