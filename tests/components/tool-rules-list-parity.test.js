@@ -873,7 +873,8 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
     for (const property of ['fontSize', 'fontWeight', 'letterSpacing', 'lineHeight', 'color']) {
       assert.equal(measured['section-kicker'][property], measured.kicker[property], property);
     }
-    assert.equal(measured.section.rowGap, '14px', 'kicker to body at the card rhythm');
+    // The inspector's 14px gap snapped up to `--fab-space-4` (issue 1523).
+    assert.equal(measured.section.rowGap, '16px', 'kicker to body at the card rhythm');
     assert.equal(measured['section-kicker'].marginBottom, '0px', 'and its kicker sits flush');
 
     // `proto:2559-2562` — the rules inset RECESSES below the aside now that the aside has
