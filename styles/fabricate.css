@@ -144,8 +144,6 @@
   --fab-overlay-dark-18: rgb(17 26 35 / 18%);
   --fab-overlay-dark-20: rgb(17 26 35 / 20%);
   --fab-overlay-dark-24: rgb(17 26 35 / 24%);
-  --fab-overlay-dark-25: rgb(17 26 35 / 25%);
-  --fab-overlay-dark-32: rgb(17 26 35 / 32%);
   --fab-overlay-dark-48: rgb(17 26 35 / 48%);
   --fab-overlay-dark-78: rgb(17 26 35 / 78%);
   --fab-overlay-light-03: rgb(241 209 181 / 3%);
@@ -159,7 +157,6 @@
   --fab-overlay-light-28: rgb(241 209 181 / 28%);
   --fab-overlay-light-96: rgb(241 209 181 / 96%);
   --fab-warning-focus: rgb(231 219 177 / 78%);
-  --fab-shadow-sm: 0 8px 18px rgb(17 26 35 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(17 26 35 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(17 26 35 / 34%);
   --fab-badge-gold: #C9A15E;
@@ -243,8 +240,6 @@
   --fab-overlay-dark-18: rgb(0 0 0 / 18%);
   --fab-overlay-dark-20: rgb(0 0 0 / 20%);
   --fab-overlay-dark-24: rgb(0 0 0 / 24%);
-  --fab-overlay-dark-25: rgb(0 0 0 / 25%);
-  --fab-overlay-dark-32: rgb(0 0 0 / 32%);
   --fab-overlay-dark-48: rgb(0 0 0 / 48%);
   --fab-overlay-dark-78: rgb(0 0 0 / 78%);
   --fab-overlay-light-03: rgb(255 255 255 / 3%);
@@ -258,7 +253,6 @@
   --fab-overlay-light-28: rgb(255 255 255 / 28%);
   --fab-overlay-light-96: rgb(255 255 255 / 96%);
   --fab-warning-focus: rgb(246 176 72 / 78%);
-  --fab-shadow-sm: 0 8px 18px rgb(0 0 0 / 18%);
   --fab-shadow-md: 0 10px 24px rgb(0 0 0 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(0 0 0 / 34%);
   --fab-badge-gold: #C2A24E;
@@ -342,8 +336,6 @@
   --fab-overlay-dark-18: rgb(20 18 20 / 18%);
   --fab-overlay-dark-20: rgb(20 18 20 / 20%);
   --fab-overlay-dark-24: rgb(20 18 20 / 24%);
-  --fab-overlay-dark-25: rgb(20 18 20 / 25%);
-  --fab-overlay-dark-32: rgb(20 18 20 / 32%);
   --fab-overlay-dark-48: rgb(20 18 20 / 48%);
   --fab-overlay-dark-78: rgb(20 18 20 / 78%);
   --fab-overlay-light-03: rgb(240 226 212 / 3%);
@@ -357,7 +349,6 @@
   --fab-overlay-light-28: rgb(240 226 212 / 28%);
   --fab-overlay-light-96: rgb(240 226 212 / 96%);
   --fab-warning-focus: rgb(214 192 142 / 78%);
-  --fab-shadow-sm: 0 8px 18px rgb(20 18 20 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(20 18 20 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(20 18 20 / 34%);
   --fab-badge-gold: #C79A4F;
@@ -441,8 +432,6 @@
   --fab-overlay-dark-18: rgb(22 28 25 / 18%);
   --fab-overlay-dark-20: rgb(22 28 25 / 20%);
   --fab-overlay-dark-24: rgb(22 28 25 / 24%);
-  --fab-overlay-dark-25: rgb(22 28 25 / 25%);
-  --fab-overlay-dark-32: rgb(22 28 25 / 32%);
   --fab-overlay-dark-48: rgb(22 28 25 / 48%);
   --fab-overlay-dark-78: rgb(22 28 25 / 78%);
   --fab-overlay-light-03: rgb(241 233 216 / 3%);
@@ -456,7 +445,6 @@
   --fab-overlay-light-28: rgb(241 233 216 / 28%);
   --fab-overlay-light-96: rgb(241 233 216 / 96%);
   --fab-warning-focus: rgb(231 216 162 / 78%);
-  --fab-shadow-sm: 0 8px 18px rgb(22 28 25 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(22 28 25 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(22 28 25 / 34%);
   --fab-badge-gold: #C7A257;
@@ -540,8 +528,6 @@
   --fab-overlay-dark-18: rgb(18 24 36 / 18%);
   --fab-overlay-dark-20: rgb(18 24 36 / 20%);
   --fab-overlay-dark-24: rgb(18 24 36 / 24%);
-  --fab-overlay-dark-25: rgb(18 24 36 / 25%);
-  --fab-overlay-dark-32: rgb(18 24 36 / 32%);
   --fab-overlay-dark-48: rgb(18 24 36 / 48%);
   --fab-overlay-dark-78: rgb(18 24 36 / 78%);
   --fab-overlay-light-03: rgb(242 236 255 / 3%);
@@ -555,7 +541,6 @@
   --fab-overlay-light-28: rgb(242 236 255 / 28%);
   --fab-overlay-light-96: rgb(242 236 255 / 96%);
   --fab-warning-focus: rgb(230 224 200 / 78%);
-  --fab-shadow-sm: 0 8px 18px rgb(18 24 36 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(18 24 36 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(18 24 36 / 34%);
   --fab-badge-gold: #C0A468;
@@ -641,8 +626,6 @@
   --fab-overlay-dark-18: rgb(12 10 20 / 18%);
   --fab-overlay-dark-20: rgb(12 10 20 / 20%);
   --fab-overlay-dark-24: rgb(12 10 20 / 24%);
-  --fab-overlay-dark-25: rgb(12 10 20 / 25%);
-  --fab-overlay-dark-32: rgb(12 10 20 / 32%);
   --fab-overlay-dark-48: rgb(12 10 20 / 48%);
   --fab-overlay-dark-78: rgb(12 10 20 / 78%);
   --fab-overlay-light-03: rgb(243 243 245 / 3%);
@@ -656,7 +639,6 @@
   --fab-overlay-light-28: rgb(243 243 245 / 28%);
   --fab-overlay-light-96: rgb(243 243 245 / 96%);
   --fab-warning-focus: rgb(193 150 110 / 72%);
-  --fab-shadow-sm: 0 8px 18px rgb(0 0 0 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(0 0 0 / 28%);
   --fab-shadow-lg: 0 14px 38px rgb(0 0 0 / 34%);
   --fab-badge-gold: #C9A15E;
@@ -740,8 +722,6 @@
   --fab-overlay-dark-18: rgb(10 14 26 / 18%);
   --fab-overlay-dark-20: rgb(10 14 26 / 20%);
   --fab-overlay-dark-24: rgb(10 14 26 / 24%);
-  --fab-overlay-dark-25: rgb(10 14 26 / 25%);
-  --fab-overlay-dark-32: rgb(10 14 26 / 32%);
   --fab-overlay-dark-48: rgb(10 14 26 / 48%);
   --fab-overlay-dark-78: rgb(10 14 26 / 78%);
   --fab-overlay-light-03: rgb(228 192 102 / 3%);
@@ -755,7 +735,6 @@
   --fab-overlay-light-28: rgb(228 192 102 / 28%);
   --fab-overlay-light-96: rgb(228 192 102 / 96%);
   --fab-warning-focus: rgb(230 208 138 / 78%);
-  --fab-shadow-sm: 0 8px 18px rgb(10 14 26 / 24%);
   --fab-shadow-md: 0 10px 24px rgb(10 14 26 / 32%);
   --fab-shadow-lg: 0 14px 38px rgb(10 14 26 / 40%);
   --fab-badge-gold: #CBA75F;
@@ -939,7 +918,7 @@
   color: var(--fab-on-success);
   background: var(--fab-success);
 
-  /* ratchet-exempt(design-system): a zero-blur ring that separates the pip from the well it overhangs, not elevation; the rail's ground is the surface over the shell ground. */
+  /* Two zero-blur rings separate the pip from the well it overhangs: the rail's ground is the surface over the shell ground. */
   box-shadow:
     0 0 0 2px var(--fab-surface-soft),
     0 0 0 2px var(--fab-bg-1);
@@ -3936,7 +3915,7 @@
   border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  box-shadow: none;
   font: inherit;
   font-variant-numeric: tabular-nums;
 }
@@ -4183,7 +4162,7 @@
   border: 1px solid var(--fab-border-strong);
   border-radius: 6px;
   background: var(--fab-bg-2);
-  box-shadow: 0 12px 24px var(--fab-overlay-dark-32);
+  box-shadow: var(--fab-shadow-md);
   overflow-y: auto;
 }
 
@@ -9649,7 +9628,7 @@
   border: 1px solid var(--fab-border-strong);
   border-radius: 9px;
   background: var(--fab-bg-0);
-  box-shadow: 0 14px 30px var(--fab-overlay-dark-48);
+  box-shadow: var(--fab-shadow-lg);
   overflow: auto;
   scrollbar-color: var(--fab-bg-3) transparent;
   scrollbar-width: thin;
@@ -11469,7 +11448,7 @@
   border: 1px solid var(--fab-border);
   color: var(--fab-text);
   background: var(--fab-bg-2);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  box-shadow: none;
   font: inherit;
 }
 
@@ -11516,7 +11495,7 @@
   border: 1px solid var(--fab-border);
   color: var(--fab-text);
   background: var(--fab-bg-2);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  box-shadow: none;
   font: inherit;
 }
 
@@ -11602,7 +11581,6 @@
   border: 1px solid var(--fab-border);
   border-radius: 11px;
   background: var(--fab-bg-3);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
 }
 
 .fabricate-manager .manager-task-core-card {
@@ -12195,7 +12173,6 @@
   border: 1px solid var(--fab-border);
   border-radius: 11px;
   background: var(--fab-bg-3);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
   overflow: hidden;
 }
 
@@ -12795,7 +12772,7 @@
   border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  box-shadow: none;
   font: inherit;
 }
 
@@ -12851,7 +12828,6 @@
   border-radius: 7px;
   background: var(--fab-overlay-dark-18);
   box-sizing: border-box;
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
   overflow: hidden;
 }
 
@@ -16493,7 +16469,7 @@
   border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  box-shadow: none;
   font: inherit;
   font-variant-numeric: tabular-nums;
 }

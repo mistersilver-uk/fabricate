@@ -548,22 +548,27 @@ test('no mono rule asks for a weight the shipped face does not have', (t) => {
   );
 });
 
+/** A swept-scope declaration with no marker at its site, which an absolute check reads. */
+const unmarkedInScope = (corpus) => (d) =>
+  SWEEP_SCOPE.test(d.file) && !exemptAt(d.file, corpus.sources[d.file], d.at);
+
+/** A declaration as an absolute check names it. */
+const scopeSite = (d) => `${d.file}: ${d.selector} | ${d.value}`;
+
 // Absolute, not against the base: the swept scope holds no off-ramp weight and no heavy mono.
 test('no weight in the sheet, components and manager leaves the ramp or the mono face', () => {
   const corpus = treeStyles();
-  const unmarked = (d) =>
-    SWEEP_SCOPE.test(d.file) && !exemptAt(d.file, corpus.sources[d.file], d.at);
-  const site = (d) => `${d.file}: ${d.selector} | ${d.value}`;
+  const unmarked = unmarkedInScope(corpus);
   const weights = fontWeights(corpus).filter(unmarked);
   assert.ok(weights.length >= 500, `only ${weights.length} in-scope weights were read`);
   assert.deepEqual(
-    weights.filter((d) => !WEIGHT_RAMP.includes(d.value)).map(site),
+    weights.filter((d) => !WEIGHT_RAMP.includes(d.value)).map(scopeSite),
     [],
     'a weight is a numeral on the 400/500/600/700 ramp: 650 → 600, 800 → 700, and `inherit` ' +
       'states the numeral it resolves to'
   );
   assert.deepEqual(
-    heavyMonoWeights(corpus).filter(unmarked).map(site),
+    heavyMonoWeights(corpus).filter(unmarked).map(scopeSite),
     [],
     'the mono face ships 400 and 500 only: a mono rule above 500 → 500'
   );
@@ -571,11 +576,66 @@ test('no weight in the sheet, components and manager leaves the ramp or the mono
 
 /* ─────────────────────────────── gate 4: shadows ─────────────────────────────── */
 
-/** The three published elevation tokens. */
-const SHADOW_TOKEN = /^var\(\s*--fab-shadow-(sm|md|lg)\s*\)$/iu;
+/** The two published elevation tokens. */
+const SHADOW_TOKEN = /^var\(\s*--fab-shadow-(md|lg)\s*\)$/iu;
+
+/** A `--fab-*` colour, with an optional fallback. */
+const FAB_COLOUR = String.raw`var\(\s*--fab-[\w-]+\s*(?:,[^)]*)?\)`;
+
+/** An edge's width, captured so it can be bounded. */
+const EDGE_WIDTH = String.raw`(\d+(?:\.\d+)?)px`;
 
 /** An inset ring: a border drawn as a shadow so it costs no layout. */
-const INSET_RING = /^(?:inset )?0 0 0 \d+(?:\.\d+)?px var\(\s*--fab-[\w-]+\s*(?:,[^)]*)?\)$/iu;
+const INSET_RING = new RegExp(`^(?:inset )?0 0 0 ${EDGE_WIDTH} ${FAB_COLOUR}$`, 'iu');
+
+/** A leading bar: an inset edge on the inline start, with no block offset and no blur. */
+const LEADING_BAR = new RegExp(`^inset ${EDGE_WIDTH} 0 0 ${FAB_COLOUR}$`, 'iu');
+
+/** The widest a ring or a bar may draw: past it the shadow is a fill rather than an edge. */
+const EDGE_MAX_PX = 4;
+
+/** Whether `value` takes `shape` with an edge no wider than {@link EDGE_MAX_PX}. */
+const edgeOf = (shape, value) => {
+  const match = shape.exec(value);
+  return match !== null && Number(match[1]) <= EDGE_MAX_PX;
+};
+
+const isRing = (value) => edgeOf(INSET_RING, value);
+const isLeadingBar = (value) => edgeOf(LEADING_BAR, value);
+
+/**
+ * The checked radio's dot, the one ring wider than {@link EDGE_MAX_PX}: its 16px accent ring fills
+ * the 16px control inside a 3px ground. It is named whole rather than lifting the bound.
+ */
+const RADIO_DOT = 'inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent)';
+
+/** A shadow's layers, split at the commas outside any parentheses. */
+function shadowLayers(value) {
+  const layers = [''];
+  let depth = 0;
+  for (const character of value) {
+    if (character === '(') depth += 1;
+    if (character === ')') depth -= 1;
+    if (character === ',' && depth === 0) layers.push('');
+    else layers[layers.length - 1] += character;
+  }
+  return layers.map((layer) => layer.trim());
+}
+
+/** Two or more rings in one declaration, such as the nav count's pip inside its halo. */
+function isRingList(value) {
+  const layers = shadowLayers(value);
+  return layers.length > 1 && layers.every(isRing);
+}
+
+/** The shapes gate 4 allows: `none`, a token, a ring, a ring list, the radio dot and a bar. */
+const allowedShadow = (value) =>
+  value.toLowerCase() === 'none' ||
+  SHADOW_TOKEN.test(value) ||
+  isRing(value) ||
+  isRingList(value) ||
+  value === RADIO_DOT ||
+  isLeadingBar(value);
 
 /** Every `box-shadow` declaration, normalised. */
 const shadowsOf = (corpus) =>
@@ -586,40 +646,213 @@ const shadowsOf = (corpus) =>
 
 const OFF_TOKEN_SHADOW_GATE = styleGate((corpus) =>
   shadowsOf(corpus)
-    .filter(
-      (declaration) =>
-        !SHADOW_TOKEN.test(declaration.value) &&
-        declaration.value.toLowerCase() !== 'none' &&
-        !INSET_RING.test(declaration.value)
-    )
+    .filter((declaration) => !allowedShadow(declaration.value))
     .map((declaration) => declarationSite('off-token box-shadow', declaration))
 );
 
 test('no box-shadow is written outside the published elevation set', (t) => {
   const shadows = shadowsOf(treeStyles());
 
-  // The two allowances are live, so widening either shows up as rows vanishing rather than as
-  // nothing at all. A `none` that is no longer written and a ring that no longer matches both
-  // read, from the ratchet alone, as debt paid down.
-  assert.ok(
-    shadows.some((declaration) => SHADOW_TOKEN.test(declaration.value)),
-    'no `box-shadow` reads a published elevation token any more, so the allowance this gate ' +
-      'grants is granted to nothing'
-  );
-  assert.ok(
-    shadows.some((declaration) => INSET_RING.test(declaration.value)),
-    'no `box-shadow` is written as an inset ring any more, so that carve-out is untested by the ' +
-      'corpus and could be widened without a row moving'
-  );
+  // Each allowance is live, so widening one shows up as rows vanishing rather than as nothing at
+  // all: a shape that no longer matches reads, from the ratchet alone, as debt paid down.
+  const live = [
+    ['a published elevation token', (value) => SHADOW_TOKEN.test(value)],
+    ['an inset ring', isRing],
+    ['a ring list', isRingList],
+    ['the radio dot', (value) => value === RADIO_DOT],
+    ['a leading bar', isLeadingBar],
+  ];
+  for (const [shape, matches] of live) {
+    assert.ok(
+      shadows.some((declaration) => matches(declaration.value)),
+      `no \`box-shadow\` is written as ${shape} any more, so that allowance is untested by the ` +
+        'corpus and could be widened without a row moving'
+    );
+  }
 
-  assertFloor('off-token box-shadows', shadows.length, 60);
+  assertFloor('off-token box-shadows', shadows.length, 80);
   checkGate(
     t,
     OFF_TOKEN_SHADOW_GATE,
-    'Token foundations are the only source of elevation. `--fab-shadow-sm`, `--fab-shadow-md` ' +
-      'and `--fab-shadow-lg` are the three heights this product has, and a hand-written offset ' +
-      'and blur is a fourth that no other surface can match. `none` and an inset ring — a border ' +
-      'drawn without costing layout — are the two shapes that are not elevation and stay allowed.'
+    'Token foundations are the only source of elevation. `--fab-shadow-md` and ' +
+      '`--fab-shadow-lg` are the two heights this product has, and only a surface that floats ' +
+      'over content takes one; a hand-written offset and blur is a third height that no ' +
+      'other surface can match. `none`, an inset ring, a comma list of rings and a leading bar ' +
+      '(`inset 3px 0 0 var(--fab-*)`), each at most 4px wide, are edges rather than elevation and ' +
+      'stay allowed, and so does the checked radio dot, whose 16px ring fills its control.'
+  );
+});
+
+// Absolute, not against the base: the swept scope draws no shadow outside the allowance.
+test('no shadow in the sheet, components and manager leaves the allowance', () => {
+  const corpus = treeStyles();
+  const shadows = shadowsOf(corpus).filter(unmarkedInScope(corpus));
+  assert.ok(shadows.length >= 80, `only ${shadows.length} in-scope shadows were read`);
+  assert.deepEqual(
+    shadows.filter((d) => !allowedShadow(d.value)).map(scopeSite),
+    [],
+    'elevation is a `--fab-shadow-*` token on a surface that floats; a sitting surface draws ' +
+      'none, and a hairline is its 1px `--fab-border` or a ring'
+  );
+});
+
+/** A selector on one line, as the pinned lists below spell it. */
+const oneLine = (selector) => selector.replaceAll(/\s+/gu, ' ').trim();
+
+/**
+ * Every in-scope read of an elevation token, by file and selector, with the reason that surface
+ * floats over content. No pattern can tell a floating surface from a sitting one, so a new read
+ * fails until it is listed here, and the review of that listing decides the classification.
+ */
+const FLOATING_SURFACES = Object.freeze([
+  ['src/ui/svelte/components/Modal.svelte', '.manager-modal', 'a dialog over the window'],
+  [
+    MODULE_SHEET,
+    '.fabricate-typeahead-list.fabricate-typeahead-list',
+    'opens over the fields below',
+  ],
+  [MODULE_SHEET, '.fabricate-manager .manager-recipe-duration-popover', 'a popover'],
+  [MODULE_SHEET, '.fabricate-manager .manager-recipe-option-suggestions', 'opens over the form'],
+  [MODULE_SHEET, '.fabricate-manager .manager-availability-menu', 'a menu'],
+  [MODULE_SHEET, '.fabricate-color-picker-popover.manager-color-picker-popover', 'a popover'],
+  [MODULE_SHEET, '.fabricate-action-menu-panel.manager-action-menu-panel', 'a row menu'],
+  [MODULE_SHEET, '.fabricate-interaction-prompt', 'a toast over the canvas'],
+  [MODULE_SHEET, '.fabricate-picker-popover.manager-travel-popover', 'a popover'],
+]);
+
+// Absolute and pinned: no marker excuses elevation on a surface the list does not name.
+test('elevation is read only on the surfaces pinned as floating', () => {
+  const corpus = treeStyles();
+  const reads = corpus.declarations.filter(
+    (d) =>
+      SWEEP_SCOPE.test(d.file) &&
+      /--fab-shadow-/iu.test(d.value) &&
+      !/^--fab-shadow-/iu.test(d.property)
+  );
+  assert.deepEqual(
+    reads.map((d) => `${d.file}: ${oneLine(d.selector)}`).sort(byCodePoint),
+    FLOATING_SURFACES.map(([file, selector]) => `${file}: ${selector}`).sort(byCodePoint),
+    'a `--fab-shadow-*` token is elevation, and only a surface that floats over content takes ' +
+      'one. A new read is listed in FLOATING_SURFACES with the reason that surface floats; a ' +
+      'surface that sits — a card, a row, a dock pinned to its edge — draws none'
+  );
+});
+
+/** A theme block's selector: `:root`, or `:root` or `.fabricate` naming one theme. */
+const THEME_BLOCK =
+  /^(?::root(?:\[data-fabricate-theme="[\w-]+"\])?|\.fabricate\[data-fabricate-theme="[\w-]+"\])$/u;
+
+const inThemeBlock = (d) =>
+  d.file === MODULE_SHEET && splitSelectorList(d.selector).every((item) => THEME_BLOCK.test(item));
+
+// Absolute: a filter, a text shadow or a re-declared token draws depth the gate above never reads.
+test('no rule in the sheet, components and manager draws depth through another channel', () => {
+  const corpus = treeStyles();
+  const declarations = corpus.declarations
+    .filter(unmarkedInScope(corpus))
+    .map((d) => ({ ...d, value: normaliseValue(d.value) }));
+  const textShadows = declarations.filter((d) => d.property.toLowerCase() === 'text-shadow');
+  assert.ok(textShadows.length >= 3, `only ${textShadows.length} in-scope text shadows were read`);
+  assert.deepEqual(
+    declarations.filter((d) => /drop-shadow\(/iu.test(d.value)).map(scopeSite),
+    [],
+    '`drop-shadow()` is elevation the box-shadow allowance cannot see: a floating surface takes ' +
+      'a `--fab-shadow-*` token as its `box-shadow`, and a sitting one draws none'
+  );
+  assert.deepEqual(
+    textShadows.filter((d) => d.value.toLowerCase() !== 'none').map(scopeSite),
+    [],
+    'a `text-shadow` other than `none` gives text a depth the design system does not have'
+  );
+
+  const definitions = corpus.declarations.filter(
+    (d) => SWEEP_SCOPE.test(d.file) && /^--fab-shadow-[\w-]+$/iu.test(d.property)
+  );
+  assertFloor('theme-block elevation tokens', definitions.filter(inThemeBlock).length, 14);
+  assert.deepEqual(
+    definitions.filter((d) => !inThemeBlock(d)).map(scopeSite),
+    [],
+    'the elevation tokens are declared in the seven theme blocks only: a rule that declares or ' +
+      're-declares one gives the surfaces beneath it a height no theme publishes'
+  );
+});
+
+/**
+ * The rules whose inset top hairline was dropped, each of which keeps its 1px `--fab-border`. The
+ * inputs among them also keep `box-shadow: none`, so no Foundry-core input shadow surfaces there.
+ */
+const HAIRLINE_EDGES = Object.freeze([
+  [MODULE_SHEET, '.fabricate-manager .manager-condition-modifier-value input', 'input'],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-gathering-event-edit-view :is(input:not([type="checkbox"])' +
+      ':not([type="radio"]):not([type="range"]), textarea)',
+    'input',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-gathering-task-edit-view :is( input:not([type="checkbox"])' +
+      ':not([type="radio"]):not([type="range"]):not([data-recipe-option-formula])' +
+      ':not([data-recipe-option-search]), textarea )',
+    'input',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-drop-editor-card input:not([type="checkbox"])' +
+      ':not([type="radio"]):not([type="range"])',
+    'input',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-environment-drop-adjustment-input ' +
+      '.manager-condition-modifier-value input',
+    'input',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-task-core-card, .fabricate-manager .manager-task-availability-card, ' +
+      '.fabricate-manager .manager-task-component-browser-card, ' +
+      '.fabricate-manager .manager-task-overview-card, .fabricate-manager .manager-task-drops-card, ' +
+      '.fabricate-manager .manager-selected-drop-editor',
+    'card',
+  ],
+  [MODULE_SHEET, '.fabricate-manager .manager-task-required-tools-card', 'card'],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] ' +
+      '.manager-drop-rate-control',
+    'card',
+  ],
+  [
+    'src/ui/svelte/apps/manager/gathering-task/GatheringTaskCard.svelte',
+    '.manager-task-stamina-card, .manager-task-nodes-card, .manager-task-dc-card, ' +
+      '.manager-task-resolution-card, .manager-task-results-card',
+    'card',
+  ],
+]);
+
+test('every rule whose inset hairline was dropped keeps its 1px border', () => {
+  const corpus = treeStyles();
+  const lost = HAIRLINE_EDGES.flatMap(([file, selector, kind]) => {
+    const declared = corpus.declarations
+      .filter((d) => d.file === file && oneLine(d.selector) === selector)
+      .map((d) => `${d.property.toLowerCase()}: ${normaliseValue(d.value)}`);
+    if (declared.length === 0) return [`${file}: ${selector} is no longer a rule`];
+    return [
+      ...(declared.includes('border: 1px solid var(--fab-border)')
+        ? []
+        : [`${file}: ${selector} lost its 1px --fab-border`]),
+      ...(kind !== 'input' || declared.includes('box-shadow: none')
+        ? []
+        : [`${file}: ${selector} no longer states box-shadow: none`]),
+    ];
+  });
+  assert.deepEqual(
+    lost,
+    [],
+    'the inset top hairline was dropped because each of these rules already draws its edge as a ' +
+      '1px `--fab-border`; without it the surface has no edge at all. An input keeps ' +
+      '`box-shadow: none` so no core input shadow surfaces where the hairline used to win'
   );
 });
 
@@ -1889,6 +2122,65 @@ test('a design-system gate fails a new offender and a grown one, and nothing els
       failures: ['src/main.js: native <select> in a template string is new (1)'],
     },
   ]);
+});
+
+// Each probe is its own subtest, so a failure names the shape that moved.
+test('the shadow allowance passes a ring list and a leading bar, and not a near-miss', async (t) => {
+  const shadow = (value) => ({
+    [MODULE_SHEET]: sheetWith(`.fabricate .s { box-shadow: ${value}; }`),
+  });
+  const offToken = (value) =>
+    `${MODULE_SHEET}: off-token box-shadow .fabricate .s | ${value} is new (1)`;
+  const allowed = [
+    ['a leading bar', 'inset 3px 0 0 var(--fab-accent)'],
+    ['a 4px bar, the widest edge', 'inset 4px 0 0 var(--fab-accent)'],
+    ['a 4px ring, the widest edge', 'inset 0 0 0 4px var(--fab-accent)'],
+    ['the radio dot', RADIO_DOT],
+    [
+      "the nav pip's outset ring list",
+      '0 0 0 2px var(--fab-surface-soft), 0 0 0 2px var(--fab-bg-1)',
+    ],
+  ];
+  const nearMisses = [
+    ['a blurred bar', 'inset 3px 0 2px var(--fab-accent)'],
+    ['a y-offset bar', 'inset 3px 1px 0 var(--fab-accent)'],
+    ['the y-offset hairline', 'inset 0 1px 0 var(--fab-overlay-dark-18)'],
+    ['an outset bar', '3px 0 0 var(--fab-accent)'],
+    ['a bar on a non-`--fab` variable', 'inset 3px 0 0 var(--probe-accent)'],
+    [
+      'a ring list with a blurred member',
+      'inset 0 0 0 3px var(--fab-bg-1), 0 2px 4px var(--fab-accent)',
+    ],
+    [
+      'a ring list with a bar member',
+      'inset 0 0 0 3px var(--fab-bg-1), inset 3px 0 0 var(--fab-accent)',
+    ],
+    ['a literal-colour bar', 'inset 3px 0 0 #fff'],
+    ['a literal-colour ring', 'inset 0 0 0 1px #fff'],
+    ['a negative-offset bar', 'inset -3px 0 0 var(--fab-accent)'],
+    ['a blurred ring', '0 0 2px 1px var(--fab-accent)'],
+    ['a 40px ring', 'inset 0 0 0 40px var(--fab-accent)'],
+    ['a 5px bar, past the widest edge', 'inset 5px 0 0 var(--fab-accent)'],
+    ["the radio dot's 16px ring alone", 'inset 0 0 0 16px var(--fab-accent)'],
+    [
+      'a ring list with a 40px member',
+      'inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 40px var(--fab-accent)',
+    ],
+  ];
+  for (const [name, value] of allowed) {
+    await t.test(`passes ${name}`, (probe) =>
+      assertGateCases(probe, OFF_TOKEN_SHADOW_GATE, WIRING_BASE, [
+        { head: shadow(value), failures: [] },
+      ])
+    );
+  }
+  for (const [name, value] of nearMisses) {
+    await t.test(`fails ${name}`, (probe) =>
+      assertGateCases(probe, OFF_TOKEN_SHADOW_GATE, WIRING_BASE, [
+        { head: shadow(value), failures: [offToken(value)] },
+      ])
+    );
+  }
 });
 
 test('a var() resolves against its own side, so moving a value into a token pays nothing', (t) => {

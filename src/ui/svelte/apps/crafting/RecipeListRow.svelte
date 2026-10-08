@@ -194,7 +194,6 @@
     border: 1px solid var(--fab-danger-border);
     background: var(--fab-danger);
     color: var(--fab-on-accent);
-    box-shadow: var(--fab-shadow-sm);
     pointer-events: none;
   }
 

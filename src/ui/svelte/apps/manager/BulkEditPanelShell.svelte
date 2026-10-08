@@ -318,7 +318,9 @@
      as the bottom, because a dock that never sticks looks pinned at maximum scroll. Two
      configurations do not pin and neither is a regression: a SIBLING delete card un-pins it, and
      below the supported minimum the sheet's container query makes `.manager-body` the scrollport —
-     do not reach into that block from here. No `z-index`, deliberately. */
+     do not reach into that block from here. No `z-index`, deliberately, and no shadow: the dock
+     sits at its scroll area's edge rather than floating over content, so it reads by its top
+     border and its fill, and a downward elevation token would be clipped at that edge. */
   .fab-bulk-edit-dock {
     position: sticky;
     bottom: calc(-1 * var(--fab-space-3));
@@ -329,7 +331,6 @@
     padding-bottom: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
-    box-shadow: 0 -2px 6px var(--fab-overlay-dark-25);
   }
 
   /* Gated on the snippet: with no `dockFoot` the dock is byte-identical to what ships. */

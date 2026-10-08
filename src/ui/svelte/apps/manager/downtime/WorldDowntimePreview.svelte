@@ -138,7 +138,6 @@
     border: 1px solid var(--fab-accent-border);
     border-radius: 11px;
     background: var(--fab-surface);
-    box-shadow: var(--fab-shadow-lg);
   }
 
   /* A centred stack against the board, with the design's 4px inner inset. */
@@ -217,7 +216,6 @@
     font-size: 11.5px;
     font-weight: 700;
     text-decoration: none;
-    box-shadow: var(--fab-shadow-sm);
   }
 
   .downtime-cta:focus-visible {
