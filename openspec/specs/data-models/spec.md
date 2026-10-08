@@ -3228,6 +3228,8 @@ Applied effects form a prefix; at most one effect is applying, and later effects
 6. Resuming execution after reload with an applying effect, failure after its invocation begins, or inability to persist its receipt requires recovery and never replays the uncertain effect.
 A normal observing-client refresh during live execution does not itself trigger recovery.
 Committed requests return their recorded outcome.
+A resumed versioned crafting stage rebuilds its Tool pairs from the plan in Tool order: each planned Tool item pairs with the first unpaired Tool it matches, and a Tool left without one was planned as the virtual station Tool (§ Session-Scoped Active Canvas Tool).
+Until the Tool effect is applied, a missing or unmatched planned item refuses the resume with `STAGE_RECONSTRUCTION_FAILED`, rather than lending its usage or breakage to another Tool; once applied, the replay from the receipt does not refuse.
 7. Gathering persists its terminal record with the planned execution journal before effects and updates receipts in that same history record by run ID.
 It does not delay terminal history until effects finish.
 8. Intent, effect plans, receipts and outcomes retain existing secret and blind-run redaction.

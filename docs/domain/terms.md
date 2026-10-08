@@ -401,6 +401,8 @@ The payload is **system-scoped** (`presentTools = { systemId, componentIds, tool
 Set on the `SvelteFabricateApp` instance by `show('crafting', { activeCanvasTool })`, replaced on every show, and cleared by a plain `show(tab)` and by close.
 It is carried per call — to recipe detail, selected-set evaluation, craft submission, the step advance and the Journal listing — and per Journal run command as that crafting command's own `payload.presentTools`, which the active GM applies to that command alone through a per-command presence view.
 It is never persisted to a run record, a stage's `selectionPlan` or the run authority's ledger.
+It does not reach salvage, companion pooled holdings, alchemy submission or the shopping-list aggregate.
+The chip names the Tool by the Tool display-name precedence (Display label, then name snapshot, then linked component name), falling back to the generic localized label.
 **UI placement:** the active station tool is surfaced as an accent-pill status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/realm), implemented in `ActorSelectTopBar` (`.actor-bar-tool-chip`); the chip appears on whatever tab is active (gathering next to the conditions; crafting/alchemy in the otherwise-empty right).
 When the Crafting and (conditional, feature-gated) Alchemy tabs gain their own header/context bars, the chip should move into that bar's right side next to the tab's own context info.
 
