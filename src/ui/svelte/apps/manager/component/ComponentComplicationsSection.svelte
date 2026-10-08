@@ -811,8 +811,8 @@
 
                        THERE IS NO NARROW BREAKPOINT, and that is a MEASUREMENT. Driven from a
                        1280px manager down to 600px the strip narrows to 534px and stops, because
-                       the pane carries its own floor; the row's content floor is 260 + 156 + 104
-                       plus two 8px gaps — 536px, 2px over — with `min-width: 0` on every child, so
+                       the pane carries its own floor; the row's content floor is 258 + 156 + 104
+                       plus two 8px gaps — the same 534px — with `min-width: 0` on every child, so
                        `scrollWidth - clientWidth === 0` throughout. A
                        `@container fabricate-manager (max-width: 680px)` rule was written and
                        removed: it fires where the row still has room and wrapped three fields onto

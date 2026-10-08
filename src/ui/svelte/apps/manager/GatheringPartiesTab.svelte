@@ -453,7 +453,7 @@
   /* The refusal banner's SLOT. `<Notice>` paints its own edge, fill, corner, glyph and type
      and declares `margin: 0`, because separation from what sits beneath a notice is the
      caller's layout — so this rule is the caller's layout and nothing else, at the scale's 12px
-     for the 11px the bespoke `<p>` it replaces put between itself and the first card. */
+     between itself and the first card. */
   .manager-travel-parties-summary {
     margin: 0 0 var(--fab-space-3);
   }
