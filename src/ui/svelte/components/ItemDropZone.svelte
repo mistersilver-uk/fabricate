@@ -131,6 +131,11 @@
     color: var(--fab-danger-text);
   }
 
+  /* A bold host's caption would otherwise reach the title as 900 and the mono uuid as 700. */
+  .manager-item-drop-zone-copy {
+    font-weight: 400;
+  }
+
   .manager-item-drop-zone-uuid {
     display: block;
     font-family: var(--fab-font-mono);

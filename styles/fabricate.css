@@ -5358,6 +5358,11 @@
   font-family: var(--fab-font-mono);
 }
 
+/* The chip's own 700 out-ranks this layered sheet, so the mono reading states its weight here. */
+.fabricate-manager .manager-recipe-duration-pill > span {
+  font-weight: 500;
+}
+
 /* Inline duration steppers: a row of five unit columns (Year…Minute). */
 .fabricate-manager .manager-recipe-duration-steppers {
   display: flex;
@@ -12721,6 +12726,11 @@
 
 .fabricate-manager .manager-drop-modifier-pill.is-negative strong {
   color: var(--fab-danger-text);
+}
+
+/* The chip is already 700, so the user agent's `bolder` would draw the value at an unshipped 900. */
+.fabricate-manager .manager-drop-modifier-pill strong {
+  font-weight: 700;
 }
 
 .fabricate-manager .manager-drop-modifier-pill span {
