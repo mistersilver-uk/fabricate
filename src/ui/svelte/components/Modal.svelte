@@ -207,8 +207,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: calc(var(--fab-space-2) + var(--fab-space-2xs));
-    padding: var(--fab-space-3) calc(var(--fab-space-3) + var(--fab-space-2xs));
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3) var(--fab-space-4);
     border-bottom: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
   }
@@ -253,9 +253,9 @@
   .manager-modal-body {
     display: flex;
     flex-direction: column;
-    gap: calc(var(--fab-space-3) + var(--fab-space-2xs));
+    gap: var(--fab-space-4);
     min-height: 0;
-    padding: calc(var(--fab-space-3) + var(--fab-space-2xs)) var(--fab-space-4);
+    padding: var(--fab-space-4);
   }
 
   .manager-modal-footer {
@@ -263,7 +263,7 @@
     align-items: center;
     justify-content: flex-end;
     gap: var(--fab-space-2);
-    padding: var(--fab-space-3) var(--fab-space-4) calc(var(--fab-space-3) + var(--fab-space-2xs));
+    padding: var(--fab-space-3) var(--fab-space-4) var(--fab-space-4);
     border-top: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
   }

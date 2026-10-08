@@ -126,15 +126,15 @@
   .downtime-preview {
     container-type: inline-size;
     min-width: 0;
-    padding: 18px 20px 24px;
+    padding: var(--fab-space-5) var(--fab-space-5) var(--fab-space-6);
     color: var(--fab-text);
   }
 
   .downtime-hero {
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
-    gap: 18px;
-    padding: 22px;
+    gap: var(--fab-space-5);
+    padding: var(--fab-space-6);
     border: 1px solid var(--fab-accent-border);
     border-radius: 11px;
     background: var(--fab-surface);
@@ -146,7 +146,7 @@
     min-width: 0;
     flex-direction: column;
     justify-content: center;
-    padding: 2px 4px;
+    padding: var(--fab-space-2xs) var(--fab-space-1);
   }
 
   /*
@@ -167,9 +167,9 @@
   }
 
   .downtime-premium {
-    gap: 7px;
+    gap: var(--fab-space-chip);
     height: 20px;
-    padding: 4px 9px;
+    padding: var(--fab-space-1) var(--fab-space-2);
     font-size: 8.5px;
     letter-spacing: 0.12em;
   }
@@ -180,7 +180,7 @@
     BROWSER viewport, not the ApplicationV2 window, exactly as the container-query note below says.
   */
   h2 {
-    margin: 13px 0 0;
+    margin: var(--fab-space-3) 0 0;
     font-size: 27px;
     font-weight: 600;
     line-height: 1.12;
@@ -188,7 +188,7 @@
 
   /* 12.5px x 1.65 is the design's 20.625px leading; sub-body copy restates its size or inherits 14px. */
   p {
-    margin: 10px 0 0;
+    margin: var(--fab-space-3) 0 0;
     color: var(--fab-text-muted);
     font-size: 12.5px;
     line-height: 1.65;
@@ -198,8 +198,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
-    margin-top: 8px;
+    gap: var(--fab-space-3);
+    margin-top: var(--fab-space-2);
   }
 
   .downtime-cta {
@@ -207,8 +207,8 @@
     min-height: 38px;
     align-items: center;
     justify-content: center;
-    gap: 9px;
-    padding: 0 16px;
+    gap: var(--fab-space-2);
+    padding: 0 var(--fab-space-4);
     border: 1px solid var(--fab-accent-border);
     border-radius: 9px;
     background: var(--fab-accent);
@@ -234,8 +234,8 @@
   .downtime-preview-note {
     display: flex;
     align-items: center;
-    gap: 7px;
-    margin: 14px 0 0;
+    gap: var(--fab-space-chip);
+    margin: var(--fab-space-4) 0 0;
     color: var(--fab-text-subtle);
     font-size: 9.5px;
     font-weight: 500;
@@ -255,7 +255,7 @@
   */
   .downtime-board {
     align-self: center;
-    padding: 13px;
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-border-strong);
     border-radius: 11px;
     background: var(--fab-bg-0);
@@ -268,15 +268,15 @@
   }
 
   .downtime-board header {
-    gap: 9px;
-    padding-bottom: 10px;
+    gap: var(--fab-space-2);
+    padding-bottom: var(--fab-space-3);
   }
 
   .downtime-board-rows {
     display: flex;
     flex-direction: column;
-    gap: 7px;
-    margin-top: 10px;
+    gap: var(--fab-space-2);
+    margin-top: var(--fab-space-3);
   }
 
   .downtime-board-heading {
@@ -349,18 +349,18 @@
   }
 
   .downtime-board-badge {
-    gap: 6px;
+    gap: var(--fab-space-chip);
     height: 17px;
     margin-left: auto;
-    padding: 3px 7px;
+    padding: var(--fab-space-1) var(--fab-space-chip);
     font-size: 7.5px;
     letter-spacing: 0.08em;
   }
 
   .downtime-board-row {
     min-height: 48px;
-    gap: 9px;
-    padding: 9px;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-bg-2);
@@ -410,9 +410,9 @@
   .downtime-board-note {
     display: flex;
     align-items: center;
-    gap: 7px;
-    margin-top: 10px;
-    padding: 8px 9px;
+    gap: var(--fab-space-chip);
+    margin-top: var(--fab-space-3);
+    padding: var(--fab-space-2);
     border: 1px dashed var(--fab-border);
     border-radius: 9px;
     color: var(--fab-text-subtle);
@@ -421,16 +421,16 @@
   }
 
   .downtime-benefits {
-    margin-top: 17px;
+    margin-top: var(--fab-space-4);
   }
 
   .downtime-benefits-header {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--fab-space-4);
     min-width: 0;
-    margin-bottom: 9px;
+    margin-bottom: var(--fab-space-2);
     flex-wrap: wrap;
   }
 
@@ -455,7 +455,7 @@
   }
 
   .downtime-benefits h3 {
-    margin: 3px 0 0;
+    margin: var(--fab-space-1) 0 0;
     font-size: 15px;
     font-weight: 600;
     line-height: 1.3;
@@ -464,11 +464,11 @@
   .downtime-feature-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 9px;
+    gap: var(--fab-space-2);
   }
 
   article {
-    padding: 13px;
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 11px;
     background: var(--fab-bg-2);
@@ -487,14 +487,14 @@
   }
 
   h4 {
-    margin: 10px 0 0;
+    margin: var(--fab-space-3) 0 0;
     font-size: 12px;
     font-weight: 600;
     line-height: 1.3;
   }
 
   article p {
-    margin: 4px 0 0;
+    margin: var(--fab-space-1) 0 0;
     font-size: 10px;
     line-height: 1.5;
   }
@@ -526,7 +526,7 @@
 
   @container (max-width: 640px) {
     .downtime-preview {
-      padding: 10px;
+      padding: var(--fab-space-3);
     }
 
     .downtime-feature-grid {

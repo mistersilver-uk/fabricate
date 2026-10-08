@@ -383,7 +383,7 @@
      `tests/components/tool-rules-list-parity.test.js` pins. */
   .manager-tool-inspector-foot {
     position: sticky;
-    bottom: calc(-1 * var(--fab-space-4));
+    bottom: -16px;
     margin: auto calc(-1 * var(--fab-space-4)) calc(-1 * var(--fab-space-4));
     min-width: 0;
     padding: var(--fab-space-3) var(--fab-space-4);

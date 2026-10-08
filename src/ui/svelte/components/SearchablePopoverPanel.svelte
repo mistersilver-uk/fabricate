@@ -265,7 +265,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--fab-space-2);
-    padding: 4px 7px 6px;
+    padding: var(--fab-space-1) var(--fab-space-2) var(--fab-space-chip);
   }
 
   .manager-travel-popover-title {
@@ -290,7 +290,7 @@
   }
 
   .manager-travel-popover.is-compact-option-rows {
-    padding: 5px;
+    padding: var(--fab-space-1);
   }
 
   .manager-travel-popover.is-compact-option-rows .manager-travel-popover-header {
@@ -327,12 +327,12 @@
     display: flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: 7px;
+    gap: var(--fab-space-chip);
     min-width: 0;
     box-sizing: border-box;
     height: 30px;
-    margin: 2px 7px 6px;
-    padding: 0 8px;
+    margin: var(--fab-space-2xs) var(--fab-space-2) var(--fab-space-chip);
+    padding: 0 var(--fab-space-2);
     border: 1px solid var(--fab-accent-border);
     border-bottom: 1px solid var(--fab-accent-border);
     border-radius: 7px;
@@ -374,16 +374,16 @@
   .manager-travel-popover.is-compact-option-rows .manager-travel-popover-options {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: 7px 0 7px 7px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-2) 0 var(--fab-space-2) var(--fab-space-2);
     scrollbar-gutter: stable;
     scrollbar-width: thin;
   }
 
   .manager-travel-popover.is-compact-option-rows .manager-travel-option {
     min-height: 38px;
-    padding: 7px;
-    gap: 7px;
+    padding: var(--fab-space-2);
+    gap: var(--fab-space-chip);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-bg-3);

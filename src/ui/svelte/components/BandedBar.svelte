@@ -102,8 +102,7 @@
   .fab-banded-bar.is-single {
     display: flex;
     flex-direction: column;
-    /* ratchet-exempt(design-system): the chance bar's shipped caption gap, moved here verbatim; no step is 3px */
-    gap: 3px;
+    gap: var(--fab-space-1);
     min-width: 88px;
   }
 

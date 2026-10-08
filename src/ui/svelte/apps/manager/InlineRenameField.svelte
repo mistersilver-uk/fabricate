@@ -90,7 +90,7 @@
     width: 100%;
     min-height: 30px;
     height: 30px;
-    padding: 0 10px;
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     color: var(--fab-text);

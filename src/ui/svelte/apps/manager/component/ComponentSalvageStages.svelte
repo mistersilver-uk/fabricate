@@ -319,10 +319,8 @@
   .manager-salvage-stage-complications {
     display: flex;
     flex-direction: column;
-    /* ratchet-exempt(design-system): moved unchanged from ComponentEditView, which carried it at base */
-    gap: 6px;
-    /* ratchet-exempt(design-system): moved unchanged from ComponentEditView, which carried it at base */
-    padding: 8px 11px;
+    gap: var(--fab-space-chip);
+    padding: var(--fab-space-2) var(--fab-space-3);
     border-top: 1px solid var(--fab-warning-border);
     border-left: 2px solid var(--fab-warning);
     background: var(--fab-warning-soft);
@@ -330,8 +328,7 @@
 
   .manager-salvage-stage-complications-head {
     display: flex;
-    /* ratchet-exempt(design-system): moved unchanged from ComponentEditView, which carried it at base */
-    gap: 7px;
+    gap: var(--fab-space-chip);
     align-items: center;
     color: var(--fab-warning);
     font-size: 9px;

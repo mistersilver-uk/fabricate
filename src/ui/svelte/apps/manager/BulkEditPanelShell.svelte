@@ -279,7 +279,7 @@
   .fab-bulk-edit-hero-copy {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
     min-width: 0;
   }
 
@@ -323,7 +323,7 @@
      border and its fill, and a downward elevation token would be clipped at that edge. */
   .fab-bulk-edit-dock {
     position: sticky;
-    bottom: calc(-1 * var(--fab-space-3));
+    bottom: -12px;
     margin-inline: calc(-1 * var(--fab-space-3));
     margin-bottom: calc(-1 * var(--fab-space-3));
     padding-top: var(--fab-space-3);
@@ -349,7 +349,7 @@
   /* The base rule's container-bound declarations restated at the wider token, gated on `dockBleed`
      so the three studios in the shared rail are byte-identical. */
   .fab-bulk-edit-dock.is-bleed-space-4 {
-    bottom: calc(-1 * var(--fab-space-4));
+    bottom: -16px;
     margin-inline: calc(-1 * var(--fab-space-4));
     margin-bottom: calc(-1 * var(--fab-space-4));
     padding-inline: var(--fab-space-4);

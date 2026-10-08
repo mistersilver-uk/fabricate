@@ -275,6 +275,6 @@
     display: flex;
     gap: var(--fab-space-2);
     align-items: center;
-    margin-block: 0.25rem;
+    margin-block: var(--fab-space-1);
   }
 </style>

@@ -69,8 +69,8 @@
   .manager-recipe-stage-complications {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 10px 11px 11px;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3);
     border-top: 1px solid var(--fab-warning-border);
     background: var(--fab-warning-soft);
   }

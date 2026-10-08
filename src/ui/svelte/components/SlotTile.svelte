@@ -182,7 +182,7 @@
   .fab-slot-affordance {
     display: flex;
     align-items: center;
-    gap: calc(var(--fab-space-chip) / 2);
+    gap: var(--fab-space-1);
     color: var(--fab-accent);
     font-size: 8px;
     font-weight: 600;

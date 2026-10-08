@@ -608,11 +608,11 @@
      per card for the reason the container rule states. Each half stays at (0,3,0). */
   :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-resolution-mode-options),
   :global(.fabricate-card[data-crafting-modifier-policy-card] .manager-resolution-mode-options) {
-    gap: 10px;
+    gap: var(--fab-space-3);
   }
 
   .manager-modifier-bounds-error {
-    margin-block: 0 0.15rem;
+    margin-block: 0 var(--fab-space-2xs);
     color: var(--fab-danger-text);
     font-size: 0.68rem;
     line-height: 1.4;
@@ -646,7 +646,7 @@
 
   .manager-modifier-inert strong {
     /* The heading and its sentence share one line box, so the note stays a paragraph. */
-    margin-right: 0.25rem;
+    margin-right: var(--fab-space-1);
   }
 
   /* The cap is a one-to-three-digit field in a full-width inspector panel, so `fill` alone

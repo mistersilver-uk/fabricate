@@ -300,7 +300,7 @@
   .manager-party-actor-panel {
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 

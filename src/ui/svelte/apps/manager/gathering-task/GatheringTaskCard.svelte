@@ -31,8 +31,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
-    /* ratchet-exempt(design-system): moved unchanged from GatheringTaskEditView, which carried it at base */
-    padding: 13px 16px;
+    padding: var(--fab-space-3) var(--fab-space-4);
     border: 1px solid var(--fab-border);
     border-radius: 11px;
     background: var(--fab-bg-3);

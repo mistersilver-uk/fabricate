@@ -372,7 +372,7 @@
     justify-content: center;
     width: 24px;
     height: 24px;
-    margin: -12px 0 0 -12px;
+    transform: translate(-50%, -50%);
     border-radius: 6px;
     cursor: ew-resize;
     touch-action: none;
