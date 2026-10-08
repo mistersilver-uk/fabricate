@@ -856,6 +856,310 @@ test('every rule whose inset hairline was dropped keeps its 1px border', () => {
   );
 });
 
+/* ───────────────────────────── surfaces: state fills ───────────────────────────── */
+
+/** A `:not(…)`, one nesting level deep, whose state is negated rather than taken. */
+const NEGATION = /:not\((?:[^()]|\([^()]*\))*\)/gu;
+
+const SELECTED_STATE =
+  /\.is-(?:bulk-)?selected(?![\w-])|\.(?:is-)?active(?![\w-])|\[aria-(?:selected|pressed)=['"]?true['"]?\]|:checked(?![\w-])/u;
+
+const HOVER_STATE = /:hover(?![\w-])/u;
+
+/** The state one selector item paints, `selected` winning over `hover`, or null at rest. */
+function stateOf(item) {
+  const taken = item.replaceAll(NEGATION, '');
+  if (SELECTED_STATE.test(taken)) return 'selected';
+  return HOVER_STATE.test(taken) ? 'hover' : null;
+}
+
+/** The fill each state takes, beside `none` and `transparent`. */
+const STATE_FILL = Object.freeze({
+  selected: 'var(--fab-surface-active)',
+  hover: 'var(--fab-surface-raised)',
+});
+
+const isStateFill = (state, value) => [STATE_FILL[state], 'none', 'transparent'].includes(value);
+
+/** Every in-scope, unmarked fill a hover or selected selector item paints. */
+function stateFills(corpus) {
+  return declarationsOf(corpus, (property) => /^background(?:-color)?$/u.test(property))
+    .filter(unmarkedInScope(corpus))
+    .map((d) => ({
+      ...d,
+      value: normaliseValue(d.value),
+      states: splitSelectorList(d.selector).map(stateOf).filter(Boolean),
+    }))
+    .filter((d) => d.states.length > 0);
+}
+
+const stateSite = (d) => `${d.file}: ${oneLine(d.selector)} | ${d.value}`;
+
+const COMPONENTS = 'src/ui/svelte/components';
+
+/**
+ * Every in-scope state fill that is not the published rung, by file, selector and fill, with the
+ * reason it is the surface's own face: a library specimen's tinted face, a family verb's hover,
+ * or a mark inside the surface rather than the surface. Review of this list is the classification.
+ */
+const STATE_TINTS = Object.freeze([
+  [
+    'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    ':global( .fabricate-manager .fabricate-button.fab-manager-button.fab-bulk-edit-apply:not(:disabled):hover )',
+    'var(--fab-accent-strong)',
+    'an accent verb deepens in its own family',
+  ],
+  [
+    'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
+    '.manager-world-tool-break-segments label.is-selected',
+    'var(--fab-accent)',
+    'the library segment specimen’s chosen face',
+  ],
+  [
+    `${COMPONENTS}/Chip.svelte`,
+    '.manager-chip.is-active, .manager-chip.is-positive',
+    'var(--fab-success-soft)',
+    'the `active` status tone, a rest face named like a state',
+  ],
+  [
+    `${COMPONENTS}/Chip.svelte`,
+    '.manager-chip-remove:hover:not(:disabled), .manager-chip-remove:focus-visible',
+    'var(--fab-danger-soft)',
+    'a destructive verb hovers in the danger family it acts in',
+  ],
+  [
+    `${COMPONENTS}/Chip.svelte`,
+    '.manager-chip.is-solid:is(.is-active, .is-positive)',
+    'var(--fab-success)',
+    'the `active` status tone’s solid emphasis, a rest face',
+  ],
+  [
+    `${COMPONENTS}/ChoiceOptionList.svelte`,
+    '.fab-choice-option.is-selected',
+    'var(--fab-accent-soft)',
+    'a single-select radio group’s answer takes the radio card’s accent-soft',
+  ],
+  [
+    `${COMPONENTS}/CollapsibleGroupHeader.svelte`,
+    '.fab-group-header.is-static:hover',
+    'var(--fab-surface-soft)',
+    'a static header restates its rest, so it does not raise',
+  ],
+  [
+    `${COMPONENTS}/NavSidebar.svelte`,
+    '.fabricate-app-nav-item.active .fabricate-app-nav-well',
+    'var(--fab-accent-soft)',
+    'the current item’s icon well, a mark inside the surface',
+  ],
+  [
+    `${COMPONENTS}/SegmentedControl.svelte`,
+    '.manager-segmented.is-tag .manager-segment.is-active',
+    'var(--fab-purple-soft)',
+    'the `tag` tone: a track about tags chooses in the tag family',
+  ],
+  [
+    `${COMPONENTS}/SegmentedControl.svelte`,
+    '.manager-segmented.is-accent .manager-segment.is-active',
+    'var(--fab-accent)',
+    'the `accent` tone, the library segment specimen’s chosen face',
+  ],
+  [
+    `${COMPONENTS}/SegmentedControl.svelte`,
+    '.manager-segmented.is-accent-soft .manager-segment.is-active',
+    'var(--fab-accent-soft)',
+    'the `accent-soft` tone',
+  ],
+  ...['success', 'info', 'warning', 'danger'].map((family) => [
+    `${COMPONENTS}/SegmentedControl.svelte`,
+    `.manager-segment.is-active.is-${family}`,
+    `var(--fab-${family}-soft)`,
+    'a per-option variant: the chosen segment names what choosing it means',
+  ]),
+  [
+    `${COMPONENTS}/ThresholdBandStrip.svelte`,
+    '.fab-band-strip-handle.is-dragging .fab-band-strip-grip, .fab-band-strip-handle:hover .fab-band-strip-grip',
+    'var(--fab-accent-soft)',
+    'a drag grip, a mark that lights while it is grabbed',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option.is-active .manager-resolution-option-icon',
+    'var(--fab-accent-soft)',
+    'the chosen card’s icon well, a mark inside the surface',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-selected-tag-pill button:hover, .fabricate-manager .manager-selected-tag-pill button:focus-visible',
+    'var(--fab-success-soft)',
+    'the remove inside a success pill hovers in the pill’s family',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-data-table .fabricate-data-table-row.is-selected > .fabricate-data-table-cell:first-child::before',
+    'var(--fab-accent)',
+    'the selected row’s leading bar, a mark',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:not(:disabled):hover, .fabricate-icon-button.fabricate-icon-button.is-ghost.is-danger:focus-visible',
+    'var(--fab-danger-soft)',
+    'a destructive verb hovers in the danger family it acts in',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:not(:disabled):hover, .fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-edit:focus-visible, .fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:not(:disabled):hover, .fabricate-button.fabricate-button.fab-manager-button.manager-component-browser-inspector-edit:focus-visible',
+    'var(--fab-accent-strong)',
+    'an accent verb deepens in its own family',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-toggle.fabricate-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track',
+    'color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-text))',
+    'a switch track lifts toward its ink: a control’s track, not a surface',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-option-cards .manager-resolution-option.is-active',
+    'var(--fab-accent-soft)',
+    'a radio card’s answer: accent-soft under the 3px bar',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-recipe-tool-remove:hover',
+    'var(--fab-danger-soft)',
+    'a destructive verb hovers in the danger family it acts in',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-recipe-tag-trigger:hover',
+    'var(--fab-purple-soft)',
+    'the tag adder rests in the tag family it hovers in',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-recipe-option-remove:hover',
+    'var(--fab-danger-soft)',
+    'a destructive verb hovers in the danger family it acts in',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-button.fabricate-button.is-danger.is-armed:not(:disabled):hover',
+    'var(--fab-danger)',
+    'the armed confirmation holds its solid danger',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-button.fabricate-button.is-primary:not(:disabled):hover',
+    'var(--fab-success-strong)',
+    'the primary verb deepens in its own family',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-icon-button.fabricate-icon-button.is-primary:not(:disabled):hover',
+    'var(--fab-success-soft)',
+    'the primary icon verb fills in the family it inks in',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-button.fabricate-button.is-danger:not(:disabled):hover, .fabricate-icon-button.fabricate-icon-button.is-danger:not(:disabled):hover',
+    'var(--fab-danger-soft)',
+    'the danger verb fills in the family it inks in',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-button.fabricate-button.is-warning-action:not(:disabled):hover',
+    'var(--fab-warning-soft)',
+    'the warning verb keeps its own fill',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-pill-select .manager-availability-remove:hover, .fabricate-pill-select .manager-availability-remove:focus-visible, .fabricate-manager .manager-danger-tag-remove:hover, .fabricate-manager .manager-danger-tag-remove:focus-visible',
+    'var(--fab-danger-soft)',
+    'a destructive verb hovers in the danger family it acts in',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-task-required-tools-card-item:hover .manager-task-required-tools-add-icon, .fabricate-manager .manager-task-required-tools-card-item:focus-visible .manager-task-required-tools-add-icon',
+    'var(--fab-bg-3)',
+    'the add glyph’s chip, a mark inside the item',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager .manager-tools-authority-segments label.is-selected',
+    'var(--fab-accent)',
+    'the library segment specimen’s chosen face',
+  ],
+  [
+    MODULE_SHEET,
+    '.fabricate-manager[data-manager-view="tools"] .manager-tool-inspector-foot [data-tool-inspector-add]:not(:disabled):hover',
+    'var(--fab-success-soft)',
+    'a success verb keeps the family it rests in',
+  ],
+]);
+
+test('a selector item reads the state it takes, never the state it negates', () => {
+  const cases = [
+    ['.row:hover', 'hover'],
+    ['.row.is-selected:hover', 'selected'],
+    ['.row:not(.is-selected):not(.is-bulk-selected):hover', 'hover'],
+    ['.seg:not(.is-active)', null],
+    [".row:has(> .open[aria-pressed='true'])", 'selected'],
+    [".row:has(> .open:enabled:hover:not([aria-pressed='true']))", 'hover'],
+    ['.nav-item.active .well', 'selected'],
+    ['.toggle:not(:disabled, .is-locked):hover .track', 'hover'],
+    ['.fabricate-manager .manager-checks-active-card', null],
+    ['.row.is-active-filter', null],
+  ];
+  assert.deepEqual(
+    cases.map(([item]) => [item, stateOf(item)]),
+    cases
+  );
+});
+
+// Absolute and pinned: rest, then `raised` under the pointer, then `active` once chosen.
+test('no state fill in the sheet, components and manager leaves its rung unlisted', () => {
+  const corpus = treeStyles();
+  const fills = stateFills(corpus);
+  assert.ok(fills.length >= 100, `only ${fills.length} in-scope state fills were read`);
+  const tinted = fills.filter((d) => d.states.some((state) => !isStateFill(state, d.value)));
+  assert.deepEqual(
+    tinted.map(stateSite).sort(byCodePoint),
+    STATE_TINTS.map(([file, selector, value]) => `${file}: ${selector} | ${value}`).sort(
+      byCodePoint
+    ),
+    'a hovered surface raises to `--fab-surface-raised`, and a selected or pressed one takes ' +
+      '`--fab-surface-active` behind its accent edge. Another fill is listed in STATE_TINTS with ' +
+      'the reason it is that surface’s own face; a site tint, a literal or a neutral off-rung ' +
+      'token is not one'
+  );
+});
+
+/** A tint family a token belongs to, its `-soft`, `-border`, `-text` and `--fab-on-*` included. */
+const FAMILY = /--fab-(?:on-)?(accent|success|info|warning|danger|purple)(?!\w)/gu;
+const FAMILY_PROPERTIES = /^(?:background(?:-color)?|border(?:-color)?|color)$/u;
+
+// A state draws one family whole: a success fill under an accent edge is two answers at once.
+test('no state rule in the sheet, components and manager mixes two tint families', () => {
+  const corpus = treeStyles();
+  const rules = new Map();
+  for (const d of stateFills(corpus)) rules.set(`${d.file}:${d.line} ${d.selector}`, d);
+  const mixed = [...rules.values()].flatMap((rule) => {
+    const families = new Set(
+      corpus.declarations.flatMap((d) =>
+        d.file === rule.file &&
+        d.line === rule.line &&
+        d.selector === rule.selector &&
+        FAMILY_PROPERTIES.test(d.property.toLowerCase())
+          ? [...d.value.matchAll(FAMILY)].map((match) => match[1])
+          : []
+      )
+    );
+    return families.size > 1 ? [`${stateSite(rule)} | ${[...families].join(' + ')}`] : [];
+  });
+  assert.ok(rules.size >= 100, `only ${rules.size} in-scope state rules were read`);
+  assert.deepEqual(mixed, [], 'a state takes its fill, edge and ink from ONE family');
+});
+
 /* ────────────────────────── gate 5: native <select> ────────────────────────── */
 
 const SELECT_GUIDANCE =
