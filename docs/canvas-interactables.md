@@ -210,9 +210,8 @@ The borrowed tool applies to recipe details, ingredient-choice recalculations, t
 Each of those actions checks for the station when you take it, so a stage begun at a station completes only while a station supplying that tool is active again.
 In the Journal, a stage that needs the tool shows **Needs tools** and its actions stay unavailable while you hold no copy of the tool and no station supplies it.
 With the station active, the same stage is ready to begin or complete.
-Reopen the window without the station, or close it, and **Needs tools** returns.
 Switching stations refreshes an already-open recipe and the Journal.
-Reopening the window without a station, or closing it, clears the borrowed availability.
+Reopening the window without a station, or closing it, clears the borrowed availability, so **Needs tools** returns.
 The header chip reads "Station tool:" followed by the tool's **Display label** (see [Tools]({% link tools.md %})), else its name, else its linked component's name.
 
 ---
