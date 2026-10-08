@@ -703,6 +703,8 @@ A pill that CONTAINS a square element — an icon chip, a thumbnail — takes th
 
 Padding, margin and gap MUST derive from the spacing scale in `ui-visual-style`, whose documented literal exemptions are 1px hairlines and one-off fixed dimensions in the 34 to 42px range.
 `tests/components/spacing-scale-ratchet.test.js` is what holds that rule, over the same two corpora and with the published scale held opaque, since deriving FROM the scale is what the rule asks for.
+Arithmetic over the scale is not opaque: a `calc()`, `min()`, `max()` or `clamp()` over `--fab-space-*` MUST compute to 0 or a scale step, so `--fab-space-3` plus `--fab-space-2xs` is a 14px length off the scale.
+A derived alignment that computes off the scale, such as an inset that lines a heading up past an option's inset, tick and gap, carries a reasoned `ratchet-exempt(design-system)` marker at the site.
 Radius, width, height, border widths, font sizes, grid track sizes and breakpoints are NOT spacing-scale members and MUST NOT be derived from `--fab-space-*`.
 They are written as literals by default, and a token is minted for one of them only where the value is SHARED across surfaces or DERIVED from another, in which case the token's declaration MUST record which it is.
 Two shipped pairs illustrate the two kinds, as examples rather than as a closed list a further token would have to join: `--fab-icon-picker-chip`/`--fab-icon-picker-row`, whose row height is computed from the chip, and `--fab-books-control-radius`/`--fab-books-panel-radius`, which carry the ladder's control and panel rungs, 7 and 11, shared by the Books & Scrolls tab and the item-page inspector.
@@ -719,6 +721,12 @@ It joins a rule to a same-selector twin elsewhere in the same file, because the 
 - **WHEN** a NEW or RESIZED control height, radius or spacing value is not on a published ladder
 - **THEN** it snaps to the nearest rung
 - **AND** a value that genuinely cannot snap mints a scale member rather than shipping a literal
+
+#### Scenario: A spacing value is arithmetic over the scale
+
+- **WHEN** a padding, margin or gap is a `calc()` over `--fab-space-*` tokens
+- **THEN** it passes only when it computes to 0 or a scale step
+- **AND** a derived alignment that computes off the scale carries a reasoned `ratchet-exempt(design-system)` marker at the site
 
 #### Scenario: A hand-rolled tile becomes a primitive
 
