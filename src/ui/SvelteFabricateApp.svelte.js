@@ -258,15 +258,14 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
 
   _buildServices() {
     // Derive the system-scoped virtual-present tool payload from the active
-    // canvas Tool. When a Tool station is active, BOTH its componentId AND its
-    // owning crafting system are threaded into the gathering listing/attempt API
-    // as `presentTools = { systemId, componentIds }`. The prerequisite check
+    // canvas Tool. When a Tool station is active, its tool ids AND its owning
+    // crafting system are threaded into the gathering and crafting seams below
+    // as `presentTools = { systemId, componentIds, toolIds }`. The prerequisite check
     // treats the componentId as present without an owned item, but ONLY for tasks
     // in the matching crafting system — componentId is a per-system id, so a tool
     // from system A must not satisfy a system-B task whose required tool shares
     // the same componentId string. The engine excludes a virtual match from
-    // breakage/usage. This is the single app→engine threading boundary for the
-    // gathering surface. With no active tool the payload is null (inert).
+    // breakage/usage. With no active tool the payload is null (inert).
     // Issue 1119: the payload carries the station's library TOOL id alongside any
     // componentId. An item-sourced Tool has no componentId, so a componentId-only payload
     // was inert for every station the Tool Studio can author.
@@ -305,14 +304,20 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // recipe. Synchronous for the same reason `evaluateSelectedSet` below is — the store's
       // `selectedRecipe` $derived reads it without an async round-trip — and null when the
       // facade is absent or the viewer may not see the recipe.
-      hydrateCraftingRecipe: (opts = {}) => game?.fabricate?.hydrateCraftingRecipe?.(opts) ?? null,
+      hydrateCraftingRecipe: (opts = {}) => game?.fabricate?.hydrateCraftingRecipe?.({
+        ...opts,
+        presentTools: presentTools(),
+      }) ?? null,
       // Player Inventory tab seam — owned components/essences across the shared
       // crafting source actors. Foundry-free store consumes this wrapper only.
       listInventoryForActor: (opts = {}) => game?.fabricate?.listInventoryForActor?.(opts) ?? null,
       // Learn one recipe from an owned recipe-item book (Inventory learn button).
       learnRecipeFromInventory: (opts = {}) =>
         game?.fabricate?.learnRecipeFromInventory?.(opts) ?? null,
-      craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
+      craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.({
+        ...opts,
+        presentTools: presentTools(),
+      }) ?? null,
       // Salvage one owned component (issue 675) — the Inventory tab's Salvage panel,
       // and the first UI caller of the engine's salvage pipeline. Takes
       // `{ actorId, systemId, componentId, interactive }`: an ACTOR ID, never a uuid,
@@ -338,7 +343,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Fresh per-set craftability for an in-session ingredient-option override
       // (issue 552). Synchronous so the store's `selectedCraftability` $derived can
       // read it without an async round-trip; returns null when the facade is absent.
-      evaluateSelectedSet: (opts = {}) => game?.fabricate?.evaluateSelectedSet?.(opts) ?? null,
+      evaluateSelectedSet: (opts = {}) => game?.fabricate?.evaluateSelectedSet?.({
+        ...opts,
+        presentTools: presentTools(),
+      }) ?? null,
       // Player Alchemy tab seams — the leak-safe workbench listing + brew submit +
       // the persisted active-discipline getter/setter. Foundry-free store consumes
       // these wrappers only.
@@ -386,7 +394,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Player-facing Journal seams. The store/components never touch Foundry
       // globals; these wrappers are the single Foundry-facing edge.
       listJournalForActor: (opts = {}) => game?.fabricate?.listJournalForActor?.(opts) ?? null,
-      advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
+      advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.({
+        ...opts,
+        presentTools: presentTools(),
+      }) ?? null,
       cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,
       getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,
       getWorldTimeComponents: (worldTime) =>
@@ -716,6 +727,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Re-show REPLACES the session-scoped canvas tool + scoped env/task/actor/ref
       // context (set when supplied, cleared when not) so a manual re-open never
       // inherits a stale station context.
+      const stationChanged = existing._activeCanvasTool !== nextCanvasTool;
       existing._activeCanvasTool = nextCanvasTool;
       existing._scopedEnvironmentId = nextEnvironmentId;
       existing._scopedTaskId = nextTaskId;
@@ -735,6 +747,12 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       });
       existing._selectTab(initialTab);
       existing.bringToFront();
+      if (stationChanged) {
+        // Hydrated details belong to the station session, not just the selected recipe.
+        // Persist a debounced stage reorder first, because the reload re-reads stored orders.
+        await existing._services?.crafting?.flushProgressiveOrder?.();
+        await existing._services?.crafting?.load?.(true);
+      }
       return existing;
     }
     const app = new SvelteFabricateApp({

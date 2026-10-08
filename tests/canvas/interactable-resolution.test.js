@@ -82,6 +82,18 @@ test('buildActiveCanvasTool defaults a missing label to an empty string', () => 
   );
 });
 
+test('buildActiveCanvasTool falls back to the tool name snapshot when no label override is set', () => {
+  assert.deepEqual(
+    buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: { componentId: null, label: '', name: ' Anvil ' } }),
+    { componentId: '', systemId: 'sysA', toolId: 'tool-1', label: 'Anvil' }
+  );
+  // A GM-authored label still wins over the snapshot name.
+  assert.equal(
+    buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: { label: 'Forge', name: 'Anvil' } }).label,
+    'Forge'
+  );
+});
+
 // --- drop classification ---
 
 const deps = () => ({

@@ -2678,12 +2678,15 @@ Activating a Tool interactable injects a **virtual-present** tool into the craft
 
 Requirements:
 
-1. The virtual-present payload is system-scoped: `presentTools = { systemId, componentIds }`.
+1. The virtual-present payload is system-scoped: `presentTools = { systemId, componentIds, toolIds }`.
    A virtual-present match fires only when the evaluated task/recipe's own crafting system id equals the active tool's `systemId`, so a station tool from system A cannot satisfy a system-B prerequisite sharing the same `componentId` string.
 2. A virtual-present tool is treated as satisfied **without the actor owning the item** and is **excluded from breakage and usage** (it is the station's tool, not the actor's).
 3. `activeCanvasTool` is session-scoped on the `SvelteFabricateApp` instance (set in `show(tab, { activeCanvasTool })`, cleared on close), system-scoped per the rule above, and never written to any persisted run record.
    With no active tool the payload is null (inert).
+   The player crafting facade carries this context into detail hydration, selected-set evaluation, craft submission and the Journal step advance (`advanceCraftingRun`, "Trigger Next Step").
+   Replacing the active station invalidates the open recipe's hydrated availability.
 4. UI placement: when an active tool is set it is surfaced as a status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/region), implemented in `ActorSelectTopBar`.
+   The chip names the station's Tool: the Tool's **Display label** (the GM-authored override), else the Tool's name; it falls back to a generic localized label only when the payload carries neither.
    The Crafting and planned Alchemy tabs should place the chip in their own header right bar once those headers exist.
 
 ### Item → Tool Drop Resolution

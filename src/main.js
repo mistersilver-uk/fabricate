@@ -1867,9 +1867,11 @@ class Fabricate {
    *   player app's pair of on-demand per-recipe reads.
    * @param {string[]|null} [options.componentSourceActorIds] Additional inventory source
    *   actor ids; defaults to the persisted component-source set.
+   * @param {{systemId: string, componentIds: string[], toolIds: string[]}|null} [options.presentTools]
+   *   The session's active canvas station, satisfying its Tool without an owned item; null when none.
    * @returns {object|null} The redaction-safe `RecipeListingModel`, or null.
    */
-  hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {
+  hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null, presentTools = null } = {}) {
     this._requireReady();
     if (!recipeId) return null;
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
@@ -1881,6 +1883,7 @@ class Fabricate {
       craftingActor,
       componentSourceActors,
       viewer: game.user,
+      presentTools,
     });
   }
 
@@ -2035,9 +2038,11 @@ class Fabricate {
    *   the original silent behaviour. The Fabricate Crafting tab passes true. A
    *   dismissed prompt returns `{ success: false, cancelled: true }` with zero
    *   mutation (no ingredients, currency, or tools consumed, no run created).
+   * @param {{systemId: string, componentIds: string[], toolIds: string[]}|null} [options.presentTools]
+   *   The session's active canvas station, satisfying its Tool without an owned item; null when none.
    * @returns {Promise<{success: boolean, results: Array|null, message: string, cancelled?: boolean}>}
    */
-  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, ingredientEssenceAllocation = null, componentSourceActorIds = null, interactive = false } = {}) {
+  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, ingredientEssenceAllocation = null, componentSourceActorIds = null, interactive = false, presentTools = null } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
@@ -2057,6 +2062,7 @@ class Fabricate {
       // Scoped essence-block funding (issue 917); null keeps the allocator's suggestion.
       ingredientEssenceAllocation,
       interactive,
+      presentTools,
     });
   }
 
@@ -2444,9 +2450,11 @@ class Fabricate {
    *   Omitted, the ACTIVE step decides (see below).
    * @param {string|null} [options.actorId] Crafting actor id (defaults to persisted).
    * @param {string[]|null} [options.componentSourceActorIds]
+   * @param {{systemId: string, componentIds: string[], toolIds: string[]}|null} [options.presentTools]
+   *   The session's active canvas station, satisfying its Tool without an owned item; null when none.
    * @returns {object|null} Fresh single-set craftability, or null when unresolvable.
    */
-  evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, essenceAllocation = null, stepId = null, actorId = null, componentSourceActorIds = null } = {}) {
+  evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, essenceAllocation = null, stepId = null, actorId = null, componentSourceActorIds = null, presentTools = null } = {}) {
     this._requireReady();
     const recipe = this.recipeManager?.getRecipe?.(recipeId);
     if (!recipe) return null;
@@ -2483,6 +2491,7 @@ class Fabricate {
       craftingActor,
       optionOverrides,
       essenceAllocation,
+      presentTools,
     }) ?? null;
   }
 
@@ -3242,9 +3251,11 @@ class Fabricate {
    * @param {boolean} [options.interactive] When true (a player "Trigger Next Step"
    *   click), prompt the interactive roll dialog + post the roll to chat. Defaults
    *   false so automated/headless advances stay silent.
+   * @param {{systemId: string, componentIds: string[], toolIds: string[]}|null} [options.presentTools]
+   *   The session's active canvas station, satisfying its Tool without an owned item; null when none.
    * @returns {Promise<object>} The craft result, or a `{ success: false, message }`.
    */
-  async advanceCraftingRun({ actorId, runId, interactive = false } = {}) {
+  async advanceCraftingRun({ actorId, runId, interactive = false, presentTools = null } = {}) {
     this._requireReady();
     const actor = game.actors?.get(actorId);
     const run = actor ? (this.craftingRunManager?.getActiveRun(actor, runId) ?? null) : null;
@@ -3262,6 +3273,7 @@ class Fabricate {
       runId,
       componentSourceActors: resolved.componentSourceActors,
       interactive,
+      presentTools,
     });
   }
 
