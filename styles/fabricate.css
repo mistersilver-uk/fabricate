@@ -1391,6 +1391,7 @@
 .fabricate-manager .manager-body.is-rail-collapsed .manager-scope-collapse {
   width: 30px;
   height: 30px;
+  border-radius: 7px;
 }
 
 /* The 56px collapsed rail keeps ONLY the icon gutter. Every element the Studio rail adds has to opt out explicitly, or it blows the column out: the crafting-system card content (above), the uppercase section label, and every trailing marker that reports on the row's own contents rather than raising an alert (issue 1515). */
@@ -3421,7 +3422,7 @@
   gap: var(--fab-space-1);
   padding-left: var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 7px;
+  border-radius: 9px;
   background: var(--fab-bg-3);
 }
 
@@ -4363,6 +4364,7 @@
   width: 26px;
   height: 26px;
   min-height: 26px;
+  border-radius: 7px;
   flex: 0 0 26px;
   font-size: 10px;
 }
@@ -5877,7 +5879,7 @@
   margin-top: var(--fab-space-2);
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--fab-overlay-light-04);
 }
 
@@ -7233,7 +7235,7 @@
   justify-content: center;
   width: var(--fab-icon-picker-chip);
   height: var(--fab-icon-picker-chip);
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--fab-accent);
   background: var(--fab-overlay-dark-16);
 }
@@ -11847,7 +11849,7 @@
   gap: var(--fab-space-2);
   padding: var(--fab-space-1) var(--fab-space-2) var(--fab-space-1) var(--fab-space-1);
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--fab-bg-2);
   color: var(--fab-text);
   min-width: 0;
@@ -12711,6 +12713,7 @@
 /* The inspector's controls run at 28px, a notch under the standard 34px control, because they sit in a 300px column beside a rate slider (issue 1118). */
 .fabricate-manager .manager-drop-inspector-stack .fabricate-button.fab-manager-button {
   min-height: 28px;
+  border-radius: 7px;
   padding: 0 var(--fab-space-2);
 }
 
@@ -12744,6 +12747,7 @@
 .fabricate-manager .manager-character-modifier-row-card .fabricate-field input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
   height: 28px;
   min-height: 28px;
+  border-radius: 7px;
   padding: var(--fab-space-2xs) var(--fab-space-2);
 }
 
@@ -14325,6 +14329,7 @@
 .fabricate-manager [data-arm-token='tool-remove-from-system'] {
   min-height: 30px;
   height: 30px;
+  border-radius: 7px;
   padding: 0 var(--fab-space-3);
   font-size: 0.66rem;
 }

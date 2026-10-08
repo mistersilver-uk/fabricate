@@ -611,7 +611,7 @@
     align-items: center;
     gap: 8px;
     padding: 8px 14px;
-    border-radius: 9px;
+    border-radius: 7px;
     border: 1px solid var(--fab-border);
     background: var(--fab-overlay-light-035);
     color: var(--fab-text);

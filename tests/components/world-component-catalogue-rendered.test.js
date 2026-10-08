@@ -848,7 +848,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     assert.ok(Boolean(essenceRow), 'NON-VACUITY: the essence group drew its row');
     // `proto:5627` pads `5px 9px` around a 22px tile — a 34px row, which is a rung.
     assert.equal(Math.round(essenceRow.height), 34, 'an essence row is on the 34px rung');
-    assert.equal(essenceRow.radius, '7px', 'on the 26-32px band`s corner');
+    assert.equal(essenceRow.radius, '9px', 'on the 34-38px band`s corner');
     assert.equal(Math.round(essenceTile.width), 22, '`proto:5628` chip: a 22px tile…');
     assert.equal(Math.round(essenceTile.height), 22);
     assert.equal(Math.round(essenceStep.width), 22, '`proto:1207`: the shared Stepper`s 22px adjunct…');
