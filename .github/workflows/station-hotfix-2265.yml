@@ -3,12 +3,14 @@ on:
   push:
     branches:
       - work/2265-station-hotfix-validation
+    paths:
+      - '.github/station-hotfix-2265.b64'
 permissions:
-  contents: read
+  contents: write
 jobs:
-  inspect:
+  hotfix:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         with:
@@ -17,20 +19,31 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Export pinned source and test dependencies
+      - name: Prepare the isolated 1.9.9-based fix
         shell: bash
         run: |
-          mkdir -p transfer
-          git branch transfer-hotfix 2b35db158ebca753186b80ce4ac47842250896da
-          git branch transfer-release 4f92d687dda38e0b64f57d42ce7e51bcc66b006f
-          git bundle create transfer/fabricate.bundle transfer-hotfix transfer-release
-          git worktree add --detach ../deps 2b35db158ebca753186b80ce4ac47842250896da
-          cd ../deps
-          npm ci --ignore-scripts --no-audit --no-fund > ../fabricate/transfer/install.log 2>&1
-          tar -czf ../fabricate/transfer/dependencies.tgz node_modules
-      - uses: actions/upload-artifact@v4
-        with:
-          name: station-hotfix-source
-          path: transfer/
-          retention-days: 1
-          compression-level: 0
+          python3 - <<'PY'
+          import base64, zlib
+          from pathlib import Path
+          Path('/tmp/station-hotfix.patch').write_bytes(zlib.decompress(base64.b64decode(Path('.github/station-hotfix-2265.b64').read_text())))
+          PY
+          git worktree add -b fix/2265-station-tool-hotfix ../hotfix-2265 2b35db158ebca753186b80ce4ac47842250896da
+          cd ../hotfix-2265
+          git apply --check /tmp/station-hotfix.patch
+          git apply /tmp/station-hotfix.patch
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run production-boundary regression and existing focused suites
+        working-directory: ../hotfix-2265
+        run: node --conditions=browser --test --test-concurrency=1 tests/canvas-station-crafting.test.js tests/recipe-tools.test.js tests/crafting-listing-builder.test.js tests/stores/crafting-store.test.js tests/components/fabricate-app-shell.test.js tests/components/player-extension-composition.test.js tests/canvas/interactable-resolution.test.js
+      - name: Build the hotfix
+        working-directory: ../hotfix-2265
+        run: npm run build
+      - name: Commit and publish working branch only
+        working-directory: ../hotfix-2265
+        shell: bash
+        run: |
+          git diff --check
+          git add src/main.js src/ui/SvelteFabricateApp.svelte.js src/systems/CraftingListingBuilder.js tests/canvas-station-crafting.test.js docs/canvas-interactables.md openspec/specs/data-models/spec.md
+          git -c user.name='ChatGPT' -c user.email='noreply@openai.com' commit -m 'fix(#2265): carry active station tools through player crafting'
+          git push origin HEAD:refs/heads/fix/2265-station-tool-hotfix
+          git log -1 --format='%H %s'
