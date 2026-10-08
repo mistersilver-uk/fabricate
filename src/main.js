@@ -1869,7 +1869,7 @@ class Fabricate {
    *   actor ids; defaults to the persisted component-source set.
    * @returns {object|null} The redaction-safe `RecipeListingModel`, or null.
    */
-  hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {
+  hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null, presentTools = null } = {}) {
     this._requireReady();
     if (!recipeId) return null;
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
@@ -1881,6 +1881,7 @@ class Fabricate {
       craftingActor,
       componentSourceActors,
       viewer: game.user,
+      presentTools,
     });
   }
 
@@ -2037,7 +2038,7 @@ class Fabricate {
    *   mutation (no ingredients, currency, or tools consumed, no run created).
    * @returns {Promise<{success: boolean, results: Array|null, message: string, cancelled?: boolean}>}
    */
-  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, ingredientEssenceAllocation = null, componentSourceActorIds = null, interactive = false } = {}) {
+  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, ingredientEssenceAllocation = null, componentSourceActorIds = null, interactive = false, presentTools = null } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
@@ -2057,6 +2058,7 @@ class Fabricate {
       // Scoped essence-block funding (issue 917); null keeps the allocator's suggestion.
       ingredientEssenceAllocation,
       interactive,
+      presentTools,
     });
   }
 
@@ -2446,7 +2448,7 @@ class Fabricate {
    * @param {string[]|null} [options.componentSourceActorIds]
    * @returns {object|null} Fresh single-set craftability, or null when unresolvable.
    */
-  evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, essenceAllocation = null, stepId = null, actorId = null, componentSourceActorIds = null } = {}) {
+  evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, essenceAllocation = null, stepId = null, actorId = null, componentSourceActorIds = null, presentTools = null } = {}) {
     this._requireReady();
     const recipe = this.recipeManager?.getRecipe?.(recipeId);
     if (!recipe) return null;
@@ -2483,6 +2485,7 @@ class Fabricate {
       craftingActor,
       optionOverrides,
       essenceAllocation,
+      presentTools,
     }) ?? null;
   }
 

@@ -204,7 +204,9 @@ It satisfies the requirement to have that tool present without the actor owning 
 This only works within the station's own crafting system.
 A station tool from one system never satisfies the same tool required by a different system.
 
-When the Crafting tab ships, a tool-station activation will surface its crafting actions there directly.
+Activating a tool station opens the Crafting tab.
+The borrowed tool applies to recipe details, ingredient-choice recalculations and the craft action itself.
+Switching stations refreshes an already-open recipe; reopening without a station or closing the window clears that borrowed availability.
 
 ---
 

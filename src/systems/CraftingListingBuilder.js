@@ -298,6 +298,7 @@ export class CraftingListingBuilder {
     componentSourceActors = [],
     viewer = null,
     access = null,
+    presentTools = null,
   } = {}) {
     const resolvedViewer = viewer ?? this._getViewer?.() ?? null;
     const isGM = resolvedViewer?.isGM === true;
@@ -342,6 +343,7 @@ export class CraftingListingBuilder {
       craftingActor,
       craftSources,
       knowledgeSources,
+      presentTools,
     });
   }
 
@@ -444,7 +446,15 @@ export class CraftingListingBuilder {
    * Project a single visible recipe into its `RecipeListingModel`.
    * @private
    */
-  _buildRecipeModel({ recipe, access, isGM, craftingActor, craftSources, knowledgeSources }) {
+  _buildRecipeModel({
+    recipe,
+    access,
+    isGM,
+    craftingActor,
+    craftSources,
+    knowledgeSources,
+    presentTools = null,
+  }) {
     const system = this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null;
     const mode = stringOrEmpty(system?.resolutionMode) || 'simple';
     const modeLabel = this.localize(
@@ -530,6 +540,7 @@ export class CraftingListingBuilder {
         step: firstStep,
         craftSources,
         craftingActor,
+        presentTools,
       }),
       // The products this set routes to (routed-by-ingredients). Empty for
       // routedByCheck, whose output is per outcome tier, not per set.
@@ -549,6 +560,7 @@ export class CraftingListingBuilder {
         this._stepRecipeView(recipe, firstStep),
         {
           craftingActor,
+          presentTools,
         }
       ) ?? null;
     const canCraftMaterials = fullCraftability?.canCraft === true;
@@ -597,7 +609,7 @@ export class CraftingListingBuilder {
       // Per-step requirement projection (`simple` multi-step only; [] otherwise). Each
       // entry carries the step's label, its per-set craftability (tool union applied)
       // and the components it produces. See Multi-Step Recipe Presentation.
-      steps: this._buildSteps({ recipe, system, mode, craftSources, craftingActor }),
+      steps: this._buildSteps({ recipe, system, mode, craftSources, craftingActor, presentTools }),
       // The ordered stage list (progressive only; [] otherwise) — the F1 fix.
       progressiveStages: this._buildProgressiveStages({ recipe, system, mode }),
       // GM policy: may this player reorder the stages? Default true (issue 651).
@@ -682,7 +694,7 @@ export class CraftingListingBuilder {
    * recipe-wide satisfiable set.
    * @private
    */
-  _evaluateSet({ recipe, set, step = null, craftSources, craftingActor }) {
+  _evaluateSet({ recipe, set, step = null, craftSources, craftingActor, presentTools = null }) {
     if (typeof this.recipeManager?.evaluateCraftability !== 'function') return null;
     // A shallow copy preserves the recipe's data fields (craftingSystemId,
     // currencyCost, …) and the IngredientSet instance methods, while narrowing the
@@ -694,6 +706,7 @@ export class CraftingListingBuilder {
     const singleSetRecipe = { ...this._stepRecipeView(recipe, owningStep), ingredientSets: [set] };
     return this.recipeManager.evaluateCraftability(craftSources, singleSetRecipe, {
       craftingActor,
+      presentTools,
     });
   }
 
@@ -777,7 +790,7 @@ export class CraftingListingBuilder {
    * exactly one ingredient set per step, so each entry carries exactly one set.
    * @private
    */
-  _buildSteps({ recipe, system, mode, craftSources, craftingActor }) {
+  _buildSteps({ recipe, system, mode, craftSources, craftingActor, presentTools = null }) {
     if (mode !== 'simple') return [];
     const steps = this._executionSteps(recipe);
     if (steps.length <= 1) return [];
@@ -795,7 +808,14 @@ export class CraftingListingBuilder {
           label:
             stringOrEmpty(set.name) ||
             this.localize('FABRICATE.App.Crafting.IngredientSetFallback', { index: setIdx + 1 }),
-          craftability: this._evaluateSet({ recipe, set, step, craftSources, craftingActor }),
+          craftability: this._evaluateSet({
+            recipe,
+            set,
+            step,
+            craftSources,
+            craftingActor,
+            presentTools,
+          }),
           products: this._productsForSet({ recipe, system, set, step }),
         })),
         // Retained deliberately as groundwork for a future non-`simple` step renderer
