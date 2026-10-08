@@ -1849,9 +1849,8 @@
   line-height: normal;
 }
 
-/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own scale is restated, at (0,4,0). Padding, radius, radio and legend are the primitive's. */
+/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own face is restated, at (0,4,0). Gap, padding, radius, radio and legend are the primitive's: the studio's 11px gap snapped to the primitive's own 12 (issue 1523). */
 .fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
-  gap: var(--fab-space-3);
   border: 1px solid var(--fab-border);
   background: var(--fab-bg-1);
 }
