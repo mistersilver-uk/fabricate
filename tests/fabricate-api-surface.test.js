@@ -18,6 +18,8 @@ import { GatheringRealmStore } from '../src/systems/GatheringRealmStore.js';
 import { JOURNAL_RUN_SOCKET_KIND } from '../src/systems/journalRunCommands.js';
 import { managerExtensions } from '../src/ui/managerExtensions.js';
 import { playerExtensions } from '../src/ui/playerExtensions.js';
+import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
+import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { findMatchingComponent } from '../src/utils/essenceResolver.js';
 import { defineStructureContract } from './helpers/structureContract.js';
 
@@ -264,6 +266,72 @@ describe('the real facade routes each public member to its collaborator', () => 
     assert.equal(details[0].recipeId, 'recipe-1');
     assert.equal(details[0].craftingActor, actor);
     assert.equal(details[0].viewer, globalThis.game.user);
+  });
+
+  // Issue 2265: a station is per call, so it gets its own builder over a presence view and the
+  // cached builder never sees it; a recording manager answers the station its Tool consult saw.
+  it('builds station detail and Journal listings over a per-call presence view', () => {
+    const actor = { id: 'actor-1' };
+    const actors = { get: (id) => (id === actor.id ? actor : null) };
+    Object.assign(globalThis, { game: { user: { id: 'gm', isGM: true }, actors } });
+    const recipeManager = {
+      resolveToolStates: (_recipe, _tools, _actors, options) => options?.presentTools ?? null,
+    };
+    const facade = readyFacade({ recipeManager });
+    facade._resolveJournalActor = () => actor;
+    const built = [];
+    const spies = [
+      [CraftingListingBuilder.prototype, 'buildRecipeDetail'],
+      [RunJournalBuilder.prototype, 'buildListing'],
+    ].map(([prototype, method]) => {
+      const original = prototype[method];
+      prototype[method] = function record() {
+        built.push(this);
+        return method;
+      };
+      return () => (prototype[method] = original);
+    });
+    const station = { systemId: 'smithing', componentIds: [], toolIds: ['anvil'] };
+    try {
+      for (const presentTools of [station, null]) {
+        const sources = { actorId: actor.id, componentSourceActorIds: [] };
+        facade.hydrateCraftingRecipe({ ...sources, recipeId: 'recipe-1', presentTools });
+        facade.listJournalForActor({ rememberedActorId: actor.id, presentTools });
+      }
+    } finally {
+      for (const restore of spies) restore();
+    }
+    const consulted = (builder) =>
+      (builder.recipeManager ?? builder._recipeManager).resolveToolStates(null, [], []);
+    assert.deepEqual(built.slice(0, 2).map(consulted), [station, station]);
+    assert.deepEqual(built.slice(2).map(consulted), [null, null]);
+    assert.equal(built[2], facade._getCraftingListingBuilder(), 'no station keeps the cached builder');
+    assert.equal(built[3], facade._getRunJournalBuilder());
+    assert.notEqual(built[0], built[2]);
+    assert.equal(facade.recipeManager, recipeManager);
+  });
+
+  it('craftRecipe and advanceCraftingRun hand the station to craft, never altered', async () => {
+    const actor = { id: 'actor-1', uuid: 'Actor.actor-1', isOwner: true };
+    const actors = { get: (id) => (id === actor.id ? actor : null) };
+    Object.assign(globalThis, { game: { user: { id: 'gm', isGM: true }, actors } });
+    const run = { id: 'run-1', recipeId: 'recipe-1', componentSourceActorUuids: [] };
+    const facade = readyFacade({
+      craftingRunManager: { getActiveRun: () => run },
+    });
+    const crafted = [];
+    facade.craft = async (...args) => {
+      crafted.push(args);
+    };
+    const station = { systemId: 'smithing', componentIds: [], toolIds: ['anvil'] };
+    const craft = { actorId: actor.id, componentSourceActorIds: [], recipeId: 'recipe-1' };
+    await facade.craftRecipe({ ...craft, presentTools: station });
+    await facade.advanceCraftingRun({ actorId: actor.id, runId: run.id, presentTools: station });
+    await facade.craftRecipe(craft);
+    assert.deepEqual(
+      crafted.map((args) => args[2].presentTools),
+      [station, station, null]
+    );
   });
 
   it('craft starts a versioned run on the live engine and executes it with the caller options', async () => {

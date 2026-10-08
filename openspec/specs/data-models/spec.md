@@ -3228,6 +3228,8 @@ Applied effects form a prefix; at most one effect is applying, and later effects
 6. Resuming execution after reload with an applying effect, failure after its invocation begins, or inability to persist its receipt requires recovery and never replays the uncertain effect.
 A normal observing-client refresh during live execution does not itself trigger recovery.
 Committed requests return their recorded outcome.
+A resumed versioned crafting stage rebuilds its Tool pairs from the plan in Tool order: each planned Tool item pairs with the first unpaired Tool it matches, and a Tool left without one was planned as the virtual station Tool (§ Session-Scoped Active Canvas Tool).
+Until the Tool effect is applied, a missing or unmatched planned item refuses the resume with `STAGE_RECONSTRUCTION_FAILED`, rather than lending its usage or breakage to another Tool; once applied, the replay from the receipt does not refuse.
 7. Gathering persists its terminal record with the planned execution journal before effects and updates receipts in that same history record by run ID.
 It does not delay terminal history until effects finish.
 8. Intent, effect plans, receipts and outcomes retain existing secret and blind-run redaction.
@@ -3842,7 +3844,7 @@ StepModel = {
    A started stage holds the choice it locked and a paused run holds the choices it already made, so neither is waiting on one.
    **No control may be offered in a state where the command behind it refuses.**
    The projection and the stage commands MUST answer readiness from ONE shared predicate rather than classify it independently, so an enabled control and the command's disposition cannot disagree.
-   That predicate names an unmade choice, a physical material shortfall, an essence gap the carrier ledger cannot cover, a price the actor cannot pay, and a required tool the actor does not hold, and both `actions.beginStep` and `actions.execute` MUST stay refused while any of them holds.
+   That predicate names an unmade choice, a physical material shortfall, an essence gap the carrier ledger cannot cover, a price the actor cannot pay, and a required tool that is neither held by the stage's actors nor supplied by the viewer's Active Canvas Tool (§ Session-Scoped Active Canvas Tool), and both `actions.beginStep` and `actions.execute` MUST stay refused while any of them holds.
    Affordability MUST be asked of the whole selection AGGREGATED onto the common base unit, as the engine's own gate asks it, not option by option: two currency ingredients each affordable alone but not together are not affordable.
    The tool probe MUST exclude the items the selection will spend, as the engine's tool validation does, because one physical Item cannot be both a consumed ingredient and a held tool.
    One cause is knowable only asynchronously and so remains the engine's alone: a `macro` spend strategy, whose affordability only the macro can answer.
@@ -3855,7 +3857,7 @@ StepModel = {
    `sourcesUnavailable` is the run whose recorded component source actors no longer resolve: the engine refuses it outright, so the projection MUST report that rather than judging the stage against the crafting actor's inventory alone and naming whatever shortfall THAT inventory shows.
    The two PICK causes are themselves distinct: `routeRequired` is the one decision a stage with more than one authored ingredient set opens, and `choiceRequired` names the option picks and essence allocation made WITHIN the route already taken, so a player on a single-route stage is never told to choose a route that has one value while the real gap is an allocation.
    Both report `awaitingChoice`, because either way what the run is waiting on is the player's own decision, and both read as guidance rather than as a refusal.
-   A live stage's tool rows MUST state whether each tool is held, because a tool the stage lacks is a cause it is refused for.
+   A live stage's tool rows MUST state whether each tool is available — held, or supplied by the viewer's Active Canvas Tool — because a tool the stage lacks is a cause it is refused for.
    A started stage whose locked route no longer resolves has no pick left to make and MUST NOT be reported as waiting on a choice it has no control to make; it reports the recipe edit (`routeUnavailable`) and keeps cancellation as its way out.
    Alchemy check labels and completion-mode eligibility MUST use the canonical active-check resolver: none has no check, simple reads the simple slot, and tiered reads the routed slot.
 
@@ -4240,13 +4242,27 @@ Activating a Tool interactable injects a **virtual-present** tool into the craft
 
 Requirements:
 
-1. The virtual-present payload is system-scoped: `presentTools = { systemId, componentIds }`.
-   A virtual-present match fires only when the evaluated task/recipe's own crafting system id equals the active tool's `systemId`, so a station tool from system A cannot satisfy a system-B prerequisite sharing the same `componentId` string.
+1. The virtual-present payload is system-scoped: `presentTools = { systemId, componentIds, toolIds }`, keyed by the station's library `toolId` and any linked `componentId` (`## Tool` requirement 9).
+   A virtual-present match fires only when the evaluated task/recipe's own crafting system id equals the active tool's `systemId`, so a station tool from system A cannot satisfy a system-B prerequisite sharing the same `componentId` or `toolId` string.
 2. A virtual-present tool is treated as satisfied **without the actor owning the item** and is **excluded from breakage and usage** (it is the station's tool, not the actor's).
-3. `activeCanvasTool` is session-scoped on the `SvelteFabricateApp` instance (set in `show(tab, { activeCanvasTool })`, cleared on close), system-scoped per the rule above, and never written to any persisted run record.
-   With no active tool the payload is null (inert).
+3. `activeCanvasTool` is session-scoped on the `SvelteFabricateApp` instance: every `show(tab, { activeCanvasTool })` replaces it, a plain `show(tab)` clears it, and `close()` clears it.
+   It is system-scoped per the rule above, and with no active tool the payload is null (inert).
+   Station presence belongs to the player's app session, not to a run: the payload is never written to a crafting or gathering run record, a stage's `selectionPlan`, or the run authority's ledger (request records, replies or prepare-token bindings).
+   What a command did with it is ordinary execution evidence: under check-driven Tool breakage a stage that used the station's Tool records it in `usedTools` with `virtual: true`, and a prepared check retains the Tool-bonus contributions it was described with.
 4. UI placement: when an active tool is set it is surfaced as a status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/region), implemented in `ActorSelectTopBar`.
+   The chip names the station's Tool by the Tool display-name precedence of `## Tool` requirement 13 — its **Display label** (`label`, resolved for the station's crafting system), then its name snapshot, then its linked managed component's name — and falls back to the generic localized label only when none of those resolves.
    The Crafting and planned Alchemy tabs should place the chip in their own header right bar once those headers exist.
+5. Crafting carries the station per call.
+   The player app supplies `presentTools` to recipe detail hydration (`hydrateCraftingRecipe`), selected-set evaluation (`evaluateSelectedSet`), craft submission (`craftRecipe`), the step advance (`advanceCraftingRun`), the Journal listing (`listJournalForActor`), and every `runType: 'crafting'` Journal run command as that command's `payload.presentTools`.
+   On the active GM, a version-1 crafting `start`, `beginStep`, `describeCheck` and `execute` evaluate Tool presence with that command's own payload and nothing else; no command inherits a station from an earlier command of the same run.
+   A started stage re-validates its Tools when it resolves, so a stage begun at a station resolves only while a station supplying that Tool is active again; a check described with the station is redeemed by an `execute` that must carry it too.
+   The Journal projection and the stage commands answer Tool readiness from the one shared predicate (`RunJournal` requirement 2) under the same viewer's station, so a control the projection enables with the station is one the command accepts with it.
+   Replacing or clearing the active station refreshes the open recipe's hydrated detail and the Journal's stage readiness without a loading indicator, keeping the open recipe selected.
+6. `presentTools` is a client-asserted claim, as on gathering's versioned start.
+   The active-GM authority does not re-verify that the sender's token occupies an activated station, and the re-resolution it performs under its execution claim (§ Authority Ledger and Recovery Boundary) does not include it.
+   The claim can satisfy only Tool presence within its own crafting system; it never causes usage, breakage, consumption or an award.
+7. The station does not reach salvage, companion pooled holdings (`presentTools: null`), alchemy submission (`submitAlchemyAttempt`), or the world-time automatic advance, which has no player command to carry one and so blocks or refuses a Tool-bearing stage without spending.
+   The shopping-list aggregate is not a target of this requirement (deferred).
 
 ### Item → Tool Drop Resolution
 

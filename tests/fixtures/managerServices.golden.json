@@ -796,7 +796,8 @@
     [
       "fabricate.advanceCraftingRun",
       {
-        "actorId": "pc-arden"
+        "actorId": "pc-arden",
+        "presentTools": null
       }
     ],
     [
@@ -808,7 +809,8 @@
     [
       "fabricate.craftRecipe",
       {
-        "actorId": "pc-arden"
+        "actorId": "pc-arden",
+        "presentTools": null
       }
     ],
     [
@@ -826,7 +828,8 @@
     [
       "fabricate.evaluateSelectedSet",
       {
-        "actorId": "pc-arden"
+        "actorId": "pc-arden",
+        "presentTools": null
       }
     ],
     [
@@ -905,7 +908,8 @@
     [
       "fabricate.hydrateCraftingRecipe",
       {
-        "actorId": "pc-arden"
+        "actorId": "pc-arden",
+        "presentTools": null
       }
     ],
     [
@@ -946,7 +950,8 @@
     [
       "fabricate.listJournalForActor",
       {
-        "actorId": "pc-arden"
+        "actorId": "pc-arden",
+        "presentTools": null
       }
     ],
     [
@@ -962,6 +967,7 @@
           "answeredBy": "getSelectedCraftingActorId"
         },
         "componentSourceActorIds": [],
+        "presentTools": null,
         "recipeId": "recipe-alpha"
       }
     ],

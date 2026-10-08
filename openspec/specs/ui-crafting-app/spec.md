@@ -87,10 +87,11 @@ and the browse half is the one that scales with the corpus.
   This MUST be asserted by an operation count rather than by review, and the count MUST be
   shown to be non-vacuous.
 - **The detail seam hydrates ONE recipe.**
-  `hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds })` returns the exact
+  `hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds, presentTools })` returns the exact
   rich model — per-set craftability, ingredient choices, the essence pool, checks, outcome
   tiers, duration, steps and progressive stages — or `null` when no such recipe exists or the
   viewer may not see it (`recipe-visibility/spec.md` § Per-Recipe Detail Hydration).
+  `presentTools` is the Active Canvas Tool's virtual-present payload or null (`data-models/spec.md` § Session-Scoped Active Canvas Tool); a hydrated model is discarded when it changes.
 - **Only the selection is hydrated.**
   The player app hydrates the selected recipe, falling back to the first visible row when the
   player has selected nothing.
