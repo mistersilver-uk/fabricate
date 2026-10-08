@@ -51,7 +51,7 @@ const MOUNTS = Object.freeze({
   },
   'drop-modifier-pill': {
     name: 'Chip',
-    props: { class: 'manager-drop-modifier-pill', children: label('Rain</span><strong>+2') },
+    props: { class: 'manager-drop-modifier-pill', children: label('Rain <strong>+2</strong>') },
   },
   'drop-zone': {
     name: 'ItemDropZone',
