@@ -13,7 +13,7 @@ test('canvas stations reach the player crafting path', async (t) => {
     const { SvelteFabricateApp: App } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
     const { Recipe } = await loadModule('/src/models/Recipe.js');
     const { buildGrantPayload } = await loadModule('/src/canvas/interactableGrant.js');
-    const { resolvedToolsFor } = await loadModule('/src/systems/scopedEntityReads.js');
+    const { InteractableManager } = await loadModule('/src/canvas/InteractableManager.js');
     const { engineWithStationPresence } = await loadModule('/src/systems/stationPresence.js');
     const f = world.fabricate;
     const game = globalThis.game;
@@ -29,14 +29,20 @@ test('canvas stations reach the player crafting path', async (t) => {
     let serial = 0;
     const ore = actor.items.find((item) => item.name === 'Iron Ore');
     const ingot = actor.items.find((item) => item.name === 'Iron Ingot');
+    ore.system.quantity = 40; // enough for every stage the suite runs
     const stock = () => ({ ore: ore.system.quantity, ingot: ingot.system.quantity });
 
-    // Every crafting command a client sends, so a station can be proved to ride its payload only.
+    // Every crafting command a client sends, marked by whether the sending app had a station, so a
+    // station can be proved to ride its payload only.
     const sentCommands = [];
+    let currentApp = null;
     const service = f.journalRunCommands;
     const execute = service.executeJournalRunCommand;
     service.executeJournalRunCommand = (command, options) => {
-      if (command?.runType === 'crafting') sentCommands.push(structuredClone(command));
+      if (command?.runType === 'crafting') {
+        const station = Boolean(currentApp?._activeCanvasTool);
+        sentCommands.push({ command: structuredClone(command), station });
+      }
       return execute.call(service, command, options);
     };
 
@@ -112,17 +118,12 @@ test('canvas stations reach the player crafting path', async (t) => {
       return recipe;
     }
 
-    // The production grant builder, over the station system's resolved Tools.
+    // The production grant builder over the production canvas manager's resolution reads.
     function grantedStation(tool) {
       const { payload } = buildGrantPayload({
         request: { userId: game.user.id, behaviorId: 'b', sceneId: 's', regionId: 'r' },
         system: { interactableType: 'tool', systemId: system.id, toolId: tool.id },
-        resolutionDeps: () => ({
-          getTool: ({ systemId, toolId }) =>
-            resolvedToolsFor(f.craftingSystemManager.getSystem(systemId)).find(
-              (entry) => entry?.id === toolId
-            ) ?? null,
-        }),
+        resolutionDeps: () => InteractableManager.instance._resolutionDeps(),
       });
       return payload.grant.context.activeCanvasTool;
     }
@@ -136,6 +137,7 @@ test('canvas stations reach the player crafting path', async (t) => {
       const activeCanvasTool = componentOnly ? { ...granted, toolId: '' } : granted;
       const app = new App({ activeCanvasTool, actorId: actor.id });
       app._services = app._buildServices();
+      currentApp = app;
       const runOptions = {
         actorId: actor.id,
         componentSourceActorIds: [actor.id],
@@ -161,6 +163,16 @@ test('canvas stations reach the player crafting path', async (t) => {
         action,
         payload,
       });
+    }
+
+    async function withOwnedAnvil(body) {
+      actor.items.push(anvil);
+      try {
+        await body();
+      } finally {
+        const index = actor.items.indexOf(anvil);
+        if (index !== -1) actor.items.splice(index, 1);
+      }
     }
 
     async function withTimeEnabled(body) {
@@ -213,15 +225,20 @@ test('canvas stations reach the player crafting path', async (t) => {
           itemIds
         );
         assert.deepEqual(
-          sentCommands.map((command) => command.action),
+          sentCommands.map(({ command }) => command.action),
           ['start', 'execute']
         );
-        for (const command of sentCommands) {
-          assert.ok(command.payload.presentTools, `${command.action} carries the station`);
-          assert.equal(Object.hasOwn(command.payload.selectionPlan ?? {}, 'presentTools'), false);
-        }
       }
     );
+
+    await t.test('the chip names a nameless component-linked Tool by its component', () => {
+      const tool = Object.assign(stationTool(`station-${++serial}`, { legacy: true }), {
+        label: '',
+        name: '',
+      });
+      system.components.find((entry) => entry.id === tool.componentId).name = 'Linked anvil';
+      assert.equal(grantedStation(tool).label, 'Linked anvil');
+    });
 
     await t.test('check-driven breakage records the station Tool as virtual evidence', async () => {
       const { services, options, recipe, tool } = fixture();
@@ -370,6 +387,23 @@ test('canvas stations reach the player crafting path', async (t) => {
       }
     );
 
+    await t.test('every station crafting command carries the station in its payload only', () => {
+      const atStation = sentCommands.filter((entry) => entry.station).map(({ command }) => command);
+      assert.deepEqual(
+        [...new Set(atStation.map((command) => command.action))].sort((a, b) => a.localeCompare(b)),
+        ['beginStep', 'execute', 'start']
+      );
+      assert.ok(
+        atStation.some((command) => command.payload.selectionPlan),
+        'an advance is seen'
+      );
+      for (const { command, station } of sentCommands) {
+        const { presentTools, selectionPlan } = command.payload ?? {};
+        assert.equal(Boolean(presentTools), station, `${command.action} carries only its station`);
+        assert.equal(Object.hasOwn(selectionPlan ?? {}, 'presentTools'), false);
+      }
+    });
+
     await t.test('the station is never written to a run record or the authority ledger', () => {
       const runs = JSON.stringify(actor.flags);
       assert.ok(runs.includes('station-'), 'the scan reads the station runs');
@@ -415,17 +449,13 @@ test('canvas stations reach the player crafting path', async (t) => {
     await t.test('ordinary owned-item crafting still works without a station', async () => {
       const { app, services, options } = fixture();
       app._activeCanvasTool = null;
-      actor.items.push(anvil);
-      try {
+      await withOwnedAnvil(async () => {
         assert.equal(
           services.hydrateCraftingRecipe(options).ingredientSets[0].craftability.canCraft,
           true
         );
         assert.equal((await services.craftRecipe(options)).success, true);
-      } finally {
-        const index = actor.items.indexOf(anvil);
-        if (index !== -1) actor.items.splice(index, 1);
-      }
+      });
     });
 
     await t.test('reshowing with a different station refreshes the open reads', async () => {
@@ -435,11 +465,12 @@ test('canvas stations reach the player crafting path', async (t) => {
       services.crafting.select(recipe.id);
       assert.equal(services.crafting.selectedRecipe.ingredientSets[0].craftability.canCraft, false);
       const calls = [];
+      const failing = new Set();
       const spy = (store, method, label) => {
         const original = store[method];
         store[method] = (...args) => {
-          calls.push(label);
-          return original(...args);
+          calls.push([label, ...args]);
+          return failing.has(label) ? Promise.reject(new Error(label)) : original(...args);
         };
       };
       spy(services.crafting, 'flushProgressiveOrder', 'flush');
@@ -447,7 +478,7 @@ test('canvas stations reach the player crafting path', async (t) => {
       spy(services.journal, 'load', 'journal');
       app.rendered = true;
       app.bringToFront = () => {
-        calls.push('front');
+        calls.push(['front']);
       };
       App._instance = app;
       try {
@@ -457,19 +488,34 @@ test('canvas stations reach the player crafting path', async (t) => {
           true
         );
         assert.equal(services.crafting.selectedRecipe.id, recipe.id, 'the open recipe stays');
-        assert.deepEqual(calls, ['front', 'flush', 'crafting', 'journal']);
+        assert.deepEqual(calls, [['front'], ['flush'], ['crafting', true], ['journal', true]]);
         calls.length = 0;
         await App.show('crafting', {
           activeCanvasTool: { ...activeCanvasTool },
           actorId: actor.id,
         });
-        assert.deepEqual(calls, ['front'], 'an equal station does not reload');
+        assert.deepEqual(calls, [['front']], 'an equal station does not reload');
         await App.show('crafting', { actorId: actor.id });
         assert.equal(app._activeCanvasTool, null, 'a plain show clears the station');
         assert.equal(
           services.crafting.selectedRecipe.ingredientSets[0].craftability.canCraft,
           false
         );
+        // A rejected read neither rejects the show nor skips the reads after it.
+        for (const [label, tool] of [
+          ['flush', activeCanvasTool],
+          ['crafting', null],
+        ]) {
+          failing.add(label);
+          calls.length = 0;
+          await App.show('crafting', { activeCanvasTool: tool, actorId: actor.id });
+          failing.delete(label);
+          assert.deepEqual(
+            calls.map(([name]) => name),
+            ['front', 'flush', 'crafting', 'journal'],
+            label
+          );
+        }
         app._services = null;
         await App.show('crafting', { activeCanvasTool, actorId: actor.id });
       } finally {
@@ -494,19 +540,20 @@ test('canvas stations reach the player crafting path', async (t) => {
       }
     );
 
-    await t.test('a resumed stage pairs each planned tool item with its own Tool', async () => {
-      // [virtual A (one use, destroy), owned B]: A matches nothing the actor holds, and B is the
-      // lab's own anvil Tool, the identity the owned anvil Item is stamped with.
-      const id = `station-${++serial}`;
-      const station = Object.assign(stationTool(id), {
+    // A station Tool no actor item matches, so it can only ever be planned as virtual.
+    function bellowsStation(id) {
+      return Object.assign(stationTool(id), {
         name: 'Station bellows',
         label: '',
         originItemUuid: `Item.${id}-elsewhere`,
         registeredItemUuid: `Item.${id}-elsewhere`,
       });
-      const owned = { id: 'sm-tool-anvil' };
-      const recipe = stationRecipe(id, [station.id, owned.id]);
-      actor.items.push(anvil);
+    }
+
+    // One engine stage at the station; `stopAt` stops it just before that effect applies and resumes
+    // it with a station-less command, so the pairing comes from the persisted plan alone.
+    async function stationStage(recipe, station, { stopAt = null, beforeResume = () => {} } = {}) {
+      const id = `${recipe.id}-${++serial}`;
       const shared = Object.create(f.craftingEngine);
       shared.versionedRunAuthority = {
         consumeExecutionGrant: async (_grant, context) => ({
@@ -516,62 +563,106 @@ test('canvas stations reach the player crafting path', async (t) => {
       };
       const presentTools = { systemId: system.id, componentIds: [], toolIds: [station.id] };
       const engine = engineWithStationPresence(shared, presentTools);
-      const runManager = f.craftingRunManager;
+      const started = await engine.startVersionedRun({
+        viewer: game.user,
+        actor,
+        sourceActors: [actor],
+        recipeId: recipe.id,
+        selectionPlan: { selectedIngredientSetId: recipe.ingredientSets[0].id },
+        executionGrant: 'grant',
+        requestId: `${id}-start`,
+      });
+      assert.equal(started.success, true, JSON.stringify(started));
       const stage = {
         actor,
         componentSourceActors: [actor],
         requestId: `${id}-execute`,
         executionGrant: 'grant',
+        runId: started.runId,
+        expectedRevision: started.runRevision,
       };
-      try {
-        const started = await engine.startVersionedRun({
-          viewer: game.user,
-          actor,
-          sourceActors: [actor],
-          recipeId: recipe.id,
-          selectionPlan: { selectedIngredientSetId: recipe.ingredientSets[0].id },
-          executionGrant: 'grant',
-          requestId: `${id}-start`,
-        });
-        assert.equal(started.success, true, JSON.stringify(started));
+      const runManager = f.craftingRunManager;
+      if (stopAt) {
         runManager.updateExecutionJournal = async (...args) => {
-          if (args[2]?.type === 'effectApplying' && args[2].effectId === 'apply-tools') {
-            throw new Error('simulated stop before the tools apply');
+          if (args[2]?.type === 'effectApplying' && args[2].effectId === stopAt) {
+            throw new Error(`simulated stop before ${stopAt}`);
           }
           return Object.getPrototypeOf(runManager).updateExecutionJournal.apply(runManager, args);
         };
-        await assert.rejects(
-          () =>
-            engine.executeVersionedStage({
-              ...stage,
-              runId: started.runId,
-              expectedRevision: started.runRevision,
-            }),
-          /simulated stop/
-        );
-        delete runManager.updateExecutionJournal;
+        try {
+          await assert.rejects(() => engine.executeVersionedStage(stage), /simulated stop/);
+        } finally {
+          delete runManager.updateExecutionJournal;
+        }
         runManager.invalidateCache(actor.id);
-        const interrupted = runManager.getActiveRun(actor, started.runId);
-        // The resume carries no station: the pairing comes from the persisted plan alone.
-        const resumed = await shared.executeVersionedStage({
-          ...stage,
-          runId: started.runId,
-          expectedRevision: interrupted.runRevision,
-        });
-        assert.equal(resumed.success, true, JSON.stringify(resumed));
+        stage.expectedRevision = runManager.getActiveRun(actor, started.runId).runRevision;
+        beforeResume();
+      }
+      const result = await (stopAt ? shared : engine).executeVersionedStage(stage);
+      assert.equal(result.success, true, JSON.stringify(result));
+      const history = runManager.getRunHistory(actor).find((run) => run.id === started.runId);
+      return history.steps.flatMap((step) => step.usedTools ?? []);
+    }
+
+    await t.test('a station-only stage resumes after an interrupted tool effect', async () => {
+      const id = `station-${++serial}`;
+      const station = bellowsStation(id);
+      const before = stock();
+      await stationStage(stationRecipe(id, [station.id]), station, { stopAt: 'apply-tools' });
+      assert.deepEqual(stock(), { ore: before.ore - 1, ingot: before.ingot + 1 });
+    });
+
+    await t.test('a resumed stage pairs each planned tool item with its own Tool', async () => {
+      // [virtual A (one use, destroy), owned B]: B is the lab's own anvil Tool, the identity the
+      // owned anvil Item is stamped with.
+      const id = `station-${++serial}`;
+      const station = bellowsStation(id);
+      const recipe = stationRecipe(id, [station.id, 'sm-tool-anvil']);
+      await withOwnedAnvil(async () => {
+        const usedTools = await stationStage(recipe, station, { stopAt: 'apply-tools' });
         assert.ok(actor.items.includes(anvil), "the station Tool's destroy never reaches B");
         assert.equal(anvil.getFlag?.('fabricate', 'toolBroken') ?? false, false);
-        const history = runManager.getRunHistory(actor).find((run) => run.id === started.runId);
-        const usedTools = history.steps.flatMap((step) => step.usedTools ?? []);
         assert.deepEqual(
           usedTools.filter((entry) => entry.itemUuid === anvil.uuid).map((entry) => entry.toolId),
-          [owned.id],
+          ['sm-tool-anvil'],
           "the owned item is used as its own Tool, not the station's"
         );
-      } finally {
-        delete runManager.updateExecutionJournal;
-        actor.items.splice(actor.items.indexOf(anvil), 1);
-      }
+      });
     });
+
+    await t.test(
+      'a resumed check-driven stage records the evidence of an uninterrupted one',
+      async () => {
+        const id = `station-${++serial}`;
+        const station = bellowsStation(id);
+        const recipe = stationRecipe(id, [station.id, 'sm-tool-anvil']);
+        const authority = system.toolBreakage;
+        system.toolBreakage = { authority: 'checkDriven' };
+        try {
+          await withOwnedAnvil(async () => {
+            const uninterrupted = await stationStage(recipe, station);
+            assert.deepEqual(
+              uninterrupted.map((entry) => [entry.toolId, entry.virtual === true]),
+              [
+                [station.id, true],
+                ['sm-tool-anvil', false],
+              ]
+            );
+            assert.deepEqual(
+              await stationStage(recipe, station, { stopAt: 'apply-tools' }),
+              uninterrupted
+            );
+            // Applied tools replay from their receipt, even once the owned item is gone.
+            const replayed = await stationStage(recipe, station, {
+              stopAt: 'award-results',
+              beforeResume: () => actor.items.splice(actor.items.indexOf(anvil), 1),
+            });
+            assert.deepEqual(replayed, uninterrupted);
+          });
+        } finally {
+          system.toolBreakage = authority;
+        }
+      }
+    );
   });
 });
