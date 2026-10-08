@@ -258,15 +258,14 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
 
   _buildServices() {
     // Derive the system-scoped virtual-present tool payload from the active
-    // canvas Tool. When a Tool station is active, BOTH its componentId AND its
-    // owning crafting system are threaded into the gathering listing/attempt API
-    // as `presentTools = { systemId, componentIds }`. The prerequisite check
+    // canvas Tool. When a Tool station is active, its tool ids AND its owning
+    // crafting system are threaded into the gathering and crafting seams below
+    // as `presentTools = { systemId, componentIds, toolIds }`. The prerequisite check
     // treats the componentId as present without an owned item, but ONLY for tasks
     // in the matching crafting system — componentId is a per-system id, so a tool
     // from system A must not satisfy a system-B task whose required tool shares
     // the same componentId string. The engine excludes a virtual match from
-    // breakage/usage. This is the single app→engine threading boundary for the
-    // gathering surface. With no active tool the payload is null (inert).
+    // breakage/usage. With no active tool the payload is null (inert).
     // Issue 1119: the payload carries the station's library TOOL id alongside any
     // componentId. An item-sourced Tool has no componentId, so a componentId-only payload
     // was inert for every station the Tool Studio can author.
@@ -395,7 +394,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Player-facing Journal seams. The store/components never touch Foundry
       // globals; these wrappers are the single Foundry-facing edge.
       listJournalForActor: (opts = {}) => game?.fabricate?.listJournalForActor?.(opts) ?? null,
-      advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
+      advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.({
+        ...opts,
+        presentTools: presentTools(),
+      }) ?? null,
       cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,
       getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,
       getWorldTimeComponents: (worldTime) =>
