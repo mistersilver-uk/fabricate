@@ -21,6 +21,7 @@ import {
   assertGateCases,
   checkGate,
   emptyMarkerFailure,
+  exemptAt,
   gateOver,
   styleCorpusOf,
   workingTree,
@@ -29,6 +30,7 @@ import { repoRoot } from '../helpers/sourceScan.js';
 import {
   MAX_VAR_CHAIN_DEPTH,
   pixelValuesIn,
+  resolveValueCandidates,
   scanPixelDeclarations,
   varReferencesIn,
 } from '../helpers/styleBlockScan.js';
@@ -61,9 +63,12 @@ let cached = null;
 function scan() {
   if (cached === null) {
     const { readFile, listFiles } = workingTree(STYLE_CORPUS);
-    const corpus = styleCorpusOf(readFile, listFiles()).styles;
+    const styleCorpus = styleCorpusOf(readFile, listFiles());
+    const corpus = styleCorpus.styles;
     cached = {
       corpus,
+      // Each declaration with its rule's selector and its own line, for the sheet's absolute check.
+      styleCorpus,
       raw: rawSpacing(corpus),
       // The complement, over the same corpus and the same definitions.
       exempt: scanSpacing(corpus, isExemptSpacingPixels),
@@ -360,9 +365,142 @@ test('no raw spacing literal has been laundered into a private token', () => {
   );
 });
 
-/* ───────────────────────── proofs against throwaway repositories ───────────────────────── */
+/* ───────────────────────── the sheet is on the scale (issue 1523) ───────────────────────── */
 
 const SHEET = 'styles/fabricate.css';
+
+/**
+ * The sheet's rules that style the PLAYER apps, by whole selector. Their spacing is the player
+ * sweep's (issue 1523 PR13), so the absolute check below reads past them, and an entry whose rule
+ * no longer carries a raw literal is stale and fails.
+ */
+const PLAYER_SHEET_RULES = Object.freeze([
+  // The icon rail's count pip, which only the player window's `FabricateAppRoot` draws.
+  '.fabricate-nav .fabricate-app-nav-count',
+]);
+
+/** A length in a unit the spacing scale never publishes, which the pixel scan cannot see. */
+const NON_PIXEL_LENGTH =
+  /(?<![\w.-])(?:\d+(?:\.\d+)?|\.\d+)(?:r?em|ch|ex|vh|vw|vmin|vmax|%)(?![\w-])/giu;
+
+/** The positioning offsets, which `ui-visual-style` rules are NOT spacing-scale members. */
+const POSITION_OFFSET =
+  /^(?:top|right|bottom|left|inset(?:-(?:block|inline)(?:-(?:start|end))?)?)$/iu;
+
+/**
+ * Every length in one spacing value that is not on the scale: a pixel literal outside the spec's
+ * two exemptions, found through any private custom property, or a non-pixel length.
+ *
+ * @param {string} value A declaration's raw value text.
+ * @param {Map<string, string[]>} definitions Custom properties, the scale already removed.
+ */
+function offScaleLengthsIn(value, definitions) {
+  const found = new Set();
+  for (const candidate of resolveValueCandidates(value, definitions).candidates) {
+    for (const pixels of pixelValuesIn(candidate)) {
+      if (!isExemptSpacingPixels(pixels)) found.add(`${pixels}px`);
+    }
+    for (const [length] of candidate.matchAll(NON_PIXEL_LENGTH)) found.add(length);
+  }
+  return [...found];
+}
+
+test('the off-scale classifier reads tokens, exemptions, private tokens and other units', () => {
+  const definitions = new Map([['--inset', ['13px']]]);
+  const probes = {
+    '14px': ['14px'],
+    'var(--fab-space-3)': [],
+    '1px var(--fab-space-chip)': [],
+    'calc(-1 * var(--fab-space-2))': [],
+    '36px 0 0': [],
+    '0 auto': [],
+    'var(--inset)': ['13px'],
+    '0.15rem': ['0.15rem'],
+    '0 0.4em': ['0.4em'],
+  };
+  for (const [value, expected] of Object.entries(probes)) {
+    assert.deepEqual(offScaleLengthsIn(value, definitions), expected, value);
+  }
+});
+
+test('no spacing length in the sheet is off the scale, outside its player rules', () => {
+  const { styleCorpus } = scan();
+  const definitions = new Map(
+    [...styleCorpus.definitions].filter(([name]) => !isSpacingScaleToken(name))
+  );
+  const scanned = new Set(SCANNED_SPACING_PROPERTIES);
+  const sheet = styleCorpus.declarations.filter(
+    (declaration) =>
+      declaration.file === SHEET &&
+      scanned.has(declaration.property.toLowerCase()) &&
+      !exemptAt(SHEET, styleCorpus.sources[SHEET], declaration.at)
+  );
+  assert.ok(
+    sheet.length >= STYLESHEET_SPACING_DECLARATION_FLOOR,
+    `only ${sheet.length} spacing declarations read in ${SHEET}, so this check is not reading it`
+  );
+
+  const failures = [];
+  const playerResidue = new Set();
+  for (const declaration of sheet) {
+    const lengths = offScaleLengthsIn(declaration.value, definitions);
+    if (lengths.length === 0) continue;
+    if (PLAYER_SHEET_RULES.includes(declaration.selector)) {
+      playerResidue.add(declaration.selector);
+      continue;
+    }
+    failures.push(
+      `${SHEET}:${declaration.at} ${declaration.selector}\n      ` +
+        `${declaration.property}: ${declaration.value} (${lengths.join(', ')})`
+    );
+  }
+
+  assert.deepEqual(
+    failures,
+    [],
+    'a spacing length in the sheet is off the published scale. Snap it to the nearest ' +
+      `\`${SPACING_SCALE_PREFIX}-*\` member and write the token; a tie goes to the main 4px rung ` +
+      'against a fine one, and up between two main rungs. A rule that styles a player app goes ' +
+      'in PLAYER_SHEET_RULES with the reason:\n  ' +
+      failures.join('\n  ')
+  );
+  assert.deepEqual(
+    PLAYER_SHEET_RULES.filter((selector) => !playerResidue.has(selector)),
+    [],
+    'a PLAYER_SHEET_RULES entry no longer carries an off-scale length (or its selector changed); ' +
+      'delete the entry so the list cannot exempt what replaces it'
+  );
+});
+
+test('no positioning offset in the sheet reads the spacing scale', () => {
+  const { styleCorpus } = scan();
+  const offsets = styleCorpus.declarations.filter(
+    (declaration) => declaration.file === SHEET && POSITION_OFFSET.test(declaration.property)
+  );
+  assert.ok(offsets.length >= 40, `only ${offsets.length} offsets read in ${SHEET}`);
+
+  const reading = offsets
+    .filter(
+      (declaration) =>
+        !PLAYER_SHEET_RULES.includes(declaration.selector) &&
+        varReferencesIn(declaration.value).some((reference) => isSpacingScaleToken(reference.name))
+    )
+    .map(
+      (declaration) =>
+        `${SHEET}:${declaration.at} ${declaration.selector} ${declaration.property}: ` +
+        declaration.value
+    );
+  assert.deepEqual(
+    reading,
+    [],
+    'a positioning offset reads the spacing scale. `ui-visual-style` rules offsets out of the ' +
+      'scale, so write the offset as a literal:\n  ' +
+      reading.join('\n  ')
+  );
+});
+
+/* ───────────────────────── proofs against throwaway repositories ───────────────────────── */
+
 const PROBE = 'src/ui/svelte/Probe.svelte';
 const REASON = 'ratchet-exempt(design-system): the probe needs it';
 
