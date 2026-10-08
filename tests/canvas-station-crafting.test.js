@@ -612,6 +612,25 @@ test('canvas stations reach the player crafting path', async (t) => {
       assert.deepEqual(stock(), { ore: before.ore - 1, ingot: before.ingot + 1 });
     });
 
+    await t.test('an unapplied resume refuses when its planned owned item is gone', async () => {
+      const id = `station-${++serial}`;
+      const station = bellowsStation(id);
+      const recipe = stationRecipe(id, [station.id, 'sm-tool-anvil']);
+      await withOwnedAnvil(async () => {
+        await assert.rejects(
+          () =>
+            stationStage(recipe, station, {
+              stopAt: 'apply-tools',
+              beforeResume: () => {
+                const index = actor.items.indexOf(anvil);
+                if (index !== -1) actor.items.splice(index, 1);
+              },
+            }),
+          /no longer available/
+        );
+      });
+    });
+
     await t.test('a resumed stage pairs each planned tool item with its own Tool', async () => {
       // [virtual A (one use, destroy), owned B]: B is the lab's own anvil Tool, the identity the
       // owned anvil Item is stamped with.
