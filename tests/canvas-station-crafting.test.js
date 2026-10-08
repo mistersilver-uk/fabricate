@@ -1,5 +1,6 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
+
 import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
 
 // Use the production app, facade, presenter and engine in the existing Foundry host.
@@ -203,7 +204,7 @@ test('canvas stations reach the player crafting path', async (t) => {
         assert.equal((await services.craftRecipe(options)).success, true);
       } finally {
         const index = actor.items.indexOf(anvil);
-        if (index >= 0) actor.items.splice(index, 1);
+        if (index !== -1) actor.items.splice(index, 1);
       }
     });
 
@@ -214,7 +215,7 @@ test('canvas stations reach the player crafting path', async (t) => {
       services.crafting.select(recipe.id);
       assert.equal(services.crafting.selectedRecipe.ingredientSets[0].craftability.canCraft, false);
       app.rendered = true;
-      app.bringToFront = () => {};
+      app.bringToFront = () => undefined;
       App._instance = app;
       try {
         await App.show('crafting', { activeCanvasTool, actorId: actor.id });
