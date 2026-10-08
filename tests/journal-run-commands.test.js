@@ -8,6 +8,7 @@ import { publicAdvantageOffer } from '../src/systems/checkAdvantage.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
+import { engineWithStationPresence } from '../src/systems/stationPresence.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
@@ -239,8 +240,50 @@ describe('journal run command protocol', () => {
     const end = source.indexOf('export function createJournalCommandsForFabricate(', start);
     assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
     return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`,
-      ['resolveAlchemySubmissions', 'resolvedComponentsFor', 'createManagerMutation', 'publicAdvantageOffer'])(
-        resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation, publicAdvantageOffer);
+      ['resolveAlchemySubmissions', 'resolvedComponentsFor', 'createManagerMutation', 'publicAdvantageOffer',
+        'engineWithStationPresence'])(
+        resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation, publicAdvantageOffer,
+        engineWithStationPresence);
+  }
+
+  /** An engine whose stage methods record their receiver and the station its Tool consult sees. */
+  function stationRecordingEngine() {
+    const recipeManager = {
+      resolveToolStates: (_recipe, _tools, _actors, options) => options?.presentTools ?? null,
+      evaluateCraftability: () => null,
+    };
+    const engine = { recipeManager };
+    const calls = [];
+    for (const method of ['startVersionedRun', 'executeVersionedStage', 'beginVersionedStage',
+      'describeVersionedStageCheck']) {
+      engine[method] = function record(args) {
+        const station = this.recipeManager.resolveToolStates(null, [], [], { presentTools: null });
+        calls.push({ method, receiver: this, station, args });
+        return { success: true, required: false };
+      };
+    }
+    return { engine, recipeManager, calls };
+  }
+
+  for (const operation of ['start', 'execute', 'beginStep', 'describeCheck']) {
+    it(`answers a crafting ${operation}'s Tool presence from that command's station only (issue 2265)`, async () => {
+      const { engine, recipeManager, calls } = stationRecordingEngine();
+      const shared = { engine: Reflect.ownKeys(engine), recipeManager: Reflect.ownKeys(recipeManager) };
+      const operations = loadCraftingOperations()({ craftingEngine: engine }, () => null);
+      const station = { systemId: 'smithing', componentIds: [], toolIds: ['anvil'] };
+      const command = { actor: { uuid: 'Actor.a' }, run: { id: 'run-1' }, sender: { id: 'gm', isGM: true } };
+
+      await operations[operation]({ ...command, payload: { presentTools: station } });
+      await operations[operation]({ ...command, payload: {} });
+
+      assert.deepEqual(calls[0].station, station, 'the command\'s own station is present');
+      assert.notEqual(calls[0].receiver, engine, 'through a per-command view');
+      assert.equal(calls[1].station, null, 'a later station-less command inherits nothing');
+      assert.equal(calls[1].receiver, engine, 'and runs on the shared engine itself');
+      assert.equal(engine.recipeManager, recipeManager);
+      assert.deepEqual(Reflect.ownKeys(engine), shared.engine, 'the shared engine is unchanged');
+      assert.deepEqual(Reflect.ownKeys(recipeManager), shared.recipeManager);
+    });
   }
 
   for (const kind of ['crafting', 'matched-alchemy', 'fizzle']) {
@@ -957,6 +1000,48 @@ describe('journal run command protocol', () => {
       },
     }]);
     assert.deepEqual(result.results, [resultItem]);
+  });
+
+  it('carries a station as its own crafting payload key, only when one is supplied (issue 2265)', async () => {
+    const station = { systemId: 'smithing', componentIds: [], toolIds: ['anvil'] };
+    const commands = [];
+    const ready = { success: true, runId: 'run-1', runRevision: 2, requiresExecution: true, canExecuteImmediately: true };
+    const service = {
+      async executeJournalRunCommand(command) {
+        commands.push(command);
+        return ready;
+      },
+      consumeExecutionGrant: () => null,
+    };
+    const crafting = { installVersionedRunAuthority(authority) { this.authority = authority; } };
+    installCraftingJournalRunAuthority({ engine: crafting, service });
+    const selectionPlan = { selectedIngredientSetId: 'set-1' };
+    const actor = { uuid: 'Actor.a' };
+    await crafting.authority.requestStart({ actor, recipeId: 'r', selectionPlan, presentTools: station });
+    await crafting.authority.requestExecute({ actor, runId: 'run-1', expectedRevision: 1, selectionPlan,
+      presentTools: station });
+    await crafting.authority.requestExecute({ actor, runId: 'run-1', expectedRevision: 1, selectionPlan,
+      presentTools: null });
+    await executePublicCraft({
+      engine: { craft: async () => ready },
+      actor,
+      sourceActors: [actor],
+      recipe: { id: 'r' },
+      ingredientSetId: 'set-1',
+      options: { presentTools: station },
+      executeCommand: (command) => service.executeJournalRunCommand(command),
+    });
+
+    assert.deepEqual(commands.map((command) => [command.action, command.payload.presentTools]), [
+      ['start', station],
+      ['execute', station],
+      ['execute', undefined],
+      ['execute', station],
+    ]);
+    assert.equal(Object.hasOwn(commands[2].payload, 'presentTools'), false, 'no key without a station');
+    for (const command of commands) {
+      assert.equal(Object.hasOwn(command.payload.selectionPlan ?? {}, 'presentTools'), false);
+    }
   });
 
   it('leaves waiting and unresolved-choice public crafts editable without stage execution', async () => {

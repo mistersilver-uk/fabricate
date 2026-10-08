@@ -2651,6 +2651,11 @@ export class CraftingEngine {
       return versionedFailure('The crafting run lifecycle version is unsupported.');
     }
     if (contract !== 'current' && options?.lifecycleVersion !== 1) return null;
+    const selectionPlan = {
+      selectedIngredientSetId: ingredientSetId,
+      ingredientOptionOverrides: options?.ingredientOptionOverrides,
+      ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
+    };
 
     if (existing) {
       const requestExecute = this.versionedRunAuthority?.requestExecute;
@@ -2660,11 +2665,8 @@ export class CraftingEngine {
         componentSourceActors: sourceActors,
         runId: existing.id,
         expectedRevision: existing.runRevision,
-        selectionPlan: {
-          selectedIngredientSetId: ingredientSetId,
-          ingredientOptionOverrides: options?.ingredientOptionOverrides,
-          ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
-        },
+        selectionPlan,
+        presentTools: options?.presentTools,
       });
     }
 
@@ -2674,12 +2676,9 @@ export class CraftingEngine {
       actor,
       sourceActors,
       recipeId: recipe?.id,
-      selectionPlan: {
-        selectedIngredientSetId: ingredientSetId,
-        ingredientOptionOverrides: options?.ingredientOptionOverrides,
-        ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
-      },
+      selectionPlan,
       completionMode: options?.completionMode || 'manual',
+      presentTools: options?.presentTools,
     });
   }
 
