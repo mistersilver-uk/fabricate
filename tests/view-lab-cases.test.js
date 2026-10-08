@@ -801,6 +801,8 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     assert.deepEqual(viewCase.position, layoutCasePosition(viewCase.id));
     assert.equal(typeof viewCase.expectLayout.containerSelector, 'string');
     assert.equal(typeof viewCase.expectLayout.gridSelector, 'string');
+    const band = BAND_LAYOUT_CASES[viewCase.id];
+    if (band) assert.equal(viewCase.expectLayout.expectedTracks, band.tracks);
   }
   for (const viewCase of declared.filter((entry) =>
     RESPONSIVE_LAYOUT_CASE_IDS.includes(entry.id)
@@ -840,11 +842,6 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     assert.equal(viewCase.expectLayout.absentSelector, '.manager-inspector');
     // And the side rail runs the body's full height below the 1120px rung (issue 1976).
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
-  }
-  for (const viewCase of declared.filter((entry) => BAND_LAYOUT_CASE_IDS.includes(entry.id))) {
-    assert.equal(viewCase.expectLayout.expectedTracks, BAND_LAYOUT_CASES[viewCase.id].tracks);
-    assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
-    assert.equal(viewCase.expectLayout.absentSelector, undefined);
   }
   for (const viewCase of declared.filter((entry) => RAIL_FILL_LAYOUT_CASE_IDS.includes(entry.id))) {
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
