@@ -399,12 +399,18 @@ const MEDIA_AT_RULE = /@media\b([^{]*)\{/gu;
 /** The user-preference features a query may test. Everything else is a viewport breakpoint. */
 const USER_PREFERENCE = /prefers-reduced-motion|prefers-contrast|forced-colors/u;
 
-/** Every `@media` in the corpus, with its query normalised and its line. */
-function mediaQueries(corpus) {
+/** An `@container` at-rule with a block, and its prelude. */
+const CONTAINER_AT_RULE = /@container\b([^{]*)\{/gu;
+
+/** A prelude that opens with a container name: an identifier that is not a keyword, then a space. */
+const NAMED_CONTAINER = /^(?!(?:not|and|or|none)\s)(-?[a-z_][\w-]*)\s/iu;
+
+/** Every at-rule `pattern` opens in the corpus, with its prelude normalised and its line. */
+function atRules(corpus, pattern) {
   const found = [];
   for (const [file, css] of Object.entries(corpus.styles)) {
-    MEDIA_AT_RULE.lastIndex = 0;
-    for (let match = MEDIA_AT_RULE.exec(css); match !== null; match = MEDIA_AT_RULE.exec(css)) {
+    pattern.lastIndex = 0;
+    for (let match = pattern.exec(css); match !== null; match = pattern.exec(css)) {
       found.push({
         file,
         line: css.slice(0, match.index).split('\n').length,
@@ -415,15 +421,56 @@ function mediaQueries(corpus) {
   return found;
 }
 
-const VIEWPORT_MEDIA_GATE = styleGate((corpus) =>
-  mediaQueries(corpus)
-    .filter((entry) => !USER_PREFERENCE.test(entry.query))
-    .map((entry) => ({ ...entry, id: `viewport @media ${entry.query}`, value: entry.query }))
-);
+/** Every `@media` in the corpus. */
+const mediaQueries = (corpus) => atRules(corpus, MEDIA_AT_RULE);
 
-test('no viewport breakpoint is introduced, and user-preference queries stay exempt', (t) => {
+/** Every `@media` that asks about the viewport rather than about the reader. */
+const viewportQueries = (corpus) =>
+  mediaQueries(corpus).filter((entry) => !USER_PREFERENCE.test(entry.query));
+
+/** Every `@container` whose prelude names no container, so it answers to the nearest one. */
+const unnamedContainers = (corpus) =>
+  atRules(corpus, CONTAINER_AT_RULE).filter((entry) => !NAMED_CONTAINER.test(entry.query));
+
+const VIEWPORT_MEDIA_GATE = styleGate((corpus) => [
+  ...viewportQueries(corpus).map((entry) => ({
+    ...entry,
+    id: `viewport @media ${entry.query}`,
+    value: `@media ${entry.query}`,
+  })),
+  ...unnamedContainers(corpus).map((entry) => ({
+    ...entry,
+    id: `unnamed @container ${entry.query}`,
+    value: `@container ${entry.query}`,
+  })),
+]);
+
+/** The published app-level ladders: a query against one of these containers breaks on a rung. */
+const APP_CONTAINER_LADDERS = Object.freeze({
+  'fabricate-manager': [1320, 1120, 960, 900, 831, 680],
+  'fabricate-recipes': [714, 634, 554],
+});
+
+/** The rung each width bound in a prelude names: `max-width: n` is n, `min-width: n` is n - 1. */
+function rungsNamed(query) {
+  return [...query.matchAll(/\b(min|max)-width:\s*(\d+)px/gu)].map(([, bound, width]) =>
+    bound === 'min' ? Number(width) - 1 : Number(width)
+  );
+}
+
+/** Every bound in a query against an app container that is not on that container's ladder. */
+const offLadderContainers = (corpus) =>
+  atRules(corpus, CONTAINER_AT_RULE).flatMap((entry) => {
+    const ladder = APP_CONTAINER_LADDERS[NAMED_CONTAINER.exec(entry.query)?.[1]];
+    if (!ladder) return [];
+    return rungsNamed(entry.query)
+      .filter((rung) => !ladder.includes(rung))
+      .map((rung) => ({ ...entry, rung }));
+  });
+
+test('no viewport breakpoint or unnamed container is introduced, and preferences stay exempt', (t) => {
   const all = mediaQueries(treeStyles());
-  const gated = all.filter((entry) => !USER_PREFERENCE.test(entry.query));
+  const gated = viewportQueries(treeStyles());
 
   // THE EXEMPTION, PROVED LIVE. A predicate that quietly matched everything would empty this
   // population wholesale, which reads like debt paid down rather than like a gate switched off.
@@ -443,8 +490,51 @@ test('no viewport breakpoint is introduced, and user-preference queries stay exe
       'and is not the viewport, so a `@media (max-width: …)` asks the wrong question and answers ' +
       'it with the monitor. Use a container query against the app root. `prefers-reduced-motion`, ' +
       '`prefers-contrast` and `forced-colors` are user preferences rather than geometry and stay ' +
-      'exempt.'
+      'exempt. A container query names its container: an unnamed one answers to whichever ' +
+      'container is nearest, which moves the moment a host declares one.'
   );
+});
+
+// Absolute, not against the base: the swept scope asks no viewport query, names every container
+// and breaks an app container on its published ladder.
+test('the sheet, components and manager ask no viewport, name every container and keep the ladder', () => {
+  const corpus = treeStyles();
+  const inScope = (entry) => SWEEP_SCOPE.test(entry.file);
+  const site = (entry) => `${entry.file}:${entry.line} ${entry.query}`;
+  const containers = atRules(corpus, CONTAINER_AT_RULE).filter(inScope);
+  assert.ok(containers.length >= 30, `only ${containers.length} in-scope container queries`);
+  assert.deepEqual(viewportQueries(corpus).filter(inScope).map(site), [], 'a viewport `@media`');
+  assert.deepEqual(unnamedContainers(corpus).filter(inScope).map(site), [], 'an unnamed container');
+  assert.deepEqual(
+    offLadderContainers(corpus).map((entry) => `${site(entry)} → ${entry.rung}`),
+    [],
+    'an app container breaks at a rung of its published ladder: the manager at 1320, 1120, 960, ' +
+      '900, 831 and 680, the recipes at 714, 634 and 554'
+  );
+});
+
+test('an unnamed container query fails, and a named one or a ladder rung passes', (t) => {
+  const corpusOf = (css) => ({ styles: { [MODULE_SHEET]: css } });
+  const named = '@container fabricate-manager (max-width: 680px) { .a { gap: 0; } }';
+  const unnamed = '@container (max-width: 680px) { .a { gap: 0; } }';
+  assert.deepEqual(unnamedContainers(corpusOf(named)), []);
+  assert.equal(unnamedContainers(corpusOf('@container not (width > 1px) { .a {} }')).length, 1);
+  assert.equal(unnamedContainers(corpusOf(unnamed)).length, 1);
+  assert.deepEqual(offLadderContainers(corpusOf(named)), []);
+  assert.deepEqual(
+    offLadderContainers(
+      corpusOf('@container fabricate-manager (min-width: 832px) and (max-width: 1000px) {}')
+    ).map((entry) => entry.rung),
+    [1000]
+  );
+  const base = { [MODULE_SHEET]: '.fabricate .a { gap: 0; }\n' };
+  assertGateCases(t, VIEWPORT_MEDIA_GATE, base, [
+    {
+      head: { [MODULE_SHEET]: `${base[MODULE_SHEET]}${unnamed}\n` },
+      failures: [`${MODULE_SHEET}: unnamed @container (max-width: 680px) is new (1)`],
+    },
+    { head: { [MODULE_SHEET]: `${base[MODULE_SHEET]}${named}\n` }, failures: [] },
+  ]);
 });
 
 /* ─────────────────────────────── gate 3: weights ─────────────────────────────── */
