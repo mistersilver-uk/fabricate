@@ -397,12 +397,14 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and
 ## Active Canvas Tool
 
 Activating a Tool interactable opens the **Crafting** tab (`describeGrant` returns `{ tab: 'crafting' }`; the Crafting tab is a shipped player surface — recipe browse/detail/shopping list/craft/run summary — and the injected tool feeds tool-availability checks, with the active-tool chip in the header as the visible marker).
-The payload is **system-scoped** (`presentTools = { systemId, componentIds }`) so a system-A station tool cannot satisfy a system-B prerequisite sharing a `componentId`.
-Set on the `SvelteFabricateApp` instance via `show('crafting', { activeCanvasTool })` and cleared on close; never persisted to a run record.
+The payload is **system-scoped** (`presentTools = { systemId, componentIds, toolIds }`, keyed by the station's library `toolId` and any linked `componentId`) so a system-A station tool cannot satisfy a system-B prerequisite sharing a `componentId` or `toolId`.
+Set on the `SvelteFabricateApp` instance by `show('crafting', { activeCanvasTool })`, replaced on every show, and cleared by a plain `show(tab)` and by close.
+It is carried per call — to recipe detail, selected-set evaluation, craft submission, the step advance and the Journal listing — and per Journal run command as that crafting command's own `payload.presentTools`, which the active GM applies to that command alone through a per-command presence view.
+It is never persisted to a run record, a stage's `selectionPlan` or the run authority's ledger.
 **UI placement:** the active station tool is surfaced as an accent-pill status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/realm), implemented in `ActorSelectTopBar` (`.actor-bar-tool-chip`); the chip appears on whatever tab is active (gathering next to the conditions; crafting/alchemy in the otherwise-empty right).
 When the Crafting and (conditional, feature-gated) Alchemy tabs gain their own header/context bars, the chip should move into that bar's right side next to the tab's own context info.
 
-Canonical mapping: `activeCanvasTool`, `presentTools`, `SvelteFabricateApp.svelte.js`, `gatheringToolRuntime.resolvePresentComponentIds`, `ActorSelectTopBar.svelte`
+Canonical mapping: `activeCanvasTool`, `presentTools`, `SvelteFabricateApp.svelte.js`, `src/systems/stationPresence.js` (`withStationPresence`/`engineWithStationPresence`), `gatheringToolRuntime.resolvePresentComponentIds`, `ActorSelectTopBar.svelte`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
