@@ -770,7 +770,7 @@ test('manager environments browser and edit route define compact responsive geom
     'environment thumbnails should render as a square 64px image that suits both scene thumbnails and chosen images'
   );
   assert.ok(
-    taskCountBlock.includes('font-weight: 800;'),
+    taskCountBlock.includes('font-weight: 700;'),
     'environment task count should render as plain emphasized text'
   );
   assert.ok(

@@ -238,12 +238,6 @@
     list-style: none;
   }
 
-  .manager-chip.is-mono {
-    font-family: var(--fab-font-mono);
-    font-variant-numeric: tabular-nums;
-    font-weight: 500;
-  }
-
   .manager-chip.is-active,
   .manager-chip.is-positive {
     border-color: var(--fab-success-border);
@@ -368,6 +362,12 @@
     border-radius: 999px;
     font-size: 10px;
     font-weight: 600;
+  }
+
+  .manager-chip.is-mono {
+    font-family: var(--fab-font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
   }
 
   .manager-chip.is-icon-only {

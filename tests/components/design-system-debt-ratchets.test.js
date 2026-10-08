@@ -74,6 +74,9 @@ const MODULE_SHEET = 'styles/fabricate.css';
 /** The class every Fabricate application root emits, and the root a module utility hangs from. */
 const MODULE_ROOT = '.fabricate';
 
+/** The sheet, the shared components and the manager; the player apps are a later pass's. */
+const SWEEP_SCOPE = /^(?:styles\/|src\/ui\/svelte\/(?:components|apps\/manager)\/)/u;
+
 test('both stylesheet corpora are still being read', () => {
   // A TOTAL HAS SLACK AND CANNOT SEE A PARTIAL LOSS. Break the `<style>` extractor and 195 files
   // stop contributing while the 20,000-line sheet still does, which a combined floor sails past —
@@ -545,6 +548,27 @@ test('no mono rule asks for a weight the shipped face does not have', (t) => {
   );
 });
 
+// Absolute, not against the base: the swept scope holds no off-ramp weight and no heavy mono.
+test('no weight in the sheet, components and manager leaves the ramp or the mono face', () => {
+  const corpus = treeStyles();
+  const unmarked = (d) =>
+    SWEEP_SCOPE.test(d.file) && !exemptAt(d.file, corpus.sources[d.file], d.at);
+  const site = (d) => `${d.file}: ${d.selector} | ${d.value}`;
+  const weights = fontWeights(corpus).filter(unmarked);
+  assert.ok(weights.length >= 500, `only ${weights.length} in-scope weights were read`);
+  assert.deepEqual(
+    weights.filter((d) => !WEIGHT_RAMP.includes(d.value)).map(site),
+    [],
+    'a weight is a numeral on the 400/500/600/700 ramp: 650 → 600, 800 → 700, and `inherit` ' +
+      'states the numeral it resolves to'
+  );
+  assert.deepEqual(
+    heavyMonoWeights(corpus).filter(unmarked).map(site),
+    [],
+    'the mono face ships 400 and 500 only: a mono rule above 500 → 500'
+  );
+});
+
 /* ─────────────────────────────── gate 4: shadows ─────────────────────────────── */
 
 /** The three published elevation tokens. */
@@ -946,9 +970,6 @@ function cornerBand(px) {
 /** A corner that names a shape rather than a band: square, a pill or track, a circle. */
 const SHAPE_CORNERS = Object.freeze(['0', '999px', '50%', 'inherit']);
 
-/** The sheet, the shared components and the manager; the player apps are a later pass's. */
-const CORNER_SCOPE = /^(?:styles\/|src\/ui\/svelte\/(?:components|apps\/manager)\/)/u;
-
 /** Sized rules whose corner follows another kind: `[file: selector, its corners, why]`. */
 const CORNER_KIND_EXCEPTIONS = Object.freeze([
   [
@@ -1079,7 +1100,7 @@ const cornersOf = (radii, definitions) => [
 function offBandCorners({ declarations, definitions, sources }) {
   const rules = new Map();
   for (const declaration of declarations) {
-    if (!CORNER_SCOPE.test(declaration.file)) continue;
+    if (!SWEEP_SCOPE.test(declaration.file)) continue;
     const key = `${declaration.file}: ${declaration.selector}\u{0}${declaration.line}`;
     rules.set(key, [...(rules.get(key) ?? []), declaration]);
   }

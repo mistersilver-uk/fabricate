@@ -329,7 +329,7 @@
     width: 100%;
     height: 30px;
     font-size: 1.05rem;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .fab-stepper.is-comfortable:not(.is-vertical) .fab-stepper-adjunct {

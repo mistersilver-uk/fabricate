@@ -387,4 +387,10 @@
   .manager-editor-tab-button.is-danger.is-active {
     border-bottom-color: var(--fab-danger-border);
   }
+
+  /* The sheet draws this badge in the mono face, which ships 500 at most; its layered rule cannot
+     out-rank the chip's own 700, so the weight is stated here. */
+  .fabricate-tabs :global(.manager-chip.manager-editor-tab-badge) {
+    font-weight: 500;
+  }
 </style>

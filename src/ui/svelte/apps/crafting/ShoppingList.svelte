@@ -494,7 +494,7 @@
     text-align: left;
     font-family: inherit;
     font-size: inherit;
-    font-weight: inherit;
+    font-weight: 400;
     line-height: inherit;
     cursor: pointer;
   }

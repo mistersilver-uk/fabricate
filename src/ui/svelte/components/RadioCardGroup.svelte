@@ -128,6 +128,6 @@
     color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
     font-size: 0.72rem;
-    font-weight: 600;
+    font-weight: 500;
   }
 </style>

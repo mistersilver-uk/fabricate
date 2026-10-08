@@ -835,7 +835,7 @@
     min-width: 26px;
     text-align: center;
     font-family: var(--fab-font-mono, monospace);
-    font-weight: 600;
+    font-weight: 500;
     font-size: 0.95rem;
     color: var(--fab-text);
   }
