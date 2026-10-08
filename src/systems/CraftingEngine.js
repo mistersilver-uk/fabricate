@@ -1910,17 +1910,15 @@ export class CraftingEngine {
         : undefined;
     const effects = new Map(journal.effects.map((effect) => [effect.effectId, effect]));
     const toolEffect = effects.get('apply-tools');
+    const applied = toolEffect?.phase === 'applied';
     const toolItems = (toolEffect?.planned || []).map((itemUuid) => {
       const item = findItemByUuid([actor, ...(componentSourceActors || [])], itemUuid);
-      if (!item && toolEffect.phase !== 'applied') {
-        throw new CraftingLifecycleExecutionError(
-          'A planned crafting tool is no longer available',
-          'STAGE_RECONSTRUCTION_FAILED'
-        );
-      }
-      return item ?? rehydrateVersionedItem({ itemUuid });
+      return item ?? (applied ? rehydrateVersionedItem({ itemUuid }) : null);
     });
-    const toolPairs = pairPlannedTools(this.recipeManager, executionRecipe, selectedSet, toolItems);
+    const toolPairs = pairPlannedTools(this.recipeManager, executionRecipe, selectedSet, {
+      items: toolItems,
+      applied,
+    });
     const currencySpends = cloneJsonValue(effects.get('spend-currency')?.planned) ?? [];
     return {
       valid: true,
