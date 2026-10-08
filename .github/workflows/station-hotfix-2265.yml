@@ -1,0 +1,42 @@
+name: Station hotfix 2265 validation
+on:
+  push:
+    branches:
+      - work/2265-station-hotfix-validation
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Inspect pinned source boundaries
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess, re
+          refs = ['2b35db158ebca753186b80ce4ac47842250896da', '4f92d687dda38e0b64f57d42ce7e51bcc66b006f']
+          files = {
+            'src/systems/RecipeManager.js': ['_buildToolStates(', 'evaluateCraftability(', '_resolvePresent'],
+            'src/ui/SvelteFabricateApp.svelte.js': ['static async show(', 'static show(', 'async close('],
+            'src/systems/CraftingListingBuilder.js': ['_buildRecipeModel(', 'evaluateCraftability('],
+            'src/ui/presenters/CraftingListingBuilder.js': ['_buildRecipeModel(', 'evaluateCraftability('],
+          }
+          for ref in refs:
+            print('\nBASE', ref)
+            for path, needles in files.items():
+              result = subprocess.run(['git', 'show', f'{ref}:{path}'], text=True, capture_output=True)
+              if result.returncode: continue
+              lines = result.stdout.splitlines()
+              print('\nFILE', path, 'LINES', len(lines))
+              indexes = sorted({i for i,line in enumerate(lines) if any(n in line for n in needles)})
+              for i in indexes:
+                print('\n'.join(f'{j+1}: {lines[j]}' for j in range(max(0,i-5), min(len(lines),i+55))))
+          print('\nHARNESS FILES')
+          print(subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', refs[0], 'tests/helpers'], text=True))
+          print('\nPACKAGE')
+          print(subprocess.check_output(['git', 'show', refs[0]+':package.json'], text=True))
+          PY
