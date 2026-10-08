@@ -163,7 +163,7 @@ after(async () => {
  * `::before`), and what `elementFromPoint` resolves just inside each extended edge, just outside
  * it, and on the neighbour's near edge.
  */
-const measure = (caseId, selector, neighbourSelector) =>
+const measure = (caseId, selector, neighbourSelector = null) =>
   tab.evaluate(
     ({ caseId, selector, neighbourSelector }) => {
       const root = document.querySelector(`[data-case="${caseId}"]`);
@@ -223,21 +223,32 @@ const assertTarget = (label, result, painted) => {
     `${label}: target ${result.target.width}x${result.target.height} is under 24x24`
   );
   assert.deepEqual(result.box, painted, `${label}: the painted box moved`);
-  for (const [edge, owner] of Object.entries(result.inside)) {
-    assert.equal(owner, 'control', `${label}: a point just inside the ${edge} of the target`);
+  for (const [side, edges, belongs] of [
+    ['inside', result.inside, true],
+    ['outside', result.outside, false],
+  ]) {
+    for (const [edge, owner] of Object.entries(edges)) {
+      assert.equal(
+        owner === 'control',
+        belongs,
+        `${label}: a point ${side} the ${edge} of the target resolved to ${owner}`
+      );
+    }
   }
-  for (const [edge, owner] of Object.entries(result.outside)) {
-    assert.notEqual(owner, 'control', `${label}: a point just past the ${edge} of the target`);
-  }
-  for (const owner of result.nearEdges.filter(Boolean)) {
-    assert.equal(owner, 'neighbour', `${label}: the neighbour's own edge belongs to the control`);
-  }
-  for (const gap of result.gaps) {
-    assert.ok(
-      (result.target.width - result.box.width) / 2 <= gap + 0.01,
-      `${label}: the extension reaches the neighbour (gap ${gap})`
-    );
-  }
+  const reach = (result.target.width - result.box.width) / 2;
+  const clear = [
+    ...result.nearEdges
+      .filter(Boolean)
+      .map((owner) => [
+        owner === 'neighbour',
+        `${label}: the neighbour's own edge belongs to ${owner}`,
+      ]),
+    ...result.gaps.map((gap) => [
+      reach <= gap + 0.01,
+      `${label}: the extension reaches the neighbour (gap ${gap})`,
+    ]),
+  ];
+  for (const [holds, message] of clear) assert.ok(holds, message);
 };
 
 describe('24px hit areas, paint unchanged (issue 1523)', () => {
