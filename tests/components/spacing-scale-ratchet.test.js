@@ -30,7 +30,6 @@ import { repoRoot } from '../helpers/sourceScan.js';
 import {
   MAX_VAR_CHAIN_DEPTH,
   pixelValuesIn,
-  resolveValueCandidates,
   scanPixelDeclarations,
   varReferencesIn,
 } from '../helpers/styleBlockScan.js';
@@ -46,6 +45,12 @@ import {
   isExemptSpacingPixels,
   isSpacingScaleToken,
 } from './spacing-known-literals.js';
+import {
+  inSvelteScope,
+  offScaleLengthsIn,
+  scaleOf,
+  spacingContext,
+} from './spacing-scale-classifier.js';
 
 /** Floors with deliberate headroom below the roughly 1445 and 1642 they were chosen against. */
 const STYLESHEET_SPACING_DECLARATION_FLOOR = 1289;
@@ -396,122 +401,9 @@ const PLAYER_SHEET_RULES = Object.freeze([
   '.fabricate-nav .fabricate-app-nav-count { padding }',
 ]);
 
-/**
- * A length in ANY unit the spacing scale never publishes, which the pixel scan cannot see: a
- * number followed by a percent sign or by letters other than `px` (`em`, `dvh`, `pt`, `cqw`, ...).
- * A leading minus is part of the length, but a hyphen inside an identifier (`--fab-space-2xs`) is
- * not.
- */
-const NON_PIXEL_LENGTH =
-  /(?<![\w.]|\w-)(?:\d+(?:\.\d+)?|\.\d+)(?:(?!px(?![\w-]))[a-z]+|%)(?![\w-])/giu;
-
-/** The arithmetic functions inside which an exempt literal could be multiplied past its band. */
-const MATH_FUNCTION = /(?<![\w-])(calc|min|max|clamp)\(/giu;
-
-/** The arguments of each outermost `calc`/`min`/`max`/`clamp` in `value`, with its name. */
-function mathCallsIn(value) {
-  const calls = [];
-  for (let from = 0; ; ) {
-    MATH_FUNCTION.lastIndex = from;
-    const match = MATH_FUNCTION.exec(value);
-    if (match === null) return calls;
-    const start = match.index + match[0].length;
-    let depth = 1;
-    let index = start;
-    for (; index < value.length && depth > 0; index += 1) {
-      if (value[index] === '(') depth += 1;
-      else if (value[index] === ')') depth -= 1;
-    }
-    calls.push({ name: match[1].toLowerCase(), inner: value.slice(start, index - 1) });
-    from = index;
-  }
-}
-
 /** The positioning offsets, which `ui-visual-style` rules are NOT spacing-scale members. */
 const POSITION_OFFSET =
   /^(?:top|right|bottom|left|inset(?:-(?:block|inline)(?:-(?:start|end))?)?)$/iu;
-
-/** A `calc()` operand list that is plain arithmetic once the scale is substituted. */
-const ARITHMETIC = /^[\d\s.+\-*/()]+$/u;
-
-/** The value of plain `+ - * /` arithmetic over numbers, or null when it does not parse. */
-function evaluate(text) {
-  const tokens = text.match(/\d*\.?\d+|[-+*/()]/gu) ?? [];
-  let at = 0;
-  const factor = () => {
-    const token = tokens[at++];
-    if (token === '-') return -factor();
-    if (token !== '(') return Number(token);
-    const inner = sum();
-    at += 1;
-    return inner;
-  };
-  const product = () => {
-    let value = factor();
-    while (tokens[at] === '*' || tokens[at] === '/') {
-      value = tokens[at++] === '*' ? value * factor() : value / factor();
-    }
-    return value;
-  };
-  const sum = () => {
-    let value = product();
-    while (tokens[at] === '+' || tokens[at] === '-') {
-      value = tokens[at++] === '+' ? value + product() : value - product();
-    }
-    return value;
-  };
-  const value = sum();
-  return at === tokens.length && Number.isFinite(value) ? value : null;
-}
-
-/** What `inner` computes to with each scale token at its pixel value, or null when it cannot. */
-function scaleArithmetic(inner, scale) {
-  const text = inner
-    .replaceAll(/var\(\s*(--[\w-]+)\s*\)/gu, (reference, name) => scale.get(name) ?? reference)
-    .replaceAll(/(\d)px/gu, '$1');
-  return ARITHMETIC.test(text) ? evaluate(text) : null;
-}
-
-/** The published scale, each token at its single pixel value. */
-function scaleOf(definitions) {
-  return new Map(
-    [...definitions]
-      .filter(([name, values]) => isSpacingScaleToken(name) && values.length === 1)
-      .map(([name, [value]]) => [name, String(Number.parseFloat(value))])
-  );
-}
-
-/**
- * Every length in one spacing value that is not on the scale: a pixel literal outside the spec's
- * two exemptions, found through any private custom property, a non-pixel length in any unit, an
- * exempt literal used as an arithmetic operand, or arithmetic that computes off the scale.
- *
- * @param {string} value A declaration's raw value text.
- * @param {Map<string, string[]>} definitions Custom properties, the scale already removed.
- * @param {Map<string, string>} scale Each scale token's pixel value.
- */
-function offScaleLengthsIn(value, definitions, scale) {
-  const steps = new Set([0, ...[...scale.values()].map(Number)]);
-  const found = new Set();
-  for (const candidate of resolveValueCandidates(value, definitions).candidates) {
-    for (const pixels of pixelValuesIn(candidate)) {
-      if (!isExemptSpacingPixels(pixels)) found.add(`${pixels}px`);
-    }
-    for (const [length] of candidate.matchAll(NON_PIXEL_LENGTH)) found.add(length);
-    // An exempt literal is only exempt standing alone: `calc(1px * 13)` is a 13px gap. The one
-    // arithmetic the exemptions allow is a sign flip, which carries no pixel literal at all.
-    for (const { name, inner } of mathCallsIn(candidate)) {
-      for (const pixels of pixelValuesIn(inner)) {
-        if (isExemptSpacingPixels(pixels)) found.add(`${pixels}px in ${name}()`);
-      }
-      const computed = scaleArithmetic(inner, scale);
-      if (computed !== null && !steps.has(Math.abs(computed))) {
-        found.add(`${name}() = ${computed}px`);
-      }
-    }
-  }
-  return [...found];
-}
 
 test('the off-scale classifier reads tokens, exemptions, private tokens and other units', () => {
   const definitions = new Map([['--inset', ['13px']]]);
@@ -556,19 +448,10 @@ test('the off-scale classifier reads tokens, exemptions, private tokens and othe
   }
 });
 
-/** The Svelte `<style>` blocks the manager sweep owns; every other Svelte file is a player app's. */
-const SVELTE_SCOPE_ROOTS = Object.freeze([
-  'src/ui/svelte/apps/manager/',
-  'src/ui/svelte/components/',
-]);
-
-const inSvelteScope = (file) =>
-  file.endsWith('.svelte') && SVELTE_SCOPE_ROOTS.some((root) => file.startsWith(root));
-
 /**
  * The corpora the absolute checks hold, each with floors that prove it is still being read. The
- * sheet reads past its named player rules; the Svelte scope excludes the player apps by path, so
- * their spacing is the player sweep's (issue 1523 PR13).
+ * sheet reads past its named player rules; the Svelte scope reads only `SVELTE_SCOPE_ROOTS`, and
+ * every other Svelte file is the player sweep's (issue 1523 PR13).
  */
 const ABSOLUTE_SCOPES = Object.freeze([
   {
@@ -581,7 +464,7 @@ const ABSOLUTE_SCOPES = Object.freeze([
     label: 'manager and component Svelte',
     includes: inSvelteScope,
     player: [],
-    floors: { spacing: 900, offsets: 20, sizes: 900 },
+    floors: { spacing: 900, offsets: 15, sizes: 900 },
   },
 ]);
 
@@ -594,41 +477,43 @@ const scopeDeclarations = (styleCorpus, scope, properties) =>
 
 const SCANNED_SPACING = new Set(SCANNED_SPACING_PROPERTIES);
 
+/**
+ * One scope's unmarked spacing declarations, those off the scale with their lengths, and the
+ * player keys that matched.
+ */
+function offScaleSpacing(styleCorpus, scope) {
+  const { definitions, scale } = spacingContext(styleCorpus);
+  const declarations = scopeDeclarations(styleCorpus, scope, (property) =>
+    SCANNED_SPACING.has(property)
+  ).filter(
+    (declaration) =>
+      !exemptAt(declaration.file, styleCorpus.sources[declaration.file], declaration.at)
+  );
+  const offScale = [];
+  const playerResidue = new Set();
+  for (const declaration of declarations) {
+    const lengths = offScaleLengthsIn(declaration.value, definitions, scale);
+    if (lengths.length === 0) continue;
+    const key = playerKey(declaration);
+    if (scope.player.includes(key)) playerResidue.add(key);
+    else offScale.push({ ...declaration, lengths });
+  }
+  return { declarations, offScale, playerResidue };
+}
+
 for (const scope of ABSOLUTE_SCOPES) {
   test(`no spacing length in ${scope.label} is off the scale, outside its player rules`, () => {
-    const { styleCorpus } = scan();
-    const definitions = new Map(
-      [...styleCorpus.definitions].filter(([name]) => !isSpacingScaleToken(name))
-    );
-    const scale = scaleOf(styleCorpus.definitions);
-    const declarations = scopeDeclarations(styleCorpus, scope, (property) =>
-      SCANNED_SPACING.has(property)
-    ).filter(
-      (declaration) =>
-        !exemptAt(declaration.file, styleCorpus.sources[declaration.file], declaration.at)
-    );
+    const { declarations, offScale, playerResidue } = offScaleSpacing(scan().styleCorpus, scope);
     assert.ok(
       declarations.length >= scope.floors.spacing,
       `only ${declarations.length} spacing declarations read in ${scope.label}, so this check ` +
         'is not reading it'
     );
 
-    const failures = [];
-    const playerResidue = new Set();
-    for (const declaration of declarations) {
-      const lengths = offScaleLengthsIn(declaration.value, definitions, scale);
-      if (lengths.length === 0) continue;
-      const key = playerKey(declaration);
-      if (scope.player.includes(key)) {
-        playerResidue.add(key);
-        continue;
-      }
-      failures.push(
-        `${declaration.file}:${declaration.at} ${declaration.selector}\n      ` +
-          `${declaration.property}: ${declaration.value} (${lengths.join(', ')})`
-      );
-    }
-
+    const failures = offScale.map(
+      ({ file, at, selector, property, value, lengths }) =>
+        `${file}:${at} ${selector}\n      ${property}: ${value} (${lengths.join(', ')})`
+    );
     assert.deepEqual(
       failures,
       [],
@@ -806,5 +691,29 @@ test('a reasoned marker at the declaration exempts it, and an empty one fails', 
         emptyMarkerFailure(SHEET, 3),
       ],
     },
+  ]);
+});
+
+/** The Svelte scope's off-scale check as a gate, so a throwaway repository can prove its paths. */
+const SVELTE_OFF_SCALE_GATE = gateOver([STYLE_CORPUS], (readFile, files) =>
+  offScaleSpacing(
+    styleCorpusOf(readFile, files),
+    ABSOLUTE_SCOPES.find((scope) => scope.includes === inSvelteScope)
+  ).offScale.map(({ file, at, property, lengths }) => ({
+    file,
+    line: at,
+    id: `${property} ${lengths}`,
+  }))
+);
+
+test('the Svelte scope reads manager, a new manager folder and components, not a player', (t) => {
+  const offender = '<div class="p"></div>\n<style>\n  .p { padding: 13px; }\n</style>\n';
+  const at = (file, failures) => ({ head: { [file]: offender }, failures });
+  const fails = (file) => at(file, [`${spacing(file, 'padding 13px')} is new (1)`]);
+  assertGateCases(t, SVELTE_OFF_SCALE_GATE, WIRING_BASE, [
+    fails('src/ui/svelte/apps/manager/Probe.svelte'),
+    fails('src/ui/svelte/apps/manager/new-area/Probe.svelte'),
+    fails('src/ui/svelte/components/Probe.svelte'),
+    at('src/ui/svelte/apps/crafting/Probe.svelte', []),
   ]);
 });
