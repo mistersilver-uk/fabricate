@@ -793,7 +793,7 @@ A spinner alone is insufficient because Foundry's bundled Font Awesome disables 
 
 Motion MUST be `--fab-motion-control`, declared once in the sheet's `:root` as `140ms ease`, on a control's state change, and nothing else animates: a hover lift, an entrance fade and a shadow transition are not state changes and are not drawn.
 A transition MUST name the properties its state changes, never `all`, and MUST carry no duration or timing function of its own.
-The sheet's one `@media (prefers-reduced-motion: reduce)` block MUST remove every transition, by `transition: none !important` on every element carrying a Fabricate class and everything inside one, and a component MUST NOT write a reduced-motion block of its own.
+The sheet's one `@media (prefers-reduced-motion: reduce)` block MUST remove every transition, by `transition: none !important` on `.fabricate`, the chat cards and the canvas prompt and everything inside them, and a component MUST NOT write a reduced-motion block of its own.
 Any state that animated MUST remain readable when it does not.
 The block resets no `animation`, because no keyframes ship and Foundry already stills `fa-spin`.
 `tests/components/motion-token-gate.test.js` holds the rule across the sheet and every Svelte `<style>` under `src/`, player apps included.

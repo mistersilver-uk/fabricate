@@ -763,14 +763,28 @@
   color: inherit;
 }
 
-/* THE ONE REDUCED-MOTION BLOCK. It reaches every element carrying a Fabricate class and everything inside one, so a window, a dialog, a chat card and the canvas prompt alike; a component writes no block of its own. No `animation` reset: none ships, and Foundry already stills `fa-spin`. See `design-system/spec.md`'s `Every interactive primitive declares its full state set`. */
+/* THE ONE REDUCED-MOTION BLOCK. It reaches `.fabricate`, the root every Fabricate window and dialog emits, and the three surfaces drawn outside one: the chat cards, their dice tiles and the canvas prompt. A component writes no block of its own. No `animation` reset: none ships, and Foundry already stills `fa-spin`. See `design-system/spec.md`'s `Every interactive primitive declares its full state set`. */
 @media (prefers-reduced-motion: reduce) {
-  [class*="fabricate"],
-  [class*="fabricate"]::before,
-  [class*="fabricate"]::after,
-  [class*="fabricate"] *,
-  [class*="fabricate"] *::before,
-  [class*="fabricate"] *::after {
+  .fabricate,
+  .fabricate *,
+  .fabricate *::before,
+  .fabricate *::after,
+  .fabricate-craft-chat,
+  .fabricate-craft-chat *,
+  .fabricate-craft-chat *::before,
+  .fabricate-craft-chat *::after,
+  .fabricate-gather-chat,
+  .fabricate-gather-chat *,
+  .fabricate-gather-chat *::before,
+  .fabricate-gather-chat *::after,
+  .fabricate-dice-tiles,
+  .fabricate-dice-tiles *,
+  .fabricate-dice-tiles *::before,
+  .fabricate-dice-tiles *::after,
+  .fabricate-interaction-prompt,
+  .fabricate-interaction-prompt *,
+  .fabricate-interaction-prompt *::before,
+  .fabricate-interaction-prompt *::after {
     transition: none !important;
   }
 }

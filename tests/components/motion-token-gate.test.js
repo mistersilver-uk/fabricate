@@ -200,10 +200,12 @@ test('reduced motion is one sheet block removing every transition, and nothing u
     'the block removes transitions, and only transitions: no keyframes ship to reset'
   );
   const selectors = splitSelectorList(inside[0].selector);
-  assert.ok(
-    selectors.some((selector) => /fabricate/u.test(selector) && /\s\*$/u.test(selector)),
-    'the block reaches every element inside a Fabricate root'
-  );
+  for (const root of ['.fabricate', '.fabricate-craft-chat', '.fabricate-interaction-prompt']) {
+    assert.ok(
+      selectors.includes(root) && selectors.includes(`${root} *`),
+      `the block reaches ${root} and everything inside it`
+    );
+  }
 });
 
 test('the value rule fails a time, a timing or an unread token, and passes the token', () => {
