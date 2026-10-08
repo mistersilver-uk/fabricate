@@ -791,10 +791,12 @@ A programmatic `.focus()` that follows a pointer activation matches `:focus` and
 A loading control MUST set `aria-busy` and change its label or text.
 A spinner alone is insufficient because Foundry's bundled Font Awesome disables `fa-spin` under `prefers-reduced-motion` and every shipped spinner is `aria-hidden`, so a motion-only busy state is conveyed to a reduced-motion user by nothing at all.
 
-Motion is limited to a 140ms ease on a control state change, and nothing else animates.
-Under `prefers-reduced-motion: reduce` every transition and animation is removed, and any state that animated MUST remain readable when it does not.
-NOTHING GATES THE 140ms FIGURE AND NOTHING SHIPS IT: measured across both stylesheet corpora, the durations written are 120ms seventeen times, 150ms nine times, and four others, and 140ms appears nowhere at all.
-So this sentence names a rung the product has never used, which makes it a decision owed rather than a rule enforced — either the ladder becomes 120/150 and a gate holds it, or the corpus moves onto 140 — and it is recorded here as unenforced so that the next reader does not mistake the silence for compliance.
+Motion MUST be `--fab-motion-control`, declared once in the sheet's `:root` as `140ms ease`, on a control's state change, and nothing else animates: a hover lift, an entrance fade and a shadow transition are not state changes and are not drawn.
+A transition MUST name the properties its state changes, never `all`, and MUST carry no duration or timing function of its own.
+The sheet's one `@media (prefers-reduced-motion: reduce)` block MUST remove every transition, by `transition: none !important` on every element carrying a Fabricate class and everything inside one, and a component MUST NOT write a reduced-motion block of its own.
+Any state that animated MUST remain readable when it does not.
+The block resets no `animation`, because no keyframes ship and Foundry already stills `fa-spin`.
+`tests/components/motion-token-gate.test.js` holds the rule across the sheet and every Svelte `<style>` under `src/`, player apps included.
 
 The chip's RECESSIVE TONES are one ladder rather than a set of percentages, and the order is `secondary` → `neutral` → `subtle` → `muted`, loudest to quietest: `secondary` names the rule the GM is reading, `neutral` a fact merely present, `subtle` a quiet non-actionable state, and `muted` something unavailable.
 The quantity that orders them is the CONTRAST of each ink composited over that theme's own ground — never an alpha and never a channel, because the themes do not agree on a model and an alpha comparison ties three of the four — and a caller routes by that MEANING rather than by matching a tone name to a token name, since the names deliberately do not track the tokens.
@@ -822,6 +824,12 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 - **WHEN** a control begins an operation that takes perceptible time
 - **THEN** it sets `aria-busy` and changes its label
 - **AND** any spinner it renders is decorative and `aria-hidden`
+
+#### Scenario: A change writes its own motion
+
+- **WHEN** a change writes a literal duration or timing function on a transition or animation, or a scoped reduced-motion block
+- **THEN** `motion-token-gate` fails it
+- **AND** a control's state transition that names its property and reads `--fab-motion-control` passes
 
 ### Requirement: Naming, announcement and hit targets are component obligations
 
