@@ -4241,6 +4241,8 @@
 }
 
 .fabricate-manager .manager-selected-tag-pill button {
+  position: relative;
+  overflow: visible;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5500,6 +5502,8 @@
 
 .fabricate-manager .manager-recipe-chip-clear,
 .fabricate-manager .manager-component-chip-clear {
+  position: relative;
+  overflow: visible;
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
@@ -6429,6 +6433,8 @@
 }
 
 .fabricate-manager .manager-scope-collapse {
+  position: relative;
+  overflow: visible;
   align-self: center;
   flex: 0 0 auto;
   width: 22px;
@@ -8633,6 +8639,8 @@
 
 /* Subtle × remove — never a loud red trash button (§D1). */
 .fabricate-manager .manager-recipe-tool-remove {
+  position: relative;
+  overflow: visible;
   appearance: none;
   -webkit-appearance: none;
   flex: 0 0 auto;
@@ -9552,6 +9560,8 @@
 
 /* A REAL BUTTON inside the pill. Its own reset, because Foundry sizes every `button` to a fixed height and this one is a 20px circle inside a 30px pill. */
 .fabricate-manager .manager-recipe-option-clear {
+  position: relative;
+  overflow: visible;
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
@@ -10143,6 +10153,8 @@
 
 /* §B1: subtle × remove — never a loud red trash/minus button. */
 .fabricate-manager .manager-recipe-option-remove {
+  position: relative;
+  overflow: visible;
   appearance: none;
   -webkit-appearance: none;
   flex: 0 0 auto;
@@ -11809,6 +11821,8 @@
 
 .fabricate-pill-select .manager-availability-remove,
 .fabricate-manager .manager-danger-tag-remove {
+  position: relative;
+  overflow: visible;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -11831,21 +11845,6 @@
 }
 
 /* HIT AREAS (issue 1523): every pointer target offers at least 24 by 24 pixels (WCAG 2.2 section 2.5.8), the painted box unchanged. The glyph-sized removes above and below are 14-22px, so each lets its overflow show (Foundry clips a `button`'s) and carries an invisible `::before` centred on it and never smaller than 24px; it belongs to the button, so a click on it is the button's, and no gap beside these controls is under the 1px the 22px ones reach into. */
-.fabricate-manager .manager-selected-tag-pill button,
-.fabricate-manager .manager-recipe-chip-clear,
-.fabricate-manager .manager-component-chip-clear,
-.fabricate-manager .manager-scope-collapse,
-.fabricate-manager .manager-recipe-tool-remove,
-.fabricate-manager .manager-recipe-option-clear,
-.fabricate-manager .manager-recipe-option-remove,
-.fabricate-pill-select .manager-availability-remove,
-.fabricate-manager .manager-danger-tag-remove,
-.fabricate-manager .manager-drop-rank-button,
-.fabricate-manager .manager-condition-remove {
-  position: relative;
-  overflow: visible;
-}
-
 .fabricate-manager .manager-selected-tag-pill button::before,
 .fabricate-manager .manager-recipe-chip-clear::before,
 .fabricate-manager .manager-component-chip-clear::before,
@@ -12337,6 +12336,8 @@
 }
 
 .fabricate-manager .manager-drop-rank-button {
+  position: relative;
+  overflow: visible;
   width: 18px;
   height: 18px;
   min-height: 18px;
@@ -13204,6 +13205,8 @@
 }
 
 .fabricate-manager .manager-condition-remove {
+  position: relative;
+  overflow: visible;
   display: inline-flex;
   align-items: center;
   justify-content: center;
