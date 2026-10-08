@@ -132,6 +132,7 @@ import {
   itemStackQuantityPath,
   updateStackQuantity,
 } from './itemStackQuantity.js';
+import { pairPlannedTools } from './plannedToolPairs.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { postResultCard } from './resultCardPost.js';
@@ -1909,8 +1910,7 @@ export class CraftingEngine {
         : undefined;
     const effects = new Map(journal.effects.map((effect) => [effect.effectId, effect]));
     const toolEffect = effects.get('apply-tools');
-    const toolDefinitions = this.recipeManager.getToolsForSet?.(executionRecipe, selectedSet) ?? [];
-    const toolPairs = (toolEffect?.planned || []).map((itemUuid, index) => {
+    const toolItems = (toolEffect?.planned || []).map((itemUuid) => {
       const item = findItemByUuid([actor, ...(componentSourceActors || [])], itemUuid);
       if (!item && toolEffect.phase !== 'applied') {
         throw new CraftingLifecycleExecutionError(
@@ -1918,11 +1918,9 @@ export class CraftingEngine {
           'STAGE_RECONSTRUCTION_FAILED'
         );
       }
-      return {
-        item: item ?? rehydrateVersionedItem({ itemUuid }),
-        tool: toolDefinitions[index] ?? null,
-      };
+      return item ?? rehydrateVersionedItem({ itemUuid });
     });
+    const toolPairs = pairPlannedTools(this.recipeManager, executionRecipe, selectedSet, toolItems);
     const currencySpends = cloneJsonValue(effects.get('spend-currency')?.planned) ?? [];
     return {
       valid: true,
@@ -1934,7 +1932,7 @@ export class CraftingEngine {
         currencySpends,
         toolItemUuids: cloneJsonValue(toolEffect?.planned) ?? [],
       },
-      toolItems: toolPairs.map((entry) => entry.item),
+      toolItems,
       executionRecipe,
       craftSelection: { plan: [] },
       toolValidation: { valid: true, tools: toolPairs },
