@@ -4,51 +4,37 @@ on:
     branches:
       - work/2265-station-hotfix-validation
     paths:
-      - '.github/station-release-2265.b64'
+      - '.github/workflows/station-hotfix-2265.yml'
 permissions:
-  contents: write
+  actions: read
+  contents: read
 jobs:
-  release-port:
+  diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          show-progress: false
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-      - name: Prepare the isolated release-line port
+      - name: Read failed job log and print assertion contexts
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          gh api repos/mistersilver-uk/fabricate/actions/jobs/113224154726/logs > unit-tests.log
           python3 - <<'PY'
-          import base64, hashlib, zlib
           from pathlib import Path
-          patch = zlib.decompress(base64.b64decode(Path('.github/station-release-2265.b64').read_text()))
-          assert hashlib.sha256(patch).hexdigest() == '99c71cbda5f76505405463a7a2ec04320a4ddecc2d078f4589de404708e9c115'
-          Path('/tmp/station-release.patch').write_bytes(patch)
+          lines = Path('unit-tests.log').read_text().splitlines()
+          output = []
+          for i, line in enumerate(lines):
+              if 'not ok ' in line or 'ERR_TEST_FAILURE' in line:
+                  output.extend(lines[max(0, i-2):min(len(lines), i+45)])
+          output.extend(lines[-25:])
+          text = '\n'.join(output)
+          Path('failures.txt').write_text(text)
+          print(text)
           PY
-          git worktree add -b fix/2265-station-tool-release ../station-release-2265 4f92d687dda38e0b64f57d42ce7e51bcc66b006f
-          cd ../station-release-2265
-          git apply --check /tmp/station-release.patch
-          git apply /tmp/station-release.patch
-          npm ci --ignore-scripts --no-audit --no-fund
-      - name: Test the real player and GM-command boundaries
-        working-directory: ../station-release-2265
-        run: node --conditions=browser --test --test-concurrency=1 tests/canvas-station-crafting.test.js tests/journal-run-commands.test.js tests/crafting-stage-start-commit.test.js tests/run-lifecycle-execution.test.js
-      - name: Test existing crafting and app regressions
-        working-directory: ../station-release-2265
-        run: node --conditions=browser --test --test-concurrency=1 tests/recipe-tools.test.js tests/crafting-listing-builder.test.js tests/stores/crafting-store.test.js tests/components/fabricate-app-shell.test.js tests/components/player-extension-composition.test.js tests/canvas/interactable-resolution.test.js
-      - name: Build the release port
-        working-directory: ../station-release-2265
-        run: npm run build
-      - name: Commit and publish working branch only
-        working-directory: ../station-release-2265
-        shell: bash
-        run: |
-          git diff --check
-          git add src/bootstrap/craftingFacade.js src/bootstrap/journalOperations.js src/systems/CraftingEngine.js src/systems/journalRunCommands.js src/ui/SvelteFabricateApp.svelte.js src/ui/presenters/CraftingListingBuilder.js tests/canvas-station-crafting.test.js docs/canvas-interactables.md openspec/specs/data-models/spec.md
-          git -c user.name='ChatGPT' -c user.email='noreply@openai.com' commit -m 'fix(#2265): preserve station tools through authorised crafting execution'
-          git push origin HEAD:refs/heads/fix/2265-station-tool-release
-          git log -1 --format='%H %s'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr2267-failure-log
+          path: |
+            failures.txt
+            unit-tests.log
+          retention-days: 1
