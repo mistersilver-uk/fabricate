@@ -286,11 +286,11 @@ test('Fabricate wires the crafting listing builder with a component resolver (is
 test('Fabricate hydrates the crafting recipe detail phase through the crafting listing builder (issue 1075)', () => {
   // `hydrateCraftingRecipe` is the detail-phase companion to the cheap `listCraftingForActor`
   // summary rows (issue 1075). The builder's `buildRecipeDetail` re-evaluation is unit-tested
-  // directly, but nothing else pins that this method actually routes there rather than, say,
-  // re-deriving a summary row or returning a stale cached value.
+  // directly. Keep this API signature pin aligned with issue 2265's optional station context;
+  // canvas-station-crafting.test.js exercises its propagation through the real app and facade.
   assert.ok(
     mainSource.includes(
-      'hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {'
+      'hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null, presentTools = null } = {}) {'
     ),
     'main.js should expose hydrateCraftingRecipe on the Fabricate API object'
   );
