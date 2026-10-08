@@ -149,8 +149,9 @@ test('the rail Downtime premium mark renders as the shared gold badge chip', asy
       'the chip must beat the later nav-count rules that re-tone every trailing marker'
     );
     assert.equal(read.chip.radius, '6px', 'the design draws a 4px chip; the chip rung is 6');
-    // 5px, one pixel tighter each side than the design's own `2px 6px`.
-    assert.equal(read.chip.padding, '5px', 'the rail chip keeps its filled-chip padding');
+    // 4px (`--fab-space-1`), a rung tighter each side than the design's own `2px 6px`: the 5px
+    // it was snapped down to the scale (issue 1523).
+    assert.equal(read.chip.padding, '4px', 'the rail chip keeps its filled-chip padding');
     assert.ok(
       read.labelLines === 1,
       `the chip must not squeeze the label into a second line (got ${read.labelLines})`

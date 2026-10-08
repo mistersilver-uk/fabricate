@@ -90,7 +90,7 @@ test('manager recipes browser defines a non-overflowing card row', () => {
   }
   assert.ok(rowBlock.includes('min-height: 62px;'), 'the recipe row is the denser library card');
   assert.ok(
-    rowBlock.includes('padding: 11px 12px;'),
+    rowBlock.includes('padding: var(--fab-space-3) var(--fab-space-3);'),
     'the recipe row uses the library card padding'
   );
   // The recipe row's own radius (9px) was retired by issue 883: the edge.

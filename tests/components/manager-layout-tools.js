@@ -613,15 +613,17 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
       page,
       'fabricate-card'
     );
-    // The shared card took the studio card's 11px corner and `--fab-bg-2` fill, so the shell
-    // no longer differs there; the combination-rule gap below carries the proof.
+    // The shared card took the studio card's 11px corner and `--fab-bg-2` fill, and the studio's
+    // 11px option gap snapped to the primitive's own 12 (issue 1523), so the shell no longer
+    // differs there; the combination-rule card's own face below carries the proof.
     assert.equal(broken.cardRadius, 11, 'the shared card is on the 11px card rung too');
     assert.equal(broken.cardBackground, fixed.cardBackground, 'and on the same fill');
+    assert.equal(broken.optionGap, fixed.optionGap, 'and the option gap is the primitive’s 12px');
     assert.notEqual(
-      broken.optionGap,
-      fixed.optionGap,
-      `expected the bare shell to drop the combination-rule cards off the studio's 11px gap ` +
-        `(bare: ${broken.optionGap})`
+      broken.optionBackground,
+      fixed.optionBackground,
+      `expected the bare shell to drop the combination-rule cards off the studio's --fab-bg-1 ` +
+        `rest face (bare: ${broken.optionBackground})`
     );
   } finally {
     await context.close();
