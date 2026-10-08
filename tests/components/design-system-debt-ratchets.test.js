@@ -949,66 +949,132 @@ const SHAPE_CORNERS = Object.freeze(['0', '999px', '50%', 'inherit']);
 /** The sheet, the shared components and the manager; the player apps are a later pass's. */
 const CORNER_SCOPE = /^(?:styles\/|src\/ui\/svelte\/(?:components|apps\/manager)\/)/u;
 
-/** Sized rules whose corner follows something other than their band, keyed `file: selector`. */
-const CORNER_KIND_EXCEPTIONS = new Map([
-  ['src/ui/svelte/components/Chip.svelte: .manager-chip', 'a text chip keeps its stadium'],
+/** Sized rules whose corner follows another kind: `[file: selector, its corners, why]`. */
+const CORNER_KIND_EXCEPTIONS = Object.freeze([
+  [
+    'src/ui/svelte/components/Chip.svelte: .manager-chip',
+    ['11px'],
+    'a text chip keeps its stadium',
+  ],
   [
     'src/ui/svelte/components/LogList.svelte: .fab-log-list-entry',
+    ['9px'],
     'LogList geometry is issue 2257',
   ],
   [
     'src/ui/svelte/components/NavSidebar.svelte: .fabricate-app-nav-well',
+    ['9px'],
     'NavSidebar geometry is issue 2257',
   ],
   [
     'src/ui/svelte/components/SegmentedControl.svelte: .manager-segmented.is-compact .manager-segment',
+    ['6px'],
     "a segment takes its track's inner rung",
   ],
   [
     'src/ui/svelte/components/SegmentedControl.svelte: .manager-segmented.is-field .manager-segment',
+    ['6px'],
     "a segment takes its track's inner rung",
   ],
   [
     'styles/fabricate.css: .fabricate-search.fabricate-search:where(.is-compact) input',
+    ['6px'],
     "the compact search's ruled box, held by search-field-geometry-gate",
   ],
   [
     'styles/fabricate.css: .fabricate-manager .manager-tag-suggestion, .fabricate-typeahead-option.fabricate-typeahead-option',
+    ['6px'],
     "an option takes its 6px panel's inner rung",
   ],
   [
     'styles/fabricate.css: .fabricate-source-picker-popover.essence-source-picker-popover .essence-source-picker-option',
+    ['9px'],
     'a list row in its 11px panel takes the row rung',
   ],
   [
     'styles/fabricate.css: .fabricate-manager .manager-recipe-option-suggestion',
+    ['6px'],
     "an option takes its suggestion panel's inner rung",
   ],
   [
     'styles/fabricate.css: .fabricate-manager .manager-availability-option',
+    ['6px'],
     "an option takes its 6px panel's inner rung",
   ],
   [
     'styles/fabricate.css: .fabricate-manager .manager-environment-mode-option',
+    ['6px'],
     "an option takes its mode control's inner rung; the container is issue 2257",
   ],
   [
     'styles/fabricate.css: .fabricate-dice-tiles__tile',
+    ['9px'],
     "the library's DiceTiles specimen: 44 high at radius 9",
   ],
   [
     'styles/fabricate.css: .fabricate-action-menu-panel.manager-recipe-or-menu button.manager-action-menu-item',
+    ['6px'],
     "an item takes its action menu's inner rung; the panel is issue 2257",
   ],
   [
     'styles/fabricate.css: .fabricate-manager .manager-tools-authority-segments label',
+    ['6px'],
     "a segment takes its track's inner rung",
   ],
 ]);
 
+/** The box sizes a rule can declare; a logical name is read as its physical twin. */
+const SIZE_PROPERTIES = Object.freeze([
+  'height',
+  'block-size',
+  'min-height',
+  'min-block-size',
+  'width',
+  'inline-size',
+]);
+
+/** A length in px: a px literal, or rem at Foundry's default 16px root; anything else is `null`. */
+function lengthPx(text) {
+  const match = /^(\d+(?:\.\d+)?)(px|rem)$/u.exec(text);
+  return match ? Number(match[1]) * (match[2] === 'rem' ? 16 : 1) : null;
+}
+
+/** The literal texts a value stands for through `var()`, with any unresolved text dropped. */
+const literalValues = (value, definitions) =>
+  value.includes('var(')
+    ? resolveValueCandidates(value, definitions).candidates.filter((text) => !text.includes('var('))
+    : [value];
+
+/** Each size with a band that one rule declares, as `{ declaration, px, band }`. */
+const bandedSizes = (rule, definitions) =>
+  rule
+    .filter((d) => SIZE_PROPERTIES.includes(d.property.toLowerCase()))
+    .flatMap((declaration) =>
+      literalValues(normaliseValue(declaration.value), definitions).map((text) => {
+        const px = lengthPx(text);
+        return { declaration, px, band: px === null ? null : cornerBand(px) };
+      })
+    )
+    .filter(({ band }) => band !== null);
+
+/** Every corner value a rule's radius shorthands and longhands resolve to. */
+const cornersOf = (radii, definitions) => [
+  ...new Set(
+    radii.flatMap((d) =>
+      radiusTokens(normaliseValue(d.value)).flatMap((token) =>
+        literalValues(token, definitions).flatMap(radiusTokens)
+      )
+    )
+  ),
+];
+
 /**
- * Every in-scope rule that declares a px size with a band and a corner off that band, `exempt`
- * when the rule carries a reasoned `ratchet-exempt(design-system)` marker.
+ * Every in-scope rule pairing a banded size with a corner off its band, and how many paired rules
+ * were judged. Read: each `height`, `min-height` and `width` (logical twins too) in px, in rem at
+ * Foundry's 16px root or through `var()`; every radius shorthand and longhand. A marker exempts
+ * only the radius or size declaration it sits on. Unseen, so the rendered corner audit holds them:
+ * a size and a corner split across two rules, an inherited corner, a size set by markup or a
+ * prop, and a `calc()` size.
  */
 function offBandCorners({ declarations, definitions, sources }) {
   const rules = new Map();
@@ -1018,26 +1084,30 @@ function offBandCorners({ declarations, definitions, sources }) {
     rules.set(key, [...(rules.get(key) ?? []), declaration]);
   }
   const found = [];
+  let evaluated = 0;
   for (const [key, rule] of rules) {
-    const last = (property) => rule.findLast((d) => d.property.toLowerCase() === property);
-    const radius = last('border-radius');
-    const size = ['height', 'min-height', 'width']
-      .map(last)
-      .find((d) => d && /^\d+(?:\.\d+)?px$/u.test(d.value.trim()));
-    const band = size ? cornerBand(Number.parseFloat(size.value)) : null;
-    if (!radius || !band) continue;
-    const corners = radiusTokens(normaliseValue(radius.value)).flatMap((token) =>
-      token.includes('var(') ? resolveValueCandidates(token, definitions).candidates : [token]
+    const radii = rule.filter((d) => RADIUS_PROPERTY.test(d.property.toLowerCase()));
+    const sizes = radii.length > 0 ? bandedSizes(rule, definitions) : [];
+    if (sizes.length === 0) continue;
+    evaluated += 1;
+    const corners = cornersOf(radii, definitions);
+    const misses = sizes.filter(({ band }) =>
+      corners.some((corner) => corner !== band && !SHAPE_CORNERS.includes(corner))
     );
-    if (corners.every((corner) => corner === band || SHAPE_CORNERS.includes(corner))) continue;
+    if (misses.length === 0) continue;
     found.push({
       key: key.split('\u{0}', 1)[0],
-      line: radius.at,
-      label: `${size.property} ${size.value} at ${radius.value}, band ${band}`,
-      exempt: rule.some((d) => exemptAt(d.file, sources[d.file], d.at)),
+      line: radii.at(-1).at,
+      corners: corners.filter((corner) => !SHAPE_CORNERS.includes(corner)),
+      label: misses
+        .map(({ declaration, px, band }) => `${declaration.property} ${px}px, band ${band}`)
+        .join('; '),
+      exempt: [...radii, ...misses.map(({ declaration }) => declaration)].some((d) =>
+        exemptAt(d.file, sources[d.file], d.at)
+      ),
     });
   }
-  return found;
+  return { found, evaluated };
 }
 
 /** Residue rules sized off the band table, whose corner the pair check therefore cannot see. */
@@ -1052,38 +1122,42 @@ const PINNED_CORNERS = Object.freeze([
   ],
 ]);
 
-// ABSOLUTE, not against the base: a 38px box at 6px is on the ladder, so gate 6 passes it.
+/** How many times each key occurs in `keys`. */
+const tally = (keys) =>
+  keys.reduce((counts, key) => counts.set(key, (counts.get(key) ?? 0) + 1), new Map());
+
+// Absolute, not against the base: a 38px box at 6px is on the ladder, so gate 6 passes it.
 test('every sized box in the sheet, components and manager takes its size band’s corner', () => {
   const corpus = treeStyles();
-  const found = offBandCorners(corpus);
-  const unexplained = found
-    .filter(({ exempt, key }) => !exempt && !CORNER_KIND_EXCEPTIONS.has(key))
-    .map(({ key, line, label }) => `${key} (line ${line}): ${label}`);
+  const { found, evaluated } = offBandCorners(corpus);
+  // Non-vacuity first, so a scan that stopped reading reports as broken rather than as rot.
+  assert.ok(evaluated >= 200, `only ${evaluated} sized rules with a corner were judged`);
+  const live = found.filter(({ exempt }) => !exempt);
+  const excused = ({ key, corners }) =>
+    CORNER_KIND_EXCEPTIONS.some(
+      ([name, allowed]) => name === key && corners.every((corner) => allowed.includes(corner))
+    );
+  const unexplained = live
+    .filter((finding) => !excused(finding))
+    .map(({ key, line, corners, label }) => `${key} (line ${line}): ${corners} for ${label}`);
   assert.deepEqual(
     unexplained,
     [],
     'a box that declares its size declares the corner of that size band — 6 for a chip at or ' +
       'under 24px, 7 for 26 to 32, 9 for 34 to 38, 11 at 44 — or a shape (0, 999px, 50%). Put the ' +
-      'band in the rule that sizes the box, or name the kind it follows here:\n  ' +
+      'band in the rule that sizes the box, or name the kind and its corner here:\n  ' +
       unexplained.join('\n  ')
   );
 
-  // Each named exception still matches a rule off its band, so the list cannot rot into cover.
-  const live = new Set(found.map(({ key }) => key));
+  // Each exception matches as many off-band rules as it is listed for, so the list can neither
+  // rot into cover nor shelter a second rule under a name it already excuses.
+  const listed = tally(CORNER_KIND_EXCEPTIONS.map(([key]) => key));
+  const matched = tally(live.map(({ key }) => key));
   assert.deepEqual(
-    [...CORNER_KIND_EXCEPTIONS.keys()].filter((key) => !live.has(key)),
+    [...listed].filter(([key, count]) => matched.get(key) !== count).map(([key]) => key),
     [],
-    'these exceptions no longer match an off-band rule: delete them'
+    'these exceptions match a different number of off-band rules than they list: re-derive them'
   );
-
-  // Non-vacuity: the pair check reads a real population of sized, cornered rules.
-  const paired = corpus.rules.filter(
-    (rule) =>
-      CORNER_SCOPE.test(rule.file) &&
-      /border-radius\s*:/u.test(rule.body) &&
-      /(?:^|[\s;{])(?:min-)?height\s*:\s*\d+px/u.test(rule.body)
-  );
-  assert.ok(paired.length >= 200, `only ${paired.length} sized rules with a corner were read`);
 
   for (const [selector, corner, why] of PINNED_CORNERS) {
     const rule = corpus.rules.find((r) => r.file === MODULE_SHEET && r.selector === selector);
@@ -1193,7 +1267,14 @@ test('no new art tile renders at an off-ladder size', (t) => {
         'that kind against is matching nothing and every site would be recorded as debt'
     );
   }
-  assertFloor('off-ladder art-tile sizes', sites.length, 40);
+  // Per kind, near the tree's 72 Medallion and 5 Avatar sites.
+  for (const [kind, floor] of [
+    ['art', 68],
+    ['portrait', 4],
+  ]) {
+    const scanned = sites.filter((site) => site.kind === kind).length;
+    assertFloor(`off-ladder ${kind}-tile sizes`, scanned, floor);
+  }
   checkGate(
     t,
     ART_SIZE_GATE,
