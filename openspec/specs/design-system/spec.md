@@ -610,10 +610,11 @@ In `foundry-native` a component tagged Aqua renders a desaturated rose, and in `
 The five withheld tints hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
 Re-deriving the eight is a palette change across seven theme blocks and is recorded as a planned migration.
 
-Elevation MUST be `--fab-shadow-sm`, `--fab-shadow-md` or `--fab-shadow-lg`, and only on a surface that floats OVER content: a popover, a menu, a suggestion list, a dialog or a toast.
+Elevation MUST be `--fab-shadow-md` or `--fab-shadow-lg`, and only on a surface that floats OVER content: a popover, a menu, a suggestion list, a dialog or a toast.
 A surface that sits on the page — a card, a row, a well, a button, a handle, or a dock pinned to its scroll area's edge — MUST draw no shadow; its edge is a 1px `--fab-border` or a ring.
+`--fab-shadow-sm` is retired from the seven theme blocks: its last reader was that dock, which sits, and a small floating surface takes `--fab-shadow-md`.
 Whether a surface floats or sits is a judgement no pattern can read from a declaration, so a pinned allow-list and review hold the split: every read of a `--fab-shadow-*` token in the sheet, `components/` and `apps/manager/` is listed by file and selector with the reason that surface floats, a new read fails until it is listed, and the review of that listing decides the classification.
-The gate MUST allow only `none`, an inset ring, a ring list and a leading inset bar beside those three tokens.
+The gate MUST allow only `none`, an inset ring, a ring list and a leading inset bar beside those two tokens.
 A ring is `0 0 0 <n>px var(--fab-*)`, inset or not, at most 4px: a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
 A ring list is two or more rings in one declaration, and a leading bar is `inset <n>px 0 0 var(--fab-*)`, at most 4px wide, the selected row's inline-start stripe.
 The checked radio's dot, `inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent)`, is the one named exception to that bound: its 16px ring fills the 16px control inside a 3px ground.
