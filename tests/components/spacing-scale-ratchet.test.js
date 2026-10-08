@@ -334,8 +334,8 @@ test('both documented exemptions are live, and nothing else is exempt', () => {
  * size rather than spacing, so it is not this ratchet's debt; it is named because closing the gap
  * would mean resolving a token through Svelte markup and a JS prop default, a different scanner
  * from this one, and the control-height ladder records the same blind spot. So "no new raw spacing
- * literal has been introduced" is a claim about what the two stylesheet corpora declare, not about
- * what the product renders.
+ * literal has been introduced" is a claim about what the two stylesheet corpora declare;
+ * `spacing-scale-markup.test.js` holds the manager and component markup's static styles.
  */
 test('no new raw spacing literal has been introduced', (t) => {
   checkGate(
