@@ -851,9 +851,12 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     assert.equal(essenceRow.radius, '9px', 'on the 34-38px band`s corner');
     assert.equal(Math.round(essenceTile.width), 22, '`proto:5628` chip: a 22px tile…');
     assert.equal(Math.round(essenceTile.height), 22);
-    assert.equal(Math.round(essenceStep.width), 22, '`proto:1207`: the shared Stepper`s 22px adjunct…');
-    assert.equal(Math.round(essenceStep.height), 22);
-    assert.equal(essenceStep.radius, '6px', '…on a 6px corner');
+    // The adjunct draws `proto:1207`'s 22px square on a 6px corner; its box is 24px, the extra pixel on
+    // each side being the hit-area padding (issue 1523), and the 7px corner is what leaves the
+    // content-box background its 6. `hit-areas-rendered.test.js` pins the painted 22.
+    assert.equal(Math.round(essenceStep.width), 24, '`proto:1207`: the shared Stepper`s 22px adjunct, plus its hit padding…');
+    assert.equal(Math.round(essenceStep.height), 24);
+    assert.equal(essenceStep.radius, '7px', '…on a 6px drawn corner, 7 outset by that padding');
     // `proto:5628`'s value column is a 26px LABEL; the shared `Stepper`'s is a typeable input.
     assert.equal(Math.round(essenceValue.width), 30, 'the stepper`s input is capped at 30px');
     assert.ok(Boolean(essenceChip), 'and the staged chip is drawn above the inset');

@@ -467,7 +467,7 @@
           <span>{chipLabel(chip)}</span>
           <button
             type="button"
-            class="manager-essence-chip-clear"
+            class="manager-essence-chip-clear fab-hit-area"
             aria-label={format(
               'FABRICATE.Admin.Manager.Essence.ClearChip',
               'Clear {filter} filter',

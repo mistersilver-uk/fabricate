@@ -216,7 +216,7 @@
            none, so a focused pager would otherwise leave Space pausing the game. -->
       <button
         type="button"
-        class="fab-bulk-inset-page"
+        class="fab-bulk-inset-page fab-hit-area"
         data-keyboard-focus="true"
         data-bulk-inset-prev={id}
         disabled={disabled || pageIndex === 0}
@@ -233,7 +233,7 @@
       </span>
       <button
         type="button"
-        class="fab-bulk-inset-page"
+        class="fab-bulk-inset-page fab-hit-area"
         data-keyboard-focus="true"
         data-bulk-inset-next={id}
         disabled={disabled || pageIndex >= pageCount - 1}

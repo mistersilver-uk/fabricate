@@ -895,7 +895,7 @@
           </span>
           <button
             type="button"
-            class="fab-bulk-book-pick-clear"
+            class="fab-bulk-book-pick-clear fab-hit-area"
             data-recipe-bulk-book-clear-pick
             aria-label={text(
               'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookClearPick',
@@ -981,7 +981,7 @@
             </span>
             <button
               type="button"
-              class="fab-bulk-book-unstage"
+              class="fab-bulk-book-unstage fab-hit-area"
               data-recipe-bulk-book-unstage={entry.id}
               aria-label={entry.unstageLabel}
               disabled={inert}

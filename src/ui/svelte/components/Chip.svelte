@@ -173,7 +173,7 @@
       class="manager-chip-label">{@render children?.()}</span
     ><button
       type="button"
-      class="manager-chip-remove"
+      class="manager-chip-remove fab-hit-area"
       data-chip-remove
       data-keyboard-focus="true"
       {disabled}

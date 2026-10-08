@@ -91,6 +91,18 @@
     cursor: pointer;
   }
 
+  /* The 24px pointer target (WCAG 2.2 §2.5.8) around a 16-22px box: an invisible inset on the label,
+     so the box and its neighbours do not move. */
+  .fab-selection-checkbox::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 24px);
+    height: max(100%, 24px);
+    transform: translate(-50%, -50%);
+  }
+
   .fab-selection-checkbox.is-disabled {
     cursor: not-allowed;
   }
