@@ -815,24 +815,24 @@ test('manager environments browser and edit route define compact responsive geom
   );
   assert.ok(
     workspaceBlock.includes(
-      'grid-template-columns: var(--fab-env-workspace-grid, minmax(0, 1fr) 300px);'
+      'grid-template-columns: var(--fab-manager-env-workspace-grid, minmax(0, 1fr) 300px);'
     ),
     'environment editor workspace should pair the main composition column with a fixed 300px inspector (matching the standard manager inspector width) at normal widths, through the token its narrow override sets'
   );
   const compBlock = blockFor('.fabricate-manager .manager-environment-comp');
   assert.ok(
-    compBlock.includes('--fab-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;'),
+    compBlock.includes('--fab-manager-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;'),
     'composition grid keeps the shared fallback layout for non-task rows'
   );
   assert.ok(
     css.includes('.manager-environment-comp[data-composition-kind="task"]') &&
-      css.includes('--fab-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;'),
+      css.includes('--fab-manager-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;'),
     'task rows reserve space for a quick action icon beside the overflow-menu action'
   );
   assert.ok(
     css.includes(
       '.manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"]'
-    ) && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 158px 72px 132px 72px;'),
+    ) && css.includes('--fab-manager-env-comp-grid: minmax(0, 1fr) 158px 72px 132px 72px;'),
     'blind-mode tasks reserve a Weight column wide enough for the stepper and its calculated percentage'
   );
   assert.ok(
@@ -840,7 +840,7 @@ test('manager environments browser and edit route define compact responsive geom
       '.fabricate-manager .manager-environment-comp[data-composition-kind="task"]'
     ) &&
       environmentCompContainerQuery.includes(
-        '--fab-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;'
+        '--fab-manager-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;'
       ),
     'narrow task rows key off manager container width and keep enough action-column width for quick action plus menu buttons'
   );
@@ -854,7 +854,7 @@ test('manager environments browser and edit route define compact responsive geom
       '.fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"]'
     ) &&
       environmentCompContainerQuery.includes(
-        '--fab-env-comp-grid: minmax(0, 1fr) 158px 64px 110px 72px;'
+        '--fab-manager-env-comp-grid: minmax(0, 1fr) 158px 64px 110px 72px;'
       ),
     'narrow blind task rows keep the full-width Weight column so the stepper never overflows it'
   );
@@ -939,33 +939,33 @@ test('manager environments browser and edit route define compact responsive geom
   );
   // The included rows are the shared ordered list's as of issue 1512, so the ranked grid is not a
   // row variant any more: the strip's LEAD track is the list's own cluster, the record's cells are a
-  // grid of their own on the same template, and `--fab-env-comp-grid-ranked` is retired with the
-  // row variant that read it.
+  // grid of their own on the same template, and the ranked grid property is retired with the row
+  // variant that read it, under either name.
   assert.ok(
-    !css.includes('--fab-env-comp-grid-ranked'),
+    !/--fab-(?:manager-)?env-comp-grid-ranked/.test(css),
     'the ranked grid variable is retired with the row variant that read it'
   );
   // Issue 1522 put the row disclosure in that cluster: badge, gap and chevron, then the grip.
   assert.ok(
-    compBlock.includes('--fab-env-comp-lead: 58px;') &&
-      compBlock.includes('--fab-env-comp-lead-ranked: 94px;'),
+    compBlock.includes('--fab-manager-env-comp-lead: 58px;') &&
+      compBlock.includes('--fab-manager-env-comp-lead-ranked: 94px;'),
     "the strip's lead track is declared from the list's own badge, disclosure, grip and gap"
   );
   assert.ok(
     blockFor('.fabricate-manager .manager-environment-comp-head').includes(
-      'grid-template-columns: var(--fab-env-comp-lead) var(--fab-env-comp-grid);'
+      'grid-template-columns: var(--fab-manager-env-comp-lead) var(--fab-manager-env-comp-grid);'
     ),
     'the column strip reads the lead track ahead of the record cells'
   );
   assert.ok(
     blockFor('.fabricate-manager .manager-environment-comp-head.has-rank-controls').includes(
-      'grid-template-columns: var(--fab-env-comp-lead-ranked) var(--fab-env-comp-grid) 24px;'
+      'grid-template-columns: var(--fab-manager-env-comp-lead-ranked) var(--fab-manager-env-comp-grid) 24px;'
     ),
     'and a ranked strip widens that lead and adds a track under the trailing rocker'
   );
   assert.ok(
     blockFor('.fabricate-manager .manager-environment-comp-cells').includes(
-      'grid-template-columns: var(--fab-env-comp-grid);'
+      'grid-template-columns: var(--fab-manager-env-comp-grid);'
     ),
     'while the record cells read the SAME template, so a label sits over the column it names'
   );

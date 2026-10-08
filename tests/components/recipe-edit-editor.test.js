@@ -745,7 +745,7 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
     assert.ok(block, '.manager-environment-workspace rule exists');
     assert.match(
       block[0],
-      /grid-template-columns:\s*var\(--fab-env-workspace-grid,\s*minmax\(0,\s*1fr\)\s*300px\)/,
+      /grid-template-columns:\s*var\(--fab-manager-env-workspace-grid,\s*minmax\(0,\s*1fr\)\s*300px\)/,
       'environment workspace inspector is 300px, matching the standard global inspector'
     );
     assert.equal(

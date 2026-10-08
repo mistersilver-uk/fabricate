@@ -469,7 +469,7 @@ const REVIEWED = [
       'NEWLY at risk at task 4, which put it there: at (0,4,0) it used to beat the ' +
       "primitive's (0,3,0) control outright, and the re-chained bespoke rules are (0,4,0) too, " +
       'so it tied them. Every tie was same-value — this rule and the sort-direction rule ' +
-      'both state `var(--fab-recipe-control-font)`, and the primitive states the 0.72rem that ' +
+      'both state `var(--fab-manager-recipe-control-font)`, and the primitive states the 0.72rem that ' +
       'token resolves to. The one overlap that was NOT identical is against ' +
       '`.manager-clear-filters` (0.78rem), and no `manager-clear-filters` control renders in ' +
       "the components view — that browser's Clear filters carries no bespoke class. Recorded " +

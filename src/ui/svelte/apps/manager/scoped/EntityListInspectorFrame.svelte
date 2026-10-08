@@ -1151,7 +1151,7 @@
        selects beside it sit on (issue 1372). */
     background: var(--fab-bg-1);
     color: var(--fab-text);
-    font-size: var(--fab-recipe-control-font);
+    font-size: 0.72rem;
     line-height: 1;
     white-space: nowrap;
     cursor: pointer;

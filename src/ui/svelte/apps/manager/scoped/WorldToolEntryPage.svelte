@@ -8,7 +8,7 @@
 <script>
   import { formulaRolls } from '../../../../../utils/rollFormulaRollability.js';
   import { localize, notifyError } from '../../../util/foundryBridge.js';
-  import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
+  import { TOOL_BREAKAGE_TRACK, toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Field from '../../../components/Field.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
@@ -1063,7 +1063,7 @@
                       'Breakage chance'
                     )}
                     resolveColor={toolBreakageChanceColor}
-                    trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
+                    trackGradient={TOOL_BREAKAGE_TRACK}
                     controlClass="manager-tool-breakage-chance-control"
                     numberInputProps={{ 'data-world-tool-entry-breakage-chance': '' }}
                     rangeInputProps={{ 'data-world-tool-entry-breakage-chance-range': '' }}

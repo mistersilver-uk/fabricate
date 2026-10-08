@@ -32,3 +32,8 @@ export function interpolateCssColorScale(value, stops) {
 export function toolBreakageChanceColor(value) {
   return interpolateCssColorScale(value, TOOL_BREAKAGE_CHANCE_STOPS);
 }
+
+// The same stops as the slider's full track.
+export const TOOL_BREAKAGE_TRACK = `linear-gradient(90deg, ${TOOL_BREAKAGE_CHANCE_STOPS.map(
+  ({ at, color }) => `${color} ${at}%`
+).join(', ')})`;
