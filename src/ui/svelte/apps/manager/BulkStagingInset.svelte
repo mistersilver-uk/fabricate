@@ -474,9 +474,8 @@
     font-size: 0.63rem;
   }
 
-  /* The pager is lifted back to `--fab-bg-1` like the search well, so the recess reads as a card
-     with two lit edges rather than as a flat band (`proto:1153`). Radius 9, a well's corner: the
-     reference's 8 is on no rung. */
+  /* Lifted back to `--fab-bg-1` like the search well, so the recess reads as a card with two lit
+     edges, not a flat band (`proto:1153`); a well's 9, as the reference's 8 is on no rung. */
   .fab-bulk-inset-pager {
     display: flex;
     gap: var(--fab-space-2);
