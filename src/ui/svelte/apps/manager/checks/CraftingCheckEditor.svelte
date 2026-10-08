@@ -521,7 +521,7 @@
           {/if}
         </div>
       </div>
-      <div class="manager-checks-card-body is-roomy">
+      <div class="manager-checks-card-body">
         {#if showPreviewAgainst}
           <div class="manager-checks-preview-against" data-preview-against>
             <span class="manager-checks-preview-against-label" id="checks-preview-against-label">

@@ -1102,7 +1102,7 @@ test('the band-strip hint keeps its 20px separation from the first tier row', as
       `<style>${css}</style>` +
         '<div class="fabricate-manager">' +
         '<section class="fabricate-card manager-checks-card" data-outcome-bands>' +
-        '<div class="manager-checks-card-body is-roomy">' +
+        '<div class="manager-checks-card-body">' +
         '<p class="manager-muted" data-outcome-band-strip-hint>' +
         'Drag or arrow-key a band edge to move its threshold.</p>' +
         '<div class="manager-checks-tier-list" role="list">' +
