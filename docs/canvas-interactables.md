@@ -208,7 +208,7 @@ Activating a tool station opens the Crafting tab.
 The borrowed tool applies to recipe details, ingredient-choice recalculations, the craft action, and Journal step advances.
 Switching stations refreshes an already-open recipe.
 Reopening the window without a station, or closing it, clears the borrowed availability.
-The header chip reads "Station tool:" followed by the Tool's name, unless a GM label override is set for that station Tool.
+The header chip reads "Station tool:" followed by the Tool's name, unless the Tool has a **Display label** set in the Tool Studio (see [Tools]({% link tools.md %})).
 
 ---
 
