@@ -576,8 +576,8 @@ test('no weight in the sheet, components and manager leaves the ramp or the mono
 
 /* ─────────────────────────────── gate 4: shadows ─────────────────────────────── */
 
-/** The three published elevation tokens. */
-const SHADOW_TOKEN = /^var\(\s*--fab-shadow-(sm|md|lg)\s*\)$/iu;
+/** The two published elevation tokens. */
+const SHADOW_TOKEN = /^var\(\s*--fab-shadow-(md|lg)\s*\)$/iu;
 
 /** A `--fab-*` colour, with an optional fallback. */
 const FAB_COLOUR = String.raw`var\(\s*--fab-[\w-]+\s*(?:,[^)]*)?\)`;
@@ -674,9 +674,9 @@ test('no box-shadow is written outside the published elevation set', (t) => {
   checkGate(
     t,
     OFF_TOKEN_SHADOW_GATE,
-    'Token foundations are the only source of elevation. `--fab-shadow-sm`, `--fab-shadow-md` ' +
-      'and `--fab-shadow-lg` are the three heights this product has, and only a surface that ' +
-      'floats over content takes one; a hand-written offset and blur is a fourth height that no ' +
+    'Token foundations are the only source of elevation. `--fab-shadow-md` and ' +
+      '`--fab-shadow-lg` are the two heights this product has, and only a surface that floats ' +
+      'over content takes one; a hand-written offset and blur is a third height that no ' +
       'other surface can match. `none`, an inset ring, a comma list of rings and a leading bar ' +
       '(`inset 3px 0 0 var(--fab-*)`), each at most 4px wide, are edges rather than elevation and ' +
       'stay allowed, and so does the checked radio dot, whose 16px ring fills its control.'
@@ -766,13 +766,13 @@ test('no rule in the sheet, components and manager draws depth through another c
   );
 
   const definitions = corpus.declarations.filter(
-    (d) => SWEEP_SCOPE.test(d.file) && /^--fab-shadow-(?:sm|md|lg)$/iu.test(d.property)
+    (d) => SWEEP_SCOPE.test(d.file) && /^--fab-shadow-[\w-]+$/iu.test(d.property)
   );
-  assertFloor('theme-block elevation tokens', definitions.filter(inThemeBlock).length, 21);
+  assertFloor('theme-block elevation tokens', definitions.filter(inThemeBlock).length, 14);
   assert.deepEqual(
     definitions.filter((d) => !inThemeBlock(d)).map(scopeSite),
     [],
-    'the three elevation tokens are declared in the seven theme blocks only: a rule that ' +
+    'the elevation tokens are declared in the seven theme blocks only: a rule that declares or ' +
       're-declares one gives the surfaces beneath it a height no theme publishes'
   );
 });
