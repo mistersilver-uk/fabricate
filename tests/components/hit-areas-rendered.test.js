@@ -122,6 +122,7 @@ ${['Stepper', 'SelectionCheckbox', 'Chip']
     ([cls, wrapper, width, height]) =>
       `<div data-case="${cls}" class="row ${wrapper}"><button class="neighbour" data-neighbour="before"></button><button type="button" class="${cls}" style="${cls === 'fab-hit-area' ? `width:${width}px;height:${height}px;padding:0` : ''}">${GLYPH}</button><button class="neighbour" data-neighbour="after"></button></div>`
   ).join('\n')}
+  <div data-case="label-input" class="row"><input class="manager-condition-label-input" aria-label="Edit label" value="Label" /></div>
   <div data-case="range" class="row manager-gathering-task-edit-view"><input type="range" min="0" max="10" value="5" /></div>
 </div></body></html>`;
 
@@ -395,6 +396,15 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
     ]) {
       assert.equal(read(path).split(`class="${token}"`).length - 1, count, `${path}: ${token}`);
     }
+  });
+
+  it('finds the condition label field at 34px, whatever its own 20px declaration says', async () => {
+    // The field baseline `.fabricate-manager input:not([type])` is (0,2,1) and out-ranks the
+    // chromeless rule's (0,2,0), so the input already offers a target well past 24px.
+    const height = await tab.evaluate(
+      () => document.querySelector('[data-case="label-input"] input').getBoundingClientRect().height
+    );
+    assert.ok(height >= 24, `the label field is ${height}px`);
   });
 
   it('gives the task range a 24px track the row does not feel', async () => {
