@@ -46,7 +46,7 @@ test('manager root defines a scoped responsive app container', () => {
 
   assert.ok(block.includes('container-type: inline-size;'), 'manager should use container queries');
   assert.ok(
-    block.includes('container-name: fabricate-manager;'),
+    block.includes('container-name: fabricate-manager fabricate-option-host;'),
     'manager should name its container'
   );
   assert.ok(block.includes('isolation: isolate;'), 'manager should isolate its shell');

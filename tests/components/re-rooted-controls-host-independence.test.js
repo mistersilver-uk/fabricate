@@ -2454,7 +2454,7 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
     }
     assert.match(
       sheet,
-      /container-name: fabricate-manager;/,
+      /container-name: fabricate-manager fabricate-option-host;/,
       'the container NAME must still be established by `.fabricate-manager` itself, which is the ' +
         'whole reason those rules cannot travel to a bare host'
     );

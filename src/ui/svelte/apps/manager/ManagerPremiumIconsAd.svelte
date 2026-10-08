@@ -183,14 +183,14 @@
     white-space: nowrap;
   }
 
-  @container fabricate-manager (max-width: 1179px) {
+  @container fabricate-manager (max-width: 1120px) {
     .manager-premium-icons-ad-icon:nth-child(n + 4),
     .manager-premium-icons-ad-subline {
       display: none;
     }
   }
 
-  @container fabricate-manager (max-width: 979px) {
+  @container fabricate-manager (max-width: 960px) {
     .manager-premium-icons-ad {
       display: none;
     }

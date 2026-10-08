@@ -979,7 +979,7 @@
   /* Below the threshold the rail stacks under the form rather than compressing to a column too
      narrow for an inventory tile — the same ruling `EntityListInspectorFrame` makes about its own
      inspector, at the width this page's own layout already breaks at. */
-  @container fabricate-manager (max-width: 1000px) {
+  @container fabricate-manager (max-width: 960px) {
     .manager-scoped-entry-body {
       grid-template-columns: minmax(0, 1fr);
     }

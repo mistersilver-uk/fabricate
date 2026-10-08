@@ -643,7 +643,7 @@
 
   /* Search wraps onto its own line before the segmented controls start colliding. The row is
      already `flex-wrap`, so this only has to release the search field's basis. */
-  @container fabricate-manager (max-width: 1000px) {
+  @container fabricate-manager (max-width: 960px) {
     .manager-essence-filter-row :global(.fabricate-search) {
       flex: 1 1 100%;
     }

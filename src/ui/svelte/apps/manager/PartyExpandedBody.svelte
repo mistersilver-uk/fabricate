@@ -555,7 +555,7 @@
     line-height: 1.4;
   }
 
-  @container fabricate-manager (max-width: 720px) {
+  @container fabricate-manager (max-width: 680px) {
     .manager-party-body {
       grid-template-columns: 1fr;
     }

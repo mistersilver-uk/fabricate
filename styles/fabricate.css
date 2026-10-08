@@ -959,7 +959,7 @@
   position: relative;
   isolation: isolate;
   container-type: inline-size;
-  container-name: fabricate-manager;
+  container-name: fabricate-manager fabricate-option-host;
   display: grid;
   grid-template-rows: auto auto 1fr;
   height: 100%;
@@ -3702,7 +3702,7 @@
   gap: var(--fab-space-3);
 }
 
-@media (width <= 720px) {
+@container fabricate-manager (max-width: 680px) {
   .fabricate-manager .manager-currency-provider-managed-grid {
     grid-template-columns: 1fr;
   }
@@ -7991,7 +7991,7 @@
   min-width: 0;
 }
 
-@media (width <= 720px) {
+@container fabricate-manager (max-width: 680px) {
   .fabricate-manager .manager-currency-macro-row {
     grid-template-columns: 1fr;
   }
@@ -8300,7 +8300,8 @@
   box-shadow: none;
 }
 
-@container (max-width: 620px) {
+/* The option cards answer the editor surface that hosts them: a card or panel that names itself `fabricate-option-host`, or else the manager. */
+@container fabricate-option-host (max-width: 620px) {
   .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -12005,7 +12006,7 @@
 /* A definite floor, because a percentage one resolves to nothing while the caption sizes its line, and the field would then shrink under the add button rather than wrap below the heading. */
 .fabricate-manager .manager-task-drop-controls .fabricate-search.is-compact {
   flex: 1 1 260px;
-  width: min(320px, 34vw);
+  width: 320px;
   min-width: 220px;
   max-width: 320px;
 }
@@ -13762,7 +13763,7 @@
 }
 
 /* Below the list frame's own 760px stack the inspector sits under the list, and in a bounded body row the list rows would shrink to nothing, so the list-over-inspector layout sizes its rows to content and is the one scroller (issue 1976). */
-@container (max-width: 760px) {
+@container fabricate-scoped-list (max-width: 760px) {
   .fabricate-manager[data-manager-view="world-components"] .manager-scoped-list-layout.has-inspector,
   .fabricate-manager[data-manager-view="world-essences"] .manager-scoped-list-layout.has-inspector,
   .fabricate-manager[data-manager-view="world-tools"] .manager-scoped-list-layout.has-inspector {
@@ -13923,7 +13924,7 @@
 
 .fabricate-manager .manager-tool-editor-panel {
   /* Shared radio cards query their available editor width, not the full manager shell. */
-  container-type: inline-size;
+  container: fabricate-option-host / inline-size;
   padding: var(--fab-space-5);
   grid-column: 2;
   grid-row: 3;
@@ -14850,7 +14851,7 @@
 
 }
 
-@container fabricate-manager (max-width: 980px) {
+@container fabricate-manager (max-width: 960px) {
   /* THE PROVENANCE CAPTION DROPS UNDER THE MODE IT QUALIFIES (issue 1373). */
   .fabricate-manager .manager-tool-authority-readonly {
     grid-template-columns: 24px minmax(0, 1fr);
@@ -17456,7 +17457,7 @@
   flex: 0 0 auto;
 }
 
-@media (max-width: 720px) {
+@container fabricate-manager (max-width: 680px) {
   .fabricate-manager .manager-realm-env-editor {
     grid-template-columns: 1fr;
   }
@@ -20183,7 +20184,7 @@
 }
 
 /* THE RAIL STACKS UNDER THE PANEL below the threshold rather than compressing to a column too narrow to read, which is the ruling the shared list frame already makes about its inspector (issue 1371). */
-@container fabricate-manager (max-width: 1000px) {
+@container fabricate-manager (max-width: 960px) {
   .fabricate-manager .manager-component-entry-page,
   .fabricate-manager .manager-main.manager-component-entry-page {
     grid-template-columns: minmax(0, 1fr);
@@ -20574,7 +20575,7 @@
 }
 
 /* The two cards stack before the tag card's chip runs start wrapping to one chip a line. */
-@container (max-width: 960px) {
+@container fabricate-manager (max-width: 960px) {
   .fabricate-manager .manager-component-rules-duo {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -20699,7 +20700,7 @@
   min-width: 0;
 }
 
-@container (max-width: 960px) {
+@container fabricate-manager (max-width: 960px) {
   .fabricate-manager .manager-component-rules-card .manager-component-essence-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -21126,7 +21127,7 @@
 }
 
 /* ══ issue 1371 r18-entry, maintainer ruling M31 — THE ENTRY'S ESSENCE GRID BREAKS AS THE EDITOR'S ══ The world Component entry's `Essence contribution` card renders the shared 4-up `.manager-component-essence-grid`, the same grid the rules editor's card renders (D5, `proto:1343`). */
-@container (max-width: 960px) {
+@container fabricate-manager (max-width: 960px) {
   .fabricate-manager .manager-component-entry-essences .manager-component-essence-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

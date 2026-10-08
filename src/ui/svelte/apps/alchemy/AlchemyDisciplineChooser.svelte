@@ -88,10 +88,10 @@
     justify-content: center;
     height: 100%;
     overflow-y: auto;
-    padding: clamp(28px, 6vh, 64px) 24px;
+    padding: 64px 24px;
     background: var(--fab-surface);
     color: var(--fab-text);
-    container-type: inline-size;
+    container: fabricate-alchemy-chooser / inline-size;
   }
 
   .alchemy-chooser-inner {
@@ -147,7 +147,7 @@
     gap: 16px;
   }
 
-  @container (max-width: 520px) {
+  @container fabricate-alchemy-chooser (max-width: 520px) {
     .alchemy-chooser-grid {
       grid-template-columns: minmax(0, 1fr);
     }
