@@ -2424,7 +2424,7 @@
   min-height: 34px;
 }
 
-/* ── The Modifiers screen's entry rows ── ONE ROW PER ENTRY, ON ONE LINE, and every number below is the prototype's own, its gap and padding (10, 9/11) snapped to the spacing scale (issue 1523) — recorded by the `modifier-entry-row` region and its parts in the parity fixture, so changing one here reds that run with the region and property named (issues 1096, 1373). */
+/* ── The Modifiers screen's entry rows ── ONE ROW PER ENTRY, ON ONE LINE, and every number below is the prototype's own, its gap and padding (10, 9/11) snapped to the spacing scale (issue 1523) — recorded by the `modifier-entry-row` region and its parts in the parity fixture, so the next parity run shows a change here as a drift in that region and property (issues 1096, 1373). */
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-row,
 .fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-row,
 .fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-row {
@@ -9860,7 +9860,7 @@
 /* A reward row's body spans the row below its controls: a currency's naming body on its own inset band, or a knowledge row's help line. */
 .fabricate-manager .manager-recipe-ingredient-option-row > .manager-recipe-reward-body {
   display: grid;
-  flex: 0 0 calc(100% + 2 * var(--fab-space-2));
+  flex: 0 0 calc(100% + 16px);
   order: 5;
   gap: var(--fab-space-2);
   box-sizing: border-box;
@@ -10007,7 +10007,7 @@
 }
 
 .fabricate-manager .manager-recipe-award-spacer {
-  flex: 1 1 var(--fab-space-2);
+  flex: 1 1 8px;
 }
 
 .fabricate-manager .manager-recipe-award-caption,
@@ -10560,7 +10560,7 @@
   font-weight: 600;
 
   /* Entering the route reveals the active sub-item with `scrollIntoView({ block: 'nearest' })`, which by itself lands the item flush against the scrollport's bottom edge and leaves the rest of the group hidden — measured at a 1330x900 Manager, the revealed item sat at 947-977 against a port ending at 977. */
-  scroll-margin-block-end: 8px;
+  scroll-margin-block-end: var(--fab-space-2);
 }
 
 /* The label follows the row rather than the rail's ordinary 12.5px, so the group's type reads as one step louder together — see the note above. */
@@ -15161,7 +15161,7 @@
 
 /* The empty currency-macro drop zone must match the height of the linked-macro card (.manager-environment-scene-linked) so dropping or selecting a macro does not resize the zone. */
 .fabricate-manager .manager-currency-macro-drop-zone {
-  min-height: calc(38px + (2 * var(--fab-space-3)) + 2px);
+  min-height: 64px;
 }
 
 /* A fixed FOUR-up grid (brief §C5). `auto-fill, minmax(260px, 1fr)` gave 2–3 columns at the manager's width, so the same system rendered a different grid depending on the window (issue 772). */
@@ -18134,7 +18134,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--fab-space-3);
+  width: 12px;
   height: 1.4em;
   color: var(--fab-accent);
   font-size: 11px;
