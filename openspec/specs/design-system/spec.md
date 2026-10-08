@@ -610,11 +610,14 @@ In `foundry-native` a component tagged Aqua renders a desaturated rose, and in `
 The five withheld tints hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
 Re-deriving the eight is a palette change across seven theme blocks and is recorded as a planned migration.
 
-Elevation MUST be `--fab-shadow-sm`, `--fab-shadow-md` or `--fab-shadow-lg`, and only on a surface that floats OVER content: a popover, a menu, a dialog, a toast, or a dock that pins over the content scrolling beneath it.
-A surface that sits on the page — a card, a row, a well, a button, a handle — MUST draw no shadow; its edge is a 1px `--fab-border` or a ring.
+Elevation MUST be `--fab-shadow-sm`, `--fab-shadow-md` or `--fab-shadow-lg`, and only on a surface that floats OVER content: a popover, a menu, a suggestion list, a dialog or a toast.
+A surface that sits on the page — a card, a row, a well, a button, a handle, or a dock pinned to its scroll area's edge — MUST draw no shadow; its edge is a 1px `--fab-border` or a ring.
+Whether a surface floats or sits is a judgement no pattern can read from a declaration, so a pinned allow-list and review hold the split: every read of a `--fab-shadow-*` token in the sheet, `components/` and `apps/manager/` is listed by file and selector with the reason that surface floats, a new read fails until it is listed, and the review of that listing decides the classification.
 The gate MUST allow only `none`, an inset ring, a ring list and a leading inset bar beside those three tokens.
-A ring is `0 0 0 <n>px var(--fab-*)`, inset or not: a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
-A ring list is two or more rings in one declaration, such as a radio's dot inside its ground, and a leading bar is `inset <n>px 0 0 var(--fab-*)`, the selected row's inline-start stripe.
+A ring is `0 0 0 <n>px var(--fab-*)`, inset or not, at most 4px: a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
+A ring list is two or more rings in one declaration, and a leading bar is `inset <n>px 0 0 var(--fab-*)`, at most 4px wide, the selected row's inline-start stripe.
+The checked radio's dot, `inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent)`, is the one named exception to that bound: its 16px ring fills the 16px control inside a 3px ground.
+No rule in that scope draws depth through another channel: no `drop-shadow()`, no `text-shadow` other than `none`, and no `--fab-shadow-*` declaration outside the theme blocks.
 `tests/components/design-system-debt-ratchets.test.js` reads every `box-shadow` in the global sheet and in every Svelte scoped block, and holds the sheet, `components/` and `apps/manager/` to that set absolutely.
 
 #### Scenario: A primitive needs a colour the token set does not name
@@ -626,6 +629,11 @@ A ring list is two or more rings in one declaration, such as a radio's dot insid
 
 - **WHEN** a change adds a `box-shadow` that is not `none`, a `--fab-shadow-*` token, a ring, a ring list or a leading inset bar — a blurred bar or a hairline with a y-offset included
 - **THEN** `design-system-debt-ratchets` fails it
+
+#### Scenario: A change draws elevation on a surface the allow-list does not name
+
+- **WHEN** a change reads a `--fab-shadow-*` token in the sheet, `components/` or `apps/manager/` at a file and selector the pinned allow-list does not name
+- **THEN** `design-system-debt-ratchets` fails it until the site is listed with the reason it floats, and the review of that listing decides whether it floats or sits
 
 ### Requirement: The token namespace is one generation and names its purpose
 
