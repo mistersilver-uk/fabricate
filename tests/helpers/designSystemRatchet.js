@@ -99,6 +99,7 @@ function buildStyleCorpus(entries) {
       line: rule.line,
       at: rule.bodyLine + declaration.line - 1,
       selector: rule.selector,
+      context: rule.context,
     }))
   );
   return { styles, sources, rules, declarations, definitions: collectCustomProperties(styles) };

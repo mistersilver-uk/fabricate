@@ -225,8 +225,9 @@ export async function checksRollEdges(page, tiersWrapperClass) {
 // `.fabricate-card` shell instead — the identical defect the recipe-tier list above was
 // fixed for — so the card took the generic 8px radius and translucent fill, and the
 // combination-rule cards fell back to the shared `RadioCardGroup` primitive's own generic
-// padding and gap instead of the studio's 13px/11px. Real Chromium + the real stylesheet, for
-// the same reason the tier-row measurement above needs both.
+// padding and gap instead of the studio's 13px/11px. Both now sit on the scale's 12 (issue
+// 1523), so the studio's `--fab-bg-1` card face is what still tells the two apart. Real
+// Chromium + the real stylesheet, for the same reason the tier-row measurement above needs both.
 export async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
   const card = `
     <section class="${cardWrapperClass}" data-crafting-modifier-catalogue="crafting">
@@ -262,6 +263,9 @@ export async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
       optionPaddingLeft: round(parseFloat(optionCs.paddingLeft)),
       optionPaddingTop: round(parseFloat(optionCs.paddingTop)),
       optionGap: optionCs.columnGap,
+      // The second card, at rest: the first is chosen, and its chosen face is the primitive's.
+      optionBackground: getComputedStyle(document.querySelectorAll('.manager-resolution-option')[1])
+        .backgroundColor,
       optionRadius: round(parseFloat(optionCs.borderTopLeftRadius)),
     };
   });

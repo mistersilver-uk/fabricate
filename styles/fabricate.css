@@ -1549,11 +1549,11 @@
   justify-content: flex-start;
   gap: var(--fab-space-2);
   margin: 0;
-  padding: 14px 15px 0;
+  padding: var(--fab-space-4) var(--fab-space-4) 0;
 }
 
 .fabricate-manager .manager-checks-card-body {
-  padding: 14px;
+  padding: var(--fab-space-4);
 }
 
 /* The Formula card's head keeps the prototype's tighter lead-to-control gap. */
@@ -1562,15 +1562,15 @@
 }
 
 .fabricate-manager .manager-checks-card-body.is-roomy {
-  padding: 14px 16px;
+  padding: var(--fab-space-4) var(--fab-space-4);
 }
 
 /* A body whose whole content is a LIST plus the dashed control that extends it. */
 .fabricate-manager .manager-checks-card-body.is-stack {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-3) var(--fab-space-4);
 }
 
 /* SENTENCE CASE, in the display face, at full text ink. The manager's `.manager-card-title` is an uppercase micro-label at muted ink — correct for the rail's flat section headings and wrong for a card that carries a title AND a description line. */
@@ -1588,7 +1588,7 @@
 
 .fabricate-manager .manager-checks-card-description {
   max-width: 640px;
-  margin: 3px 0 0;
+  margin: var(--fab-space-1) 0 0;
   color: var(--fab-text-muted);
   font-size: 10.5px;
   font-weight: 400;
@@ -1604,7 +1604,7 @@
 
 .fabricate-manager .manager-checks-card-heading {
   display: flex;
-  gap: 10px;
+  gap: var(--fab-space-3);
   align-items: center;
   min-width: 0;
 }
@@ -1615,7 +1615,7 @@
   -webkit-appearance: none;
   display: inline-flex;
   flex: 0 0 auto;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   align-items: center;
   height: auto;
   min-height: 0;
@@ -1662,13 +1662,13 @@
 
 /* The SECTION STRIP's own scale (maintainer parity round 3). */
 .fabricate-manager .manager-environment-tabs.manager-checks-sections {
-  gap: 2px;
+  gap: var(--fab-space-2xs);
 }
 
 .fabricate-manager .manager-checks-sections .manager-environment-tab-button {
   min-height: 38px;
-  gap: 7px;
-  padding: 11px 14px;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-3) var(--fab-space-4);
   font-size: 12.5px;
   font-weight: 500;
 }
@@ -1681,11 +1681,11 @@
 
 /* The PANE heading — the studio's section title, above the cards. It was missing entirely, so the Outcomes screen opened on a card with no statement of what the screen is for. */
 .fabricate-manager .manager-checks-pane-head {
-  margin: 0 0 16px;
+  margin: 0 0 var(--fab-space-4);
 }
 
 .fabricate-manager .manager-checks-pane-title {
-  margin: 0 0 3px;
+  margin: 0 0 var(--fab-space-1);
   color: var(--fab-text);
   font-family: var(--fab-font-serif);
   font-size: 18px;
@@ -1710,10 +1710,10 @@
 .fabricate-manager .manager-checks-mode-callout {
   display: flex;
   align-items: flex-start;
-  gap: 13px;
+  gap: var(--fab-space-3);
   min-width: 0;
-  margin: 0 0 14px;
-  padding: 15px 16px;
+  margin: 0 0 var(--fab-space-4);
+  padding: var(--fab-space-4) var(--fab-space-4);
   border: 1px solid var(--fab-info-border);
   border-radius: 11px;
   background: var(--fab-info-soft);
@@ -1757,7 +1757,7 @@
 }
 
 .fabricate-manager .manager-checks-mode-callout-lead {
-  margin: 6px 0 0;
+  margin: var(--fab-space-chip) 0 0;
   color: var(--fab-text-muted);
   font-size: 11.5px;
   font-weight: 400;
@@ -1767,8 +1767,8 @@
 .fabricate-manager .manager-checks-mode-callout-facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin: 6px 0 0;
+  gap: var(--fab-space-4);
+  margin: var(--fab-space-chip) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -1776,7 +1776,7 @@
 .fabricate-manager .manager-checks-mode-callout-fact {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--fab-space-chip);
   color: var(--fab-text-subtle);
   font-size: 10.5px;
   font-weight: 500;
@@ -1793,7 +1793,7 @@
 
 /* The prototype separates a fact's LABEL from its VALUE with a middle dot. */
 .fabricate-manager .manager-checks-mode-callout-fact > b::before {
-  margin-right: 7px;
+  margin-right: var(--fab-space-chip);
   content: "·";
 }
 
@@ -1807,7 +1807,7 @@
 .fabricate-manager .manager-checks-difficulty-fields {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
@@ -1816,13 +1816,13 @@
   .manager-checks-card
   .manager-resolution-mode-card
   + .manager-checks-difficulty-fields {
-  margin-top: 13px;
+  margin-top: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-checks-difficulty-field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--fab-space-1);
   min-width: 0;
 }
 
@@ -1849,9 +1849,8 @@
   line-height: normal;
 }
 
-/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own scale is restated, at (0,4,0). Padding, radius, radio and legend are the primitive's. */
+/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own face is restated, at (0,4,0). Gap, padding, radius, radio and legend are the primitive's: the studio's 11px gap snapped to the primitive's own 12 (issue 1523). */
 .fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
-  gap: 11px;
   border: 1px solid var(--fab-border);
   background: var(--fab-bg-1);
 }
@@ -1910,8 +1909,8 @@
 .fabricate-manager .manager-checks-preview-against {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: var(--fab-space-3);
+  margin-bottom: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-checks-preview-against-label {
@@ -1942,7 +1941,7 @@
 .fabricate-manager .manager-checks-tier-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
@@ -2008,7 +2007,7 @@
 /* The outcome list's own append action, which lives outside that list so it is reachable from the zero state too (issue 1097 follow-up); full width, as the tier list's footer adder is. */
 .fabricate-button.fabricate-button.manager-checks-outcome-add {
   width: 100%;
-  margin-top: 6px;
+  margin-top: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-checks-tier-row.is-invalid {
@@ -2019,7 +2018,7 @@
 .fabricate-manager .manager-checks-trigger-presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -2028,7 +2027,7 @@
   flex: 0 1 auto;
   height: 30px;
   min-height: 0;
-  padding: 0 12px;
+  padding: 0 var(--fab-space-3);
   border-radius: 7px;
 }
 
@@ -2043,7 +2042,7 @@
 
 /* Colour and size come from the same measurement, and both were drifting while only the margin was being argued about. */
 .fabricate-manager [data-outcome-bands] [data-outcome-band-strip-hint] {
-  margin-bottom: 20px;
+  margin-bottom: var(--fab-space-5);
   color: var(--fab-text-subtle);
   font-size: 10.5px;
 }
@@ -2146,20 +2145,20 @@
 }
 
 .fabricate-manager [data-checks-editor] .manager-environment-tab-panel {
-  /* The 12px `padding-right` this replaces was a scrollbar buffer. It is no longer needed: the scroller is styled from tokens below and `scrollbar-gutter: stable` still reserves its own track, so the pane's 22px inset is doing that job with room to spare. */
-  padding: 20px 22px 26px;
+  /* The 12px `padding-right` this replaces was a scrollbar buffer. It is no longer needed: the scroller is styled from tokens below and `scrollbar-gutter: stable` still reserves its own track, so the pane's 24px inset is doing that job with room to spare. */
+  padding: var(--fab-space-5) var(--fab-space-6) var(--fab-space-6);
 }
 
-/* The section strip runs edge to edge, with its tabs on the pane's own 22px inset — the prototype's header carries `padding: 14px 22px 0` and the strip sits inside it. */
+/* The section strip runs edge to edge, with its tabs on the pane's own inset — the prototype's header carries `padding: 14px 22px 0` (the 22 snapped to 24) and the strip sits inside it. */
 .fabricate-manager [data-checks-editor] .manager-environment-tabs {
-  padding-right: 22px;
-  padding-left: 22px;
+  padding-right: var(--fab-space-6);
+  padding-left: var(--fab-space-6);
 }
 
 /* ── The right inspector ── TWO authorities, and they do not overlap. */
 .fabricate-manager .manager-environment-workspace .manager-inspector.manager-checks-rail {
-  gap: 12px;
-  padding: 16px 15px 20px;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4) var(--fab-space-4) var(--fab-space-5);
   border: 0;
   border-left: 1px solid var(--fab-border);
   border-radius: 0;
@@ -2168,7 +2167,7 @@
 
 .fabricate-manager .manager-checks-rail .fabricate-card {
   gap: var(--fab-space-2);
-  padding: 12px 13px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 11px;
   background: var(--fab-bg-1);
@@ -2187,7 +2186,7 @@
 /* THE HEADING ROW. The Tool Studio owns where it sits — flat, above its card — and the prototype owns what it is made of: a leading glyph at the kicker's own ink, and an optional adjunct pushed hard right (the odds panel's die domain, the digest's status chip). */
 .fabricate-manager .manager-checks-rail-head {
   display: flex;
-  gap: 8px;
+  gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
 }
@@ -2214,7 +2213,7 @@
 /* The documentation / quickstart pair the prototype opens the rail with. */
 .fabricate-manager .manager-checks-rail-links {
   display: flex;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-checks-rail-link {
@@ -2222,7 +2221,7 @@
   flex: 1 1 0;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   height: 30px;
   border: 1px solid var(--fab-border);
@@ -2241,8 +2240,8 @@
 
 /* ── The activation card ── The prototype gives this section NO heading: the card is the statement, so it carries the state in its own surface. */
 .fabricate-manager .manager-checks-rail .manager-checks-active-card {
-  gap: 7px;
-  padding: 13px 14px;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3) var(--fab-space-4);
 }
 
 .fabricate-manager .manager-checks-rail .manager-checks-active-card.is-on {
@@ -2291,8 +2290,8 @@
 
 /* ── The rail's LISTS ── `THIS CHECK` and `ALL CHECKS` are ONE card of compact rows each, not a stack of bordered cards. */
 .fabricate-manager .manager-checks-rail .fabricate-card.is-rail-list {
-  gap: 3px;
-  padding: 9px 11px;
+  gap: var(--fab-space-1);
+  padding: var(--fab-space-2) var(--fab-space-3);
 }
 
 .fabricate-manager .manager-checks-rail-row {
@@ -2301,7 +2300,7 @@
   -webkit-appearance: none;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--fab-space-2);
   width: 100%;
   min-width: 0;
 
@@ -2309,7 +2308,7 @@
   height: auto;
   min-height: 0;
   margin: 0;
-  padding: 7px 8px;
+  padding: var(--fab-space-2) var(--fab-space-2);
   border: 0;
   border-radius: 7px;
 
@@ -2372,7 +2371,7 @@
 
 /* A row that carries a second line is the Validation rail's: its first line names the check rather than reporting a fact, so it takes the prototype's heavier row title. */
 .fabricate-manager .manager-checks-rail-row.is-detailed {
-  padding: 8px;
+  padding: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-checks-rail-row.is-detailed .manager-checks-rail-row-text {
@@ -2425,15 +2424,15 @@
   min-height: 34px;
 }
 
-/* ── The Modifiers screen's entry rows ── ONE ROW PER ENTRY, ON ONE LINE, and every number below is the prototype's own — recorded by the `modifier-entry-row` region and its parts in the parity fixture, so changing one here reds that run with the region and property named (issues 1096, 1373). */
+/* ── The Modifiers screen's entry rows ── ONE ROW PER ENTRY, ON ONE LINE, and every number below is the prototype's own, its gap and padding (10, 9/11) snapped to the spacing scale (issue 1523) — recorded by the `modifier-entry-row` region and its parts in the parity fixture, so the next parity run shows a change here as a drift in that region and property (issues 1096, 1373). */
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-row,
 .fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-row,
 .fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--fab-space-3);
   min-width: 0;
-  padding: 9px 11px;
+  padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-bg-0);
@@ -2519,7 +2518,7 @@
   -webkit-appearance: none;
   display: inline-flex;
   flex: 0 0 auto;
-  gap: 7px;
+  gap: var(--fab-space-chip);
   align-items: center;
   justify-content: center;
   width: 112px;
@@ -2575,10 +2574,10 @@
 /* THE NOTE THAT CLOSES THE CARD. Quiet on purpose: the surface fill and the ordinary border, with the glyph carrying the only colour, because it points at another screen rather than reporting a hazard. */
 .fabricate-manager .manager-checks-card .manager-modifier-library-note {
   display: flex;
-  gap: 10px;
+  gap: var(--fab-space-3);
   align-items: flex-start;
   margin: 0;
-  padding: 11px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   color: var(--fab-text-muted);
@@ -2598,10 +2597,10 @@
 /* THE PICK CAP, as the row the prototype draws: its label and hint on the left, the Stepper on the right, inside the studio's own row box. */
 .fabricate-manager .manager-checks-card .manager-modifier-max-picks {
   display: flex;
-  gap: 14px;
+  gap: var(--fab-space-4);
   align-items: center;
-  margin-top: 14px;
-  padding: 11px 13px;
+  margin-top: var(--fab-space-4);
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-bg-0);
@@ -2614,7 +2613,7 @@
 
 /* Stated on the ELEMENT, not inherited from `.manager-muted`. That class sets `margin: … 0 0` as a shorthand at the same specificity a longhand here would tie with, and the later of two tied declarations wins — which is how a neighbouring hint on this studio's Outcomes screen computed a `margin-bottom` of `0px` while its own rule said otherwise. */
 .fabricate-manager .manager-checks-card .manager-modifier-max-picks-hint {
-  margin: 3px 0 0;
+  margin: var(--fab-space-1) 0 0;
   color: var(--fab-text-muted);
   font-size: 10px;
   font-weight: 400;
@@ -2623,8 +2622,8 @@
 
 /* ── The On failure screen's flag cards ── `ToggleCard` is the manager's shared status card and the recipe editor's Overview uses it too, so this restates the studio's own metrics through the flag list rather than moving the primitive: the accent tint on the ON state, the 28px icon tile, and the prototype's type. */
 .fabricate-manager .manager-checks-flag-list .manager-recipe-status-card {
-  gap: 12px;
-  padding: 14px 15px;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-4) var(--fab-space-4);
   border-radius: 11px;
 }
 
@@ -2657,15 +2656,15 @@
 
 /* ── The Validation screen ── `EditorValidationSurface` is the ONE implementation of the validation arrangement (issue 1444 closed it onto seven renderers), so every rule here is scoped to the checks route: same primitive, this studio's metrics (issue 1373). */
 .fabricate-manager .manager-checks-validation-route .manager-recipe-rail-summary {
-  gap: 16px;
-  padding: 19px 20px;
+  gap: var(--fab-space-4);
+  padding: var(--fab-space-5) var(--fab-space-5);
   border-radius: 11px;
   background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-checks-validation-route .manager-recipe-rail-count {
   height: 34px;
-  padding: 0 13px;
+  padding: 0 var(--fab-space-3);
   border-radius: 9px;
   background: var(--fab-bg-2);
 }
@@ -2681,8 +2680,8 @@
 }
 
 .fabricate-manager .manager-checks-validation-route .manager-recipe-val-row {
-  gap: 11px;
-  padding: 13px 14px;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3) var(--fab-space-4);
 }
 
 /* The checks editors' choice selectors (check type, DC source, award mode, alchemy check mode, modifier policy) render through the shared `RadioCardGroup` primitive, so they carry the `manager-resolution-mode-card is-config-cards` contract rather than a bespoke grid of their own (issue 855). */
@@ -2692,14 +2691,14 @@
 /* ── A TRIGGER IS A COLLAPSED CARD (issue 419 recombine, redrawn for issue 1096) ── A trigger card states itself in a HEAD a GM can read at a glance — glyph tile, condition title, effect sentence, result chip, chevron, delete — and hides its controls until that head is clicked. The head, the body and the sentence are `RuleRow`'s, rooted at it (issue 1782); the card's frame is the caller's class. */
 .fabricate-manager .manager-checks-trigger-route {
   display: grid;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
 .fabricate-manager .manager-checks-trigger-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -2719,9 +2718,9 @@
 .fabricate-rule-row .fabricate-rule-row-head {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: var(--fab-space-3);
   min-width: 0;
-  padding: 11px 13px;
+  padding: var(--fab-space-3) var(--fab-space-3);
 }
 
 /* THE WHOLE HEAD IS THE DISCLOSURE. Foundry's core `button` rule sets a fixed height and its own border, and a card head is neither — the same reset the rail's digest rows take, and for the same reason: `min-height: 0` does not cancel a fixed `height`, so a two-line head would draw on top of itself. */
@@ -2731,7 +2730,7 @@
   display: flex;
   flex: 1 1 auto;
   align-items: center;
-  gap: 11px;
+  gap: var(--fab-space-3);
   min-width: 0;
   height: auto;
   min-height: 0;
@@ -2809,7 +2808,7 @@
 
 .fabricate-rule-row .fabricate-rule-row-lead {
   display: block;
-  margin-top: 3px;
+  margin-top: var(--fab-space-1);
   color: var(--fab-text-muted);
   font-size: 10.5px;
   font-weight: 400;
@@ -2819,7 +2818,7 @@
 /* The result chip: the effect in two words, at the right of the head. Same family as the glyph tile, so the pair reads as one statement. */
 .fabricate-rule-row .fabricate-rule-row-chip {
   flex: 0 0 auto;
-  padding: 4px 9px;
+  padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
   border-radius: 6px;
   font-size: 10px;
@@ -2861,9 +2860,9 @@
 .fabricate-rule-row .fabricate-rule-row-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
-  padding: 13px;
+  padding: var(--fab-space-3);
   border-top: 1px solid var(--fab-border);
   background: var(--fab-bg-0);
 }
@@ -2883,7 +2882,7 @@
   flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 8px;
+  gap: var(--fab-space-2);
 }
 
 /* THIS STUDIO'S FIELD SCALE, restated in scope rather than moved onto the manager-wide `.fabricate-field` — the same move `.manager-checks-flag-list` and the Validation route already make with their own shared surfaces. */
@@ -2896,7 +2895,7 @@
 }
 
 .fabricate-rule-row .fabricate-rule-row-body .fabricate-field {
-  gap: 5px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-rule-row
@@ -2904,7 +2903,7 @@
   .fabricate-field
   input:not(.fab-stepper-input):not([type="radio"]):not([type="range"]) {
   height: 30px;
-  padding: 0 8px;
+  padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 7px;
   background: var(--fab-surface-soft);
@@ -2927,13 +2926,13 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 18px;
+  gap: var(--fab-space-5);
 }
 
 /* The break-tools card inside a trigger: the shared `ToggleCard` at this studio's metrics, the same restatement the On failure screen's flag list makes. */
 .fabricate-manager .manager-checks-breakage-trigger .manager-recipe-status-card {
-  gap: 11px;
-  padding: 10px 12px;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3) var(--fab-space-3);
   border-radius: 9px;
   background: var(--fab-bg-2);
 }
@@ -2954,10 +2953,10 @@
 /* The closing restatement, quotation-marked: the controls above are the parts and this is what they add up to. */
 .fabricate-rule-row .fabricate-rule-row-quote {
   display: flex;
-  gap: 9px;
+  gap: var(--fab-space-2);
   margin: 0;
   min-width: 0;
-  padding: 10px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   border-radius: 9px;
   color: var(--fab-text-muted);
   background: var(--fab-surface-soft);
@@ -3019,10 +3018,10 @@
 .fabricate-manager .manager-checks-formula-input {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--fab-space-2);
   min-width: 0;
   height: 38px;
-  padding: 0 12px;
+  padding: 0 var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-surface-soft);
@@ -3049,7 +3048,7 @@
   width: auto;
   min-width: 0;
   height: auto;
-  padding: 1px 2px;
+  padding: 1px var(--fab-space-2xs);
   border: 0;
   color: var(--fab-text);
   background: transparent;
@@ -3075,10 +3074,10 @@
 .fabricate-manager .manager-checks-formula-resolved {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--fab-space-3);
   min-width: 0;
-  margin-top: 10px;
-  padding: 10px 12px;
+  margin-top: var(--fab-space-3);
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px solid var(--fab-info-border);
   border-radius: 9px;
   background: var(--fab-info-soft);
@@ -3086,7 +3085,7 @@
 
 .fabricate-manager .manager-checks-formula-resolved > i {
   flex: 0 0 auto;
-  margin-top: 2px;
+  margin-top: var(--fab-space-2xs);
   color: var(--fab-info);
   font-size: 11px;
 }
@@ -3109,8 +3108,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: 6px 0 0;
+  gap: var(--fab-space-2);
+  margin: var(--fab-space-chip) 0 0;
   min-width: 0;
 }
 
@@ -3155,7 +3154,7 @@
 }
 
 .fabricate-manager .manager-checks-formula-rule {
-  margin: 6px 0 0;
+  margin: var(--fab-space-chip) 0 0;
   color: var(--fab-text-muted);
   font-size: 10.5px;
   font-weight: 400;
@@ -4812,7 +4811,7 @@
   align-items: center;
   width: 100%;
   min-width: 0;
-  padding: 0 13px var(--fab-space-2xs);
+  padding: 0 var(--fab-space-3) var(--fab-space-2xs);
   color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
@@ -4962,7 +4961,7 @@
   width: 100%;
   min-width: 0;
   min-height: 62px;
-  padding: 11px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   color: var(--fab-text);
 }
 
@@ -5012,7 +5011,7 @@
 .fabricate-manager .manager-recipe-io {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   align-items: flex-end;
   color: var(--fab-text-secondary);
   font-size: 0.68rem;
@@ -5277,7 +5276,7 @@
 }
 
 .fabricate-toggle-card .manager-recipe-status-sub {
-  margin: 2px 0 0;
+  margin: var(--fab-space-2xs) 0 0;
   min-width: 0;
   line-height: 1.35;
 }
@@ -5315,7 +5314,7 @@
 }
 
 .fabricate-manager .manager-recipe-step-mode-card p {
-  margin: 2px 0 0;
+  margin: var(--fab-space-2xs) 0 0;
 }
 
 .fabricate-manager .manager-recipe-duration-card-head,
@@ -5328,7 +5327,7 @@
 
 .fabricate-manager .manager-recipe-duration-card-head p,
 .fabricate-manager .manager-recipe-steps-card-head p {
-  margin: 2px 0 0;
+  margin: var(--fab-space-2xs) 0 0;
 }
 
 .fabricate-manager .manager-recipe-duration-pill {
@@ -5831,7 +5830,7 @@
   align-items: center;
   max-width: 40%;
   overflow: hidden;
-  padding: 1px 7px;
+  padding: 1px var(--fab-space-chip);
   border-radius: 999px;
 
   /* 0.62rem (~10px): the outcome-tier pills at 0.52rem were too small to read (issue 643). */
@@ -5910,7 +5909,7 @@
 .fabricate-manager .manager-recipe-produces-outcome {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-recipe-produces-outcome + .manager-recipe-produces-outcome {
@@ -5984,8 +5983,8 @@
 .fabricate-manager .manager-recipe-produces-tier-body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 4px;
+  gap: var(--fab-space-1);
+  margin-top: var(--fab-space-1);
   padding-left: var(--fab-space-2);
 }
 
@@ -6028,7 +6027,7 @@
   width: 100%;
   min-width: 0;
   min-height: 62px;
-  padding: 11px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   color: var(--fab-text);
 }
 
@@ -7762,7 +7761,7 @@
   width: 100%;
   min-width: 0;
   min-height: 62px;
-  padding: 11px 12px;
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   color: var(--fab-text);
@@ -8050,7 +8049,7 @@
 }
 
 .fabricate-option-cards .manager-resolution-mode-note i {
-  margin-top: 0.1rem;
+  margin-top: var(--fab-space-2xs);
   color: var(--fab-warning);
 }
 
@@ -8089,7 +8088,7 @@
   height: 16px;
   min-width: 0;
   margin: 0;
-  margin-top: 0.15rem;
+  margin-top: var(--fab-space-2xs);
   padding: 0;
   border: 1.5px solid var(--fab-control-outline);
   border-radius: 50%;
@@ -8106,7 +8105,7 @@
   height: 16px;
   min-width: 0;
   margin: 0;
-  margin-top: 0.15rem;
+  margin-top: var(--fab-space-2xs);
   padding: 0;
   border: 1.5px solid var(--fab-control-outline);
   border-radius: 50%;
@@ -8348,7 +8347,7 @@
 .fabricate-option-cards .manager-resolution-option-badge {
   display: inline-block;
   margin-left: var(--fab-space-2);
-  padding: 0.05rem 0.4rem;
+  padding: 1px var(--fab-space-chip);
   border: 1px solid var(--fab-border);
   border-radius: 999px;
   color: var(--fab-text-muted);
@@ -9184,7 +9183,7 @@
 .fabricate-manager .manager-recipe-ingredient-or-separator > span,
 .fabricate-manager .manager-recipe-ingredient-and-separator > span {
   flex: 0 0 auto;
-  padding: 2px var(--fab-space-2);
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 999px;
   background: var(--fab-bg-3);
@@ -9285,7 +9284,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-recipe-routing-assignment-label {
@@ -9319,7 +9318,7 @@
 .fabricate-manager .manager-chip.manager-recipe-routing-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   border-radius: 6px;
 }
 
@@ -9397,7 +9396,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-chip);
-  padding: 2px var(--fab-space-2);
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-accent-border);
   border-radius: 999px;
   background: var(--fab-accent-soft);
@@ -9757,7 +9756,7 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  padding: 2px var(--fab-space-chip);
+  padding: var(--fab-space-2xs) var(--fab-space-chip);
   border: 1px solid var(--fab-border);
   border-radius: 6px;
   color: var(--fab-text-subtle);
@@ -9861,7 +9860,7 @@
 /* A reward row's body spans the row below its controls: a currency's naming body on its own inset band, or a knowledge row's help line. */
 .fabricate-manager .manager-recipe-ingredient-option-row > .manager-recipe-reward-body {
   display: grid;
-  flex: 0 0 calc(100% + 2 * var(--fab-space-2));
+  flex: 0 0 calc(100% + 16px);
   order: 5;
   gap: var(--fab-space-2);
   box-sizing: border-box;
@@ -10008,7 +10007,7 @@
 }
 
 .fabricate-manager .manager-recipe-award-spacer {
-  flex: 1 1 var(--fab-space-2);
+  flex: 1 1 8px;
 }
 
 .fabricate-manager .manager-recipe-award-caption,
@@ -10284,7 +10283,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-1);
-  margin-top: calc(var(--fab-space-3) + var(--fab-space-2xs));
+  margin-top: var(--fab-space-4);
   padding-top: var(--fab-space-3);
   border-top: 1px solid var(--fab-border);
 }
@@ -10540,7 +10539,7 @@
 /* The header's premium unlock action. It is deliberately NOT `.is-primary`: that variant is the green Save treatment, and a promotional unlock in Save-green would read as the page's commit action (issues 1185, 1118). */
 .fabricate-button.fabricate-button.fab-manager-button.manager-downtime-unlock {
   min-height: 34px;
-  padding: 0 14px;
+  padding: 0 var(--fab-space-4);
   border-radius: 9px;
   font-size: 11.5px;
   font-weight: 600;
@@ -10561,7 +10560,7 @@
   font-weight: 600;
 
   /* Entering the route reveals the active sub-item with `scrollIntoView({ block: 'nearest' })`, which by itself lands the item flush against the scrollport's bottom edge and leaves the rest of the group hidden — measured at a 1330x900 Manager, the revealed item sat at 947-977 against a port ending at 977. */
-  scroll-margin-block-end: 8px;
+  scroll-margin-block-end: var(--fab-space-2);
 }
 
 /* The label follows the row rather than the rail's ordinary 12.5px, so the group's type reads as one step louder together — see the note above. */
@@ -10582,8 +10581,8 @@
 .fabricate-nav .manager-nav-premium {
   min-width: 0;
 
-  /* `2px 5px`, one pixel tighter each side than the design's `2px 6px`. The design's rail row ends in an inert chevron; this one ends in a real 28px expand/collapse BUTTON, so the same chip on the same 175px row leaves the label a pixel short and it breaks mid-word. */
-  padding: 2px 5px;
+  /* `2px 4px`, a rung tighter each side than the design's `2px 6px` (it was 5, which snaps down to the scale's 4 rather than up to the chip's 6). The design's rail row ends in an inert chevron; this one ends in a real 28px expand/collapse BUTTON, so the same chip on the same 175px row leaves the label a pixel short and it breaks mid-word. */
+  padding: var(--fab-space-2xs) var(--fab-space-1);
   border-radius: 6px;
 
   /* A lettered mark, not a numeral, so it takes the body face rather than the mono one. */
@@ -10601,7 +10600,7 @@
 
   /* Top gutter left to the group's own gap (see the submenu rule above), so the callout sits the same 6px below the sub-items that the parent row sits above them. */
   margin: 0 var(--fab-space-chip) var(--fab-space-chip);
-  padding: 9px 10px;
+  padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-accent-border);
   border-radius: 9px;
   color: var(--fab-text-muted);
@@ -13804,7 +13803,7 @@
   align-items: center;
   gap: var(--fab-space-2) var(--fab-space-3);
   min-width: 0;
-  padding: var(--fab-space-2) var(--fab-space-4) 10px;
+  padding: var(--fab-space-2) var(--fab-space-4) var(--fab-space-3);
   border-bottom: 1px solid var(--fab-border);
   background: var(--fab-bg-0);
   grid-column: 1 / -1;
@@ -14020,7 +14019,7 @@
   flex-direction: column;
   gap: var(--fab-space-3);
   min-width: 0;
-  padding: 10px var(--fab-space-3);
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 11px;
   background: var(--fab-overlay-light-04);
@@ -14069,8 +14068,8 @@
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) max-content;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: var(--fab-space-3);
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px solid var(--fab-info-border);
   border-radius: 9px;
   background: var(--fab-info-soft);
@@ -14425,8 +14424,8 @@
 
 .fabricate-manager .manager-tool-player-quantity {
   position: absolute;
-  top: var(--fab-space-1);
-  right: var(--fab-space-1);
+  top: 4px;
+  right: 4px;
   padding: 1px var(--fab-space-1);
   border: 1px solid var(--fab-border);
   border-radius: 999px;
@@ -14730,7 +14729,7 @@
 
 .fabricate-manager [data-tool-limited-uses-info] > i {
   flex: 0 0 auto;
-  margin-top: 0.15em;
+  margin-top: var(--fab-space-2xs);
   font-size: 0.64rem;
   line-height: 1;
 }
@@ -15162,7 +15161,7 @@
 
 /* The empty currency-macro drop zone must match the height of the linked-macro card (.manager-environment-scene-linked) so dropping or selecting a macro does not resize the zone. */
 .fabricate-manager .manager-currency-macro-drop-zone {
-  min-height: calc(38px + (2 * var(--fab-space-3)) + 2px);
+  min-height: 64px;
 }
 
 /* A fixed FOUR-up grid (brief §C5). `auto-fill, minmax(260px, 1fr)` gave 2–3 columns at the manager's width, so the same system rendered a different grid depending on the window (issue 772). */
@@ -16332,7 +16331,7 @@
 }
 
 .fabricate-manager .manager-environment-node-no-restock-hint {
-  margin: 6px 0 0;
+  margin: var(--fab-space-chip) 0 0;
   font-size: 0.85em;
   white-space: normal;
   line-height: 1.35;
@@ -17581,7 +17580,7 @@
   width: 100%;
   box-sizing: border-box;
   margin: 0;
-  padding: 11px 18px;
+  padding: var(--fab-space-3) var(--fab-space-5);
   border: 0;
   border-top: 1px solid var(--fab-border);
   border-radius: 0;
@@ -17619,7 +17618,7 @@
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 7px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   height: 30px;
   padding: 0 var(--fab-space-2);
@@ -18135,7 +18134,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--fab-space-3);
+  width: 12px;
   height: 1.4em;
   color: var(--fab-accent);
   font-size: 11px;
@@ -18336,7 +18335,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
-  padding: 10px var(--fab-space-3);
+  padding: var(--fab-space-3) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 11px;
   background: var(--fab-overlay-light-04);
@@ -18419,13 +18418,13 @@
   font-size: 0.56rem;
 }
 
-/* `proto:2505`: `gap: 4px; padding: 3px; background: var(--bg1); border: 1px solid var(--border); border-radius: 9px`. */
+/* `proto:2505`: `gap: 4px; padding: 3px` (the 3 snapped to 4); `background: var(--bg1); border: 1px solid var(--border); border-radius: 9px`. */
 .fabricate-manager .manager-tools-authority-segments {
   display: flex;
   flex: 1 1 auto;
   gap: var(--fab-space-1);
   max-width: none;
-  padding: 3px;
+  padding: var(--fab-space-1);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-bg-0);
@@ -18615,7 +18614,7 @@
 /* ── THE ROW'S ENABLE SWITCH IS THE SHARED ONE, AND ITS FIVE-RULE SKIN IS GONE ── The Tools list drew this switch by hand — a 36px box, a 34x20 track and a 14px knob that travelled 14px, in the accent on and the raised neutral off (issue 1515). */
 
 .fabricate-manager .manager-tool-browser-inspector {
-  gap: 14px;
+  gap: var(--fab-space-4);
   min-width: 0;
   padding: 0;
   border: 0;
@@ -20119,8 +20118,8 @@
 
 .fabricate-manager .manager-component-entry-preview-quantity {
   position: absolute;
-  top: var(--fab-space-1);
-  right: var(--fab-space-1);
+  top: 4px;
+  right: 4px;
   padding: 0 var(--fab-space-1);
   background: var(--fab-bg-0);
   border: 1px solid var(--fab-border);
@@ -20133,9 +20132,9 @@
 
 .fabricate-manager .manager-component-entry-preview-status {
   position: absolute;
-  right: var(--fab-space-1);
-  bottom: var(--fab-space-1);
-  left: var(--fab-space-1);
+  right: 4px;
+  bottom: 4px;
+  left: 4px;
   padding: var(--fab-space-2xs) var(--fab-space-1);
   background: var(--fab-warning-soft);
   border: 1px solid var(--fab-warning-border);
