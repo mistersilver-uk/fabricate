@@ -171,7 +171,17 @@ test('every spacing property spelling is scanned, including the logical longhand
       }
     }
   }
-  for (const property of ['row-gap', 'column-gap']) {
+  for (const family of ['scroll-padding', 'scroll-margin']) {
+    for (const suffix of ['', '-top', '-right', '-bottom', '-left']) {
+      if (!scanned.has(`${family}${suffix}`)) missing.push(`${family}${suffix}`);
+    }
+    for (const side of ['block', 'inline']) {
+      for (const suffix of ['', '-start', '-end']) {
+        if (!scanned.has(`${family}-${side}${suffix}`)) missing.push(`${family}-${side}${suffix}`);
+      }
+    }
+  }
+  for (const property of ['row-gap', 'column-gap', 'border-spacing']) {
     if (!scanned.has(property)) missing.push(property);
   }
 
