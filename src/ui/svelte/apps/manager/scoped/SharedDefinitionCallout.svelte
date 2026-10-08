@@ -29,7 +29,7 @@
   data-tab-heading
 >
   <div class="manager-scoped-shared-head">
-    <Medallion {icon} {tint} size={40} glyph={20} />
+    <Medallion {icon} {tint} size={38} glyph={15} />
     <div class="manager-scoped-shared-copy">
       <div class="manager-scoped-shared-title-row">
         <h3 class="manager-card-title manager-scoped-entity-title" title={name}>{name}</h3>

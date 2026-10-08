@@ -411,7 +411,6 @@
 
   /* The row's inline actions are secondary to the dialog's Cancel and Import, which keep the
      default 34px so the commit action stays the heaviest thing in the footer.
-
      RE-CHAINED, and split in two, at the conversion (issue 1118). `:global()` is load-bearing: the
      row carries this component's hash and the buttons inside it do not. At (0,3,0) this rule TIED
      the primitive's own compound and kept its 28px only on injection order, so naming that class
@@ -421,6 +420,7 @@
   .manager-import-mapping-row :global(.fabricate-button.fab-manager-button),
   .manager-import-mapping-row :global(.fabricate-button.manager-recipe-routing-add-trigger) {
     min-height: 28px;
+    border-radius: 7px;
     padding: 0 var(--fab-space-2);
     font-size: var(--fab-recipe-control-font);
   }

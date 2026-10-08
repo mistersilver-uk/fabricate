@@ -611,7 +611,7 @@
     align-items: center;
     gap: 8px;
     padding: 8px 14px;
-    border-radius: 9px;
+    border-radius: 7px;
     border: 1px solid var(--fab-border);
     background: var(--fab-overlay-light-035);
     color: var(--fab-text);
@@ -674,7 +674,7 @@
     height: 34px;
     padding: 0 10px;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     color: var(--fab-text);
     background: var(--fab-bg-1);
   }
@@ -746,7 +746,7 @@
   .manager-economy-actor-thumb {
     width: 30px;
     height: 30px;
-    border-radius: 6px;
+    border-radius: 7px;
     object-fit: cover;
     flex: 0 0 auto;
   }

@@ -72,6 +72,7 @@
              is invisible until the tile is hovered or the button takes keyboard focus —
              `:focus-visible` keeps it reachable without a pointer. -->
         <div class="manager-essence-icon-tile">
+          <!-- ratchet-exempt(design-system): a 124px preview of the GM's colour and icon choice, not a record tile; the art ladder's 38 would shrink it to a speck -->
           <Medallion icon={normalizedIcon} tint={colorToken || ''} size={124} glyph={44} />
           <IconButton
             class="manager-essence-icon-reset"

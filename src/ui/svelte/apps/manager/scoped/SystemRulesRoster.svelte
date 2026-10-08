@@ -329,6 +329,7 @@
   /* THE 34px CONTROL IS WHY THE ~36px ROW TAKES A RULE. Scoped, so no other danger button moves. */
   .manager-scoped-roster-system :global(.fabricate-button.is-danger) {
     min-height: 26px;
+    border-radius: 7px;
     padding: 0 var(--fab-space-2);
   }
 
@@ -380,6 +381,7 @@
     width: 24px;
     height: 24px;
     min-height: 24px;
+    border-radius: 6px;
     flex: 0 0 24px;
   }
 </style>

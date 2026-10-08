@@ -432,6 +432,7 @@
   :global(.fab-bulk-inset .fab-bulk-inset-row.is-stepper) {
     height: 34px;
     min-height: 34px;
+    border-radius: 9px;
     cursor: default;
   }
 
@@ -473,9 +474,8 @@
     font-size: 0.63rem;
   }
 
-  /* The pager is lifted back to `--fab-bg-1` like the search well, so the recess reads as a card
-     with two lit edges rather than as a flat band (`proto:1153`). Radius 7, not the reference's
-     8: the ladder puts nothing on 8. */
+  /* Lifted back to `--fab-bg-1` like the search well, so the recess reads as a card with two lit
+     edges, not a flat band (`proto:1153`); a well's 9, as the reference's 8 is on no rung. */
   .fab-bulk-inset-pager {
     display: flex;
     gap: var(--fab-space-2);
@@ -484,7 +484,7 @@
     /* `proto:1153`: `padding:6px 8px`, the dense step over the scale's 8. */
     padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 7px;
+    border-radius: 9px;
     background: var(--fab-bg-1);
   }
 

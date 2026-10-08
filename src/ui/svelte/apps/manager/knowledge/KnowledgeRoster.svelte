@@ -108,7 +108,7 @@
             data-knowledge-actor={character.id}
             onclick={() => onSelect(character.id)}
           >
-            <Avatar art={character.img} name={character.name} size={34} alt="" />
+            <Avatar art={character.img} name={character.name} size={32} alt="" />
             <span class="manager-knowledge-roster-copy">
               <strong class="manager-knowledge-roster-name" title={character.name}
                 >{character.name}</strong

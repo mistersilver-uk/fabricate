@@ -95,8 +95,8 @@
     // `false` keeps the one row every caller renders today.
     splitToolbar = false,
     // ── THE ROW'S LEADING TILE (issue 1371 r9-cat, UX finding F12) ─────────────────────────── A
-    // `Medallion` descriptor — `{variant, size, glyph}`, the primitive's OWN prop names — for the
-    // tile at the head of every list row.
+    // `Medallion` descriptor — `{variant, glyph}`, the primitive's OWN prop names — for the tile
+    // at the head of every list row, which is the art ladder's 38 whatever the caller.
     rowMedallion = null,
     // ── THE SELECTION BAND'S SELECT-ALL, AND WHAT IT REACHES (issue 1371 r9-cat, gap-list 37) ──
     // `'results'` (the shipped band: a tri-state master box for the page, and `Select all {n}
@@ -208,7 +208,6 @@
   /** The row medallion's three arguments, merged over the shipped tile. */
   const rowMedallionSpec = $derived({
     variant: '',
-    size: 40,
     glyph: 0,
     ...(rowMedallion && typeof rowMedallion === 'object' ? rowMedallion : {}),
   });
@@ -729,7 +728,7 @@
                       icon={thumbnail.icon}
                       tint={thumbnail.tint}
                       variant={rowMedallionSpec.variant}
-                      size={rowMedallionSpec.size}
+                      size={38}
                       glyph={rowMedallionSpec.glyph}
                     />
                     <span class="manager-system-copy">
@@ -876,14 +875,14 @@
             {#if inspectorKicker}
               <p class="manager-kicker" data-scoped-list-inspector-kicker>{inspectorKicker}</p>
             {/if}
-            <div class="manager-inspector-title-row">
-              <span class="manager-inspector-icon">
+            <div class="manager-inspector-title-row is-art">
+              <span class="manager-inspector-icon is-art">
                 <Medallion
                   art={thumbnail.src}
                   alt=""
                   icon={thumbnail.icon}
                   tint={thumbnail.tint}
-                  size={42}
+                  size={38}
                 />
               </span>
               <span class="manager-inspector-copy">

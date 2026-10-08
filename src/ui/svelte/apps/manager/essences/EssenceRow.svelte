@@ -147,7 +147,7 @@
   <Medallion
     icon={essence.icon || 'fas fa-mortar-pestle'}
     tint={essence.colorToken || ''}
-    size={40}
+    size={38}
   />
 {/snippet}
 

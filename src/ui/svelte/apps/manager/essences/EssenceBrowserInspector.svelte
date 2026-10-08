@@ -144,13 +144,13 @@
 </script>
 
 <Rail data-essence-browser-inspector="">
-  <div class="manager-inspector-title-row is-hero-large">
+  <div class="manager-inspector-title-row is-hero-large is-art">
     <!-- The tile carries the essence's own colour here too, so the inspector and the row
          cannot disagree about what colour an essence is. -->
     <Medallion
       icon={essence.icon || 'fas fa-mortar-pestle'}
       tint={essence.colorToken || ''}
-      size={52}
+      size={38}
     />
     <div class="manager-inspector-copy">
       <p class="manager-kicker">

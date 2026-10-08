@@ -1069,7 +1069,7 @@
     width: 26px;
     height: 26px;
     overflow: hidden;
-    border-radius: 6px;
+    border-radius: 7px;
     background: var(--fab-surface-raised);
     color: var(--fab-accent);
     font-size: 0.68rem;
@@ -1149,7 +1149,7 @@
     min-height: 30px;
     padding: 0 var(--fab-space-2);
     border: 1px solid var(--fab-border-strong);
-    border-radius: 6px;
+    border-radius: 7px;
     background: var(--fab-surface-raised);
     color: var(--fab-text);
     font-size: 0.68rem;

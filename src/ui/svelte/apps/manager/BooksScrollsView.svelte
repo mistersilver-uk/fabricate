@@ -596,7 +596,7 @@
     width: 34px;
     height: 34px;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 9px;
     color: var(--fab-accent);
     background: var(--fab-overlay-dark-16);
   }

@@ -93,7 +93,6 @@
    */
   const COMPONENT_ROW_MEDALLION = Object.freeze({
     variant: 'glyph-chip',
-    size: 38,
     glyph: 15,
   });
 

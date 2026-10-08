@@ -321,7 +321,7 @@
   .fab-stepper.is-vertical .fab-stepper-adjunct {
     width: 100%;
     height: 26px;
-    border-radius: 6px;
+    border-radius: 7px;
     font-size: 0.7rem;
   }
 

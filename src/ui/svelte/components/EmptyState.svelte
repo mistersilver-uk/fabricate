@@ -201,6 +201,7 @@
   .manager-empty.is-field {
     width: 100%;
     height: 34px;
+    border-radius: 9px;
     padding: var(--fab-space-1) var(--fab-space-2);
   }
 
