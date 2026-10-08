@@ -727,7 +727,7 @@ test('the shared icon fact row is one well, used by every behavior-fact surface'
 
   for (const declaration of [
     'grid-template-columns: 28px minmax(0, 1fr);',
-    'padding: 9px 11px;',
+    'padding: var(--fab-space-2) var(--fab-space-3);',
     'border-radius: 6px;',
     'background: var(--fab-bg-1);',
     'border: 1px solid var(--fab-border);',
