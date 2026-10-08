@@ -12264,7 +12264,6 @@
 .fabricate-manager .manager-task-required-tools-card-item:focus-visible {
   border-color: var(--fab-border-strong);
   background: var(--fab-surface-raised);
-  outline: none;
 }
 
 .fabricate-manager .manager-task-required-tools-card-item:active {
