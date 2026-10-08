@@ -5,7 +5,8 @@
  * gate reads the global sheet and every Svelte `<style>` under `src/`, player apps included.
  *
  * Out of scope, because none ships: Svelte `transition:`, `in:`, `out:` and `animate:`
- * directives, and a JS `duration:`. The 150ms tooltip grace the tab strips keep
+ * directives, a JS `duration:`, and a `transition` set in a template's `style` attribute or
+ * `style:` directive. The 150ms tooltip grace the tab strips keep
  * (`editor-tabs-capabilities`, `world-downtime-tabs-a11y`) is a pointer timer, not motion.
  */
 import assert from 'node:assert/strict';
