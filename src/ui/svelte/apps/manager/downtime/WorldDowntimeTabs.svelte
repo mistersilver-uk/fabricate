@@ -60,10 +60,10 @@
     align-items: center;
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 14px;
+    gap: var(--fab-space-4);
     min-width: 0;
-    margin: 14px 20px 20px;
-    padding: 13px 14px;
+    margin: var(--fab-space-4) var(--fab-space-5) var(--fab-space-5);
+    padding: var(--fab-space-3) var(--fab-space-4);
     border: 1px solid var(--fab-border-strong);
     border-radius: 11px;
     background: var(--fab-bg-2);
@@ -76,7 +76,7 @@
     min-width: 0;
     flex: 1 1 240px;
     align-items: center;
-    gap: 12px;
+    gap: var(--fab-space-3);
   }
 
   .downtime-connected-studio strong {
@@ -86,7 +86,7 @@
   }
 
   .downtime-connected-studio p {
-    margin: 2px 0 0;
+    margin: var(--fab-space-2xs) 0 0;
     color: var(--fab-text-subtle);
     font-size: 9.5px;
     line-height: 1.4;

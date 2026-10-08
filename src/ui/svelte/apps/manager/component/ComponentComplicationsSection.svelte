@@ -811,8 +811,8 @@
 
                        THERE IS NO NARROW BREAKPOINT, and that is a MEASUREMENT. Driven from a
                        1280px manager down to 600px the strip narrows to 534px and stops, because
-                       the pane carries its own floor; the row's content floor is 260 + 156 + 104
-                       plus two 7px gaps — the same 534px — with `min-width: 0` on every child, so
+                       the pane carries its own floor; the row's content floor is 258 + 156 + 104
+                       plus two 8px gaps — the same 534px — with `min-width: 0` on every child, so
                        `scrollWidth - clientWidth === 0` throughout. A
                        `@container fabricate-manager (max-width: 680px)` rule was written and
                        removed: it fires where the row still has room and wrapped three fields onto
@@ -1076,7 +1076,7 @@
   /* Theme-ROOT tokens only, per `Chip.svelte`'s note, so a reuse outside `.fabricate-manager`
      does not silently lose them. */
   .fab-complications-title-glyph {
-    margin-right: 7px;
+    margin-right: var(--fab-space-chip);
     color: var(--fab-warning);
     font-size: 11px;
   }
@@ -1085,7 +1085,7 @@
     display: flex;
     flex: 0 0 auto;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     justify-content: flex-end;
   }
 
@@ -1102,20 +1102,20 @@
   .fab-complications-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .fab-complication-fields {
     display: flex;
     flex-wrap: wrap;
-    gap: 11px;
+    gap: var(--fab-space-3);
     align-items: flex-end;
   }
 
   .fab-complication-field {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: var(--fab-space-1);
     min-width: 0;
   }
 
@@ -1126,7 +1126,7 @@
   .fab-complication-activity-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 7px;
+    gap: var(--fab-space-2);
   }
 
   /* The NOT-PROGRESSIVE axis, applied over whichever tone chosen-ness gave the chip. `opacity`
@@ -1144,7 +1144,7 @@
   /* Its OWN run, not more of the chip's label: concatenated into the chip's text node it
      inherited that weight and size, so "· not progressive" read as part of the activity's NAME. */
   .fab-complication-activity-note {
-    margin-left: 2px;
+    margin-left: var(--fab-space-2xs);
     color: var(--fab-text-subtle);
     font-size: 9px;
     font-weight: 400;
@@ -1164,7 +1164,7 @@
      darker raw colour was ruled out for the studio as a whole (see the mapping note in
      `styles/fabricate.css`): it would force a value into all seven themes to correct one step. */
   .fab-complication-card {
-    padding: 12px;
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 11px;
     background: var(--fab-bg-0);
@@ -1172,9 +1172,9 @@
 
   .fab-complication-card-heading {
     display: flex;
-    gap: 9px;
+    gap: var(--fab-space-2);
     align-items: center;
-    margin-bottom: 9px;
+    margin-bottom: var(--fab-space-2);
   }
 
   .fab-complication-card-hint {
@@ -1191,7 +1191,7 @@
   .fab-complication-rows {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
   }
 
   .fab-complication-expression {
@@ -1223,7 +1223,7 @@
     display: flex;
     flex: 1 1 100%;
     flex-wrap: nowrap;
-    gap: 7px;
+    gap: var(--fab-space-2);
     align-items: center;
     min-width: 0;
   }
@@ -1266,7 +1266,7 @@
   /* Indented to the reveal strip's own inset, so it hangs under the row's copy rather than its
      checkbox. Subtle rather than the macro card's warning tone: nothing has gone wrong. */
   .fab-complication-trigger-hint {
-    margin: 6px 0 0 24px;
+    margin: var(--fab-space-chip) 0 0 var(--fab-space-6);
     color: var(--fab-text-subtle);
     font-size: 9.5px;
     line-height: 1.45;
@@ -1285,7 +1285,7 @@
   .fab-complication-macro-controls {
     display: flex;
     flex: 1 1 100%;
-    gap: 9px;
+    gap: var(--fab-space-2);
     align-items: center;
   }
 
@@ -1295,7 +1295,7 @@
      macros" onto two lines. `white-space: nowrap` is what fixes the wrap; the rest keeps it from
      looking like a different button once it no longer does. */
   .fab-complication-macro :global([data-complication-macro-browse]) {
-    padding: 4px 9px;
+    padding: var(--fab-space-1) var(--fab-space-2);
     font-size: 0.8125rem;
     font-weight: 600;
     line-height: normal;
@@ -1312,7 +1312,7 @@
   }
 
   .fab-complication-macro-warning {
-    margin: 7px 0 0;
+    margin: var(--fab-space-2) 0 0;
     color: var(--fab-warning-text);
     font-size: 10px;
   }

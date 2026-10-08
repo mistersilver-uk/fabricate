@@ -214,20 +214,20 @@
 
   .fab-complication-row-line {
     display: flex;
-    gap: 11px;
+    gap: var(--fab-space-3);
     align-items: center;
-    padding: 11px 13px;
+    padding: var(--fab-space-3);
   }
 
   .fab-complication-row.is-readonly-gm .fab-complication-row-line {
-    gap: 9px;
-    padding: 7px 10px;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2) var(--fab-space-3);
   }
 
   /* No padding of its own: the band or group card the player row sits in already carries the
      inset, and paying it twice costs a 300px column ~20px of prose width. */
   .fab-complication-row.is-player .fab-complication-row-line {
-    gap: 9px;
+    gap: var(--fab-space-2);
     padding: 0;
     align-items: flex-start;
   }
@@ -266,7 +266,7 @@
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
     min-width: 0;
   }
 
@@ -345,7 +345,7 @@
   .fab-complication-row-activities {
     display: flex;
     flex: 0 0 auto;
-    gap: 7px;
+    gap: var(--fab-space-2);
     align-items: center;
     color: var(--fab-text-secondary);
     font-size: 10px;
@@ -360,8 +360,8 @@
   .fab-complication-row-detail {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 13px;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
   }
 </style>

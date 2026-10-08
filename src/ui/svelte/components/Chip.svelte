@@ -306,7 +306,7 @@
 
   .manager-chip.is-row {
     min-height: 22px;
-    padding: 0 9px;
+    padding: 0 var(--fab-space-2);
     border-radius: 999px;
     color: var(--fab-text-secondary);
     background: var(--fab-bg-2);

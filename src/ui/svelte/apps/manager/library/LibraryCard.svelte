@@ -130,7 +130,7 @@
     display: flex;
     align-items: flex-start;
     gap: var(--fab-space-2);
-    padding-right: 2.25rem;
+    padding-right: 36px;
   }
 
   .fab-library-card-heading {
@@ -155,7 +155,7 @@
 
   .fab-library-card-subtitle {
     min-width: 0;
-    margin-top: 0.15rem;
+    margin-top: var(--fab-space-2xs);
     overflow: hidden;
     color: var(--fab-text-subtle);
     text-overflow: ellipsis;
@@ -259,7 +259,7 @@
   /* The selection box is pinned into the top-right corner over the header. */
   .fab-library-card :global(.fab-selection-checkbox) {
     position: absolute;
-    top: var(--fab-space-3);
-    right: var(--fab-space-3);
+    top: 12px;
+    right: 12px;
   }
 </style>

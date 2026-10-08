@@ -572,7 +572,7 @@
        surrounding `margin` gives it whitespace off the panel edges, and the
        success-soft fill + 9px radius mirror `.manager-component-drop-zone`. */
     margin: var(--fab-space-3);
-    padding: var(--fab-space-3) var(--fab-space-3);
+    padding: var(--fab-space-3);
     border: 1px dashed var(--fab-border-strong);
     border-radius: 9px;
     color: var(--fab-text);

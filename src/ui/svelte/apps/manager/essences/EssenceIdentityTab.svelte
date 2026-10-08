@@ -242,8 +242,8 @@
      tile. Specificity is unchanged, because Svelte compiles a scoped descendant with `:where()`. */
   .manager-essence-icon-tile :global(.manager-essence-icon-reset) {
     position: absolute;
-    top: var(--fab-space-1);
-    right: var(--fab-space-1);
+    top: 4px;
+    right: 4px;
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms ease;

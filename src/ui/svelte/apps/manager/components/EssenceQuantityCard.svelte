@@ -88,7 +88,7 @@
     gap: var(--fab-space-2);
     align-content: start;
     min-width: 0;
-    padding: var(--fab-space-2) var(--fab-space-2);
+    padding: var(--fab-space-2);
     /* A contributing tile is `--fab-bg-1` behind a `border-strong` hairline, not an accent wash. */
     border: 1px solid var(--fab-border-strong);
     border-radius: 9px;

@@ -25,11 +25,21 @@ export const MAX_VAR_CHAIN_DEPTH = 8;
  */
 const MAX_VALUE_CANDIDATES = 512;
 
-/** A line that is nothing but a `<style …>` opening tag. */
-const STYLE_OPEN_LINE = /^\s*<style\b[^<>]*>\s*$/;
+/** The markup-level openers extraction reads: a comment, a script block or a style block. */
+const MARKUP_OPENER = /(<!--)|(<script\b)|<style\b[^>]*>/giu;
 
-/** A line that is nothing but the matching close. */
-const STYLE_CLOSE_LINE = /^\s*<\/style>\s*$/;
+const COMMENT_CLOSE = /-->/gu;
+const SCRIPT_CLOSE = /<\/script\s*>/giu;
+const STYLE_CLOSE = /<\/style\s*>/giu;
+
+/** The close of the region an opener match starts. */
+function closerOf([, comment, script]) {
+  if (comment !== undefined) return COMMENT_CLOSE;
+  return script === undefined ? STYLE_CLOSE : SCRIPT_CLOSE;
+}
+
+/** `text` as spaces, its newlines kept. */
+const blank = (text) => text.replaceAll(/[^\n]/gu, ' ');
 
 /** One `property: value` pair, anchored to a real declaration boundary. */
 const DECLARATION = /(?:^|[;{}])\s*(--[\w-]+|[a-zA-Z][\w-]*)\s*:\s*([^;{}]*)/g;
@@ -42,27 +52,34 @@ const PIXEL_LITERAL = /(?<![\w.])(\d+(?:\.\d+)?|\.\d+)px\b/gi;
 
 /**
  * Replace `source` with same-length text in which everything OUTSIDE a `<style>` block is
- * spaces, so a Svelte file can be scanned as CSS without moving a single character.
+ * spaces, so a Svelte file can be scanned as CSS without moving a single character. A tag opens a
+ * block wherever it sits in markup; one named inside a comment or a script opens nothing.
  *
  * @param {string} source A `.svelte` file's text.
  * @returns {string} Same length, same newlines, CSS only.
  */
 export function maskNonStyleRegions(source) {
-  let inside = false;
-  return String(source ?? '')
-    .split('\n')
-    .map((line) => {
-      if (!inside) {
-        if (STYLE_OPEN_LINE.test(line)) inside = true;
-        return ' '.repeat(line.length);
-      }
-      if (STYLE_CLOSE_LINE.test(line)) {
-        inside = false;
-        return ' '.repeat(line.length);
-      }
-      return line;
-    })
-    .join('\n');
+  const text = String(source ?? '');
+  let masked = '';
+  for (let index = 0; ; ) {
+    MARKUP_OPENER.lastIndex = index;
+    const opener = MARKUP_OPENER.exec(text);
+    if (opener === null) return masked + blank(text.slice(index));
+    const closer = closerOf(opener);
+    const isStyle = closer === STYLE_CLOSE;
+    const body = opener.index + opener[0].length;
+    closer.lastIndex = body;
+    const close = closer.exec(text);
+    const end = close === null ? text.length : close.index;
+    if (isStyle) {
+      masked += blank(text.slice(index, body)) + text.slice(body, end);
+      index = end;
+    } else {
+      const after = close === null ? text.length : end + close[0].length;
+      masked += blank(text.slice(index, after));
+      index = after;
+    }
+  }
 }
 
 /**

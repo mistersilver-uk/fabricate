@@ -830,17 +830,17 @@
   /* The pill row reads as the tri-state's consequence, so it sits tight under it. It is a child
      COMPONENT's root and carries no scoping hash, hence `:global` nested under one that does. */
   [data-recipe-crafting-modifier-picker] :global([data-modifier-pill-select]) {
-    margin-top: 0.25rem;
+    margin-top: var(--fab-space-1);
   }
 
   [data-recipe-crafting-modifier-inherited] {
-    margin-block: 0.25rem 0;
+    margin-block: var(--fab-space-1) 0;
   }
 
   /* The cap note trails the pill row it constrains at the inherited-set line's rhythm, so the
      cell keeps one vertical beat whichever trailing line is on screen. */
   .manager-recipe-modifier-cap,
   .manager-recipe-modifier-suppressed {
-    margin-block: 0.25rem 0;
+    margin-block: var(--fab-space-1) 0;
   }
 </style>

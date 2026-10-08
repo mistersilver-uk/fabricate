@@ -417,12 +417,12 @@
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-    padding: 14px 18px 26px;
+    padding: var(--fab-space-4) var(--fab-space-5) var(--fab-space-6);
     overflow: auto;
   }
 
   .manager-travel-parties-intro {
-    margin: 0 0 13px;
+    margin: 0 0 var(--fab-space-3);
     color: var(--fab-text-muted);
     font-family: var(--font-primary);
     font-size: 11px;
@@ -438,8 +438,8 @@
   .manager-travel-parties-search {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 11px;
+    gap: var(--fab-space-2);
+    margin-bottom: var(--fab-space-3);
   }
 
   .manager-travel-parties-count {
@@ -452,21 +452,21 @@
 
   /* The refusal banner's SLOT. `<Notice>` paints its own edge, fill, corner, glyph and type
      and declares `margin: 0`, because separation from what sits beneath a notice is the
-     caller's layout — so this rule is the caller's layout and nothing else, at the same 11px
-     the bespoke `<p>` it replaces put between itself and the first card. */
+     caller's layout — so this rule is the caller's layout and nothing else, at the scale's 12px
+     between itself and the first card. */
   .manager-travel-parties-summary {
-    margin: 0 0 11px;
+    margin: 0 0 var(--fab-space-3);
   }
 
   .manager-travel-parties-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--fab-space-3);
     min-width: 0;
   }
 
   .manager-travel-parties-row {
-    padding: 13px;
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 11px;
     background: var(--fab-bg-2);
@@ -479,9 +479,9 @@
   .manager-travel-parties-create {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: var(--fab-space-chip);
     height: 34px;
-    padding: 0 15px;
+    padding: 0 var(--fab-space-4);
     border: 1px solid var(--fab-accent-border);
     border-radius: 9px;
     color: var(--fab-on-accent);

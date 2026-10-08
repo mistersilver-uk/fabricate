@@ -557,15 +557,15 @@
     grid-column: 1 / -1;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--fab-space-4);
   }
 
   /* Card chrome mirrors the sibling .manager-condition-panel. */
   .manager-economy-card {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 14px;
+    gap: var(--fab-space-4);
+    padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
     border-radius: 11px;
     background: var(--fab-overlay-light-035);
@@ -574,13 +574,13 @@
   .manager-economy-card-head {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
   }
 
   .manager-economy-card-title {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     margin: 0;
     color: var(--fab-text);
     font-size: 0.95rem;
@@ -594,7 +594,7 @@
   }
 
   .manager-economy-card-hint {
-    margin: -2px 0 0;
+    margin: calc(-1 * var(--fab-space-2xs)) 0 0;
     color: var(--fab-text-muted);
     font-size: 0.78rem;
     line-height: 1.35;
@@ -603,14 +603,14 @@
   .manager-economy-mode-options {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .manager-economy-mode-option {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2) var(--fab-space-4);
     border-radius: 7px;
     border: 1px solid var(--fab-border);
     background: var(--fab-surface-soft);
@@ -630,7 +630,7 @@
   .manager-economy-subsection {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--fab-space-3);
     min-width: 0;
   }
 
@@ -647,7 +647,7 @@
   .manager-economy-subtitle {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     margin: 0;
     color: var(--fab-text);
     font-size: 0.85rem;
@@ -657,7 +657,7 @@
   .manager-economy-regen-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   /* Manual-only regen hides the Per select, so Regeneration spans full width. */
@@ -670,7 +670,7 @@
     width: 100%;
     box-sizing: border-box;
     height: 34px;
-    padding: 0 10px;
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     color: var(--fab-text);
@@ -683,10 +683,10 @@
   .manager-economy-actor-list {
     list-style: none;
     margin: 0;
-    padding: 0 12px 0 0;
+    padding: 0 var(--fab-space-3) 0 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fab-space-chip);
     /* 380px, not 320px: a 30px bare cell became a 36px filled stepper, so six rows plus the sticky
        header no longer fit the old height and the list would scroll before pagination kicked in. */
     max-height: 380px;
@@ -712,8 +712,8 @@
     display: grid;
     grid-template-columns: minmax(140px, 1fr) 106px 106px 64px;
     align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-overlay-light-035);
@@ -724,7 +724,7 @@
     position: sticky;
     top: 0;
     z-index: 1;
-    padding: 4px 8px;
+    padding: var(--fab-space-1) var(--fab-space-2);
     border: 0;
     border-radius: 0;
     background: var(--fab-bg-3);
@@ -737,7 +737,7 @@
   .manager-economy-actor-identity {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 
@@ -784,7 +784,7 @@
   ) {
     width: auto;
     justify-self: center;
-    padding: 3px 10px;
+    padding: var(--fab-space-1) var(--fab-space-3);
     justify-content: center;
     font-size: 0.82rem;
     line-height: 1.1;
@@ -817,8 +817,8 @@
   /* Keep the actor-list pagination compact and on a single line. */
   .manager-economy-subsection :global(.fabricate-pagination) {
     flex-wrap: nowrap;
-    gap: 8px;
-    padding: 8px 0 0;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2) 0 0;
     border-top: 0;
     background: transparent;
   }

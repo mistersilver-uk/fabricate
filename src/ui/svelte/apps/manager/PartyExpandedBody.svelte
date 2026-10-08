@@ -381,7 +381,7 @@
 
 <style>
   /* Theme-ROOT tokens only (`--fab-manager-*` is declared inside `.fabricate-manager`). Geometry
-     is the prototype's: an 11px head gap over a `minmax(0,1fr) 210px` body at 12px.
+     is the prototype's on the scale: a 12px head gap over a `minmax(0,1fr) 210px` body at 12px.
 
      `flex-start`, NOT `center`. The identity cell is TWO lines — the name field over the
      meta line — while the enable pill and delete are one control each, so centring the
@@ -392,7 +392,7 @@
   .manager-party-head {
     display: flex;
     align-items: flex-start;
-    gap: 11px;
+    gap: var(--fab-space-3);
   }
 
   /* 30px, matching the name field and both head buttons, so the band is uniform. */
@@ -431,9 +431,9 @@
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: 7px;
+    gap: var(--fab-space-chip);
     height: 30px;
-    padding: 0 11px;
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
     color: var(--fab-text-subtle);
@@ -470,8 +470,8 @@
   .manager-party-body {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 210px;
-    gap: 12px;
-    margin-top: 11px;
+    gap: var(--fab-space-3);
+    margin-top: var(--fab-space-3);
   }
 
   .manager-party-members-col {
@@ -494,10 +494,10 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    gap: var(--fab-space-chip);
     width: 100%;
     height: auto;
-    padding: 8px;
+    padding: var(--fab-space-2);
     border: 1px dashed var(--fab-border-strong);
     border-radius: 9px;
     color: var(--fab-text-secondary);

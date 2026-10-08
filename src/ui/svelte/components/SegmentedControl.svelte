@@ -111,11 +111,11 @@
     flex: 1 1 0;
   }
 
-  /* COMPACT density, in px because the parity fixture asserts the value, and declared BEFORE
-     `.is-active` so the active tile's weight still wins at equal specificity. */
+  /* COMPACT density, declared BEFORE `.is-active` so the active tile's weight still wins at equal
+     specificity. */
   .manager-segmented.is-compact {
-    gap: 3px;
-    padding: 3px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-1);
     border-radius: 9px;
     background: var(--fab-bg-1);
   }
@@ -123,7 +123,7 @@
   .manager-segmented.is-compact .manager-segment {
     flex: 1 1 0;
     height: 26px;
-    padding: 0 10px;
+    padding: 0 var(--fab-space-3);
     border-radius: 6px;
     font-size: 10.5px;
   }
@@ -137,8 +137,8 @@
   /* FIELD density: a third density rather than a rule written from the Difficulty card, because
      those four properties are the primitive's to state. */
   .manager-segmented.is-field {
-    gap: 4px;
-    padding: 4px;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-1);
     border-radius: 9px;
     background: var(--fab-bg-1);
   }
@@ -146,7 +146,7 @@
   .manager-segmented.is-field .manager-segment {
     flex: 1 1 0;
     height: 26px;
-    padding: 0 10px;
+    padding: 0 var(--fab-space-3);
     border-radius: 6px;
     font-size: 10.5px;
   }

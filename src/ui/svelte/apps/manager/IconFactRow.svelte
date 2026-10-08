@@ -80,7 +80,7 @@
     align-items: center;
     gap: var(--fab-space-2);
     min-width: 0;
-    padding: 9px 11px;
+    padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 6px;
     background: var(--fab-bg-1);

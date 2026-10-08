@@ -132,8 +132,7 @@ test('both stylesheet corpora are still being scanned', () => {
     `only ${svelte} height declarations found in Svelte <style> blocks, against roughly ` +
       `${FLOOR_REFERENCE_SVELTE_DECLARATIONS} when the floor of ${SVELTE_DECLARATION_FLOOR} was ` +
       'set. This is the corpus stylelint cannot reach, so nothing else in the repository would ' +
-      'notice: the likely cause is the line-anchored `<style>` extractor, not 50 deleted ' +
-      'components.'
+      'notice: the likely cause is the `<style>` extractor, not 50 deleted components.'
   );
   assert.ok(
     Object.keys(corpus).length > 150,

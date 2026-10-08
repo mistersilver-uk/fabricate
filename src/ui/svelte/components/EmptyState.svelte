@@ -103,7 +103,7 @@
     box-sizing: border-box;
     display: grid;
     place-items: center;
-    padding: 44px 20px;
+    padding: var(--fab-space-6) var(--fab-space-5);
     border: 1.5px dashed var(--fab-border);
     border-radius: 11px;
     color: var(--fab-text-subtle);
@@ -114,7 +114,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 9px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 
@@ -175,14 +175,14 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    padding: 14px 16px;
+    padding: var(--fab-space-4);
     text-align: left;
   }
 
   .manager-empty.is-inline > div {
     flex-direction: row;
     align-items: center;
-    gap: 10px;
+    gap: var(--fab-space-3);
   }
 
   .manager-empty.is-inline > div > i {

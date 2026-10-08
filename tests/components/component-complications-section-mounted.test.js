@@ -431,7 +431,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     // The geometry itself: the harness mounts markup rather than a stylesheet.
     const block = blockIn(effectRowSource, '.fab-complication-effect.is-form-pill');
     assert.match(block, /height:\s*34px/, 'flush with the inputs it shares a line with');
-    assert.match(block, /padding:\s*0 12px/);
+    assert.match(block, /padding:\s*0 var\(--fab-space-3\)/);
     assert.match(block, /border-radius:\s*9px/);
     assert.match(block, /width:\s*max-content/, 'sized to its content, never to the field');
     assert.match(block, /align-items:\s*center/, 'a one-line switch centres against its knob');
@@ -457,7 +457,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     // Non-vacuity: a CONDITION row keeps it.
     assert.match(
       blockIn(effectRowSource, '.fab-complication-effect-reveal'),
-      /margin:\s*10px 0 0 24px/,
+      /margin:\s*var\(--fab-space-3\) 0 0 var\(--fab-space-6\)/,
       'the base indent survives for the form that has a control column'
     );
 

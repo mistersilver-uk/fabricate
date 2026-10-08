@@ -104,7 +104,7 @@
   /* A CONDITION: one item in a checklist. Transparent until it is checked, so the chosen
      ones read as a set against the card behind them. */
   .fab-complication-effect.is-form-condition {
-    padding: 9px 11px;
+    padding: var(--fab-space-2) var(--fab-space-3);
     border-radius: 9px;
     background: none;
   }
@@ -115,7 +115,7 @@
      matches its value; `ComponentComplicationsSection`'s `.fab-complication-card` note records
      why a by-value re-map flattens the section instead of deepening it. */
   .fab-complication-effect.is-form-effect {
-    padding: 11px 12px;
+    padding: var(--fab-space-3);
     border-radius: 9px;
     background: var(--fab-bg-1);
   }
@@ -126,7 +126,7 @@
     align-items: center;
     width: max-content;
     height: 34px;
-    padding: 0 12px;
+    padding: 0 var(--fab-space-3);
     border-radius: 9px;
     background: var(--fab-bg-1);
   }
@@ -149,20 +149,15 @@
 
   .fab-complication-effect-head {
     display: flex;
-    gap: 10px;
+    gap: var(--fab-space-3);
     align-items: flex-start;
     margin: 0;
   }
 
-  /* Both roomier forms centre their head; only the EFFECT widens its gap, since on a pill that
-     pixel comes off the control's own width. */
+  /* Both roomier forms centre their head. */
   .fab-complication-effect.is-form-effect .fab-complication-effect-head,
   .fab-complication-effect.is-form-pill .fab-complication-effect-head {
     align-items: center;
-  }
-
-  .fab-complication-effect.is-form-effect .fab-complication-effect-head {
-    gap: 11px;
   }
 
   /* Only the checkbox form makes the whole head a click target; the switch form's head is
@@ -218,7 +213,7 @@
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
     min-width: 0;
   }
 
@@ -243,9 +238,9 @@
   .fab-complication-effect-reveal {
     display: flex;
     flex-wrap: wrap;
-    gap: 7px;
+    gap: var(--fab-space-2);
     align-items: center;
-    margin: 10px 0 0 24px;
+    margin: var(--fab-space-3) 0 0 var(--fab-space-6);
   }
 
   /* …but ONLY where that column exists: an effect row's control is the switch on the FAR side, so

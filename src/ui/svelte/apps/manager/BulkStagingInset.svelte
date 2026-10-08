@@ -313,24 +313,18 @@
     gap: var(--fab-space-1);
     /* A 28px row plus its 4px gap per row, less the last gap (M24: rows sit on rungs now, so the
        window is the rung's arithmetic — five glyph rows are 156px). */
-    min-height: calc(
-      var(--fab-bulk-inset-rows, 5) * (28px + var(--fab-space-1)) - var(--fab-space-1)
-    );
+    min-height: calc(var(--fab-bulk-inset-rows, 5) * (28px + 4px) - 4px);
     align-content: flex-start;
   }
 
   /* The box rows are on the 30 rung (five: 166px) and the stepper rows on 34 (five: 186px, the
      reference's own `min-height:186px` at `proto:1200`). */
   .fab-bulk-inset-rows.is-rung-30 {
-    min-height: calc(
-      var(--fab-bulk-inset-rows, 5) * (30px + var(--fab-space-1)) - var(--fab-space-1)
-    );
+    min-height: calc(var(--fab-bulk-inset-rows, 5) * (30px + 4px) - 4px);
   }
 
   .fab-bulk-inset-rows.is-rung-34 {
-    min-height: calc(
-      var(--fab-bulk-inset-rows, 5) * (34px + var(--fab-space-1)) - var(--fab-space-1)
-    );
+    min-height: calc(var(--fab-bulk-inset-rows, 5) * (34px + 4px) - 4px);
   }
 
   /* THE ROW, ROOTED AT THIS COMPONENT (see the header): the reference's 27px row on the 28 rung

@@ -161,7 +161,7 @@
 
   .fab-yield-cut-rule {
     height: 1px;
-    min-width: var(--fab-space-3);
+    min-width: 12px;
     flex: 1 1 auto;
     background: var(--fab-accent-border);
   }
