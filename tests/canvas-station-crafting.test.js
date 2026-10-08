@@ -20,8 +20,18 @@ test('canvas stations reach the player crafting path', async (t) => {
     system.requirements.time.enabled = false;
     await f.setCraftingComponentSourceIds([actor.id]);
     let serial = 0;
+    const ore = actor.items.find((item) => item.name === 'Iron Ore');
+    const ingot = actor.items.find((item) => item.name === 'Iron Ingot');
+    const stock = () => ({ ore: ore.system.quantity, ingot: ingot.system.quantity });
 
-    function fixture({ legacy = false, enabled = true, multiStep = false } = {}) {
+    async function assertCraftRefused(services, options) {
+      const before = stock();
+      const result = await services.craftRecipe(options);
+      assert.equal(result?.success, false, JSON.stringify(result));
+      assert.deepEqual(stock(), before, 'a refused craft consumes and awards nothing');
+    }
+
+    function fixture({ legacy = false, enabled = true, multiStep = false, componentOnly = false } = {}) {
       const id = `station-${++serial}`;
       const componentId = legacy ? `${id}-component` : null;
       if (componentId) {
@@ -83,11 +93,13 @@ test('canvas stations reach the player crafting path', async (t) => {
         });
       }
       f.recipeManager.recipes.set(recipe.id, recipe);
-      const activeCanvasTool = buildActiveCanvasTool({
+      const built = buildActiveCanvasTool({
         systemId: system.id,
         toolId: tool.id,
         tool,
       });
+      // A station carrying only the legacy componentId exercises the componentIds branch.
+      const activeCanvasTool = componentOnly ? { ...built, toolId: '' } : built;
       const app = new App({ activeCanvasTool, actorId: actor.id });
       app._services = app._buildServices();
       const options = {
@@ -98,11 +110,17 @@ test('canvas stations reach the player crafting path', async (t) => {
       return { app, recipe, tool, activeCanvasTool, services: app._services, options };
     }
 
-    for (const legacy of [false, true]) {
+    const variants = [
+      { name: 'item-sourced', legacy: false },
+      { name: 'component-linked', legacy: true },
+      { name: 'component-only', legacy: true, componentOnly: true },
+    ];
+    for (const { name, ...variant } of variants) {
       await t.test(
-        `${legacy ? 'component-linked' : 'item-sourced'} station hydrates and re-evaluates as available`,
+        `${name} station hydrates and re-evaluates as available`,
         () => {
-          const { services, options, recipe } = fixture({ legacy });
+          const { services, options, recipe, activeCanvasTool } = fixture(variant);
+          assert.equal(activeCanvasTool.toolId === '', variant.componentOnly === true);
           const detail = services.hydrateCraftingRecipe(options);
           assert.ok(detail);
           assert.equal(detail.ingredientSets[0].craftability.toolStates[0].virtual, true);
@@ -121,25 +139,32 @@ test('canvas stations reach the player crafting path', async (t) => {
     await t.test(
       'a station craft consumes material and awards its result without an owned Tool',
       async () => {
-        const { services, options } = fixture();
-        const ore = actor.items.find((item) => item.name === 'Iron Ore');
-        const ingot = actor.items.find((item) => item.name === 'Iron Ingot');
-        const before = { ore: ore.system.quantity, ingot: ingot.system.quantity };
+        const { services, options, tool } = fixture();
+        const before = stock();
+        const itemIds = actor.items.map((item) => item.id);
         const result = await services.craftRecipe(options);
         assert.equal(result.success, true, JSON.stringify(result));
         assert.equal(ore.system.quantity, before.ore - 1);
         assert.equal(ingot.system.quantity, before.ingot + 1);
-        assert.equal(actor.items.includes(anvil), false);
+        // A one-use destroy-on-break Tool is untouched: no owned item is destroyed or added.
+        assert.deepEqual(actor.items.map((item) => item.id), itemIds);
+        assert.ok(system.tools.includes(tool), 'the library Tool survives the craft');
       }
     );
 
-    await t.test('no station and a mismatched system remain unavailable', () => {
-      const { app, services, options, activeCanvasTool } = fixture();
+    await t.test('no station and a mismatched system remain unavailable', async () => {
+      const { app, services, options, recipe, activeCanvasTool } = fixture();
       for (const context of [null, { ...activeCanvasTool, systemId: 'another-system' }]) {
         app._activeCanvasTool = context;
         const detail = services.hydrateCraftingRecipe(options);
         assert.equal(detail.ingredientSets[0].craftability.canCraft, false);
         assert.equal(detail.ingredientSets[0].craftability.toolStates[0].available, false);
+        const evaluated = services.evaluateSelectedSet({
+          ...options,
+          setId: recipe.ingredientSets[0].id,
+        });
+        assert.equal(evaluated.canCraft, false);
+        await assertCraftRefused(services, options);
       }
     });
 
@@ -152,13 +177,38 @@ test('canvas stations reach the player crafting path', async (t) => {
     });
 
     await t.test('multi-step details apply the station to every step requirement', () => {
-      const { services, options } = fixture({ multiStep: true });
+      const { services, options, recipe } = fixture({ multiStep: true });
       const detail = services.hydrateCraftingRecipe(options);
       assert.equal(detail.steps.length, 2);
       for (const step of detail.steps) {
         assert.equal(step.ingredientSets[0].craftability.canCraft, true);
         assert.equal(step.ingredientSets[0].craftability.toolStates[0].virtual, true);
       }
+      const evaluated = services.evaluateSelectedSet({
+        ...options,
+        setId: recipe.steps[1].ingredientSets[0].id,
+        stepId: recipe.steps[1].id,
+        optionOverrides: {},
+      });
+      assert.equal(evaluated.canCraft, true);
+      assert.equal(evaluated.toolStates[0].virtual, true);
+    });
+
+    await t.test('a Journal advance carries the station into the next run step', async () => {
+      const { app, services, options, activeCanvasTool } = fixture({ multiStep: true });
+      const first = await services.craftRecipe(options);
+      assert.equal(first.success, true, JSON.stringify(first));
+      const run = f.craftingRunManager.findActiveRunForRecipe(actor, options.recipeId);
+      assert.ok(run, 'the first step leaves an active run');
+      const advance = { actorId: actor.id, runId: run.id };
+      app._activeCanvasTool = null;
+      const before = stock();
+      assert.equal((await services.advanceCraftingRun(advance)).success, false);
+      assert.deepEqual(stock(), before, 'a refused advance consumes nothing');
+      app._activeCanvasTool = activeCanvasTool;
+      const second = await services.advanceCraftingRun(advance);
+      assert.equal(second.success, true, JSON.stringify(second));
+      assert.equal(ore.system.quantity, before.ore - 1);
     });
 
     await t.test('virtual presence does not bypass Tool prerequisites', () => {
@@ -214,8 +264,21 @@ test('canvas stations reach the player crafting path', async (t) => {
       await services.crafting.load();
       services.crafting.select(recipe.id);
       assert.equal(services.crafting.selectedRecipe.ingredientSets[0].craftability.canCraft, false);
+      const calls = [];
+      const { crafting } = services;
+      const { load, flushProgressiveOrder } = crafting;
+      crafting.load = (...args) => {
+        calls.push('load');
+        return load(...args);
+      };
+      crafting.flushProgressiveOrder = () => {
+        calls.push('flush');
+        return flushProgressiveOrder();
+      };
       app.rendered = true;
-      app.bringToFront = () => undefined;
+      app.bringToFront = () => {
+        calls.push('front');
+      };
       App._instance = app;
       try {
         await App.show('crafting', { activeCanvasTool, actorId: actor.id });
@@ -223,6 +286,11 @@ test('canvas stations reach the player crafting path', async (t) => {
           services.crafting.selectedRecipe.ingredientSets[0].craftability.canCraft,
           true
         );
+        // The window surfaces first; a pending stage reorder is persisted before the reload.
+        assert.deepEqual(calls, ['front', 'flush', 'load']);
+        calls.length = 0;
+        await App.show('crafting', { activeCanvasTool, actorId: actor.id });
+        assert.deepEqual(calls, ['front'], 'an unchanged station does not reload');
         await App.show('crafting', { actorId: actor.id });
         assert.equal(
           services.crafting.selectedRecipe.ingredientSets[0].craftability.canCraft,
@@ -246,6 +314,7 @@ test('canvas stations reach the player crafting path', async (t) => {
           services.hydrateCraftingRecipe(options).ingredientSets[0].craftability.canCraft,
           false
         );
+        await assertCraftRefused(services, options);
       }
     );
   });
