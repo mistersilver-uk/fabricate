@@ -253,7 +253,7 @@ describe('RequirementRail mounted behavior', () => {
 
   // Open must NOT be a ring: the app already paints a 2px accent focus-visible
   // outline, so a ring would make "focused" and "open" indistinguishable.
-  it('marks the open slot with the accent-soft fill class rather than a ring', async () => {
+  it('marks the open slot with the pressed fill class rather than a ring', async () => {
     const target = await harness.mount({ slots: slots(), openSlotId: 'g-choice' });
     const [, choice, essence] = tilesIn(target);
     assert.ok(choice.classList.contains('is-open'));

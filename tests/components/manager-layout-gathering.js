@@ -104,7 +104,7 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     'expanded gathering parent should not use the selected left accent'
   );
   assert.ok(
-    expandedParentHoverBlock.includes('background: var(--fab-overlay-light-04);'),
+    expandedParentHoverBlock.includes('background: var(--fab-surface-raised);'),
     'expanded gathering parent may have a subtle hover without becoming selected'
   );
   assert.ok(
@@ -880,10 +880,10 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop cells are divided by row hairlines, not vertical separators'
   );
   assert.ok(
-    selectedDropRowBlock.includes('background: var(--fab-success-soft);') &&
+    selectedDropRowBlock.includes('background: var(--fab-surface-active);') &&
       selectedDropBarBlock.includes('background: var(--fab-accent);') &&
       selectedDropBarBlock.includes('width: 3px;'),
-    'selected drop rows should use the component-browser success/accent family'
+    'selected drop rows take the active surface behind the accent bar'
   );
   assert.equal(
     `${selectedDropRowBlock}${selectedDropBarBlock}`.includes('inset 0 0 0 1px'),
@@ -1453,12 +1453,14 @@ test('the drop table paints a drop-target row and keeps a hovered selected row s
         `${row('plain', '')}${row('target', 'is-drop-active')}${row('chosen', 'is-selected')}` +
         `${row('chosen-target', 'is-selected is-drop-active')}</div>` +
         '<i id="soft" style="background: var(--fab-success-soft)"></i>' +
-        '<i id="raised" style="background: var(--fab-surface-raised)"></i></div>'
+        '<i id="raised" style="background: var(--fab-surface-raised)"></i>' +
+        '<i id="active" style="background: var(--fab-surface-active)"></i></div>'
     );
     const ground = (selector) =>
       page.evaluate((one) => getComputedStyle(document.querySelector(one)).backgroundColor, selector);
     const soft = await ground('#soft');
     const raised = await ground('#raised');
+    const active = await ground('#active');
     assert.notEqual(soft, raised, 'precondition: the two grounds are told apart');
     assert.equal(await ground('#plain > td'), 'rgba(0, 0, 0, 0)', 'a plain row is unpainted');
     for (const id of ['target', 'chosen-target']) {
@@ -1467,7 +1469,7 @@ test('the drop table paints a drop-target row and keeps a hovered selected row s
     await page.hover('#plain > td');
     assert.equal(await ground('#plain > td'), raised, 'precondition: hover paints a plain row');
     await page.hover('#chosen > td');
-    assert.equal(await ground('#chosen > td'), soft, 'hover never repaints the selected row');
+    assert.equal(await ground('#chosen > td'), active, 'hover never repaints the selected row');
   } finally {
     await context.close();
   }

@@ -126,10 +126,14 @@ function absentScope() {
 
 function measureAbsentRows() {
   const probe = document.createElement('span');
-  probe.style.background = 'var(--fab-bg-1)';
   probe.style.border = '1px solid var(--fab-accent-border)';
   document.body.append(probe);
-  const bg1 = getComputedStyle(probe).backgroundColor;
+  const fill = (token) => {
+    probe.style.background = `var(${token})`;
+    return getComputedStyle(probe).backgroundColor;
+  };
+  const raised = fill('--fab-surface-raised');
+  const active = fill('--fab-surface-active');
   const accentBorder = getComputedStyle(probe).borderColor;
   probe.remove();
 
@@ -159,7 +163,8 @@ function measureAbsentRows() {
   });
   return {
     rows,
-    bg1,
+    raised,
+    active,
     accentBorder,
   };
 }
@@ -515,14 +520,14 @@ describe('absent world components use the Essence Rules row contract (issue 2036
     }
   });
 
-  it('uses transparent rest, bg-1 hover and bg-1 plus the accent edge when selected', () => {
+  it('uses transparent rest, the raised hover and the active fill behind the accent edge when selected', () => {
     for (const [width, { rest, hover }] of measurements) {
       const bare = rest.rows.find((row) => row.id === 'world-bare');
       const hovered = hover.rows.find((row) => row.id === 'world-bare');
       const selected = rest.rows.find((row) => row.id === 'world-long');
       assert.equal(bare.backgroundColor, 'rgba(0, 0, 0, 0)', `${width}px: resting fill`);
-      assert.equal(hovered.backgroundColor, rest.bg1, `${width}px: hover fill`);
-      assert.equal(selected.backgroundColor, rest.bg1, `${width}px: selected fill`);
+      assert.equal(hovered.backgroundColor, rest.raised, `${width}px: hover fill`);
+      assert.equal(selected.backgroundColor, rest.active, `${width}px: selected fill`);
       assert.equal(selected.borderColor, rest.accentBorder, `${width}px: selected edge`);
     }
   });

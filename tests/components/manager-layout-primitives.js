@@ -255,7 +255,7 @@ test('the rail crafting-system card selects a system and links back to the libra
     'the back link may shrink'
   );
   assert.ok(
-    returnFocusBlock.includes('background: var(--fab-surface-soft);'),
+    returnFocusBlock.includes('background: var(--fab-surface-raised);'),
     'the back link keeps a manager-styled hover'
   );
   assert.ok(

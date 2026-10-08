@@ -397,7 +397,7 @@
 
   .fab-stepper-adjunct:hover:not(:disabled) {
     color: var(--fab-text);
-    background: var(--fab-surface-active);
+    background: var(--fab-surface-raised);
   }
 
   .fab-stepper-adjunct:disabled {

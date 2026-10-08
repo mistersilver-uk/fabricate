@@ -1161,7 +1161,7 @@
 .fabricate-button.fabricate-button.fab-manager-button.is-ghost:not(:disabled):hover {
   border-color: var(--fab-border);
   color: var(--fab-text);
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-raised);
 }
 
 /* The `dashed` role (issue 1096): the append action at the foot of a list (issue 1118). */
@@ -1191,7 +1191,7 @@
 .fabricate-button.fabricate-button.fab-manager-button.is-dashed:not(:disabled):hover {
   border-color: var(--fab-accent-border);
   color: var(--fab-text);
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-raised);
 }
 
 /* `fullWidth`, split out of the `dashed` role that used to carry it (issue 1118). */
@@ -1328,7 +1328,7 @@
 .fabricate-manager .manager-rail-toggle:hover {
   color: var(--fab-text);
   border-color: var(--fab-border-strong);
-  background: var(--fab-overlay-light-06);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager .manager-rail-toggle:focus-visible {
@@ -1861,7 +1861,7 @@
   .manager-resolution-mode-card.is-config-cards
   .manager-resolution-option.is-active {
   border-color: var(--fab-accent-border);
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-active);
 }
 
 .fabricate-manager
@@ -2333,7 +2333,7 @@
 }
 
 .fabricate-manager button.manager-checks-rail-row:hover {
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager button.manager-checks-rail-row:focus-visible {
@@ -4187,8 +4187,7 @@
 .fabricate-manager .manager-tag-suggestion:focus-visible,
 .fabricate-typeahead-option.fabricate-typeahead-option:hover,
 .fabricate-typeahead-option.fabricate-typeahead-option:focus-visible {
-  color: var(--fab-success-text);
-  background: var(--fab-success-soft);
+  background: var(--fab-surface-raised);
 }
 
 /* The keyboard cursor: the field keeps DOM focus, so the active option is drawn from its state. */
@@ -4239,7 +4238,7 @@
 .fabricate-manager .manager-selected-tag-pill button:hover,
 .fabricate-manager .manager-selected-tag-pill button:focus-visible {
   color: var(--fab-success-text);
-  background: var(--fab-overlay-light-12);
+  background: var(--fab-success-soft);
 }
 
 .fabricate-search.fabricate-search:where(.is-compact) > i {
@@ -4745,7 +4744,7 @@
 }
 
 .fabricate-data-table .fabricate-data-table-row.is-selected > .fabricate-data-table-cell {
-  background: var(--fab-success-soft);
+  background: var(--fab-surface-active);
 }
 
 /* The selected row's accent bar, drawn by its first cell so the table's own geometry never moves. */
@@ -5945,7 +5944,7 @@
   border: 1px solid var(--fab-border);
   border-radius: 6px;
   color: var(--fab-text);
-  background: var(--fab-overlay-light-04);
+  background: var(--fab-surface-soft);
   font-size: 0.72rem;
   font-weight: 600;
   text-align: left;
@@ -5953,7 +5952,7 @@
 }
 
 .fabricate-manager .manager-recipe-produces-tier-head:hover {
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager .manager-recipe-produces-tier.is-failure .manager-recipe-produces-tier-head {
@@ -6238,7 +6237,7 @@
 /* The selected system card is the same identity cue as a selected browser row, so it moves to the accent family with them (issue 643). */
 .fabricate-manager .manager-system-row.is-selected {
   border-color: var(--fab-accent-border);
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-active);
   box-shadow: inset 3px 0 0 var(--fab-accent);
 }
 
@@ -6267,7 +6266,7 @@
 .fabricate-manager .manager-essence-row {
   border: 1px solid var(--fab-border);
   border-radius: 9px;
-  background: var(--fab-overlay-light-03);
+  background: var(--fab-surface-soft);
 }
 
 /* The shared row-card geometry — size only; the skin is the joined rule above (issues 643, 676). */
@@ -6301,7 +6300,7 @@
 .fabricate-manager .manager-gathering-task-row.is-selected,
 .fabricate-manager .manager-essence-row.is-selected {
   border-color: var(--fab-accent-border);
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-active);
   box-shadow: inset 3px 0 0 var(--fab-accent);
 }
 
@@ -6474,7 +6473,7 @@
 .fabricate-manager .manager-scope-return:hover,
 .fabricate-manager .manager-scope-return:focus-visible {
   color: var(--fab-text);
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-raised);
 }
 
 /* On the systems browser there is nowhere to return to, so the back link is faded and inert — never a live control (issue 643). */
@@ -7336,7 +7335,7 @@
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
-  background: var(--fab-overlay-light-06);
+  background: var(--fab-surface-soft);
   text-align: left;
 }
 
@@ -7362,7 +7361,7 @@
   padding: var(--fab-space-1);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
-  background: var(--fab-overlay-light-06);
+  background: var(--fab-surface-soft);
   text-align: left;
 }
 
@@ -7380,16 +7379,20 @@
   white-space: nowrap;
 }
 
-/* THE CURRENT VALUE AND THE POINTER, at (0,4,0) so they out-rank the retained row box above and the shared row's own `:hover` (issue 1503). */
-.fabricate-icon-picker-popover.essence-icon-picker-popover
-  .essence-icon-picker-option[aria-selected='true'],
-.fabricate-source-picker-popover.essence-source-picker-popover
-  .essence-source-picker-option[aria-selected='true'],
+/* THE POINTER, then THE CURRENT VALUE, at (0,4,0) so they out-rank the retained row box above and the shared row's own `:hover` (issue 1503); the value is written later, so a hovered value keeps its face. */
 .fabricate-icon-picker-popover.essence-icon-picker-popover .essence-icon-picker-option:hover,
 .fabricate-source-picker-popover.essence-source-picker-popover
   .essence-source-picker-option:hover {
   border-color: var(--fab-border-strong);
-  background: var(--fab-success-soft);
+  background: var(--fab-surface-raised);
+}
+
+.fabricate-icon-picker-popover.essence-icon-picker-popover
+  .essence-icon-picker-option[aria-selected='true'],
+.fabricate-source-picker-popover.essence-source-picker-popover
+  .essence-source-picker-option[aria-selected='true'] {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
 }
 
 .fabricate-manager .manager-component-evidence,
@@ -7464,14 +7467,14 @@
   padding: 0;
   border: 1px solid var(--fab-border);
   border-radius: 9px;
-  background: var(--fab-overlay-light-05);
+  background: var(--fab-surface-soft);
   overflow: hidden;
 }
 
 .fabricate-manager .manager-essence-usage-item:hover,
 .fabricate-manager .manager-essence-usage-item:focus-visible {
   border-color: var(--fab-border-strong);
-  background: var(--fab-success-soft);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager .manager-essence-usage-item img {
@@ -7763,7 +7766,7 @@
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   color: var(--fab-text);
-  background: var(--fab-overlay-light-03);
+  background: var(--fab-surface-soft);
 }
 
 .fabricate-manager .manager-scoped-list-row > * {
@@ -7775,10 +7778,10 @@
   background: var(--fab-surface-raised);
 }
 
-/* TWO INDEPENDENT STATES, AND A ROW CARRIES BOTH. `.is-selected` is "you are here" — an identity cue, so it reads in the accent family rather than in success or amber; `.is-bulk-selected` is "this row is in the set the next Apply writes to", one surface step forward (issue 1373). */
+/* TWO INDEPENDENT STATES, AND A ROW CARRIES BOTH. `.is-selected` is "you are here" — an identity cue, so it reads in the accent family rather than in success or amber; `.is-bulk-selected` is "this row is in the set the next Apply writes to". Both take the one selected face, the active surface; the full accent edge and the row's checkbox tell them apart (issue 1373). */
 .fabricate-manager .manager-scoped-list-row.is-selected {
   border-color: var(--fab-accent);
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-active);
 }
 
 .fabricate-manager .manager-scoped-list-row.is-bulk-selected {
@@ -8070,7 +8073,7 @@
 }
 
 .fabricate-option-cards .manager-resolution-option:hover {
-  background: var(--fab-overlay-light-04);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-option-cards .manager-resolution-option.is-active {
@@ -8188,7 +8191,7 @@
 
 .fabricate-manager .manager-tool-prerequisite-row:hover,
 .fabricate-manager .manager-tool-bonus-row:hover {
-  background: var(--fab-overlay-light-04);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager .manager-tool-prerequisite-row.is-active,
@@ -8256,12 +8259,12 @@
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 11px;
-  background: var(--fab-overlay-light-04);
+  background: var(--fab-surface-soft);
 }
 
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option.is-active {
   border-color: var(--fab-accent);
-  background: var(--fab-overlay-light-08);
+  background: var(--fab-surface-active);
   box-shadow: none;
 }
 
@@ -8711,7 +8714,7 @@
 .fabricate-button.fabricate-button.is-ghost:not(:disabled):hover {
   border-color: var(--fab-border);
   color: var(--fab-text);
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-raised);
 }
 
 /* The dashed add-button, RECONCILED with the primitive's `dashed` role (issue 1118). */
@@ -8736,7 +8739,7 @@
 .fabricate-button.fabricate-button.is-dashed:not(:disabled):hover {
   border-color: var(--fab-accent-border);
   color: var(--fab-text);
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-raised);
 }
 
 /* ── The Validation tab's aggregate header ── Rehomed from the deleted RecipeContextRail, which showed it only while this tab was open (issues 676, 1509, 1507). */
@@ -9560,7 +9563,7 @@
   border: 0;
   border-radius: 50%;
   color: var(--fab-text-muted);
-  background: var(--fab-surface-raised);
+  background: var(--fab-surface-soft);
   font-size: 0.55rem;
   line-height: 1;
   cursor: pointer;
@@ -9568,7 +9571,7 @@
 
 .fabricate-manager .manager-recipe-option-clear:hover {
   color: var(--fab-text);
-  background: var(--fab-surface-active);
+  background: var(--fab-surface-raised);
 }
 
 /* UNCHOSEN (`proto:2276`): an inline search field, in the row rather than behind a popover. */
@@ -9658,7 +9661,7 @@
 }
 
 .fabricate-manager .manager-recipe-option-suggestion:hover {
-  background: var(--fab-surface-soft);
+  background: var(--fab-surface-raised);
 }
 
 /* The keyboard cursor: the field keeps DOM focus, so the active option is drawn from its state. */
@@ -10358,7 +10361,7 @@
 
 .fabricate-nav .manager-nav-button:hover:not(:disabled) {
   color: var(--fab-text);
-  background: var(--fab-overlay-light-04);
+  background: var(--fab-surface-raised);
 }
 
 /* World established the manager rail's quiet selected language. The same link styling is shared by every system-specific direct, parent, and child route so changing scope does not change the meaning of an active navigation row. */
@@ -10411,7 +10414,7 @@
 
 .fabricate-nav .manager-nav-group.is-expanded .manager-nav-parent:hover {
   border-color: transparent;
-  background: var(--fab-overlay-light-04);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-nav .manager-nav-toggle {
@@ -10435,7 +10438,7 @@
 .fabricate-nav .manager-nav-toggle:not(:disabled):hover {
   color: var(--fab-text);
   border-color: var(--fab-border);
-  background: var(--fab-overlay-light-06);
+  background: var(--fab-surface-raised);
 }
 
 /* The locked disclosure. It keeps `pointer-events` so the `title` explaining WHY it cannot collapse still surfaces on hover — the counter-example is `.manager-scope-return.is-disabled` above, which has no reason to convey and can afford `pointer-events: none`. */
@@ -10498,7 +10501,7 @@
 .fabricate-nav .manager-nav-subitem:hover {
   color: var(--fab-text);
   border-color: var(--fab-border);
-  background: var(--fab-overlay-light-04);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-nav .manager-nav-subitem.is-active {
@@ -10920,7 +10923,7 @@
   border: 1px solid var(--fab-border);
   border-radius: 6px;
   color: var(--fab-text);
-  background: var(--fab-overlay-light-06);
+  background: var(--fab-surface-soft);
   line-height: 1;
   cursor: pointer;
 }
@@ -10999,7 +11002,7 @@
 .fabricate-button.fabricate-button:not(:disabled):hover,
 .fabricate-icon-button.fabricate-icon-button:not(:disabled):hover {
   border-color: var(--fab-border-strong);
-  background: var(--fab-overlay-light-10);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-button.fabricate-button.is-primary:not(:disabled):hover {
@@ -11167,11 +11170,12 @@
 
 .fabricate-manager .manager-gathering-event-row:hover {
   border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager .manager-gathering-event-row.is-selected {
   border-color: var(--fab-accent);
-  background: var(--fab-bg-2);
+  background: var(--fab-surface-active);
 }
 
 .fabricate-manager .manager-gathering-event-row .manager-status-cell {
@@ -11335,7 +11339,7 @@
 
 .fabricate-manager .manager-danger-tag-pill.is-suggestion:hover,
 .fabricate-manager .manager-danger-tag-pill.is-suggestion:focus-visible {
-  background: var(--fab-overlay-light-06);
+  background: var(--fab-surface-raised);
   border-style: solid;
   color: var(--fab-text);
 }
@@ -11387,7 +11391,7 @@
 }
 
 .fabricate-manager .manager-gathering-event-scene-dropzone.is-drop-active {
-  border-color: var(--fab-accent);
+  border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
   color: var(--fab-text);
 }
@@ -11757,8 +11761,8 @@
 
 .fabricate-manager .manager-availability-option:hover,
 .fabricate-manager .manager-availability-option:focus-visible {
-  border-color: var(--fab-warning-border);
-  background: var(--fab-warning-soft);
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
   outline: none;
 }
 
@@ -12258,9 +12262,8 @@
 
 .fabricate-manager .manager-task-required-tools-card-item:hover,
 .fabricate-manager .manager-task-required-tools-card-item:focus-visible {
-  border-color: var(--fab-warning-border);
-  background: var(--fab-overlay-light-08);
-  outline: none;
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager .manager-task-required-tools-card-item:active {
@@ -15152,7 +15155,7 @@
 }
 
 .fabricate-manager .manager-component-source-drop-zone.is-drop-active {
-  border-color: var(--fab-accent);
+  border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
   color: var(--fab-text);
 }
@@ -15373,7 +15376,7 @@
 
 .fabricate-manager .manager-environment-mode-option.is-selected {
   color: var(--fab-text);
-  background: var(--fab-overlay-light-04);
+  background: var(--fab-surface-active);
   box-shadow: inset 0 0 0 1px var(--fab-accent);
 }
 
@@ -16114,11 +16117,11 @@
 }
 
 .fabricate-action-menu-panel button.manager-action-menu-item:hover:not(:disabled) {
-  background: var(--fab-overlay-light-04);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-action-menu-panel button.manager-action-menu-item:focus-visible {
-  background: var(--fab-overlay-light-04);
+  background: var(--fab-surface-raised);
   outline: 1px solid var(--fab-accent);
   outline-offset: -1px;
 }
@@ -17180,17 +17183,18 @@
   gap: var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
-  background: var(--fab-overlay-light-03);
+  background: var(--fab-surface-soft);
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
 .fabricate-manager .manager-map-link-row:hover {
   border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager .manager-map-link-row.is-selected {
   border-color: var(--fab-accent);
-  background: var(--fab-overlay-light-04);
+  background: var(--fab-surface-active);
 }
 
 .fabricate-manager .manager-map-link-header {
@@ -18817,7 +18821,7 @@
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   color: inherit;
-  background: var(--fab-overlay-light-03);
+  background: var(--fab-surface-soft);
   font-family: inherit;
   font-size: inherit;
   line-height: 1.2;
@@ -18825,9 +18829,13 @@
   cursor: pointer;
 }
 
+.fabricate-manager .manager-knowledge-roster-row:hover {
+  background: var(--fab-surface-raised);
+}
+
 .fabricate-manager .manager-knowledge-roster-row.is-selected {
-  border-color: var(--fab-border-strong);
-  background: var(--fab-surface-soft);
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
 }
 
 .fabricate-manager .manager-knowledge-roster-row:focus-visible {
@@ -19118,17 +19126,17 @@
   background: transparent;
 }
 
-/* THE HOVER AND SELECTED STATES STILL HAVE TO READ. With the resting fill gone, the row's two feedback states are the only things that change its surface, so they are restated one rung up from the pane rather than left pointing at a ladder that no longer starts where they assumed (issue 1373). */
+/* THE HOVER AND SELECTED STATES STILL HAVE TO READ. The route's `background: transparent` stands later than the shared row states at the same specificity, so the two feedback rungs, `raised` and `active`, are restated here (issue 1373). */
 .fabricate-manager[data-manager-view='world-essences']
   .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover,
 .fabricate-manager[data-manager-view='essences']
   .manager-essence-row:not(.is-selected):not(.is-bulk-selected):hover {
-  background: var(--fab-bg-1);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row.is-selected,
 .fabricate-manager[data-manager-view='essences'] .manager-essence-row.is-selected {
-  background: var(--fab-bg-1);
+  background: var(--fab-surface-active);
 }
 
 /* AND THE TICKED ROW IS RESTATED TOO, WHICH IS A SECOND DEFECT AND NOT THE HOVER ONE (issue 1373). */
@@ -19227,15 +19235,15 @@
   background: transparent;
 }
 
-/* HOVER STILL HAS TO READ with the resting fill gone, so it is restated one rung up from the pane rather than left pointing at a ladder that no longer starts where it assumed (issue 1373). */
+/* HOVER AND SELECTION STILL HAVE TO READ: the route's transparent rest out-ranks the shared row states on source order, so `raised` and `active` are restated here (issue 1373). */
 .fabricate-manager[data-manager-view='world-tools']
   .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover,
 .fabricate-manager[data-manager-view='tools'] .manager-tools-row:not(.is-selected):hover {
-  background: var(--fab-bg-1);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row.is-selected {
-  background: var(--fab-bg-1);
+  background: var(--fab-surface-active);
 }
 
 /* AND THE TICKED ROW IS RESTATED TOO, for the reason the block above the hover rule gives: the route's own `background: transparent` is (0,3,0) and stands LATER in this file than the shared `.is-bulk-selected` rule at the same specificity, so it won on source order and a ticked row on this one route rendered with no fill at all. */
@@ -19301,11 +19309,11 @@
 
 .fabricate-manager[data-manager-view='world-components']
   .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover {
-  background: var(--fab-bg-1);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row.is-selected {
-  background: var(--fab-bg-1);
+  background: var(--fab-surface-active);
 }
 
 /* ON ONE LINE, and that is load-bearing rather than a formatting choice: the joined-selector guard in `manager-layout.test.js` takes each `.is-bulk-selected` selector back to the start of its own LINE so the route attribute travels with it, and a wrapped selector reads as an UNSCOPED second statement of the shared rule. */
@@ -20253,12 +20261,12 @@
 
 .fabricate-manager .manager-components-list .manager-component-row.is-ghost:hover {
   border-color: var(--fab-border-strong);
-  background: var(--fab-bg-1);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager .manager-components-list .manager-component-row.is-ghost.is-selected {
   border-color: var(--fab-accent-border);
-  background: var(--fab-bg-1);
+  background: var(--fab-surface-active);
 }
 
 .fabricate-manager .manager-components-list .manager-component-row .manager-component-identity {
@@ -20986,15 +20994,6 @@
   gap: var(--fab-space-3);
   border-radius: 9px;
   background: var(--fab-bg-1);
-}
-
-/* HOVER AND THE INSPECTED STATE, RESTATED ONE RUNG UP. With the row's resting fill restored, the route block's hover and selection values above are now the SAME colour as rest, so a hovered row and a chosen row would be indistinguishable from an idle one. */
-.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-rows .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover {
-  background: var(--fab-surface-raised);
-}
-
-.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-rows .manager-scoped-list-row.is-selected {
-  background: var(--fab-surface-soft);
 }
 
 /* ── THE TOOLBAR AND THE ROWS SHARE THEIR INLINE EDGES (r8 GATES alignment `catalogue-list-rows`) ── `proto:576` pads the toolbar `14px 20px 0` and `proto:597` pads the row scroller `2px 20px 18px`, so the filter line and every row beneath it start and end together. */

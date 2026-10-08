@@ -159,7 +159,7 @@
 
   .manager-segmented.is-field .manager-segment.is-active {
     border-color: var(--fab-accent-border);
-    background: var(--fab-surface-raised);
+    background: var(--fab-surface-active);
   }
 
   /* Inline density: a 30px track (24px segments, 2px padding, 1px border) for a row whose other
@@ -215,7 +215,7 @@
 
   .manager-segmented.is-tag .manager-segment.is-active {
     border-color: transparent;
-    background: color-mix(in srgb, var(--fab-purple) 22%, transparent);
+    background: var(--fab-purple-soft);
     color: var(--fab-text);
   }
 

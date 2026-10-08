@@ -841,7 +841,7 @@ test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm o
               <label class="manager-segment" data-segment="all"><input type="radio" class="manager-segment-input" name="tm"><span class="manager-segment-label">All of</span></label>
             </div>`)}
             <span data-probe="edge" style="color: color-mix(in srgb, var(--fab-purple) 40%, transparent)"></span>
-            <span data-probe="lit" style="color: color-mix(in srgb, var(--fab-purple) 22%, transparent)"></span>
+            <span data-probe="lit" style="color: var(--fab-purple-soft)"></span>
             <span data-probe="warm" style="color: var(--fab-surface-active)"></span>
             <span data-probe="resting" style="color: var(--fab-text-subtle)"></span>
           </main>

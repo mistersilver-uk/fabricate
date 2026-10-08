@@ -294,8 +294,8 @@ test('a selected browser row reads as an identity cue in the accent family, not 
     ['the selected system card', selectedSystemBlock],
   ]) {
     assert.ok(
-      block.includes('background: var(--fab-surface-soft);'),
-      `${name} uses a neutral soft surface`
+      block.includes('background: var(--fab-surface-active);'),
+      `${name} takes the neutral active surface`
     );
     assert.ok(
       block.includes('border-color: var(--fab-accent-border);'),
@@ -1765,7 +1765,7 @@ test('every manager browser row joins ONE edge, corner and fill treatment', () =
   for (const declaration of [
     'border: 1px solid var(--fab-border);',
     'border-radius: 9px;',
-    'background: var(--fab-overlay-light-03);',
+    'background: var(--fab-surface-soft);',
   ]) {
     assert.ok(treatment.includes(declaration), `the shared row treatment declares ${declaration}`);
   }

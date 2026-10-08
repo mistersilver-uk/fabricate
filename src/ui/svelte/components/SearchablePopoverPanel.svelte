@@ -299,7 +299,7 @@
 
   .manager-travel-popover.is-compact-option-rows .manager-travel-option[aria-selected='true'] {
     border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
+    background: var(--fab-surface-active);
   }
 
   .manager-travel-popover.is-compact-option-rows .manager-travel-option:hover {
@@ -310,7 +310,7 @@
   .manager-travel-popover.is-compact-option-rows
     .manager-travel-option[aria-selected='true']:hover {
     border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
+    background: var(--fab-surface-active);
   }
 
   .manager-travel-popover

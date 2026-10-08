@@ -3108,7 +3108,7 @@ test('the family base rule declares its background rather than inheriting one', 
   try {
     await tab.setContent(document_(sheet));
     const rules = await readRules(tab);
-    // `background: var(--fab-overlay-light-06)` resolves through a custom property.
+    // `background: var(--fab-surface-soft)` resolves through a custom property.
     const base = rules.filter((rule) => rule.selectorText === BASE_RULE_SELECTOR);
     assert.equal(
       base.length,
@@ -3117,7 +3117,7 @@ test('the family base rule declares its background rather than inheriting one', 
     );
     assert.match(
       base[0].cssText,
-      /background-color:\s*var\(--fab-overlay-light-06\)|background:\s*var\(--fab-overlay-light-06\)/,
+      /background-color:\s*var\(--fab-surface-soft\)|background:\s*var\(--fab-surface-soft\)/,
       'the family declares its own resting background on its lowest-specificity rule'
     );
   } finally {

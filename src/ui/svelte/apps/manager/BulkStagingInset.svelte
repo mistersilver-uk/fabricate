@@ -358,13 +358,13 @@
     cursor: pointer;
   }
 
-  :global(.fab-bulk-inset button.fab-bulk-inset-row:hover:not(:disabled)) {
+  :global(.fab-bulk-inset button.fab-bulk-inset-row:not([aria-pressed='true']):enabled:hover) {
     border-color: var(--fab-border-strong);
+    background: var(--fab-surface-raised);
   }
 
-  /* The three staged paints (`proto:5601`-`5604`): a chosen or added row on the accent pair, a
-     removal on the danger pair — the direction has to survive a monochrome render, so the glyph
-     carries it too. `is-staged` is the reference's `add`/`on` face; `is-removing` its `rem`. */
+  /* The staged pair (`proto:5601`-`5604`), pressed, kept under the pointer: `add`/`on` on accent,
+     `rem` on danger, and the glyph carries the direction too, for a monochrome render. */
   :global(.fab-bulk-inset .fab-bulk-inset-row.is-staged) {
     border-color: var(--fab-accent-border);
     background: var(--fab-accent-soft);
