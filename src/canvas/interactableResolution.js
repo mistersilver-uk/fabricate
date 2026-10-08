@@ -164,6 +164,10 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
   return null;
 }
 
+function trimmedString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 /**
  * Build the normalized `activeCanvasTool` payload from a resolved library Tool.
  *
@@ -181,7 +185,7 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
  * @param {string} params.systemId   The crafting system id.
  * @param {string} params.toolId     The library Tool id.
  * @param {object|null} params.tool  The resolved library Tool entry
- *   (`{ componentId, label? }`).
+ *   (`{ componentId, label?, name? }`).
  * @returns {{ componentId: string, systemId: string, toolId: string, label: string } | null}
  */
 export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
@@ -193,7 +197,8 @@ export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
   // activation denial. A componentId, when present, is still carried so a migrated
   // component-linked station keeps satisfying componentId-keyed virtual presence.
   if (!resolvedToolId && !componentId) return null;
-  const label = typeof tool?.label === 'string' && tool.label.trim() ? tool.label.trim() : '';
+  // The chip label prefers the GM's optional override, then the Tool's name snapshot.
+  const label = trimmedString(tool?.label) || trimmedString(tool?.name);
   return {
     componentId,
     systemId: typeof systemId === 'string' ? systemId : '',
