@@ -746,9 +746,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
         scopedActorId: nextActorId
       });
       existing._selectTab(initialTab);
-      // Hydrated details belong to the station session, not just the selected recipe.
-      if (stationChanged) await existing._services?.crafting?.load?.(true);
       existing.bringToFront();
+      if (stationChanged) {
+        // Hydrated details belong to the station session, not just the selected recipe.
+        // Persist a debounced stage reorder first, because the reload re-reads stored orders.
+        await existing._services?.crafting?.flushProgressiveOrder?.();
+        await existing._services?.crafting?.load?.(true);
+      }
       return existing;
     }
     const app = new SvelteFabricateApp({
