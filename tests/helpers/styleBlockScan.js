@@ -104,7 +104,9 @@ export function collectStyleCorpus({
   extensions = STYLE_CORPUS_EXTENSIONS,
 } = {}) {
   const corpus = {};
-  for (const [file, source] of Object.entries(collectWorkingTreeSources([...roots], [...extensions]))) {
+  for (const [file, source] of Object.entries(
+    collectWorkingTreeSources([...roots], [...extensions])
+  )) {
     const css = styleTextFor(file, source);
     if (css.trim().length > 0) corpus[file] = css;
   }
@@ -240,8 +242,9 @@ export function splitSelectorList(selector) {
 }
 
 /**
- * Every RULE in one comment-stripped stylesheet, as `{ selector, body, line, bodyLine }` (issue
- * 1497): `line` is where the selector begins and `bodyLine` holds the `{`, the first line of `body`.
+ * Every RULE in one comment-stripped stylesheet, as `{ selector, context, body, line, bodyLine }`
+ * (issue 1497). `context` is the enclosing at-rules, e.g. `@media (width < 600px)`, or `''`; `line`
+ * is where the selector begins and `bodyLine` holds the `{`, the first line of `body`.
  *
  * @param {string} css Comment-stripped CSS, offsets intact — from {@link styleTextFor}.
  */
@@ -267,7 +270,17 @@ export function rulesIn(css) {
       const open = stack.pop();
       if (open && !open.selector.startsWith('@')) {
         const body = css.slice(open.start, index);
-        rules.push({ selector: open.selector, body, line: open.line, bodyLine: open.bodyLine });
+        const context = stack
+          .filter((enclosing) => enclosing.selector.startsWith('@'))
+          .map((enclosing) => enclosing.selector)
+          .join(' ');
+        rules.push({
+          selector: open.selector,
+          context,
+          body,
+          line: open.line,
+          bodyLine: open.bodyLine,
+        });
       }
       prelude = '';
       preludeStarted = false;
@@ -344,7 +357,9 @@ function expandOnce(text, definitions) {
   if (references.length === 0) return [];
   let combinations = [[]];
   for (const reference of references) {
-    const options = substitutionsFor(reference, definitions) ?? [text.slice(reference.start, reference.end)];
+    const options = substitutionsFor(reference, definitions) ?? [
+      text.slice(reference.start, reference.end),
+    ];
     combinations = combinations.flatMap((prefix) => options.map((option) => [...prefix, option]));
     if (combinations.length > MAX_VALUE_CANDIDATES) {
       throw new Error(
@@ -390,7 +405,11 @@ function expandFrontier(frontier, definitions, candidates) {
  * @param {string} value A declaration's raw value text.
  * @param {Map<string, string[]>} definitions From {@link collectCustomProperties}.
  */
-export function resolveValueCandidates(value, definitions, { maxDepth = MAX_VAR_CHAIN_DEPTH } = {}) {
+export function resolveValueCandidates(
+  value,
+  definitions,
+  { maxDepth = MAX_VAR_CHAIN_DEPTH } = {}
+) {
   const candidates = new Set([value]);
   let frontier = [value];
   let depth = 0;
@@ -408,11 +427,7 @@ export function resolveValueCandidates(value, definitions, { maxDepth = MAX_VAR_
 export function pixelValuesIn(text) {
   const values = [];
   PIXEL_LITERAL.lastIndex = 0;
-  for (
-    let match = PIXEL_LITERAL.exec(text);
-    match !== null;
-    match = PIXEL_LITERAL.exec(text)
-  ) {
+  for (let match = PIXEL_LITERAL.exec(text); match !== null; match = PIXEL_LITERAL.exec(text)) {
     values.push(Number(match[1]));
   }
   return values;

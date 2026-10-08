@@ -369,19 +369,53 @@ test('no raw spacing literal has been laundered into a private token', () => {
 
 const SHEET = 'styles/fabricate.css';
 
+/** One declaration's identity for the player list: its at-rule context, selector and property. */
+const playerKey = ({ context, selector, property }) =>
+  `${context === undefined || context === '' ? '' : `${context} `}${selector} { ${property} }`;
+
 /**
- * The sheet's rules that style the PLAYER apps, by whole selector. Their spacing is the player
- * sweep's (issue 1523 PR13), so the absolute check below reads past them, and an entry whose rule
- * no longer carries a raw literal is stale and fails.
+ * The sheet's declarations that style the PLAYER apps, each by at-rule context, selector and
+ * property. Their spacing is the player sweep's (issue 1523 PR13), so the absolute check below
+ * reads past exactly these declarations: a new off-scale declaration on the same rule, or the same
+ * rule under an `@media`, is a different key and fails. An entry that no longer carries an
+ * off-scale length is stale and fails, and the list is pinned in full by a test below so that
+ * adding to it is a deliberate edit of that pin.
  */
 const PLAYER_SHEET_RULES = Object.freeze([
   // The icon rail's count pip, which only the player window's `FabricateAppRoot` draws.
-  '.fabricate-nav .fabricate-app-nav-count',
+  '.fabricate-nav .fabricate-app-nav-count { padding }',
 ]);
 
-/** A length in a unit the spacing scale never publishes, which the pixel scan cannot see. */
+/**
+ * A length in ANY unit the spacing scale never publishes, which the pixel scan cannot see: a
+ * number followed by a percent sign or by letters other than `px` (`em`, `dvh`, `pt`, `cqw`, ...).
+ * A leading minus is part of the length, but a hyphen inside an identifier (`--fab-space-2xs`) is
+ * not.
+ */
 const NON_PIXEL_LENGTH =
-  /(?<![\w.-])(?:\d+(?:\.\d+)?|\.\d+)(?:r?em|ch|ex|vh|vw|vmin|vmax|%)(?![\w-])/giu;
+  /(?<![\w.]|\w-)(?:\d+(?:\.\d+)?|\.\d+)(?:(?!px(?![\w-]))[a-z]+|%)(?![\w-])/giu;
+
+/** The arithmetic functions inside which an exempt literal could be multiplied past its band. */
+const MATH_FUNCTION = /(?<![\w-])(calc|min|max|clamp)\(/giu;
+
+/** The arguments of each outermost `calc`/`min`/`max`/`clamp` in `value`, with its name. */
+function mathCallsIn(value) {
+  const calls = [];
+  for (let from = 0; ; ) {
+    MATH_FUNCTION.lastIndex = from;
+    const match = MATH_FUNCTION.exec(value);
+    if (match === null) return calls;
+    const start = match.index + match[0].length;
+    let depth = 1;
+    let index = start;
+    for (; index < value.length && depth > 0; index += 1) {
+      if (value[index] === '(') depth += 1;
+      else if (value[index] === ')') depth -= 1;
+    }
+    calls.push({ name: match[1].toLowerCase(), inner: value.slice(start, index - 1) });
+    from = index;
+  }
+}
 
 /** The positioning offsets, which `ui-visual-style` rules are NOT spacing-scale members. */
 const POSITION_OFFSET =
@@ -389,7 +423,8 @@ const POSITION_OFFSET =
 
 /**
  * Every length in one spacing value that is not on the scale: a pixel literal outside the spec's
- * two exemptions, found through any private custom property, or a non-pixel length.
+ * two exemptions, found through any private custom property, a non-pixel length in any unit, or an
+ * exempt literal used as an arithmetic operand.
  *
  * @param {string} value A declaration's raw value text.
  * @param {Map<string, string[]>} definitions Custom properties, the scale already removed.
@@ -401,6 +436,13 @@ function offScaleLengthsIn(value, definitions) {
       if (!isExemptSpacingPixels(pixels)) found.add(`${pixels}px`);
     }
     for (const [length] of candidate.matchAll(NON_PIXEL_LENGTH)) found.add(length);
+    // An exempt literal is only exempt standing alone: `calc(1px * 13)` is a 13px gap. The one
+    // arithmetic the exemptions allow is a sign flip, which carries no pixel literal at all.
+    for (const { name, inner } of mathCallsIn(candidate)) {
+      for (const pixels of pixelValuesIn(inner)) {
+        if (isExemptSpacingPixels(pixels)) found.add(`${pixels}px in ${name}()`);
+      }
+    }
   }
   return [...found];
 }
@@ -417,6 +459,15 @@ test('the off-scale classifier reads tokens, exemptions, private tokens and othe
     'var(--inset)': ['13px'],
     '0.15rem': ['0.15rem'],
     '0 0.4em': ['0.4em'],
+    '-0.5em 0': ['0.5em'],
+    '10dvh': ['10dvh'],
+    '2pt': ['2pt'],
+    '4cqw 0': ['4cqw'],
+    'calc(1px + 1px)': ['1px in calc()'],
+    'calc(1px * 13)': ['1px in calc()'],
+    'min(1px, 100%)': ['100%', '1px in min()'],
+    'calc(var(--fab-space-2) * -1)': [],
+    'var(--fab-space-2xs)': [],
   };
   for (const [value, expected] of Object.entries(probes)) {
     assert.deepEqual(offScaleLengthsIn(value, definitions), expected, value);
@@ -445,8 +496,9 @@ test('no spacing length in the sheet is off the scale, outside its player rules'
   for (const declaration of sheet) {
     const lengths = offScaleLengthsIn(declaration.value, definitions);
     if (lengths.length === 0) continue;
-    if (PLAYER_SHEET_RULES.includes(declaration.selector)) {
-      playerResidue.add(declaration.selector);
+    const key = playerKey(declaration);
+    if (PLAYER_SHEET_RULES.includes(key)) {
+      playerResidue.add(key);
       continue;
     }
     failures.push(
@@ -460,17 +512,65 @@ test('no spacing length in the sheet is off the scale, outside its player rules'
     [],
     'a spacing length in the sheet is off the published scale. Snap it to the nearest ' +
       `\`${SPACING_SCALE_PREFIX}-*\` member and write the token; a tie goes to the main 4px rung ` +
-      'against a fine one, and up between two main rungs. A rule that styles a player app goes ' +
-      'in PLAYER_SHEET_RULES with the reason:\n  ' +
+      'against a fine one, and up between two main rungs. A declaration that styles a player app ' +
+      'goes in PLAYER_SHEET_RULES with the reason:\n  ' +
       failures.join('\n  ')
   );
   assert.deepEqual(
     PLAYER_SHEET_RULES.filter((selector) => !playerResidue.has(selector)),
     [],
-    'a PLAYER_SHEET_RULES entry no longer carries an off-scale length (or its selector changed); ' +
-      'delete the entry so the list cannot exempt what replaces it'
+    'a PLAYER_SHEET_RULES entry no longer carries an off-scale length (or its selector, property ' +
+      'or at-rule changed); delete the entry so the list cannot exempt what replaces it'
   );
 });
+
+test('the player list is pinned, so growing it is a reviewed edit of this pin', () => {
+  assert.deepEqual(
+    [...PLAYER_SHEET_RULES],
+    // PR13 (the player sweep) deletes these as it puts the rules on the scale.
+    ['.fabricate-nav .fabricate-app-nav-count { padding }'],
+    'PLAYER_SHEET_RULES changed. It exempts declarations from the scale, so an addition must be ' +
+      'a player-app rule and must edit this pin on purpose; a manager rule never belongs here'
+  );
+});
+
+/** The sizing properties, which MUST NOT derive from the spacing scale (ui-visual-style spec). */
+const SIZE_PROPERTY =
+  /^(?:width|height|inline-size|block-size|(?:min|max)-(?:width|height|inline-size|block-size)|flex-basis|flex)$/iu;
+
+test('no width, height or flex basis in the sheet reads the spacing scale', () => {
+  const { styleCorpus } = scan();
+  const sizes = styleCorpus.declarations.filter(
+    (declaration) => declaration.file === SHEET && SIZE_PROPERTY.test(declaration.property)
+  );
+  assert.ok(sizes.length >= 400, `only ${sizes.length} size declarations read in ${SHEET}`);
+
+  // A named derived token (`--fab-icon-picker-row`, computed from its chip) is the spec's own
+  // example of a size that may be built from the scale; it is DEFINED on a custom property, which
+  // this check does not read, and used by name, which carries no `--fab-space-*` reference.
+  const reading = sizes
+    .filter((declaration) =>
+      varReferencesIn(declaration.value).some((reference) => isSpacingScaleToken(reference.name))
+    )
+    .map(
+      (declaration) =>
+        `${SHEET}:${declaration.at} ${declaration.selector} ${declaration.property}: ` +
+        declaration.value
+    );
+  assert.deepEqual(
+    reading,
+    [],
+    'a width, height, min/max size or flex basis derives from the spacing scale. ' +
+      '`ui-visual-style` rules sizes out of the scale, so write the size as a literal or as a ' +
+      'named derived token:\n  ' +
+      reading.join('\n  ')
+  );
+});
+
+/** The selectors the player list names, for the offsets check, which reads a whole rule. */
+const PLAYER_SHEET_SELECTORS = new Set(
+  PLAYER_SHEET_RULES.map((key) => key.replace(/^.*?(\.fabricate)/u, '$1').replace(/ \{.*$/u, ''))
+);
 
 test('no positioning offset in the sheet reads the spacing scale', () => {
   const { styleCorpus } = scan();
@@ -482,7 +582,7 @@ test('no positioning offset in the sheet reads the spacing scale', () => {
   const reading = offsets
     .filter(
       (declaration) =>
-        !PLAYER_SHEET_RULES.includes(declaration.selector) &&
+        !PLAYER_SHEET_SELECTORS.has(declaration.selector) &&
         varReferencesIn(declaration.value).some((reference) => isSpacingScaleToken(reference.name))
     )
     .map(

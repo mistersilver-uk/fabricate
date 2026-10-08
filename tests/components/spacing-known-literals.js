@@ -16,7 +16,12 @@
  * tell `-8px` from `8px` would need that pattern changed rather than this file.
  */
 
-/** The properties the spacing scale governs, exactly as `ui-visual-style/spec.md` names them: */
+/**
+ * The properties the spacing scale governs: the spec's padding, margin and gap spellings, plus the
+ * scroll offsets (`scroll-padding`, `scroll-margin`) and `border-spacing`, which are spacing by
+ * what they do. `text-indent` is deliberately NOT here: it indents a line of text, so it is
+ * typography and sizes in `em` against the type scale, not an inset around a box.
+ */
 export const SCANNED_SPACING_PROPERTIES = Object.freeze([
   'padding',
   'padding-top',
@@ -43,6 +48,29 @@ export const SCANNED_SPACING_PROPERTIES = Object.freeze([
   'gap',
   'row-gap',
   'column-gap',
+  'scroll-padding',
+  'scroll-padding-top',
+  'scroll-padding-right',
+  'scroll-padding-bottom',
+  'scroll-padding-left',
+  'scroll-padding-block',
+  'scroll-padding-block-start',
+  'scroll-padding-block-end',
+  'scroll-padding-inline',
+  'scroll-padding-inline-start',
+  'scroll-padding-inline-end',
+  'scroll-margin',
+  'scroll-margin-top',
+  'scroll-margin-right',
+  'scroll-margin-bottom',
+  'scroll-margin-left',
+  'scroll-margin-block',
+  'scroll-margin-block-start',
+  'scroll-margin-block-end',
+  'scroll-margin-inline',
+  'scroll-margin-inline-start',
+  'scroll-margin-inline-end',
+  'border-spacing',
 ]);
 
 /**
