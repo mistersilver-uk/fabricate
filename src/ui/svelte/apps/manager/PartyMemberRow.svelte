@@ -327,7 +327,7 @@
 
   .manager-party-move-target:hover {
     border-color: var(--fab-accent-border);
-    background: var(--fab-surface-soft);
+    background: var(--fab-surface-raised);
   }
 
   .manager-party-move-target > i {

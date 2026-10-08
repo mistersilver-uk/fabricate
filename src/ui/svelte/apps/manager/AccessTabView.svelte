@@ -318,7 +318,7 @@
 
   .manager-access-row.is-selected {
     border-color: var(--fab-accent);
-    background: var(--fab-surface-raised);
+    background: var(--fab-surface-active);
   }
 
   .manager-access-copy {

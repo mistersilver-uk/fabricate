@@ -266,7 +266,7 @@
 
   .manager-party-add-candidate:hover {
     border-color: var(--fab-accent-border);
-    background: var(--fab-surface-soft);
+    background: var(--fab-surface-raised);
   }
 
   /* The tile is the row's ONLY leading element, portrait or not, so every candidate name

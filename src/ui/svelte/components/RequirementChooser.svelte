@@ -301,7 +301,7 @@
   }
 
   button.fab-requirement-slot:hover {
-    background: var(--fab-surface-soft);
+    background: var(--fab-surface-raised);
   }
 
   /* Open is a fill, never a ring: the focus ring is already an accent outline. */

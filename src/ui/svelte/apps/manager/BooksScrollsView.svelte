@@ -678,7 +678,7 @@
 
   .manager-books-scrolls-listitem.is-selected {
     border-color: var(--fab-accent-border);
-    background: var(--fab-surface-soft);
+    background: var(--fab-surface-active);
   }
 
   .manager-books-scrolls-listitem.is-disabled {

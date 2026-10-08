@@ -613,19 +613,17 @@
     padding: 8px 14px;
     border-radius: 7px;
     border: 1px solid var(--fab-border);
-    background: var(--fab-overlay-light-035);
+    background: var(--fab-surface-soft);
     color: var(--fab-text);
     cursor: pointer;
     font-weight: 600;
   }
 
-  /* The fill is a NEUTRAL overlay, not an accent tint, and that is the shipped pixel rather than an
-     oversight: this rule asked for a soft accent with the overlay as its fallback, the soft accent
-     was never declared anywhere, and the overlay is what every theme has always painted (issue
-     1399). Tinting it is a visible change and needs `--fab-accent-soft`, which does exist. */
+  /* The chosen mode is the selected face: the ACTIVE surface behind the accent edge, NEUTRAL
+     rather than an accent tint (issue 1399). */
   .manager-economy-mode-option.is-active {
     border-color: var(--fab-accent);
-    background: var(--fab-overlay-light-035);
+    background: var(--fab-surface-active);
     color: var(--fab-text);
   }
 
