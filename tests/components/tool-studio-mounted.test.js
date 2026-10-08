@@ -957,11 +957,11 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.match(
       chanceControl.getAttribute('style'),
-      /--fab-chance-slider-track-gradient: var\(--fab-tool-breakage-chance-track-gradient\)/
+      /--fab-chance-slider-track-gradient: var\(--fab-manager-tool-breakage-chance-track-gradient\)/
     );
     assert.match(
       fabricateCss,
-      /\.fabricate-manager \.manager-tool-breakage-chance-control\s*\{\s*--fab-tool-breakage-chance-track-gradient:\s*linear-gradient\(\s*90deg,\s*var\(--fab-success\) 0%,\s*var\(--fab-warning\) 33%,\s*var\(--fab-badge-gold\) 66%,\s*var\(--fab-danger\) 100%\s*\);/
+      /\.fabricate-manager \.manager-tool-breakage-chance-control\s*\{\s*--fab-manager-tool-breakage-chance-track-gradient:\s*linear-gradient\(\s*90deg,\s*var\(--fab-success\) 0%,\s*var\(--fab-warning\) 33%,\s*var\(--fab-badge-gold\) 66%,\s*var\(--fab-danger\) 100%\s*\);/
     );
     assert.ok(chanceControl.querySelector('.manager-drop-rate-fill'));
 
