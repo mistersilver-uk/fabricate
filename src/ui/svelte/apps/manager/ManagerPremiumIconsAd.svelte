@@ -17,7 +17,7 @@
     `onDismiss` runs, so it never falls to `body` — pinned by
     `tests/components/manager-header-mounted.js`.
   - The tiles are decorative backgrounds whose images live in `styles/fabricate.css`, so no icon is
-    addressable as art; the strip compacts below 1180px of manager width and is withheld below 980.
+    addressable as art; the strip compacts at 1120px of manager width and is withheld at 960.
 -->
 <script>
   import Button from '../../components/Button.svelte';

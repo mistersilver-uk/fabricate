@@ -897,8 +897,10 @@ Every `@container` MUST name its container, because an unnamed query answers to 
 `tests/components/design-system-debt-ratchets.test.js` fails a new viewport `@media` and a new unnamed `@container` anywhere, and holds the sheet, `components/` and `apps/manager/` to neither, absolutely.
 A container query adds no specificity, so the narrow case is declared after the wide one.
 The APP-LEVEL container breakpoints are a published ladder, and a new surface reuses them rather than inventing a rung: the manager container breaks at 1320, 1120, 960, 900, 831 and 680; the recipes container at 714, 634 and 554; the alchemy and crafting containers at 960.
-The same test fails a query against the manager or recipes container at any other width.
-A component MAY declare its own container and its own rung where the thing that must respond is the component rather than the app — that is not covered by this ladder and does not need to be, but the component still names the container it declares.
+The manager root also carries `fabricate-option-host`, the name the option-card reflow queries, so that name's one rung, 620, is app-level as well.
+The same test fails a query against the manager, recipes or option-host container at any other width, in feature or range syntax, and fails any bound on those containers it cannot read as a px width.
+It also fails an `@container` whose name no `container-name` or `container` declaration establishes, because that query never fires.
+A component MAY declare its own container and its own rung where the thing that must respond is the component rather than the app — that is not covered by this ladder and does not need to be, but the component still names the container it declares, and the same test fails a `container-type` with no `container-name` beside it in the sheet, `components/` and `apps/manager/`.
 A layout that reserves fixed rail widths MUST also declare a container minimum, because `ApplicationV2#_updatePosition` clamps only to a computed `min-width` that defaults to zero and a `minmax(0, 1fr)` centre column can otherwise collapse.
 The shipped manager grid is `220px minmax(0, 1fr) 300px` with fixed outer tracks; giving those tracks a `minmax(0, …)` upper bound is a proposed change recorded in the migrations, not a description of what ships.
 
