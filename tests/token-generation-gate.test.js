@@ -358,11 +358,11 @@ test('the area-scoped set is measured, and the prefix is exactly that set', () =
   assert.ok(
     sites.size > 100,
     `only ${sites.size} distinct \`${TOKEN_PREFIX}\` properties are declared anywhere, against the ` +
-      '~134 this tree holds. With none, the set below is empty and all three clauses are vacuous.'
+      '~135 this tree holds. With none, the set below is empty and all three clauses are vacuous.'
   );
   assert.ok(
     names.length >= 10,
-    `only ${names.length} properties measured as area-scoped, against the 15 this tree holds. A ` +
+    `only ${names.length} properties measured as area-scoped, against the 16 this tree holds. A ` +
       'set that has collapsed makes every clause below an absence check over nothing.'
   );
 
@@ -432,12 +432,11 @@ test('an area-scoped property is declared and read only inside its area', () => 
   // Non-vacuity, and it is the reason this gate is written against the requirement's own words
   // rather than against a directory. Measured at issue 1782's search field: 29 rules, after the
   // data table retired the drop grid's two properties and the search shell retired the two
-  // toolbar search rules that read `--fab-manager-recipe-control-font`; 28 once the breakage
-  // track was written from its colour stops.
+  // toolbar search rules that read `--fab-manager-recipe-control-font`.
   assert.ok(
     rules.length >= 25,
     `only ${rules.length} sheet rules mention one of the ${names.length} area-scoped properties, ` +
-      'against the 28 this sheet holds. With none, the assertion below is vacuous.'
+      'against the 29 this sheet holds. With none, the assertion below is vacuous.'
   );
 
   // THE TOP-LEVEL SPLIT IS EXERCISED BY THE LIVE CORPUS, not only by the fixtures in
@@ -492,7 +491,7 @@ function areaScopedStyleReads(corpus) {
       if (!text.includes(TOKEN_PREFIX)) continue;
       for (const name of names) {
         if (text.includes(name))
-          found.push({ file, line: index + 1, id: `area-scoped read ${name}` });
+          found.push({ file, line: index + 1, id: `area-scoped read ${name}`, value: 'read' });
       }
     }
   }
@@ -574,7 +573,12 @@ function areaScopedStringUses(readFile, files) {
       for (const name of names) {
         if (!text.includes(name)) continue;
         if (areaUseShapes(name).some(({ pattern }) => pattern.test(text))) {
-          found.push({ file, line: index + 1, id: `area-scoped property in a string ${name}` });
+          found.push({
+            file,
+            line: index + 1,
+            id: `area-scoped property in a string ${name}`,
+            value: 'string',
+          });
         }
       }
     }
@@ -663,5 +667,19 @@ test('the area-scoped gates fail a new or grown use against base, measuring the 
       },
       failures: [],
     },
+  ]);
+
+  // A rename nets against the use it replaces within its file, and a copy does not.
+  const renamed = sheet('.fabricate-manager { --fab-manager-pad: 2px; }');
+  assertGateCases(t, AREA_STYLE_READ_GATE, base, [
+    { head: { [SHEET]: renamed, [PROBE]: probe().replace('gap)', 'pad)') }, failures: [] },
+    {
+      head: { [SHEET]: renamed, [PROBE]: probe('  .probe { margin: var(--fab-manager-pad); }') },
+      failures: [`${read('--fab-manager-pad')} is new (1)`],
+    },
+  ]);
+  const spelled = (name) => `export const a = 'var(${name})';\n`;
+  assertGateCases(t, AREA_STRING_GATE, { ...base, 'src/a.js': spelled('--fab-manager-gap') }, [
+    { head: { [SHEET]: renamed, 'src/a.js': spelled('--fab-manager-pad') }, failures: [] },
   ]);
 });
