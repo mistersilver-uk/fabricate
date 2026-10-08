@@ -205,8 +205,10 @@ This only works within the station's own crafting system.
 A station tool from one system never satisfies the same tool required by a different system.
 
 Activating a tool station opens the Crafting tab.
-The borrowed tool applies to recipe details, ingredient-choice recalculations and the craft action itself.
-Switching stations refreshes an already-open recipe; reopening without a station or closing the window clears that borrowed availability.
+The borrowed tool applies to recipe details, ingredient-choice recalculations, the craft action, and Journal step advances.
+Switching stations refreshes an already-open recipe.
+Reopening the window without a station, or closing it, clears the borrowed availability.
+The header chip reads "Station tool:" followed by the Tool's name, unless a GM label override is set for that station Tool.
 
 ---
 
