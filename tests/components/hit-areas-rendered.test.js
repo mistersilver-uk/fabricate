@@ -241,13 +241,36 @@ const assertTarget = (label, result, painted) => {
 describe('24px hit areas, paint unchanged (issue 1523)', () => {
   it('gives the stepper adjuncts a 24px target inside the 2px gap to the input', async () => {
     for (const selector of ['[data-stepper-decrement]', '[data-stepper-increment]']) {
-      const adjunct = await measure('stepper', selector, '[data-stepper-input]');
-      assert.deepEqual(adjunct.box, { width: 22, height: 22 });
-      assert.ok(adjunct.target.width >= 24 && adjunct.target.height >= 24, selector);
-      assert.equal(adjunct.inside.left, 'control');
-      assert.equal(adjunct.inside.right, 'control');
-      assert.equal(adjunct.inside.top, 'control');
-      assert.equal(adjunct.inside.bottom, 'control');
+      const adjunct = await tab.evaluate((query) => {
+        const control = document.querySelector(`[data-case="stepper"] ${query}`);
+        const box = control.getBoundingClientRect();
+        const style = getComputedStyle(control);
+        const padding = Number.parseFloat(style.paddingLeft);
+        const at = (x, y) => document.elementFromPoint(x, y) === control;
+        const cy = box.top + box.height / 2;
+        const cx = box.left + box.width / 2;
+        return {
+          target: { width: box.width, height: box.height },
+          painted: {
+            width: box.width - 2 * padding,
+            height: box.height - 2 * padding,
+            clip: style.backgroundClip,
+          },
+          margin: style.marginLeft,
+          inside: [
+            at(box.left + 0.5, cy),
+            at(box.right - 0.5, cy),
+            at(cx, box.top + 0.5),
+            at(cx, box.bottom - 0.5),
+          ],
+          outside: [at(box.left - 1.5, cy), at(box.right + 1.5, cy)],
+        };
+      }, selector);
+      assert.deepEqual(adjunct.target, { width: 24, height: 24 }, selector);
+      assert.deepEqual(adjunct.painted, { width: 22, height: 22, clip: 'content-box' }, selector);
+      assert.equal(adjunct.margin, '-1px', `${selector}: the row keeps its 22px`);
+      assert.deepEqual(adjunct.inside, [true, true, true, true], selector);
+      assert.deepEqual(adjunct.outside, [false, false], selector);
     }
     // The input beside them keeps its own edge.
     const edges = await tab.evaluate(() => {

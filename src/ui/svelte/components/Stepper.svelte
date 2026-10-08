@@ -359,8 +359,6 @@
   .fab-stepper-adjunct {
     appearance: none;
     -webkit-appearance: none;
-    position: relative;
-    overflow: visible;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -377,16 +375,23 @@
     cursor: pointer;
   }
 
-  /* The 24px pointer target (WCAG 2.2 §2.5.8) of a 22px button: one pixel into the 2px gap on each
-     side, so it never reaches the input beside it, and no paint moves. */
-  .fab-stepper-adjunct::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: max(100%, 24px);
-    height: max(100%, 24px);
-    transform: translate(-50%, -50%);
+  /* The 24px pointer target (WCAG 2.2 §2.5.8) of a 22px button: a 1px padding the negative margin
+     gives back, so the row keeps its 22px and the 2px gap to the input. The background stays on the
+     content box and takes the 7px corner that leaves it the drawn 6px, and the focus ring sits on
+     the 24px edge, which is where the 22px box's ring sat at an offset of 1px. A positioned
+     `::before` would paint the glyph a sub-pixel off. */
+  .fab-stepper:not(.is-vertical):not(.is-comfortable) .fab-stepper-adjunct {
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    margin: -1px;
+    padding: 1px;
+    border-radius: 7px;
+    background-clip: content-box;
+  }
+
+  .fab-stepper:not(.is-vertical):not(.is-comfortable) .fab-stepper-adjunct:focus-visible {
+    outline-offset: 0;
   }
 
   .fab-stepper-adjunct:hover:not(:disabled) {
