@@ -84,7 +84,8 @@ const HARNESS = Object.freeze({
 /** The weights a text element may compute: the published ramp. */
 const RAMP = Object.freeze([400, 500, 600, 700]);
 
-/** A sheet rule that sets the face on a child of a bold caption, so the weight is inherited. */
+/** A sheet rule that sets the face on a child of a bold caption, so the weight is inherited; the
+ * caption's weight comes from the sheet's `.fabricate-field` rule, not this fixture. */
 const PREREQUISITE_AT =
   '<label class="fabricate-field"><span class="manager-prerequisite-at">@</span></label>';
 
