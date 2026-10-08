@@ -610,14 +610,22 @@ In `foundry-native` a component tagged Aqua renders a desaturated rose, and in `
 The five withheld tints hold their hue within 27 degrees, because the hue-preserving derivation was applied when they were added and never retrofitted to the original eight.
 Re-deriving the eight is a palette change across seven theme blocks and is recorded as a planned migration.
 
-Elevation is for surfaces that float OVER content and MUST come from `--fab-shadow-sm`, `--fab-shadow-md` or `--fab-shadow-lg`.
-A card that merely sits on the page uses a border and no shadow.
-`tests/components/design-system-debt-ratchets.test.js` reads every `box-shadow` in the global sheet and in every Svelte scoped block and fails a new one that is none of those three, allowing only `none` and an inset ring — a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
+Elevation MUST be `--fab-shadow-sm`, `--fab-shadow-md` or `--fab-shadow-lg`, and only on a surface that floats OVER content: a popover, a menu, a dialog, a toast, or a dock that pins over the content scrolling beneath it.
+A surface that sits on the page — a card, a row, a well, a button, a handle — MUST draw no shadow; its edge is a 1px `--fab-border` or a ring.
+The gate MUST allow only `none`, an inset ring, a ring list and a leading inset bar beside those three tokens.
+A ring is `0 0 0 <n>px var(--fab-*)`, inset or not: a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
+A ring list is two or more rings in one declaration, such as a radio's dot inside its ground, and a leading bar is `inset <n>px 0 0 var(--fab-*)`, the selected row's inline-start stripe.
+`tests/components/design-system-debt-ratchets.test.js` reads every `box-shadow` in the global sheet and in every Svelte scoped block, and holds the sheet, `components/` and `apps/manager/` to that set absolutely.
 
 #### Scenario: A primitive needs a colour the token set does not name
 
 - **WHEN** a primitive needs a colour no `--fab-*` token provides
 - **THEN** the change mints a token in every theme block rather than writing a literal at the call site
+
+#### Scenario: A change writes a shadow outside the allowance
+
+- **WHEN** a change adds a `box-shadow` that is not `none`, a `--fab-shadow-*` token, a ring, a ring list or a leading inset bar — a blurred bar or a hairline with a y-offset included
+- **THEN** `design-system-debt-ratchets` fails it
 
 ### Requirement: The token namespace is one generation and names its purpose
 
