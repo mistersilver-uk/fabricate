@@ -2686,7 +2686,7 @@ Requirements:
    The player crafting facade carries this context into detail hydration, selected-set evaluation, craft submission and the Journal step advance (`advanceCraftingRun`, "Trigger Next Step").
    Replacing the active station invalidates the open recipe's hydrated availability.
 4. UI placement: when an active tool is set it is surfaced as a status chip in the tab header bar's right-side context cluster (alongside gathering's weather/time/region), implemented in `ActorSelectTopBar`.
-   The chip names the station's Tool: the GM's optional label override, else the Tool's name; it falls back to a generic localized label only when the payload carries neither.
+   The chip names the station's Tool: the Tool's **Display label** (the GM-authored override), else the Tool's name; it falls back to a generic localized label only when the payload carries neither.
    The Crafting and planned Alchemy tabs should place the chip in their own header right bar once those headers exist.
 
 ### Item → Tool Drop Resolution
