@@ -518,12 +518,17 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   // persisted first because the crafting reload re-reads stored orders. Never throws: the grant
   // path discards `show()`'s promise.
   async _refreshStationReads() {
-    try {
-      await this._services?.crafting?.flushProgressiveOrder?.();
-      await this._services?.crafting?.load?.(true);
-      await this._services?.journal?.load?.(true);
-    } catch {
-      // The previous reads stay; the next interaction reloads them.
+    const reads = [
+      () => this._services?.crafting?.flushProgressiveOrder?.(),
+      () => this._services?.crafting?.load?.(true),
+      () => this._services?.journal?.load?.(true),
+    ];
+    for (const read of reads) {
+      try {
+        await read();
+      } catch {
+        // A failed read keeps its previous state and never skips the reads after it.
+      }
     }
   }
 
