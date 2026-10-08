@@ -12,7 +12,10 @@ import { after, before, it } from 'node:test';
 import { chromium } from 'playwright';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  FOUNDRY_BRIDGE_RAW_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
+} from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
