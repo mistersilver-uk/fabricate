@@ -22,6 +22,45 @@ const component = (name) => `src/ui/svelte/components/${name}.svelte`;
 
 const snippet = (html) => createRawSnippet(() => ({ render: () => html }));
 const GLYPH = '<i class="fas fa-xmark" aria-hidden="true"></i>';
+/** A glyph with a drawn size, for a button the sheet does not size (Font Awesome is not loaded). */
+const SQUARE_GLYPH = '<i style="display:inline-block;width:10px;height:10px"></i>';
+
+/** The scoped CSS of the components whose own parents are drawn here, each with its hash class. */
+const PARENTS = Object.freeze({
+  essence: scopedComponentCss(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte')
+  ),
+  inset: scopedComponentCss(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/BulkStagingInset.svelte')
+  ),
+  panel: scopedComponentCss(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte')
+  ),
+});
+
+/** Adds a component's scope hash to every classed element of a fixture drawn from its markup. */
+const scoped = (html, { hashClass }) =>
+  html.replaceAll(/class="([^"]*)"/gu, (_whole, value) => `class="${value} ${hashClass}"`);
+
+const PAGER = `<div class="fab-bulk-inset"><div class="fab-bulk-inset-pager">
+  <span class="fab-bulk-inset-range">Showing 1-5 of 20</span>
+  <div class="fab-bulk-inset-pages">
+    <button type="button" class="fab-bulk-inset-page fab-hit-area" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+    <span class="fab-bulk-inset-page-label">Page 1 of 4</span>
+    <button type="button" class="fab-bulk-inset-page fab-hit-area" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+  </div></div></div>`;
+
+const PICK = `<div class="fab-bulk-book-pick"><div class="fab-bulk-book-pick-head">
+  <span class="fab-bulk-book-pick-art"><i class="fas fa-book"></i></span>
+  <span class="fab-bulk-book-pick-copy"><strong class="fab-bulk-book-pick-name">A long book name</strong><span class="fab-bulk-book-pick-meta">12 recipes</span></span>
+  <button type="button" class="fab-bulk-book-pick-clear fab-hit-area" aria-label="Clear">${GLYPH}</button>
+  </div></div>`;
+
+const STAGED = `<ul class="fab-bulk-book-staged"><li class="fab-bulk-book-staged-row is-add">
+  <span class="fab-bulk-book-staged-op"><i class="fas fa-plus"></i>Add</span>
+  <span class="fab-bulk-book-staged-copy"><span class="fab-bulk-book-staged-name">A long book name</span><span class="fab-bulk-book-staged-count">12 recipes</span></span>
+  <button type="button" class="fab-bulk-book-unstage fab-hit-area" aria-label="Unstage">${GLYPH}</button>
+  </li></ul>`;
 
 /** The mounted primitives, each by the harness that compiles it. */
 const MOUNTS = Object.freeze({
@@ -56,6 +95,31 @@ const MOUNTS = Object.freeze({
       ),
     },
   },
+  truncChip: {
+    name: 'Chip',
+    props: {
+      truncate: true,
+      removable: true,
+      removeLabel: 'Remove',
+      onRemove: () => {},
+      children: snippet('<span>Tag</span>'),
+    },
+  },
+  essenceChip: {
+    name: 'Chip',
+    props: {
+      tone: 'info',
+      class: 'manager-essence-filter-chip',
+      children: snippet(
+        `<span style="display:contents"><span>Filter</span><button type="button" class="manager-essence-chip-clear fab-hit-area ${PARENTS.essence.hashClass}" aria-label="Clear">${SQUARE_GLYPH}</button></span>`
+      ),
+    },
+  },
+  contents: {
+    name: 'SelectionCheckbox',
+    props: { density: 'compact', wrapper: 'contents', ariaLabel: 'Pick' },
+  },
+  decorative: { name: 'SelectionCheckbox', props: { density: 'compact', decorative: true } },
   tagPill: {
     name: 'Chip',
     props: {
@@ -91,8 +155,18 @@ const SHEET_CONTROLS = Object.freeze([
   ['fab-hit-area', '', 22, 22],
 ]);
 
-/** The narrowest gap any of these sits beside another control: the chip rung's 6px. */
-const GAP = 6;
+/** The three checkbox densities and their drawn boxes. */
+const CHECKBOX_SIZES = Object.freeze([
+  ['compact', 16],
+  ['default', 20],
+  ['comfortable', 22],
+]);
+
+/**
+ * The tightest gap a neighbour is drawn at: the control's reach plus the one pixel Chromium's hit
+ * test counts at a transformed edge, since a gap of exactly the reach hands that pixel to the control.
+ */
+const reachOf = (size) => (24 - size) / 2 + 1;
 
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}
@@ -101,26 +175,34 @@ const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 ${['Stepper', 'SelectionCheckbox', 'Chip']
   .map((name) => `<style>${scopedComponentCss(resolve(repoRoot, component(name))).css}</style>`)
   .join('\n')}
+${Object.values(PARENTS)
+  .map(({ css }) => `<style>${css}</style>`)
+  .join('\n')}
 <style>:root{--font-primary:Arial,sans-serif}
-.row{display:flex;align-items:center;gap:${GAP}px;margin:12px}
+.row{display:flex;align-items:center;gap:var(--gap,6px);margin:12px}
 .row .neighbour{width:30px;height:30px;padding:0;border:1px solid #888}</style>
 </head><body class="game"><div class="fabricate fabricate-manager" style="width:900px">
   <div data-case="stepper" class="row">${markup.stepper}</div>
   <div data-case="fill" class="row" style="width:240px">${markup.fill}</div>
   <div data-case="vertical" class="row" style="width:80px">${markup.vertical}</div>
-  ${['compact', 'default', 'comfortable']
-    .map(
-      (key) =>
-        `<div data-case="${key}" class="row"><button class="neighbour" data-neighbour="before"></button>${markup[key]}<button class="neighbour" data-neighbour="after"></button></div>`
-    )
-    .join('\n')}
-  <div data-case="chip" class="row">${markup.chip}<button class="neighbour" data-neighbour="after"></button></div>
+  ${CHECKBOX_SIZES.map(
+    ([key, size]) =>
+      `<div data-case="${key}" class="row" style="--gap:${reachOf(size)}px"><button class="neighbour" data-neighbour="before"></button>${markup[key]}<button class="neighbour" data-neighbour="after"></button></div>`
+  ).join('\n')}
+  <div data-case="chip" class="row" style="--gap:${reachOf(20)}px">${markup.chip}<button class="neighbour" data-neighbour="after"></button></div>
   <div data-case="recipeChip" class="row">${markup.recipeChip}</div>
   <div data-case="componentChip" class="row">${markup.componentChip}</div>
   <div data-case="tagPill" class="row">${markup.tagPill}</div>
+  <div data-case="truncChip" class="row">${markup.truncChip}</div>
+  <div data-case="essenceChip" class="row">${markup.essenceChip}</div>
+  <div data-case="contentsHost" class="row"><label class="host">${markup.contents}<span>Text</span></label></div>
+  <div data-case="decorativeHost" class="row"><div class="host" role="option">${markup.decorative}<span>Text</span></div></div>
+  <div data-case="pager" style="width:300px;margin:12px">${scoped(PAGER, PARENTS.inset)}</div>
+  <div data-case="pick" style="width:300px;margin:12px">${scoped(PICK, PARENTS.panel)}</div>
+  <div data-case="staged" style="width:300px;margin:12px">${scoped(STAGED, PARENTS.panel)}</div>
   ${SHEET_CONTROLS.map(
     ([cls, wrapper, width, height]) =>
-      `<div data-case="${cls}" class="row ${wrapper}"><button class="neighbour" data-neighbour="before"></button><button type="button" class="${cls}" style="${cls === 'fab-hit-area' ? `width:${width}px;height:${height}px;padding:0` : ''}">${GLYPH}</button><button class="neighbour" data-neighbour="after"></button></div>`
+      `<div data-case="${cls}" class="row ${wrapper}" style="--gap:${reachOf(width)}px"><button class="neighbour" data-neighbour="before"></button><button type="button" class="${cls}" style="${cls === 'fab-hit-area' ? `width:${width}px;height:${height}px;padding:0` : ''}">${GLYPH}</button><button class="neighbour" data-neighbour="after"></button></div>`
   ).join('\n')}
   <div data-case="label-input" class="row"><input class="manager-condition-label-input" aria-label="Edit label" value="Label" /></div>
   <div data-case="range" class="row manager-gathering-task-edit-view"><input type="range" min="0" max="10" value="5" /></div>
@@ -150,7 +232,7 @@ before(async () => {
     }
   }
   browser = await chromium.launch();
-  tab = await browser.newPage({ viewport: { width: 1280, height: 1100 } });
+  tab = await browser.newPage({ viewport: { width: 1280, height: 2600 } });
   await tab.setContent(page(markup), { waitUntil: 'load' });
 });
 
@@ -215,6 +297,66 @@ const measure = (caseId, selector, neighbourSelector = null) =>
       };
     },
     { caseId, selector, neighbourSelector }
+  );
+
+/**
+ * Measures a control inside its REAL parent: its target, what resolves at each extended edge, the
+ * real gap to each sibling beside it, and the ancestors whose clip cuts the target.
+ */
+const probeParent = (caseId, selector, nth = 0) =>
+  tab.evaluate(
+    ({ caseId, selector, nth }) => {
+      const root = document.querySelector(`[data-case="${caseId}"]`);
+      const control = root.querySelectorAll(selector)[nth];
+      const box = control.getBoundingClientRect();
+      const pseudo = getComputedStyle(control, '::before');
+      const width = Math.max(box.width, Number.parseFloat(pseudo.width) || 0);
+      const height = Math.max(box.height, Number.parseFloat(pseudo.height) || 0);
+      const cx = box.left + box.width / 2;
+      const cy = box.top + box.height / 2;
+      const owner = (x, y) => {
+        const hit = document.elementFromPoint(x, y);
+        return hit === control || control.contains(hit) ? 'control' : (hit?.className ?? 'nothing');
+      };
+      const target = {
+        left: cx - width / 2,
+        right: cx + width / 2,
+        top: cy - height / 2,
+        bottom: cy + height / 2,
+      };
+      const clippedBy = [];
+      for (let up = control.parentElement; up && up !== root; up = up.parentElement) {
+        const style = getComputedStyle(up);
+        if (style.overflowX === 'visible' && style.overflowY === 'visible') continue;
+        const rect = up.getBoundingClientRect();
+        const cut = [
+          target.top < rect.top - 0.01 && 'top',
+          target.bottom > rect.bottom + 0.01 && 'bottom',
+          target.left < rect.left - 0.01 && 'left',
+          target.right > rect.right + 0.01 && 'right',
+        ].filter(Boolean);
+        if (cut.length > 0) clippedBy.push({ by: String(up.className), cut });
+      }
+      const gaps = [control.previousElementSibling, control.nextElementSibling]
+        .filter(Boolean)
+        .map((sibling) => {
+          const nb = sibling.getBoundingClientRect();
+          return Math.max(nb.left - box.right, box.left - nb.right, nb.top - box.bottom, 0);
+        });
+      return {
+        box: { width: box.width, height: box.height },
+        target: { width, height },
+        inside: {
+          left: owner(target.left + 0.5, cy),
+          right: owner(target.right - 0.5, cy),
+          top: owner(cx, target.top + 0.5),
+          bottom: owner(cx, target.bottom - 0.5),
+        },
+        clippedBy,
+        gaps,
+      };
+    },
+    { caseId, selector, nth }
   );
 
 const assertTarget = (label, result, painted) => {
@@ -337,11 +479,7 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
     assert.equal(adjunct.target.height, 26);
   });
 
-  for (const [key, size] of [
-    ['compact', 16],
-    ['default', 20],
-    ['comfortable', 22],
-  ]) {
+  for (const [key, size] of CHECKBOX_SIZES) {
     it(`gives the ${key} selection checkbox a 24px target beside a neighbour`, async () => {
       const label = await measure(key, '.fab-selection-checkbox');
       assertTarget(`${key} selection checkbox`, label, { width: size, height: size });
@@ -382,6 +520,73 @@ describe('24px hit areas, paint unchanged (issue 1523)', () => {
     it(`gives .${cls} a 24px target beside its neighbours`, async () => {
       const control = await measure(cls, `.${cls}`);
       assertTarget(`.${cls}`, control, { width, height });
+    });
+  }
+
+  // The chip clears sit inside a chip at least 24px high, so the 24px target fits whole and the
+  // truncating chip's `overflow: hidden` (the one chip that clips) cuts nothing of it.
+  for (const key of ['recipeChip', 'componentChip', 'tagPill', 'essenceChip', 'truncChip']) {
+    it(`fits the ${key} clear's 24px target inside its chip, uncut`, async () => {
+      const real = await probeParent(key, 'button');
+      const chip = await tab.evaluate(
+        (id) =>
+          document.querySelector(`[data-case="${id}"] .manager-chip`).getBoundingClientRect()
+            .height,
+        key
+      );
+      assert.ok(real.target.width >= 24 && real.target.height >= 24, JSON.stringify(real.target));
+      assert.ok(chip >= real.target.height, `${key}: the chip is ${chip}px high`);
+      assert.deepEqual(real.clippedBy, [], `${key}: the chip cuts the target`);
+      assert.deepEqual(Object.values(real.inside), ['control', 'control', 'control', 'control']);
+    });
+  }
+
+  // `wrapper="contents"` and `decorative` render no `.fab-selection-checkbox`, so they carry no
+  // `::before` to reach or overlap anything: the host that wraps the box is the target.
+  for (const [caseId, tag] of [
+    ['contentsHost', 'label'],
+    ['decorativeHost', 'div'],
+  ]) {
+    it(`leaves the ${caseId} box to its host, with no extension of its own`, async () => {
+      const result = await tab.evaluate(
+        ({ caseId, tag }) => {
+          const host = document.querySelector(`[data-case="${caseId}"] ${tag}.host`);
+          const box = host.querySelector('.fab-selection-check').getBoundingClientRect();
+          const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+          return {
+            wrappers: host.querySelectorAll('.fab-selection-checkbox').length,
+            box: { width: box.width, height: box.height },
+            reach: [...host.querySelectorAll('*')].filter(
+              (node) => getComputedStyle(node, '::before').content !== 'none'
+            ).length,
+            hitInHost: host.contains(hit),
+          };
+        },
+        { caseId, tag }
+      );
+      assert.equal(result.wrappers, 0, 'no label wrapper');
+      assert.deepEqual(result.box, { width: 16, height: 16 });
+      assert.equal(result.reach, 0, 'no pseudo-element extends anything');
+      assert.ok(result.hitInHost, 'a click on the box lands in the host');
+    });
+  }
+
+  // The real parents of the shared `.fab-hit-area` class: the target must reach 24 and no ancestor
+  // may cut it, or the probe states the cut.
+  for (const [caseId, selector, nth, size] of [
+    ['pager', '.fab-bulk-inset-page', 0, 22],
+    ['pager', '.fab-bulk-inset-page', 1, 22],
+    ['pick', '.fab-bulk-book-pick-clear', 0, 22],
+    ['staged', '.fab-bulk-book-unstage', 0, 22],
+  ]) {
+    it(`reaches 24px, uncut, for ${selector} #${nth} in its ${caseId} parent`, async () => {
+      const real = await probeParent(caseId, selector, nth);
+      assert.deepEqual(real.box, { width: size, height: size });
+      assert.ok(real.target.width >= 24 && real.target.height >= 24, JSON.stringify(real.target));
+      assert.deepEqual(real.clippedBy, [], `${caseId}: an ancestor cuts the target`);
+      assert.deepEqual(Object.values(real.inside), ['control', 'control', 'control', 'control']);
+      const reach = (real.target.width - real.box.width) / 2;
+      for (const gap of real.gaps) assert.ok(reach <= gap, `${caseId}: gap ${gap} under ${reach}`);
     });
   }
 
