@@ -791,12 +791,16 @@ A programmatic `.focus()` that follows a pointer activation matches `:focus` and
 A loading control MUST set `aria-busy` and change its label or text.
 A spinner alone is insufficient because Foundry's bundled Font Awesome disables `fa-spin` under `prefers-reduced-motion` and every shipped spinner is `aria-hidden`, so a motion-only busy state is conveyed to a reduced-motion user by nothing at all.
 
-Motion MUST be `--fab-motion-control`, declared once in the sheet's `:root` as `140ms ease`, on a control's state change, and nothing else animates: a hover lift, an entrance fade and a shadow transition are not state changes and are not drawn.
+Motion MUST be `--fab-motion-control`, declared once in the sheet's `:root` as `140ms ease`, on a control's state change, and nothing else animates.
+A press nudge, and a hover or focus reveal of a control, are control state changes; a hover lift, an entrance fade and a shadow transition are not, and are not drawn.
 A transition MUST name the properties its state changes, never `all`, and MUST carry no duration or timing function of its own.
 The sheet's one `@media (prefers-reduced-motion: reduce)` block MUST remove every transition, by `transition: none !important` on `.fabricate`, the chat cards and the canvas prompt and everything inside them, and a component MUST NOT write a reduced-motion block of its own.
+Every sheet transition MUST sit under one of those roots, and a Svelte `<style>` block mounts inside them.
+Three Fabricate surfaces draw outside every root and carry no motion today: the environment dialog, the player character types menu and the compendium directory context menu; giving one a transition means rooting it first.
 Any state that animated MUST remain readable when it does not.
 The block resets no `animation`, because no keyframes ship and Foundry already stills `fa-spin`.
 `tests/components/motion-token-gate.test.js` holds the rule across the sheet and every Svelte `<style>` under `src/`, player apps included.
+The same gate fails a Svelte motion directive or import, a script-set `transition`, an `animate()` call, an inline `transition`, `@keyframes` and `scroll-behavior: smooth` under `src/`.
 
 The chip's RECESSIVE TONES are one ladder rather than a set of percentages, and the order is `secondary` → `neutral` → `subtle` → `muted`, loudest to quietest: `secondary` names the rule the GM is reading, `neutral` a fact merely present, `subtle` a quiet non-actionable state, and `muted` something unavailable.
 The quantity that orders them is the CONTRAST of each ink composited over that theme's own ground — never an alpha and never a channel, because the themes do not agree on a model and an alpha comparison ties three of the four — and a caller routes by that MEANING rather than by matching a tone name to a token name, since the names deliberately do not track the tokens.
