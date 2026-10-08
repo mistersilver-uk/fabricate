@@ -603,6 +603,8 @@
   }
 
   .manager-essence-chip-clear {
+    position: relative;
+    overflow: visible;
     display: inline-flex;
     align-items: center;
     padding: 0;
@@ -610,6 +612,17 @@
     background: none;
     color: inherit;
     cursor: pointer;
+  }
+
+  /* The 24px pointer target of a glyph-sized clear, which no padding gives: an invisible inset. */
+  .manager-essence-chip-clear::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 24px);
+    height: max(100%, 24px);
+    transform: translate(-50%, -50%);
   }
 
   /* `:global` because `LibraryShelf` renders the `<ul>` these style, so a scoped selector would be

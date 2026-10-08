@@ -1112,6 +1112,8 @@
      restates both (see the CSS override map in `CONTRIBUTING.md`). */
   .fab-bulk-book-pick-clear,
   .fab-bulk-book-unstage {
+    position: relative;
+    overflow: visible;
     display: flex;
     flex: 0 0 auto;
     align-items: center;
@@ -1125,6 +1127,18 @@
     color: var(--fab-text-muted);
     font-size: 0.68rem;
     cursor: pointer;
+  }
+
+  /* The 24px pointer target of the 22px square: a pixel past it on every side. */
+  .fab-bulk-book-pick-clear::before,
+  .fab-bulk-book-unstage::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 24px);
+    height: max(100%, 24px);
+    transform: translate(-50%, -50%);
   }
 
   .fab-bulk-book-pick-clear:hover:not(:disabled),

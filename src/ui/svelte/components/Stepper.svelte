@@ -359,6 +359,8 @@
   .fab-stepper-adjunct {
     appearance: none;
     -webkit-appearance: none;
+    position: relative;
+    overflow: visible;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -373,6 +375,18 @@
     font-size: 0.62rem;
     line-height: 1;
     cursor: pointer;
+  }
+
+  /* The 24px pointer target (WCAG 2.2 §2.5.8) of a 22px button: one pixel into the 2px gap on each
+     side, so it never reaches the input beside it, and no paint moves. */
+  .fab-stepper-adjunct::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 24px);
+    height: max(100%, 24px);
+    transform: translate(-50%, -50%);
   }
 
   .fab-stepper-adjunct:hover:not(:disabled) {
@@ -401,6 +415,14 @@
     appearance: textfield;
   }
 
+  /* The same 24px target for the typeable input, by a 1px border-box inset the negative margin gives
+     back: the row keeps its 22px, the text stays centred and the focus ring stays where it was. */
+  .fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input {
+    box-sizing: border-box;
+    height: 24px;
+    margin-block: -1px;
+  }
+
   .fab-stepper-input::-webkit-outer-spin-button,
   .fab-stepper-input::-webkit-inner-spin-button {
     appearance: none;
@@ -411,6 +433,10 @@
   .fab-stepper-input:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 1px;
+  }
+
+  .fab-stepper:not(.is-vertical):not(.is-fill) .fab-stepper-input:focus-visible {
+    outline-offset: 0;
   }
 
   .fab-stepper-adjunct:focus-visible {

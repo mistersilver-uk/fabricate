@@ -426,6 +426,8 @@
   }
 
   .manager-chip-remove {
+    position: relative;
+    overflow: visible;
     flex: 0 0 auto;
     display: grid;
     place-items: center;
@@ -441,6 +443,18 @@
     font-family: inherit;
     font-size: inherit;
     cursor: pointer;
+  }
+
+  /* The 24px pointer target of the 20px remove: 2px past it, inside the chip's own padding box so
+     the chip's `overflow: hidden` clips none of it. */
+  .manager-chip-remove::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 24px);
+    height: max(100%, 24px);
+    transform: translate(-50%, -50%);
   }
 
   .manager-chip-remove:hover:not(:disabled),
