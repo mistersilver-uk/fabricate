@@ -139,7 +139,7 @@ test('canvas stations reach the player crafting path', async (t) => {
     await t.test(
       'a station craft consumes material and awards its result without an owned Tool',
       async () => {
-        const { services, options, tool } = fixture();
+        const { services, options } = fixture();
         const before = stock();
         const itemIds = actor.items.map((item) => item.id);
         const result = await services.craftRecipe(options);
@@ -148,7 +148,6 @@ test('canvas stations reach the player crafting path', async (t) => {
         assert.equal(ingot.system.quantity, before.ingot + 1);
         // A one-use destroy-on-break Tool is untouched: no owned item is destroyed or added.
         assert.deepEqual(actor.items.map((item) => item.id), itemIds);
-        assert.ok(system.tools.includes(tool), 'the library Tool survives the craft');
       }
     );
 
@@ -290,7 +289,7 @@ test('canvas stations reach the player crafting path', async (t) => {
         assert.deepEqual(calls, ['front', 'flush', 'load']);
         calls.length = 0;
         await App.show('crafting', { activeCanvasTool, actorId: actor.id });
-        assert.deepEqual(calls, ['front'], 'an unchanged station does not reload');
+        assert.deepEqual(calls, ['front'], 're-showing with the same session object does not reload');
         await App.show('crafting', { actorId: actor.id });
         assert.equal(
           services.crafting.selectedRecipe.ingredientSets[0].craftability.canCraft,

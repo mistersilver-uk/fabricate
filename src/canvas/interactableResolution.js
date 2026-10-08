@@ -175,10 +175,11 @@ function trimmedString(value) {
  * app when a Tool-station region activation is granted (the player walked their
  * token into the region and clicked Interact). The shape is deliberately
  * simple/serializable: `{ componentId, systemId, toolId, label }`.
- * The crafting/gathering prerequisite checks treat `componentId` as present
- * without an owned item and exclude it from breakage/usage.
+ * The payload carries the library Tool id and any legacy `componentId`; the
+ * crafting/gathering prerequisite checks treat the station as present without
+ * an owned item and exclude it from breakage/usage.
  *
- * Returns `null` when the tool cannot be resolved to a `componentId` (so the
+ * Returns `null` only when neither a Tool id nor a `componentId` resolves (so the
  * caller can decline to open a tool-scoped session).
  *
  * @param {object} params
