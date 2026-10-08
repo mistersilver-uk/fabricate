@@ -568,7 +568,7 @@
     left: 6px;
     color: var(--fab-text-muted);
     opacity: 0;
-    transition: opacity 0.12s ease;
+    transition: opacity var(--fab-motion-control);
   }
 
   .alchemy-chip:hover .alchemy-chip-remove-one,

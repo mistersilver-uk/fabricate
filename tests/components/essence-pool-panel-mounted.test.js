@@ -370,11 +370,14 @@ describe('EssencePoolPanel mounted behavior', () => {
     assert.ok(controls.every((control) => control.disabled));
   });
 
-  it('animates nothing, so no reduced-motion exemption is needed', () => {
+  it('animates nothing, and leaves reduced motion to the sheet', () => {
     const code = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte'),
       'utf8'
     ).replaceAll(/<!--[\s\S]*?-->/gu, '');
-    assert.ok(!/transition:|prefers-reduced-motion/u.test(code));
+    assert.ok(
+      !/transition:|prefers-reduced-motion/u.test(code),
+      'a state change reads --fab-motion-control, and the sheet’s one block removes it'
+    );
   });
 });
