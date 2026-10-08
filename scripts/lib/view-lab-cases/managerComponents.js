@@ -689,7 +689,7 @@ export const CASES = Object.freeze([
         target: '[data-scoped-entry-preview-tile]',
       },
     ],
-    position: { width: 980, height: 860 },
+    position: { width: 960, height: 860 },
     kinds: ['manager', 'components', 'responsive'],
     sourceMatches: COMPONENT_EDITOR_MATCHES,
   }),

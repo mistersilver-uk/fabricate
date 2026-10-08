@@ -707,6 +707,13 @@ const RAIL_FILL_LAYOUT_CASES = {
   'manager-world-downtime-narrow': { tracks: 2, width: 960 },
 };
 const RAIL_FILL_LAYOUT_CASE_IDS = Object.keys(RAIL_FILL_LAYOUT_CASES);
+// And one case inside each band the app ladder's rungs moved: 680-720 and 960-1000, where the
+// arrangement a viewport query or an off-ladder rung used to stack now keeps both columns.
+const BAND_LAYOUT_CASES = {
+  'manager-world-parties-card-700': { tracks: 2, width: 700, height: 900 },
+  'world-component-entry-980': { tracks: 2, width: 980, height: 860 },
+};
+const BAND_LAYOUT_CASE_IDS = Object.keys(BAND_LAYOUT_CASES);
 // And the requirement row's result cases (issue 1516), which assert row geometry and no grid, each
 // at its own window.
 const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
@@ -758,6 +765,7 @@ const LAYOUT_CASE_IDS = [
   ...FULL_WIDTH_LAYOUT_CASE_IDS,
   ...FRAME_STACK_LAYOUT_CASE_IDS,
   ...RAIL_FILL_LAYOUT_CASE_IDS,
+  ...BAND_LAYOUT_CASE_IDS,
   'fabricate-journal-lifecycle-narrow',
   'fabricate-journal-lifecycle-wide',
 ];
@@ -832,6 +840,11 @@ test('exactly the declared layout cases carry complete layout expectations', () 
     assert.equal(viewCase.expectLayout.absentSelector, '.manager-inspector');
     // And the side rail runs the body's full height below the 1120px rung (issue 1976).
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
+  }
+  for (const viewCase of declared.filter((entry) => BAND_LAYOUT_CASE_IDS.includes(entry.id))) {
+    assert.equal(viewCase.expectLayout.expectedTracks, BAND_LAYOUT_CASES[viewCase.id].tracks);
+    assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
+    assert.equal(viewCase.expectLayout.absentSelector, undefined);
   }
   for (const viewCase of declared.filter((entry) => RAIL_FILL_LAYOUT_CASE_IDS.includes(entry.id))) {
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
@@ -917,7 +930,11 @@ test('the side-rail band cases name the scroller that owns their overflow', () =
 });
 
 function layoutCasePosition(id) {
-  if (FRAME_STACK_LAYOUT_CASE_IDS.includes(id)) return { width: 980, height: 860 };
+  if (FRAME_STACK_LAYOUT_CASE_IDS.includes(id)) return { width: 960, height: 860 };
+  if (BAND_LAYOUT_CASE_IDS.includes(id)) {
+    const { width, height } = BAND_LAYOUT_CASES[id];
+    return { width, height };
+  }
   if (RAIL_FILL_LAYOUT_CASE_IDS.includes(id)) {
     return { width: RAIL_FILL_LAYOUT_CASES[id].width, height: 900 };
   }
@@ -1722,7 +1739,7 @@ test('the 680px World Parties case pins the card-column container breakpoint', (
   const normal = getCaseById('manager-world-parties-normal');
   const narrow = getCaseById('manager-world-parties-card-stacked-680');
 
-  assert.ok(narrow, 'the <=720px party-card layout needs registered screenshot evidence');
+  assert.ok(narrow, 'the <=680px party-card layout needs registered screenshot evidence');
   assert.deepEqual(narrow.position, { width: 680, height: 900 });
   assert.deepEqual(narrow.query, normal.query);
   assert.deepEqual(narrow.steps, normal.steps);
@@ -1733,6 +1750,12 @@ test('the 680px World Parties case pins the card-column container breakpoint', (
   assert.deepEqual(narrow.smokeLabels, []);
   assert.equal(narrow.reaches, 'beyond');
   assert.ok(narrow.kinds.includes('responsive'));
+
+  // Its twin inside the 680-720 band reaches the same card, which keeps both columns there.
+  const band = getCaseById('manager-world-parties-card-700');
+  assert.deepEqual(band.position, { width: 700, height: 900 });
+  assert.deepEqual([band.query, band.steps], [narrow.query, narrow.steps]);
+  assert.equal(band.expectSelector, narrow.expectSelector);
 });
 
 test('the World Parties fixture is legal, and its search and pager cases claim what it seeds', () => {
