@@ -329,7 +329,7 @@
     padding-bottom: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
-    box-shadow: 0 -2px 6px var(--fab-overlay-dark-25);
+    box-shadow: var(--fab-shadow-sm);
   }
 
   /* Gated on the snippet: with no `dockFoot` the dock is byte-identical to what ships. */

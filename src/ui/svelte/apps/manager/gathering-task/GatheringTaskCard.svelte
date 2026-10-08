@@ -38,13 +38,6 @@
     background: var(--fab-bg-3);
   }
 
-  .manager-task-stamina-card,
-  .manager-task-nodes-card,
-  .manager-task-dc-card {
-    /* ratchet-exempt(design-system): moved unchanged from GatheringTaskEditView, which carried it at base */
-    box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
-  }
-
   .manager-task-resolution-card,
   .manager-task-results-card {
     border-radius: 9px;

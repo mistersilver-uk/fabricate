@@ -939,7 +939,7 @@
   color: var(--fab-on-success);
   background: var(--fab-success);
 
-  /* ratchet-exempt(design-system): a zero-blur ring that separates the pip from the well it overhangs, not elevation; the rail's ground is the surface over the shell ground. */
+  /* Two zero-blur rings separate the pip from the well it overhangs: the rail's ground is the surface over the shell ground. */
   box-shadow:
     0 0 0 2px var(--fab-surface-soft),
     0 0 0 2px var(--fab-bg-1);
@@ -3936,7 +3936,7 @@
   border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  box-shadow: none;
   font: inherit;
   font-variant-numeric: tabular-nums;
 }
@@ -4183,7 +4183,7 @@
   border: 1px solid var(--fab-border-strong);
   border-radius: 6px;
   background: var(--fab-bg-2);
-  box-shadow: 0 12px 24px var(--fab-overlay-dark-32);
+  box-shadow: var(--fab-shadow-md);
   overflow-y: auto;
 }
 
@@ -9649,7 +9649,7 @@
   border: 1px solid var(--fab-border-strong);
   border-radius: 9px;
   background: var(--fab-bg-0);
-  box-shadow: 0 14px 30px var(--fab-overlay-dark-48);
+  box-shadow: var(--fab-shadow-lg);
   overflow: auto;
   scrollbar-color: var(--fab-bg-3) transparent;
   scrollbar-width: thin;
@@ -11469,7 +11469,7 @@
   border: 1px solid var(--fab-border);
   color: var(--fab-text);
   background: var(--fab-bg-2);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  box-shadow: none;
   font: inherit;
 }
 
@@ -11516,7 +11516,7 @@
   border: 1px solid var(--fab-border);
   color: var(--fab-text);
   background: var(--fab-bg-2);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  box-shadow: none;
   font: inherit;
 }
 
@@ -11602,7 +11602,6 @@
   border: 1px solid var(--fab-border);
   border-radius: 11px;
   background: var(--fab-bg-3);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
 }
 
 .fabricate-manager .manager-task-core-card {
@@ -12195,7 +12194,6 @@
   border: 1px solid var(--fab-border);
   border-radius: 11px;
   background: var(--fab-bg-3);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
   overflow: hidden;
 }
 
@@ -12795,7 +12793,7 @@
   border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  box-shadow: none;
   font: inherit;
 }
 
@@ -12851,7 +12849,6 @@
   border-radius: 7px;
   background: var(--fab-overlay-dark-18);
   box-sizing: border-box;
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
   overflow: hidden;
 }
 
@@ -16493,7 +16490,7 @@
   border-radius: 7px;
   color: var(--fab-text);
   background: var(--fab-bg-2);
-  box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
+  box-shadow: none;
   font: inherit;
   font-variant-numeric: tabular-nums;
 }

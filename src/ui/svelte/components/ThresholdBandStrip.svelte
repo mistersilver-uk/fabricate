@@ -390,7 +390,6 @@
     border: 1px solid var(--fab-border-strong);
     border-radius: 999px;
     background: var(--fab-surface);
-    box-shadow: var(--fab-shadow-sm);
   }
 
   .fab-band-strip-handle.is-dragging .fab-band-strip-grip,
