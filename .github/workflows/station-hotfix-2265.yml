@@ -18,18 +18,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh api repos/mistersilver-uk/fabricate/actions/jobs/113224154726/logs > unit-tests.log
+          gh api --allow-escape-sequences repos/mistersilver-uk/fabricate/actions/jobs/113224154726/logs > unit-tests.log
           python3 - <<'PY'
           from pathlib import Path
-          lines = Path('unit-tests.log').read_text().splitlines()
-          output = []
+          import re
+          text = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', Path('unit-tests.log').read_text())
+          lines = text.splitlines()
+          selected = set()
           for i, line in enumerate(lines):
-              if 'not ok ' in line or 'ERR_TEST_FAILURE' in line:
-                  output.extend(lines[max(0, i-2):min(len(lines), i+45)])
-          output.extend(lines[-25:])
-          text = '\n'.join(output)
-          Path('failures.txt').write_text(text)
-          print(text)
+              if 'not ok ' in line:
+                  selected.update(range(max(0, i-2), min(len(lines), i+55)))
+          selected.update(range(max(0, len(lines)-25), len(lines)))
+          output = '\n'.join(lines[i] for i in sorted(selected))
+          Path('failures.txt').write_text(output)
+          print(output)
           PY
       - uses: actions/upload-artifact@v4
         with:
