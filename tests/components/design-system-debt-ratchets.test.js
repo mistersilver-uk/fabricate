@@ -586,10 +586,10 @@ const FAB_COLOUR = String.raw`var\(\s*--fab-[\w-]+\s*(?:,[^)]*)?\)`;
 const EDGE_WIDTH = String.raw`(\d+(?:\.\d+)?)px`;
 
 /** An inset ring: a border drawn as a shadow so it costs no layout. */
-const INSET_RING = new RegExp(String.raw`^(?:inset )?0 0 0 ${EDGE_WIDTH} ${FAB_COLOUR}$`, 'iu');
+const INSET_RING = new RegExp(`^(?:inset )?0 0 0 ${EDGE_WIDTH} ${FAB_COLOUR}$`, 'iu');
 
 /** A leading bar: an inset edge on the inline start, with no block offset and no blur. */
-const LEADING_BAR = new RegExp(String.raw`^inset ${EDGE_WIDTH} 0 0 ${FAB_COLOUR}$`, 'iu');
+const LEADING_BAR = new RegExp(`^inset ${EDGE_WIDTH} 0 0 ${FAB_COLOUR}$`, 'iu');
 
 /** The widest a ring or a bar may draw: past it the shadow is a fill rather than an edge. */
 const EDGE_MAX_PX = 4;
@@ -697,7 +697,7 @@ test('no shadow in the sheet, components and manager leaves the allowance', () =
 });
 
 /** A selector on one line, as the pinned lists below spell it. */
-const oneLine = (selector) => selector.replace(/\s+/gu, ' ').trim();
+const oneLine = (selector) => selector.replaceAll(/\s+/gu, ' ').trim();
 
 /**
  * Every in-scope read of an elevation token, by file and selector, with the reason that surface
