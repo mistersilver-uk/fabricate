@@ -136,6 +136,7 @@ import {
   itemStackQuantityPath,
   updateStackQuantity,
 } from './itemStackQuantity.js';
+import { pairPlannedTools } from './plannedToolPairs.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { postResultCard } from './resultCardPost.js';
@@ -1926,19 +1927,14 @@ export class CraftingEngine {
         : undefined;
     const effects = new Map(journal.effects.map((effect) => [effect.effectId, effect]));
     const toolEffect = effects.get('apply-tools');
-    const toolDefinitions = this.recipeManager.getToolsForSet?.(executionRecipe, selectedSet) ?? [];
-    const toolPairs = (toolEffect?.planned || []).map((itemUuid, index) => {
+    const applied = toolEffect?.phase === 'applied';
+    const toolItems = (toolEffect?.planned || []).map((itemUuid) => {
       const item = findItemByUuid([actor, ...(componentSourceActors || [])], itemUuid);
-      if (!item && toolEffect.phase !== 'applied') {
-        throw new CraftingLifecycleExecutionError(
-          'A planned crafting tool is no longer available',
-          'STAGE_RECONSTRUCTION_FAILED'
-        );
-      }
-      return {
-        item: item ?? rehydrateVersionedItem({ itemUuid }),
-        tool: toolDefinitions[index] ?? null,
-      };
+      return item ?? (applied ? rehydrateVersionedItem({ itemUuid }) : null);
+    });
+    const toolPairs = pairPlannedTools(this.recipeManager, executionRecipe, selectedSet, {
+      items: toolItems,
+      applied,
     });
     const currencySpends = cloneJsonValue(effects.get('spend-currency')?.planned) ?? [];
     return {
@@ -1951,7 +1947,7 @@ export class CraftingEngine {
         currencySpends,
         toolItemUuids: cloneJsonValue(toolEffect?.planned) ?? [],
       },
-      toolItems: toolPairs.map((entry) => entry.item),
+      toolItems,
       executionRecipe,
       craftSelection: { plan: [] },
       toolValidation: { valid: true, tools: toolPairs },
@@ -2654,6 +2650,11 @@ export class CraftingEngine {
       return versionedFailure('The crafting run lifecycle version is unsupported.');
     }
     if (contract !== 'current' && options?.lifecycleVersion !== 1) return null;
+    const selectionPlan = {
+      selectedIngredientSetId: ingredientSetId,
+      ingredientOptionOverrides: options?.ingredientOptionOverrides,
+      ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
+    };
 
     if (existing) {
       const requestExecute = this.versionedRunAuthority?.requestExecute;
@@ -2663,11 +2664,8 @@ export class CraftingEngine {
         componentSourceActors: sourceActors,
         runId: existing.id,
         expectedRevision: existing.runRevision,
-        selectionPlan: {
-          selectedIngredientSetId: ingredientSetId,
-          ingredientOptionOverrides: options?.ingredientOptionOverrides,
-          ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
-        },
+        selectionPlan,
+        presentTools: options?.presentTools,
       });
     }
 
@@ -2677,12 +2675,9 @@ export class CraftingEngine {
       actor,
       sourceActors,
       recipeId: recipe?.id,
-      selectionPlan: {
-        selectedIngredientSetId: ingredientSetId,
-        ingredientOptionOverrides: options?.ingredientOptionOverrides,
-        ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
-      },
+      selectionPlan,
       completionMode: options?.completionMode || 'manual',
+      presentTools: options?.presentTools,
     });
   }
 

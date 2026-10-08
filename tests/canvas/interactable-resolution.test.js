@@ -77,6 +77,22 @@ test('buildActiveCanvasTool defaults a missing label to an empty string', () => 
   );
 });
 
+test('buildActiveCanvasTool labels the chip by the Tool display-name precedence (issue 2265)', () => {
+  const components = [{ id: 'comp-anvil', name: 'Linked Anvil' }];
+  const label = (tool) =>
+    buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool, components }).label;
+  const linked = { componentId: 'comp-anvil' };
+  assert.equal(label({ ...linked, label: ' Forge ', name: 'Anvil' }), 'Forge', 'the Display label');
+  assert.equal(label({ ...linked, label: '  ', name: 'Anvil' }), 'Anvil', 'then the name snapshot');
+  assert.equal(label({ ...linked, label: '', name: null }), 'Linked Anvil', 'then the component');
+  assert.equal(label({ componentId: null, label: '', name: '' }), '', 'else the generic label');
+  assert.equal(
+    buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: linked }).label,
+    '',
+    'no components resolves no linked name'
+  );
+});
+
 // --- drop classification ---
 
 const deps = () => ({

@@ -68,6 +68,7 @@ Where a run needs something from **you**, a second badge sits beside the status 
   A route, an option, or an essence allocation has not been made yet.
 - **Needs materials**, **Needs essences**, **Needs payment**, **Needs tools**.
   The stage is short of something you have to acquire.
+  **Needs tools** clears while a [tool station]({% link canvas-interactables.md %}#virtual-present-station-tools) you activated supplies the missing tool, and returns when that station is no longer active.
 
 A small bolt before the status badge, labelled **Finishes this stage as time passes**, means the run's current stage will complete on its own once its wait is over.
 It shows only for a run that is set to complete as time passes, is not paused, and is still waiting on its time gate.
