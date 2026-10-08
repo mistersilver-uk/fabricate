@@ -445,18 +445,60 @@ const VIEWPORT_MEDIA_GATE = styleGate((corpus) => [
   })),
 ]);
 
-/** The published app-level ladders: a query against one of these containers breaks on a rung. */
+/**
+ * The published app-level ladders: a query against one of these containers breaks on a rung. The
+ * manager root also carries `fabricate-option-host`, so that name's one rung is app-level too.
+ */
 const APP_CONTAINER_LADDERS = Object.freeze({
   'fabricate-manager': [1320, 1120, 960, 900, 831, 680],
   'fabricate-recipes': [714, 634, 554],
+  'fabricate-option-host': [620],
 });
 
-/** The rung each width bound in a prelude names: `max-width: n` is n, `min-width: n` is n - 1. */
-function rungsNamed(query) {
-  return [...query.matchAll(/\b(min|max)-width:\s*(\d+)px/gu)].map(([, bound, width]) =>
-    bound === 'min' ? Number(width) - 1 : Number(width)
-  );
+/** An inline-size feature, in either spelling. */
+const INLINE_FEATURE = /^(?:width|inline-size)$/u;
+
+/** `min-` or `max-` before an inline-size feature, then its value. */
+const BOUND_FEATURE = /^(min|max)-(?:width|inline-size)\s*:\s*(.+)$/u;
+
+/** A range comparison, kept when splitting a condition so the operator survives. */
+const COMPARISON = /\s*(<=|>=|<|>|=)\s*/u;
+
+/** The same comparison with its operands swapped: `n >= width` is `width <= n`. */
+const SWAPPED = Object.freeze({ '<': '>', '>': '<', '<=': '>=', '>=': '<=', '=': '=' });
+
+/**
+ * The boundaries `width <op> value` draws, as rungs: rung n parts n from n + 1, so `<= n` and
+ * `> n` are n, `< n` and `>= n` are n - 1, and `= n` is both. A value not in px is unparsed.
+ */
+function rungsOf(op, value, condition) {
+  const px = /^(\d+(?:\.\d+)?)px$/u.exec(value.trim());
+  if (!px) return [`unparsed (${condition})`];
+  const n = Number(px[1]);
+  if (op === '=') return [n - 1, n];
+  return [op === '<=' || op === '>' ? n : n - 1];
 }
+
+/** The rungs one parenthesised condition draws, or its text when it is not an inline-size bound. */
+function conditionRungs(condition) {
+  const bound = BOUND_FEATURE.exec(condition);
+  if (bound) return rungsOf(bound[1] === 'max' ? '<=' : '>=', bound[2], condition);
+  const [left, op, middle, op2, right] = condition.split(COMPARISON);
+  if (op && INLINE_FEATURE.test(left) && op2 === undefined) return rungsOf(op, middle, condition);
+  if (op && INLINE_FEATURE.test(middle) && op2 === undefined) {
+    return rungsOf(SWAPPED[op], left, condition);
+  }
+  if (op2 && INLINE_FEATURE.test(middle)) {
+    return [...rungsOf(SWAPPED[op], left, condition), ...rungsOf(op2, right, condition)];
+  }
+  return [`unparsed (${condition})`];
+}
+
+/** Every rung a prelude's innermost conditions draw, in feature and in range syntax. */
+const rungsNamed = (query) =>
+  [...query.matchAll(/\(([^()]*)\)/gu)].flatMap(([, condition]) =>
+    conditionRungs(condition.trim().toLowerCase())
+  );
 
 /** Every bound in a query against an app container that is not on that container's ladder. */
 const offLadderContainers = (corpus) =>
@@ -466,6 +508,41 @@ const offLadderContainers = (corpus) =>
     return rungsNamed(entry.query)
       .filter((rung) => !ladder.includes(rung))
       .map((rung) => ({ ...entry, rung }));
+  });
+
+/** Every name a `container-name` or `container` declaration establishes, over the corpus. */
+function declaredContainerNames(corpus) {
+  const names = corpus.declarations.flatMap(({ property, value }) => {
+    const bare = normaliseValue(value);
+    if (property.toLowerCase() === 'container-name') return bare.split(' ');
+    if (property.toLowerCase() === 'container') return bare.split('/', 1)[0].trim().split(' ');
+    return [];
+  });
+  return new Set(names.filter((name) => name !== '' && name.toLowerCase() !== 'none'));
+}
+
+/** Every `@container` naming a container no declaration establishes, so it never fires. */
+function undeclaredContainers(corpus) {
+  const declared = declaredContainerNames(corpus);
+  return atRules(corpus, CONTAINER_AT_RULE).filter((entry) => {
+    const name = NAMED_CONTAINER.exec(entry.query)?.[1];
+    return name !== undefined && !declared.has(name);
+  });
+}
+
+/** Every rule declaring a `container-type` without a `container-name` beside it. */
+const unnamedContainerTypes = (corpus) =>
+  corpus.rules.flatMap((rule) => {
+    const declared = declarationsIn(rule.file, rule.body);
+    const has = (property) => declared.some((entry) => entry.property.toLowerCase() === property);
+    const typed = declared.some(
+      (entry) =>
+        entry.property.toLowerCase() === 'container-type' &&
+        normaliseValue(entry.value) !== 'normal'
+    );
+    return typed && !has('container-name')
+      ? [{ file: rule.file, line: rule.line, query: rule.selector }]
+      : [];
   });
 
 test('no viewport breakpoint or unnamed container is introduced, and preferences stay exempt', (t) => {
@@ -506,10 +583,47 @@ test('the sheet, components and manager ask no viewport, name every container an
   assert.deepEqual(viewportQueries(corpus).filter(inScope).map(site), [], 'a viewport `@media`');
   assert.deepEqual(unnamedContainers(corpus).filter(inScope).map(site), [], 'an unnamed container');
   assert.deepEqual(
+    unnamedContainerTypes(corpus).filter(inScope).map(site),
+    [],
+    'a `container-type` with no `container-name` beside it: name the container it declares'
+  );
+  assert.deepEqual(
+    undeclaredContainers(corpus).map(site),
+    [],
+    'an `@container` names a container no `container-name` or `container` declares, so it never fires'
+  );
+  assert.deepEqual(
     offLadderContainers(corpus).map((entry) => `${site(entry)} → ${entry.rung}`),
     [],
-    'an app container breaks at a rung of its published ladder: the manager at 1320, 1120, 960, ' +
-      '900, 831 and 680, the recipes at 714, 634 and 554'
+    'an app container breaks at a rung of its published ladder, as a px width or inline-size bound: ' +
+      'the manager at 1320, 1120, 960, 900, 831 and 680, the recipes at 714, 634 and 554, and the ' +
+      'option host the manager root also carries at 620'
+  );
+});
+
+test('the option host is the manager root, the modifier catalogue card and the tool editor panel', () => {
+  const hosts = treeStyles()
+    .declarations.filter(
+      (entry) =>
+        /^container(?:-name)?$/u.test(entry.property.toLowerCase()) &&
+        /(?:^|\s)fabricate-option-host(?:\s|$)/u.test(normaliseValue(entry.value).split('/', 1)[0])
+    )
+    .map((entry) => `${entry.file} ${entry.selector}`);
+  assert.deepEqual(
+    hosts.sort(byCodePoint),
+    [
+      `${MODULE_SHEET} .fabricate-manager`,
+      `${MODULE_SHEET} .fabricate-manager .manager-tool-editor-panel`,
+      'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte ' +
+        ':global(.fabricate-card[data-crafting-modifier-catalogue]), ' +
+        ':global(.fabricate-card[data-crafting-modifier-policy-card])',
+    ].sort(byCodePoint),
+    'the 620 option-card reflow answers these hosts; a player app root must not carry the name'
+  );
+  assert.deepEqual(
+    hosts.filter((host) => !SWEEP_SCOPE.test(host) || /\.fabricate-app\b/u.test(host)),
+    [],
+    'a player app root carries `fabricate-option-host`, so the manager reflow reaches the player'
   );
 });
 
@@ -521,13 +635,8 @@ test('an unnamed container query fails, and a named one or a ladder rung passes'
   assert.equal(unnamedContainers(corpusOf('@container not (width > 1px) { .a {} }')).length, 1);
   assert.equal(unnamedContainers(corpusOf(unnamed)).length, 1);
   assert.deepEqual(offLadderContainers(corpusOf(named)), []);
-  assert.deepEqual(
-    offLadderContainers(
-      corpusOf('@container fabricate-manager (min-width: 832px) and (max-width: 1000px) {}')
-    ).map((entry) => entry.rung),
-    [1000]
-  );
   const base = { [MODULE_SHEET]: '.fabricate .a { gap: 0; }\n' };
+  const media = '@media (max-width: 680px) { .a { gap: 0; } }';
   assertGateCases(t, VIEWPORT_MEDIA_GATE, base, [
     {
       head: { [MODULE_SHEET]: `${base[MODULE_SHEET]}${unnamed}\n` },
@@ -535,6 +644,69 @@ test('an unnamed container query fails, and a named one or a ladder rung passes'
     },
     { head: { [MODULE_SHEET]: `${base[MODULE_SHEET]}${named}\n` }, failures: [] },
   ]);
+  // A viewport `@media` turned into an unnamed `@container` in the same file does not net.
+  assertGateCases(t, VIEWPORT_MEDIA_GATE, { [MODULE_SHEET]: `${base[MODULE_SHEET]}${media}\n` }, [
+    {
+      head: { [MODULE_SHEET]: `${base[MODULE_SHEET]}${unnamed}\n` },
+      failures: [`${MODULE_SHEET}: unnamed @container (max-width: 680px) is new (1)`],
+    },
+  ]);
+});
+
+test('the ladder reads every width bound to px, and an unreadable or non-px bound fails', () => {
+  const rungs = (prelude) =>
+    offLadderContainers({ styles: { [MODULE_SHEET]: `@container ${prelude} { .a {} }` } }).map(
+      (entry) => entry.rung
+    );
+  assert.deepEqual(rungs('fabricate-manager (min-width: 832px) and (max-width: 1000px)'), [1000]);
+  assert.deepEqual(rungs('fabricate-manager (width <= 720px)'), [720]);
+  assert.deepEqual(rungs('fabricate-manager (720px >= width)'), [720]);
+  assert.deepEqual(rungs('fabricate-manager (inline-size < 1000px)'), [999]);
+  assert.deepEqual(rungs('fabricate-manager (max-inline-size: 700px)'), [700]);
+  assert.deepEqual(rungs('fabricate-manager (width = 700px)'), [699, 700]);
+  assert.deepEqual(rungs('fabricate-manager (500px < width <= 700px)'), [500, 700]);
+  assert.deepEqual(rungs('fabricate-manager (max-width: 42rem)'), ['unparsed (max-width: 42rem)']);
+  assert.deepEqual(rungs('fabricate-manager (width < 60%)'), ['unparsed (width < 60%)']);
+  assert.deepEqual(rungs('fabricate-manager (orientation: portrait)'), [
+    'unparsed (orientation: portrait)',
+  ]);
+  // On the ladder in every spelling, and a component's own container is not read.
+  assert.deepEqual(rungs('fabricate-manager (width <= 680px)'), []);
+  assert.deepEqual(rungs('fabricate-manager (width > 680px)'), []);
+  assert.deepEqual(rungs('fabricate-manager (681px <= inline-size)'), []);
+  assert.deepEqual(rungs('fabricate-manager (min-width: 961px) and (width < 1121px)'), []);
+  assert.deepEqual(rungs('fabricate-option-host (max-width: 620px)'), []);
+  assert.deepEqual(rungs('fabricate-scoped-list (max-width: 42rem)'), []);
+});
+
+test('an @container naming no declared container fails, and an unnamed container-type fails', () => {
+  const corpusOf = (css) => {
+    const file = 'src/ui/svelte/apps/manager/Probe.svelte';
+    return styleCorpusOf(
+      (path) => (path === file ? `<style>\n${css}\n</style>\n` : undefined),
+      [file]
+    );
+  };
+  const query = (name) => `@container ${name} (max-width: 680px) { .a { gap: 0; } }`;
+  const declared = '.host { container-type: inline-size; container-name: fabricate-manager; }';
+  assert.equal(
+    undeclaredContainers(corpusOf(`${declared}\n${query('fabricate-manager')}`)).length,
+    0
+  );
+  assert.equal(
+    undeclaredContainers(corpusOf(`${declared}\n${query('fabricate-managr')}`)).length,
+    1
+  );
+  assert.equal(
+    undeclaredContainers(
+      corpusOf(`.host { container: fabricate-host / inline-size; }\n${query('fabricate-host')}`)
+    ).length,
+    0
+  );
+  assert.equal(unnamedContainerTypes(corpusOf(declared)).length, 0);
+  assert.equal(unnamedContainerTypes(corpusOf('.host { container-type: inline-size; }')).length, 1);
+  assert.equal(unnamedContainerTypes(corpusOf('.host { container-type: normal; }')).length, 0);
+  assert.equal(unnamedContainerTypes(corpusOf('.host { container: a / inline-size; }')).length, 0);
 });
 
 /* ─────────────────────────────── gate 3: weights ─────────────────────────────── */

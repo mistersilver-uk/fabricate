@@ -488,10 +488,7 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
   try {
     const page = await context.newPage();
 
-    const edges = await checksRollEdges(
-      page,
-      'fabricate-card manager-checks-card'
-    );
+    const edges = await checksRollEdges(page, 'fabricate-card manager-checks-card');
     assert.equal(
       edges.rowLeft,
       edges.radioLeft,
@@ -598,10 +595,7 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
   try {
     const page = await context.newPage();
 
-    const fixed = await modifiersCombinationRuleMetrics(
-      page,
-      'fabricate-card manager-checks-card'
-    );
+    const fixed = await modifiersCombinationRuleMetrics(page, 'fabricate-card manager-checks-card');
     assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
     // The library's `<OptionCards>` states padding 12px and radius 11px, so the primitive owns them.
     assert.equal(fixed.optionPaddingLeft, 12, "the combination-rule card's padding is 12px");
@@ -609,10 +603,7 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
     assert.equal(fixed.optionRadius, 11, "the combination-rule card's radius is 11px");
 
     // MUTATION PROOF, same page: reintroducing the defect.
-    const broken = await modifiersCombinationRuleMetrics(
-      page,
-      'fabricate-card'
-    );
+    const broken = await modifiersCombinationRuleMetrics(page, 'fabricate-card');
     // The shared card took the studio card's 11px corner and `--fab-bg-2` fill, and the studio's
     // 11px option gap snapped to the primitive's own 12 (issue 1523), so the shell no longer
     // differs there; the combination-rule card's own face below carries the proof.
@@ -874,7 +865,10 @@ test('the Tool rule card eyebrow carries the reference type, not the shared kick
   // may do is name a DIFFERENT figure, which is the defect returning under a new address.
   const kickerFontSize = /font-size: ([^;]+);/;
   for (const [file, selector] of [
-    ['tools/ToolInheritCard.svelte', '.manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow'],
+    [
+      'tools/ToolInheritCard.svelte',
+      '.manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow',
+    ],
     ['tools/ToolBrowserInspector.svelte', '.manager-tool-inspector-kicker'],
     ['tools/ToolRequirementsTab.svelte', '.manager-tool-bonus-kicker {'],
   ]) {
@@ -1081,7 +1075,6 @@ test('the band fill is painted by rules that still match', async () => {
   // The band's INK is per-band and inline (issue 1096).
   assert.equal(painted.inkedName, 'rgb(250, 200, 10)', 'a band name takes its own inline ink');
   assert.notEqual(painted.plainName, painted.inkedName, 'and falls back when the band omits one');
-
 });
 
 // The band-strip hint's separation from the first tier row (maintainer parity round 4). The
@@ -1172,7 +1165,7 @@ test('an outcome tier row lays its controls on one line inside its own box', asy
       };
     });
   });
-  assert.equal(measured.childCount, 5, 'the fixture renders the row\'s five controls');
+  assert.equal(measured.childCount, 5, "the fixture renders the row's five controls");
   assert.equal(measured.outcomeDisplay, 'flex', 'the outcome row is a flex row');
   assert.equal(measured.outcomeBorder, '1px', 'the outcome row draws its own 1px box');
   assert.equal(
@@ -1187,7 +1180,7 @@ test('an outcome tier row lays its controls on one line inside its own box', asy
   assert.equal(
     measured.hostedDirection,
     'column',
-    'the SortableList-hosted tier row keeps the primitive\'s column layout'
+    "the SortableList-hosted tier row keeps the primitive's column layout"
   );
   assert.equal(
     measured.hostedPadding,
@@ -1516,7 +1509,12 @@ test('a Modifiers card button renders exactly like the tool studio button of the
  * root under `rootClass`, the `toolbar` trigger carrying the call site's hook and `probe`, and the
  * value span.
  */
-function previewRecordControl(probe, rootClass, rung = 'toolbar', hook = 'data-checks-preview-record') {
+function previewRecordControl(
+  probe,
+  rootClass,
+  rung = 'toolbar',
+  hook = 'data-checks-preview-record'
+) {
   return (
     `<div class="fabricate-picker manager-travel-picker fabricate-select ${rootClass}">` +
     `<button type="button" class="fabricate-select-trigger fabricate-select-trigger-${rung}"` +
@@ -1762,7 +1760,10 @@ test('the modifier row gives every field room for its longest content at every m
                 body { margin: 0; font-family: Arial, sans-serif; font-size: 16px; }
                 /* The real manager container, so the shipped fabricate-manager container
                    queries resolve against this width rather than never matching. */
-                .fabricate-manager { container-type: inline-size; container-name: fabricate-manager; }
+                .fabricate-manager {
+                  container-type: inline-size;
+                  container-name: fabricate-manager fabricate-option-host;
+                }
                 .manager-settings-pane { box-sizing: border-box; width: 100%; padding: 16px; }
                 .fas::before { content: "x"; }
               </style>
