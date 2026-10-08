@@ -342,6 +342,7 @@ class InteractableManager {
         resolvedToolsFor(systemManager?.getSystem?.(systemId)).find(
           (tool) => tool?.id === toolId
         ) ?? null,
+      getComponents: ({ systemId }) => resolvedComponentsFor(systemManager?.getSystem?.(systemId)),
       getTask: ({ systemId, taskId }) =>
         this._readLibraryTasks(systemId).find((task) => task?.id === taskId) ?? null,
       resolveItemUuidToTool: (uuid) =>
