@@ -619,7 +619,7 @@
     font-weight: 600;
   }
 
-  /* The chosen mode is the selected face: the ACTIVE surface behind the accent edge, NEUTRAL
+  /* The chosen mode is the selected face: the active surface behind the accent edge, neutral
      rather than an accent tint (issue 1399). */
   .manager-economy-mode-option.is-active {
     border-color: var(--fab-accent);

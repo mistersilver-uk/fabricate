@@ -11391,7 +11391,7 @@
 }
 
 .fabricate-manager .manager-gathering-event-scene-dropzone.is-drop-active {
-  border-color: var(--fab-accent);
+  border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
   color: var(--fab-text);
 }
@@ -12262,7 +12262,7 @@
 
 .fabricate-manager .manager-task-required-tools-card-item:hover,
 .fabricate-manager .manager-task-required-tools-card-item:focus-visible {
-  border-color: var(--fab-warning-border);
+  border-color: var(--fab-border-strong);
   background: var(--fab-surface-raised);
   outline: none;
 }
@@ -15156,7 +15156,7 @@
 }
 
 .fabricate-manager .manager-component-source-drop-zone.is-drop-active {
-  border-color: var(--fab-accent);
+  border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
   color: var(--fab-text);
 }

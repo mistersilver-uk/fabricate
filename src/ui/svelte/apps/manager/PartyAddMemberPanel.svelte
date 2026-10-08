@@ -265,7 +265,7 @@
   }
 
   .manager-party-add-candidate:hover {
-    border-color: var(--fab-accent-border);
+    border-color: var(--fab-border-strong);
     background: var(--fab-surface-raised);
   }
 

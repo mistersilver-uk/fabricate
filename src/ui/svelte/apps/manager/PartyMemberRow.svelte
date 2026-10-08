@@ -288,7 +288,7 @@
   .manager-party-member-move.is-open {
     border-color: var(--fab-accent-border);
     color: var(--fab-accent);
-    background: var(--fab-accent-soft);
+    background: var(--fab-surface-active);
   }
 
   .manager-party-member-remove {
@@ -326,7 +326,7 @@
   }
 
   .manager-party-move-target:hover {
-    border-color: var(--fab-accent-border);
+    border-color: var(--fab-border-strong);
     background: var(--fab-surface-raised);
   }
 

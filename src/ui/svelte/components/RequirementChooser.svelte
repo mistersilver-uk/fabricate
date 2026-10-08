@@ -300,13 +300,13 @@
     cursor: pointer;
   }
 
-  button.fab-requirement-slot:hover {
+  button.fab-requirement-slot:not(.is-open):hover {
     background: var(--fab-surface-raised);
   }
 
-  /* Open is a fill, never a ring: the focus ring is already an accent outline. */
+  /* Open is the pressed fill, never a ring: the focus ring is already an accent outline. */
   .fab-requirement-slot.is-open {
-    background: var(--fab-accent-soft);
+    background: var(--fab-surface-active);
   }
 
   .fab-requirement-slot-affordance {
