@@ -358,6 +358,7 @@
           ></span>
         {:else}
           <Chip
+            mono
             tone={badgeTone(mark.tone)}
             class={badgeClasses(mark)}
             {...markAttributes(tab, mark)}>{mark.label}</Chip

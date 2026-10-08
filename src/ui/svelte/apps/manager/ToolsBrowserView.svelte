@@ -713,7 +713,7 @@
     color: var(--fab-text-secondary);
     font-family: var(--fab-font-mono);
     font-size: 0.76rem;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
 

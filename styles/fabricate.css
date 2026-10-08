@@ -2386,7 +2386,7 @@
   overflow: hidden;
   color: var(--fab-text-muted);
   font-size: inherit;
-  font-weight: inherit;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3436,6 +3436,7 @@
 .fabricate-manager .manager-prerequisite-at {
   color: var(--fab-text-muted);
   font-family: var(--fab-font-mono, monospace);
+  font-weight: 500;
 }
 
 .fabricate-manager .manager-prerequisite-note {
@@ -6013,7 +6014,7 @@
   font-family: var(--fab-font-mono);
   font-size: 0.66rem;
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .fabricate-manager .manager-recipe-flow-empty {
@@ -7108,7 +7109,7 @@
 .fabricate-manager .manager-essence-field-label {
   color: var(--fab-text-muted);
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.2;
 }
 
@@ -7419,7 +7420,7 @@
 .fabricate-manager .manager-environment-task-count {
   color: var(--fab-text);
   font-size: 0.86rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -8858,7 +8859,7 @@
 .fabricate-validation .manager-recipe-rail-count-value {
   flex: 0 0 auto;
   font-family: var(--fab-font-mono);
-  font-weight: 700;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
@@ -9139,7 +9140,7 @@
   color: var(--fab-info);
   font-family: var(--fab-font-mono);
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -10652,7 +10653,7 @@
 
   /* Prototype scale is 10px (0.625rem); an earlier pass bumped this to 0.74rem for readability, but the font-size audit realigned it to the design (issues 643, 1304). */
   font-size: 0.625rem;
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   overflow-wrap: normal;
 }
@@ -10724,7 +10725,7 @@
   background: var(--fab-warning-soft);
   font-family: var(--fab-font-mono);
   font-size: 0.58rem;
-  font-weight: 700;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
@@ -10750,7 +10751,7 @@
   color: var(--fab-text-muted);
   font-family: var(--fab-font-mono);
   font-size: 0.625rem;
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
@@ -13342,7 +13343,7 @@
   margin: 0;
   color: var(--fab-text);
   font-size: 0.98rem;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.25;
   overflow-wrap: break-word;
 }
@@ -16267,7 +16268,7 @@
   background: transparent;
   color: var(--fab-text-muted);
   font-size: 0.74rem;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
@@ -16443,7 +16444,7 @@
 .fabricate-manager .manager-environment-drop-adjustment-rate span {
   color: var(--fab-text-muted);
   font-size: 0.68rem;
-  font-weight: 650;
+  font-weight: 600;
   text-transform: uppercase;
 }
 

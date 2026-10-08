@@ -404,7 +404,7 @@
     color: var(--fab-accent);
     font-family: var(--fab-font-mono);
     font-size: 9px;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
