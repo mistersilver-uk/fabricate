@@ -134,7 +134,7 @@ const DECOUNTED_COUNT = 4;
  * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988, #1934,
  * #2118, #2119). `after` lists every sentence a split replacement became.
  */
-const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118', '#2119']);
+const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118', '#2119', '#2287']);
 
 const SUPERSEDED_POLICY = [
   {
@@ -630,10 +630,31 @@ const SUPERSEDED_POLICY = [
       'part of `scripts/**`, for the reason below',
     survivesIn: 'CONTRIBUTING.md',
   },
+  // PR #2287: a supplied forward-port resolution turns the initial merge conflict into an
+  // expected intermediate state. Keep genuine failures annotated as errors.
+  {
+    issue: '#2287',
+    before:
+      "A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` followed by one `::error::` line per path that could not be combined.",
+    after: [
+      "A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` and names each path that could not be combined.",
+      'When `resolution_ref` is supplied these are `::notice::` annotations: the initial conflict is expected, and only the following content gate may accept the resolution.',
+      'Without a resolution they are `::error::` annotations, followed by an actionable refusal; an invalid or unverifiable supplied resolution also produces a real error at its failure point.',
+    ],
+    survivesIn: '.github/workflows/README.md',
+  },
+  {
+    issue: '#2287',
+    before:
+      'Anything else prints `left no conflicting paths behind` and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.',
+    after:
+      'Anything else prints `left no conflicting paths behind` as an error and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.',
+    survivesIn: '.github/workflows/README.md',
+  },
 ];
 
 /** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 58;
+const SUPERSEDED_POLICY_COUNT = 60;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
