@@ -580,8 +580,8 @@ export const CASES = Object.freeze([
       {
         selector:
           '[data-manager-titlebar-premium] > .visually-hidden:text-is("Fabricate Premium is installed and connected")',
-        name: 'class',
-        value: 'visually-hidden',
+        name: 'aria-hidden',
+        value: null,
       },
       {
         selector: '#manager-world-nav-downtime',

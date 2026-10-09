@@ -92,6 +92,7 @@ describe('ManagerTitleBar', () => {
     assert.equal(badge.tagName, 'SPAN', 'the mark is a bare span, not a Chip');
     assert.ok(badge.classList.contains('manager-titlebar-badge'), 'it rides the gold badge rule');
     assert.equal(badge.parentElement, titleBarOf(root));
+    assert.equal(badge.children.length, 2, 'the mark and its hidden name, nothing else');
     const [mark, name] = badge.children;
     assert.equal(mark.textContent, titlebar.Premium);
     assert.equal(mark.getAttribute('aria-hidden'), 'true', 'the visible mark is not read');

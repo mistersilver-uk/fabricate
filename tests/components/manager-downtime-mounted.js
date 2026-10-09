@@ -745,7 +745,7 @@ export function registerDowntimeCases() {
       'Fabricate Premium is installed and connected',
       'the badge is named by visually hidden text, not aria-label (issue 2257 D4)'
     );
-    assert.ok(!titlebarPremium().hasAttribute('aria-label'));
+    assert.ok(!titlebarPremium().hasAttribute('aria-label'), 'the badge carries no aria-label');
     assert.equal(
       titlebarPremium().getAttribute('title'),
       'Fabricate Premium is installed and connected'
