@@ -335,7 +335,7 @@ test('both documented exemptions are live, and nothing else is exempt', () => {
  * would mean resolving a token through Svelte markup and a JS prop default, a different scanner
  * from this one, and the control-height ladder records the same blind spot. So "no new raw spacing
  * literal has been introduced" is a claim about what the two stylesheet corpora declare;
- * `spacing-scale-markup.test.js` holds the manager and component markup's static styles.
+ * `spacing-scale-markup.test.js` holds the Svelte markup's static styles.
  */
 test('no new raw spacing literal has been introduced', (t) => {
   checkGate(
@@ -389,17 +389,11 @@ const playerKey = ({ context, selector, property }) =>
   `${context === undefined || context === '' ? '' : `${context} `}${selector} { ${property} }`;
 
 /**
- * The sheet's declarations that style the PLAYER apps, each by at-rule context, selector and
- * property. Their spacing is the player sweep's (issue 1523 PR13), so the absolute check below
- * reads past exactly these declarations: a new off-scale declaration on the same rule, or the same
- * rule under an `@media`, is a different key and fails. An entry that no longer carries an
- * off-scale length is stale and fails, and the list is pinned in full by a test below so that
- * adding to it is a deliberate edit of that pin.
+ * Sheet declarations the absolute check reads past, each by at-rule context, selector and
+ * property, so the same rule under an `@media` is a different key and fails. An entry that no
+ * longer carries an off-scale length is stale and fails, and a test below pins the list empty.
  */
-const PLAYER_SHEET_RULES = Object.freeze([
-  // The icon rail's count pip, which only the player window's `FabricateAppRoot` draws.
-  '.fabricate-nav .fabricate-app-nav-count { padding }',
-]);
+const PLAYER_SHEET_RULES = Object.freeze([]);
 
 /** The positioning offsets, which `ui-visual-style` rules are NOT spacing-scale members. */
 const POSITION_OFFSET =
@@ -450,8 +444,8 @@ test('the off-scale classifier reads tokens, exemptions, private tokens and othe
 
 /**
  * The corpora the absolute checks hold, each with floors that prove it is still being read. The
- * sheet reads past its named player rules; the Svelte scope reads only `SVELTE_SCOPE_ROOTS`, and
- * every other Svelte file is the player sweep's (issue 1523 PR13).
+ * Svelte floors sit above what the manager and component roots alone carry, so a scope that stops
+ * reading the player apps fails them.
  */
 const ABSOLUTE_SCOPES = Object.freeze([
   {
@@ -461,10 +455,10 @@ const ABSOLUTE_SCOPES = Object.freeze([
     floors: { spacing: STYLESHEET_SPACING_DECLARATION_FLOOR, offsets: 40, sizes: 400 },
   },
   {
-    label: 'manager and component Svelte',
+    label: 'Svelte',
     includes: inSvelteScope,
     player: [],
-    floors: { spacing: 900, offsets: 15, sizes: 900 },
+    floors: { spacing: SVELTE_SPACING_DECLARATION_FLOOR, offsets: 40, sizes: 1350 },
   },
 ]);
 
@@ -519,8 +513,8 @@ for (const scope of ABSOLUTE_SCOPES) {
       [],
       `a spacing length in ${scope.label} is off the published scale. Snap it to the nearest ` +
         `\`${SPACING_SCALE_PREFIX}-*\` member and write the token; a tie goes to the main 4px ` +
-        'rung against a fine one, and up between two main rungs. A sheet declaration that styles ' +
-        'a player app goes in PLAYER_SHEET_RULES with the reason:\n  ' +
+        'rung against a fine one, and up between two main rungs. A derived alignment that ' +
+        'cannot snap carries a reasoned `ratchet-exempt(design-system)` marker:\n  ' +
         failures.join('\n  ')
     );
     assert.deepEqual(
@@ -535,10 +529,9 @@ for (const scope of ABSOLUTE_SCOPES) {
 test('the player list is pinned, so growing it is a reviewed edit of this pin', () => {
   assert.deepEqual(
     [...PLAYER_SHEET_RULES],
-    // PR13 (the player sweep) deletes these as it puts the rules on the scale.
-    ['.fabricate-nav .fabricate-app-nav-count { padding }'],
-    'PLAYER_SHEET_RULES changed. It exempts declarations from the scale, so an addition must be ' +
-      'a player-app rule and must edit this pin on purpose; a manager rule never belongs here'
+    [],
+    'PLAYER_SHEET_RULES changed. It exempts declarations from the scale and is empty now the ' +
+      'player apps are on it, so an addition must edit this pin on purpose'
   );
 });
 
@@ -706,14 +699,17 @@ const SVELTE_OFF_SCALE_GATE = gateOver([STYLE_CORPUS], (readFile, files) =>
   }))
 );
 
-test('the Svelte scope reads manager, a new manager folder and components, not a player', (t) => {
+test('the Svelte scope reads manager, components and every player app', (t) => {
   const offender = '<div class="p"></div>\n<style>\n  .p { padding: 13px; }\n</style>\n';
-  const at = (file, failures) => ({ head: { [file]: offender }, failures });
-  const fails = (file) => at(file, [`${spacing(file, 'padding 13px')} is new (1)`]);
+  const fails = (file) => ({
+    head: { [file]: offender },
+    failures: [`${spacing(file, 'padding 13px')} is new (1)`],
+  });
   assertGateCases(t, SVELTE_OFF_SCALE_GATE, WIRING_BASE, [
     fails('src/ui/svelte/apps/manager/Probe.svelte'),
     fails('src/ui/svelte/apps/manager/new-area/Probe.svelte'),
     fails('src/ui/svelte/components/Probe.svelte'),
-    at('src/ui/svelte/apps/crafting/Probe.svelte', []),
+    fails('src/ui/svelte/apps/crafting/Probe.svelte'),
+    fails('src/ui/svelte/apps/InteractableProbe.svelte'),
   ]);
 });

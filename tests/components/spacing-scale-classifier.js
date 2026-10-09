@@ -1,21 +1,14 @@
 /**
  * The absolute spacing classifier (issue 1523): whether one spacing value is on the published
- * scale, and the Svelte files the manager sweep holds to it. `spacing-scale-ratchet.test.js` runs
- * it over `<style>` blocks and `spacing-scale-markup.test.js` over styles set in markup.
+ * scale, and the Svelte files held to it. `spacing-scale-ratchet.test.js` runs it over `<style>`
+ * blocks and `spacing-scale-markup.test.js` over styles set in markup.
  */
 import { pixelValuesIn, resolveValueCandidates } from '../helpers/styleBlockScan.js';
 
 import { isExemptSpacingPixels, isSpacingScaleToken } from './spacing-known-literals.js';
 
-/**
- * The Svelte files the manager sweep owns. Every other Svelte file is the player sweep's (issue
- * 1523 PR13), the GM interactables roots `apps/InteractableConfigRoot` and
- * `apps/InteractableBrowserRoot` included.
- */
-export const SVELTE_SCOPE_ROOTS = Object.freeze([
-  'src/ui/svelte/apps/manager/',
-  'src/ui/svelte/components/',
-]);
+/** The Svelte files held to the scale: the manager, the shared components and the player apps. */
+export const SVELTE_SCOPE_ROOTS = Object.freeze(['src/ui/svelte/']);
 
 export const inSvelteScope = (file) =>
   file.endsWith('.svelte') && SVELTE_SCOPE_ROOTS.some((root) => file.startsWith(root));
