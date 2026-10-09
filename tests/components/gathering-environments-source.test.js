@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 import { compile } from 'svelte/compiler';
 
+import { withFabricateLifecycleReplay } from '../helpers/extension-composition-harness.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function read(relPath) {
@@ -36,10 +38,6 @@ function cardRule(selector) {
 
 describe('Fabricate app wiring for the gathering tab', () => {
   it('exposes listGatheringForActor and passes services down', () => {
-    assert.ok(
-      appSource.includes('game?.fabricate?.listGatheringForActor?.({') && appSource.includes('presentTools: presentTools(),'),
-      'app should add the listGatheringForActor service threading the system-scoped active canvas tool'
-    );
     assert.equal(
       appSource.includes('nodeStateOverride'),
       false,
@@ -52,15 +50,25 @@ describe('Fabricate app wiring for the gathering tab', () => {
     assert.ok(appSource.includes('services: this._services'), 'app should pass the services prop');
   });
 
-  it('threads the active canvas tool into the gathering start-attempt service', () => {
-    assert.ok(
-      appSource.includes('getActiveCanvasTool: () => this._activeCanvasTool ?? null'),
-      'app should expose getActiveCanvasTool through the services bag'
-    );
-    assert.ok(
-      appSource.includes('game?.fabricate?.startGatheringAttempt?.({') && appSource.includes('presentTools: presentTools(),'),
-      'startGatheringAttempt should carry the derived system-scoped presentTools'
-    );
+  it('threads the active canvas tool into the gathering listing and start-attempt services', async () => {
+    await withFabricateLifecycleReplay(async ({ loadModule }) => {
+      const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
+      const activeCanvasTool = { systemId: 'survival', toolId: 'sickle', componentId: '' };
+      const app = new SvelteFabricateApp({ activeCanvasTool });
+      const received = [];
+      const record = (opts) => {
+        received.push(opts);
+      };
+      globalThis.game.fabricate.listGatheringForActor = record;
+      globalThis.game.fabricate.startGatheringAttempt = record;
+      const services = app._buildServices();
+      assert.equal(services.getActiveCanvasTool(), activeCanvasTool);
+      services.listGatheringForActor();
+      services.startGatheringAttempt({ taskId: 'herbs' });
+      const presentTools = { systemId: 'survival', componentIds: [], toolIds: ['sickle'] };
+      assert.deepEqual(received.map((opts) => opts.presentTools), [presentTools, presentTools]);
+      assert.equal(received[1].taskId, 'herbs');
+    });
   });
 
   it('renders GatheringView on the gathering tab (every tab now routes to a real view)', () => {

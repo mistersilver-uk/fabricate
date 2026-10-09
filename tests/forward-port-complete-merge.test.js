@@ -51,8 +51,13 @@ test('a CONFLICT is reported as one, names the paths, aborts the merge, and refu
   // A conflict is reported AS a conflict, distinguishably from any other merge failure, and the
   // content that could not be combined is named — which is the whole of what a reader needs before
   // they can produce a resolution.
-  assert.match(output, /merge of origin\/release into main CONFLICTED/);
+  assert.match(output, /::error::the forward-port's merge of origin\/release into main CONFLICTED/);
   assert.match(output, /::error:: {2}f\.txt/, 'the conflicting path is named');
+  assert.doesNotMatch(
+    output,
+    /::notice::.*CONFLICTED/,
+    'a conflict with no resolution is an error'
+  );
   assert.ok(
     !/::error:: {2}mainonly\.txt/.test(output),
     'a path the merge settled on its own is not a conflicting path'
@@ -108,8 +113,9 @@ test('a merge failure that is NOT a conflict never consults the resolution input
     REASON: 'a test run',
   });
   assert.equal(status, 1, output);
-  assert.match(output, /left no conflicting paths behind/);
+  assert.match(output, /::error::.*left no conflicting paths behind/);
   assert.match(output, /A resolution is not the remedy here/);
+  assert.doesNotMatch(output, /::notice::.*CONFLICTED/, 'non-conflict errors stay errors');
   assert.ok(!/completed from conflict resolution/.test(output), 'no commit was built');
   assert.equal(git('rev-parse', 'HEAD'), topology.mainTip, 'HEAD was not moved');
 });
@@ -132,6 +138,13 @@ test('the completed merge takes the tree VERBATIM, both parents in order, under 
     REASON: 'a test run',
   });
   assert.equal(status, 0, output);
+  assert.match(
+    output,
+    /::notice::the forward-port's merge of origin\/release into main CONFLICTED/,
+    'an expected conflict being resolved is informational'
+  );
+  assert.match(output, /::notice:: {2}f\.txt/, 'the recovered path remains visible');
+  assert.doesNotMatch(output, /::error::/, 'successful completion must leave no error annotations');
 
   const head = git('rev-parse', 'HEAD');
 
@@ -178,7 +191,15 @@ test('a resolution that does not resolve is UNVERIFIABLE, and no override is off
     REASON: 'a test run',
   });
   assert.equal(status, 2, output);
-  assert.match(output, /does not resolve to a commit in this repository/);
+  assert.match(
+    output,
+    /::notice::the forward-port's merge of origin\/release into main CONFLICTED/,
+    'a supplied resolution does not make the initial conflict an error annotation'
+  );
+  assert.match(
+    output,
+    /::error::resolution_ref .* does not resolve to a commit in this repository/
+  );
   assert.match(output, /UNVERIFIABLE rather than refused/);
   assert.ok(!new RegExp(OVERRIDE_HINT).test(output), 'an unverifiable state is never offered a hint');
   assert.equal(git('rev-parse', 'HEAD'), topology.mainTip, 'nothing was committed');

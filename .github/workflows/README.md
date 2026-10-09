@@ -175,8 +175,10 @@ The workflow now completes the merge itself from a resolution you supply.
 
 **Is it a conflict, or a failure?**
 `scripts/forward-port-complete-merge.sh` runs only when the merge fails, and says which it was.
-A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` followed by one `::error::` line per path that could not be combined.
-Anything else prints `left no conflicting paths behind` and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.
+A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` and names each path that could not be combined.
+When `resolution_ref` is supplied these are `::notice::` annotations: the initial conflict is expected, and only the following content gate may accept the resolution.
+Without a resolution they are `::error::` annotations, followed by an actionable refusal; an invalid or unverifiable supplied resolution also produces a real error at its failure point.
+Anything else prints `left no conflicting paths behind` as an error and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.
 
 **Produce the resolution.**
 In a local clone, `git fetch origin main release`, `git checkout -B resolve origin/main`, `git merge --no-ff origin/release`, resolve the paths the job named, and `git commit`.

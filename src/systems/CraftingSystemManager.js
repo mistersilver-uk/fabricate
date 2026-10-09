@@ -65,6 +65,7 @@ import {
   replaceItemSource,
   resolveImportedComponentSourceData,
 } from './manager/itemSources.js';
+import { sourceSnapshotCollaborators } from './manager/sourceSnapshotCollaborators.js';
 import { deleteTool, toolSourcesCollaborators, upsertTool } from './manager/toolSources.js';
 import { migrateRecipeForModeChange } from './migrateRecipeForModeChange.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
@@ -582,16 +583,7 @@ export class CraftingSystemManager {
   /** The snapshot cluster's collaborators (issue 1699), rebuilt per call because suites patch
    * these methods on constructed instances. */
   _sourceSnapshotCollaborators() {
-    return {
-      enrichToHtml: (raw, options) => this._enrichToHtml(raw, options),
-      resolveImportedComponentSourceData: (itemUuid, source) =>
-        this._resolveImportedComponentSourceData(itemUuid, source),
-      plainTextDescription: (value) => this._plainTextDescription(value),
-      descriptionTextCandidate: (value, seen) => this._descriptionTextCandidate(value, seen),
-      normalizeComponentDescription: (description) =>
-        this._normalizeComponentDescription(description),
-      extractSourceDescription: (source) => this._extractSourceDescription(source),
-    };
+    return sourceSnapshotCollaborators(this);
   }
 
   async _extractSourceDescription(source = null) {

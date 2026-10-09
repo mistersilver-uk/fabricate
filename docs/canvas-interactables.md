@@ -205,7 +205,14 @@ It satisfies the requirement to have that tool present without the actor owning 
 This only works within the station's own crafting system.
 A station tool from one system never satisfies the same tool required by a different system.
 
-When the Crafting tab ships, a tool-station activation will surface its crafting actions there directly.
+Activating a tool station opens the Crafting tab.
+The borrowed tool applies to recipe details, ingredient-choice recalculations, the craft action, and the Journal's stage actions, **Begin step** and **Complete stage**.
+Each of those actions checks for the station when you take it, so a stage begun at a station completes only while a station supplying that tool is active again.
+In the Journal, a stage that needs the tool shows **Needs tools** and its actions stay unavailable while you hold no copy of the tool and no station supplies it.
+With the station active, the same stage is ready to begin or complete.
+Switching stations refreshes an already-open recipe and the Journal.
+Reopening the window without a station, or closing it, clears the borrowed availability, so **Needs tools** returns.
+The header chip reads "Station tool:" followed by the tool's **Display label** (see [Tools]({% link tools.md %})), else its name, else its linked component's name.
 
 ---
 
