@@ -584,6 +584,11 @@ export class CraftingSystemManager {
   _sourceSnapshotCollaborators() {
     return {
       enrichToHtml: (raw, options) => this._enrichToHtml(raw, options),
+      // Relative embedded UUIDs must be looked up against their containing document.
+      resolveEmbedUuid: (uuid, relativeTo) =>
+        typeof globalThis.fromUuid === 'function'
+          ? globalThis.fromUuid(uuid, { relative: relativeTo })
+          : null,
       resolveImportedComponentSourceData: (itemUuid, source) =>
         this._resolveImportedComponentSourceData(itemUuid, source),
       plainTextDescription: (value) => this._plainTextDescription(value),
