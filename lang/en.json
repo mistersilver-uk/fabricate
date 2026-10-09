@@ -2746,7 +2746,6 @@
           "RailLockedOpen": "The sidebar stays open on this page."
         },
         "Titlebar": {
-          "Label": "Crafting manager",
           "Premium": "PREMIUM",
           "PremiumStatus": "Fabricate Premium is installed and connected",
           "Status": "Selected system resolution",

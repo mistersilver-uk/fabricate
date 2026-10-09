@@ -2324,16 +2324,26 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     '[data-lab-companion-scroll]',
     'the companion owns the scrolling, which is only reachable at the full panel height'
   );
-  assert.ok(
-    premium.expectVisible.includes(lang.FABRICATE.Admin.Manager.Titlebar.Premium),
-    'the badge caption is the shipped titlebar premium mark'
+  assert.equal(
+    premium.expectVisible,
+    `[data-manager-titlebar-premium] > [aria-hidden="true"]:text-is("${lang.FABRICATE.Admin.Manager.Titlebar.Premium}")`,
+    'the visible badge caption is the shipped premium mark, not the hidden name that contains it'
   );
   const premiumAttribute = (selector, name) =>
     premium.expectAttributes.find((entry) => entry.selector === selector && entry.name === name)
       ?.value;
-  assert.equal(
+  assert.strictEqual(
     premiumAttribute('[data-manager-titlebar-premium]', 'aria-label'),
-    lang.FABRICATE.Admin.Manager.Titlebar.PremiumStatus
+    null,
+    'the frame proves the badge carries no aria-label (issue 2257 D4)'
+  );
+  assert.strictEqual(
+    premiumAttribute(
+      `[data-manager-titlebar-premium] > .visually-hidden:text-is("${lang.FABRICATE.Admin.Manager.Titlebar.PremiumStatus}")`,
+      'aria-hidden'
+    ),
+    null,
+    'and that its name is the shipped status string, read as visually hidden text'
   );
   assert.equal(
     premiumAttribute('#manager-world-nav-downtime', 'title'),
