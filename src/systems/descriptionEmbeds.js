@@ -10,8 +10,8 @@
 const EMBED_DIRECTIVE = /@Embed\[([^\]]{1,2048})\](?:\{([^}]{0,2048})\})?/gi;
 const MAX_EMBED_DEPTH = 2;
 const MAX_EMBEDS = 16;
-const MAX_EMBED_SOURCE_CHARS = 12000;
-const MAX_TOTAL_EMBED_CHARS = 16000;
+const MAX_EMBED_SOURCE_CHARS = 12_000;
+const MAX_TOTAL_EMBED_CHARS = 16_000;
 
 function escapeHtml(text) {
   return String(text)
@@ -32,7 +32,7 @@ function parseEmbedConfig(raw) {
     explicit?.[3] ||
     raw.trim().match(/^\S{1,1024}/)?.[0] ||
     ''
-  ).replace(/^["']|["']$/g, '');
+  ).replaceAll(/^["']|["']$/g, '');
   if (!uuid.includes('.') || uuid.length > 1024) return null;
 
   return {

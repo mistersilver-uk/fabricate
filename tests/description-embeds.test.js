@@ -1,9 +1,10 @@
 /** Bounded source-description embeds: replace inline content, not entire rich Document HTML. */
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import { expandDescriptionEmbeds } from '../src/systems/descriptionEmbeds.js';
 import { plainTextDescription } from '../src/utils/plainTextDescription.js';
+
 import { setupDOM, teardownDOM } from './helpers/svelte-dom.js';
 
 const SCROLL_UUID = 'Compendium.dnd5e.equipment24.Item.dmgSpellScroll00';
@@ -112,7 +113,7 @@ test('retains missing references, limits oversized sources, and prevents recursi
     'Item.huge': {
       uuid: 'Item.huge',
       name: 'Too long',
-      description: 'X'.repeat(12001),
+      description: 'X'.repeat(12_001),
     },
   });
 

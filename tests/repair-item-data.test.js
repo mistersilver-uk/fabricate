@@ -296,15 +296,15 @@ test('repair — expands the shared dnd5e inline embed from a LOCKED compendium 
   const raw = 'Scroll rules: @Embed[' + sharedUuid + ' inline]';
   const { component, run } = buildDescriptionRepairManager({ sourceDescription: raw });
   const originalResolver = globalThis.fromUuid;
-  globalThis.fromUuid = async (uuid, options) =>
+  t.mock.method(globalThis, 'fromUuid', async (uuid, options) =>
     uuid === sharedUuid
       ? {
           uuid,
           name: 'Spell Scroll, Cantrip',
           system: { description: { value: '<p>Shared spell scroll instructions.</p>' } },
         }
-      : originalResolver(uuid, options);
-  t.after(() => { globalThis.fromUuid = originalResolver; });
+      : originalResolver(uuid, options)
+  );
 
   const first = await run();
   assert.equal(component.description, 'Scroll rules: Shared spell scroll instructions.');
@@ -322,11 +322,11 @@ test('repair — resolves an embedded text Journal page in the Item description'
     sourceDescription: 'Journal: @Embed[' + pageUuid + ' inline]',
   });
   const originalResolver = globalThis.fromUuid;
-  globalThis.fromUuid = async (uuid, options) =>
+  t.mock.method(globalThis, 'fromUuid', async (uuid, options) =>
     uuid === pageUuid
       ? { uuid, name: 'Rules Page', text: { content: '<p>Journal instructions.</p>' } }
-      : originalResolver(uuid, options);
-  t.after(() => { globalThis.fromUuid = originalResolver; });
+      : originalResolver(uuid, options)
+  );
 
   const summary = await run();
   assert.equal(component.description, 'Journal: Journal instructions.');
