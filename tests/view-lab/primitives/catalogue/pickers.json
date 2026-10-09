@@ -190,12 +190,27 @@
   },
   {
     "spec": "<TintPicker> <Menu>",
-    "cap": "tint — eight tokens, plus an optional custom colour",
-    "draws": ":scope > div:first-of-type",
+    "cap": "popover — 220px, eight 46px swatches four to a row, then the custom hex",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/TintPicker.svelte",
+    "slot": {
+      "width": 236,
+      "height": 190
+    },
+    "note": "The popover is absolutely positioned, so it needs a containing block to stand in; a caller would anchor it to its trigger.",
+    "props": {
+      "colorToken": "sage"
+    }
+  },
+  {
+    "spec": "<TintPicker> <Menu>",
+    "cap": "inline — a 28px strip in the editor’s column",
+    "draws": ":scope > div",
     "path": "src/ui/svelte/components/TintPicker.svelte",
     "props": {
-      "colorToken": "sage",
-      "layout": "inline"
+      "colorToken": "lavender",
+      "layout": "inline",
+      "allowCustom": false
     }
   },
   {
