@@ -75,13 +75,13 @@ async function renderEmbed(match, parent, depth, context, io) {
     if (!plain) return fallback;
 
     // Foundry omits captions in inline embeds, but normally displays one for block embeds.
-    const text = [!config.inline && config.caption ? label : '', plain]
+    const embeddedText = [!config.inline && config.caption ? label : '', plain]
       .filter(Boolean)
       .join(' ');
-    if (text.length > context.remainingChars) return fallback;
-    context.remainingChars -= text.length;
+    if (embeddedText.length > context.remainingChars) return fallback;
+    context.remainingChars -= embeddedText.length;
     // This is text, not trusted markup; escape before inserting into the outer HTML source.
-    return escapeHtml(text);
+    return escapeHtml(embeddedText);
   } catch {
     return fallback;
   } finally {
