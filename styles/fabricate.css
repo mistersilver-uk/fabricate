@@ -14348,11 +14348,7 @@
 
 .fabricate-manager .manager-tool-label-field input {
   width: 100%;
-  height: 34px;
   box-sizing: border-box;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
   color: var(--fab-text);
   background: var(--fab-surface-soft);
   font-size: 0.74rem;
