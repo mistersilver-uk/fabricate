@@ -157,6 +157,15 @@ function actorUuidList(actors, fallbackUuids = []) {
   return Array.isArray(fallbackUuids) ? fallbackUuids.filter(validText) : [];
 }
 
+function executeCommandUnavailable(started) {
+  return {
+    ...started,
+    success: false,
+    authorityUnavailable: true,
+    reason: 'execute-command-unavailable',
+  };
+}
+
 function installEngineAuthority(engine, authority) {
   if (typeof engine?.installVersionedRunAuthority !== 'function') {
     throw new TypeError('The versioned run engine authority adapter is unavailable');
@@ -205,14 +214,7 @@ export async function executePublicCraft({
   ) {
     return started;
   }
-  if (typeof executeCommand !== 'function') {
-    return {
-      ...started,
-      success: false,
-      authorityUnavailable: true,
-      reason: 'execute-command-unavailable',
-    };
-  }
+  if (typeof executeCommand !== 'function') return executeCommandUnavailable(started);
   const settled = await executeCommand(
     {
       actorUuid: actor?.uuid,
@@ -228,6 +230,7 @@ export async function executePublicCraft({
         },
         trigger: 'manual',
         sourceActorUuids: actorUuidList(sourceActors),
+        ...(options?.presentTools && { presentTools: options.presentTools }),
       },
     },
     // The caller's flag, never a constant (issue 1780): the crafting UI passes `true` and expects
@@ -273,14 +276,7 @@ export async function executePublicGather({
   if (started.requiresExecution !== true || started.canExecuteImmediately !== true) return started;
   const runId = validText(started.runId) ? started.runId : null;
   if (!runId) return started;
-  if (typeof executeCommand !== 'function') {
-    return {
-      ...started,
-      success: false,
-      authorityUnavailable: true,
-      reason: 'execute-command-unavailable',
-    };
-  }
+  if (typeof executeCommand !== 'function') return executeCommandUnavailable(started);
   const settled = await executeCommand(
     {
       actorUuid: actor?.uuid,
@@ -331,7 +327,7 @@ export function createJournalExecutionReconstructor({
 /**
  * Install crafting start, execute and cancel requests through the command service.
  * Resolved Actor inputs become UUID targets, whose sender ownership is checked by the authority.
- * @param {{engine: object, service: object}} options
+ * A station's `presentTools` is a start or execute payload key only when the caller supplied one.
  * @returns {object} The supplied engine with its versioned authority adapter installed.
  */
 export function installCraftingJournalRunAuthority({ engine, service } = {}) {
@@ -348,6 +344,7 @@ export function installCraftingJournalRunAuthority({ engine, service } = {}) {
       completionMode,
       craftingSystemId,
       submittedItems,
+      presentTools,
     }) =>
       service.executeJournalRunCommand({
         actorUuid: actor?.uuid,
@@ -368,6 +365,7 @@ export function installCraftingJournalRunAuthority({ engine, service } = {}) {
               }))
             : [],
           sourceActorUuids: actorUuidList(sourceActors),
+          ...(presentTools && { presentTools }),
         },
       }),
     requestExecute: ({
@@ -378,6 +376,7 @@ export function installCraftingJournalRunAuthority({ engine, service } = {}) {
       expectedRevision,
       selectionPlan,
       trigger = 'manual',
+      presentTools,
     }) =>
       service.executeJournalRunCommand({
         actorUuid: actor?.uuid,
@@ -389,6 +388,7 @@ export function installCraftingJournalRunAuthority({ engine, service } = {}) {
           selectionPlan,
           trigger,
           sourceActorUuids: actorUuidList(componentSourceActors, componentSourceActorUuids),
+          ...(presentTools && { presentTools }),
         },
       }),
     requestCancel: ({

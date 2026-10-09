@@ -5,6 +5,8 @@
  * synthetic `Fabricate.<systemId>.<tool|gatheringTask>.<id>` is minted into `sourceUuid`.
  */
 
+import { linkedComponentFor, resolveToolDisplayName } from '../models/toolDisplay.js';
+
 const SOURCE_PREFIX = 'Fabricate';
 
 /** The synthetic source-identity string for a library interactable. */
@@ -114,15 +116,19 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
 /**
  * The session-scoped virtual-present tool injected on a granted station activation: prerequisite
  * checks treat it as present without an owned item and exclude it from breakage and usage.
+ * `label` follows the Tool display-name precedence over the station system's `components`, and is
+ * empty when nothing resolves, leaving the chip its localized fallback.
  */
-export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
+export function buildActiveCanvasTool({ systemId, toolId, tool, components = [] } = {}) {
   const componentId = typeof tool?.componentId === 'string' ? tool.componentId.trim() : '';
   const resolvedToolId = typeof toolId === 'string' ? toolId.trim() : '';
   // The station's identity is its LIBRARY TOOL ID (issue 1119). Requiring a componentId here
   // returned null for every item-sourced Tool, which the caller answered with a silent denial.
   // One is still carried when present, so a migrated component-linked station keeps working.
   if (!resolvedToolId && !componentId) return null;
-  const label = typeof tool?.label === 'string' && tool.label.trim() ? tool.label.trim() : '';
+  const label = String(
+    resolveToolDisplayName(tool, linkedComponentFor(tool, components), '')
+  ).trim();
   return {
     componentId,
     systemId: typeof systemId === 'string' ? systemId : '',

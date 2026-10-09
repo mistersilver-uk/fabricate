@@ -104,10 +104,13 @@ export function buildGrantPayload({ request, system, resolutionDeps }) {
   if (!grant) return { payload: null, reason: null };
 
   if (system.interactableType === 'tool') {
+    const deps = resolutionDeps();
     const activeCanvasTool = buildActiveCanvasTool({
       systemId: system.systemId,
       toolId: system.toolId,
-      tool: resolutionDeps().getTool({ systemId: system.systemId, toolId: system.toolId }),
+      tool: deps.getTool({ systemId: system.systemId, toolId: system.toolId }),
+      // The chip label's linked-component rung needs the station system's managed components.
+      components: deps.getComponents?.({ systemId: system.systemId }) ?? [],
     });
     if (!activeCanvasTool) return { payload: null, reason: 'SOURCE_MISSING' };
     grant.context = { ...grant.context, activeCanvasTool };
