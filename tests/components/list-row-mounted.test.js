@@ -636,7 +636,7 @@ describe('ListRow inset and detailAlign (issue 2321)', () => {
     assert.ok(!end.attributes.includes('detailalign'), 'the prop never reaches the root');
   });
 
-  it('leaves the pinned dense matrix the case with both props absent', () => {
+  it('keeps inset and detailAlign out of the byte-pinned DENSE_MATRIX, so the markup pin covers their absent defaults', () => {
     for (const [label, props] of DENSE_MATRIX) {
       assert.ok(!('inset' in props) && !('detailAlign' in props), label);
     }

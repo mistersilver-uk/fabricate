@@ -98,8 +98,8 @@ The manager's cross-reference lists are adoption debt under issue 2322.
 
 #### Scenario: A list mixes rows that open with rows that do not
 
-- **WHEN** a tool's Required for lists a recipe and a salvage
-- **THEN** the recipe row is a button that opens that recipe, and the salvage row is no control
+- **WHEN** a tool's Required for lists a recipe and a gathering task
+- **THEN** the recipe row is a button that opens that recipe, and the gathering row is no control
 - **AND** both rows stand the same height
 
 #### Scenario: A cross-reference list is empty

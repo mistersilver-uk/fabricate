@@ -18,7 +18,8 @@
   - `class` is a named prop, because a rest key would replace it instead of extending it.
 
   Invariants:
-  - With zero items it draws the label and no `<ul>`; the caller owns the empty state and pager.
+  - With zero items it draws the label and no `<ul>`; the caller owns the empty state and pager —
+    pinned by `tests/components/xref-list-mounted.test.js`.
   - Every row is one ellipsized line, 40px border-box whether it opens or not — pinned by
     `tests/components/xref-list-rendered.test.js`.
 -->

@@ -53,8 +53,9 @@ const CASES = Object.freeze({
 });
 
 /**
- * Core's layered sheet with its reset's border-box sizing, which the 22px mark's border sits
- * inside; the module sheet in `layer(modules)`; the scoped styles unlayered.
+ * Core's layered sheet with its reset's border-box sizing (as `select-popover-width.test.js`
+ * restates it), which the 22px mark's border sits inside; the module sheet in `layer(modules)`;
+ * the scoped styles unlayered.
  */
 const page = (markup) => `<!doctype html><html><head><meta charset="utf-8">
 <style>${read('tests/fixtures/foundry-core-min.css')}

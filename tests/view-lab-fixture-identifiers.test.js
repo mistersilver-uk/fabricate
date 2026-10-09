@@ -103,6 +103,9 @@ function modifierLibraryIds() {
 const IDENTITY_SOURCES = {
   'data-component-id': new Set(content.components.map((entry) => entry.id)),
   'data-recipe-id': new Set(content.recipes.map((entry) => entry.id)),
+  // The inventory inspector's cross-reference row hooks (issue 2321).
+  'data-inventory-required-for': new Set(content.recipes.map((entry) => entry.id)),
+  'data-inventory-contributor': new Set(content.components.map((entry) => entry.id)),
   'data-manager-tool-id': new Set(content.tools.map((entry) => entry.id)),
   'data-gathering-task-id': new Set(content.gatheringConfig.tasks.map((entry) => entry.id)),
   'data-task-id': new Set(content.gatheringConfig.tasks.map((entry) => entry.id)),

@@ -773,7 +773,11 @@ describe('InventoryView (mounted)', () => {
     const item = makeItem();
     item.requiredFor = [
       ...item.requiredFor,
-      { kind: 'salvage', recipeId: null, name: 'Break Down Kit', img: null },
+      { kind: 'gathering', recipeId: null, name: 'Cut Icecap Fronds', img: null },
+    ];
+    item.producedBy = [
+      ...item.producedBy,
+      { kind: 'salvage', recipeId: null, name: 'Cracked Alembic', img: null },
     ];
     const { services } = makeServices(item);
     const target = await harness.mount({ services });
@@ -781,8 +785,9 @@ describe('InventoryView (mounted)', () => {
 
     const focusable = 'button, a[href], input, select, textarea, [tabindex]';
     for (const hook of [
-      '[data-inventory-required-for-kind="salvage"]',
+      '[data-inventory-required-for-kind="gathering"]',
       '[data-inventory-produced-by-kind="gathering"]',
+      '[data-inventory-produced-by-kind="salvage"]',
     ]) {
       const row = target.querySelector(hook);
       assert.ok(Boolean(row), `${hook} renders`);
