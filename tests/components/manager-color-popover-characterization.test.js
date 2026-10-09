@@ -1,11 +1,10 @@
-/** CHARACTERIZATION suite for `TintPicker` (issue 1036); its naming and pressed state (issue 2257). */
+/** Characterization suite for `TintPicker` (issue 1036); its naming and pressed state (issue 2257). */
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
-import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -62,6 +61,21 @@ function onlyPressed(pressed, { none = false } = {}) {
     ...(none ? [['none', String(pressed === 'none')]] : []),
     ...PRESETS.map(([token]) => [token, String(pressed === token)]),
   ]);
+}
+
+const TINT_PICKER_KEYS = {
+  'FABRICATE.Common.TintPicker.Presets': '[presets]',
+  'FABRICATE.Common.TintPicker.CustomHex': '[custom-hex]',
+  'FABRICATE.Common.TintPicker.None': '[none]',
+};
+
+/** Swap the ambient `game.i18n` for `i18n`, returning a restore thunk. */
+function withI18n(i18n) {
+  const previous = globalThis.game.i18n;
+  globalThis.game.i18n = i18n;
+  return () => {
+    globalThis.game.i18n = previous;
+  };
 }
 
 describe('1036 TintPicker — characterization', () => {
@@ -158,16 +172,40 @@ describe('1036 TintPicker — characterization', () => {
     harness.remount();
   });
 
-  it('names the palette in localized English when a caller passes no label (issue 2257)', async () => {
-    const restore = installLangBackedI18n(repoRoot);
+  it('names the palette through the shared keys when a caller passes no label (issue 2257)', async () => {
+    const restore = withI18n({
+      localize: (key) => TINT_PICKER_KEYS[key] ?? key,
+      format: (key) => key,
+    });
     try {
-      const target = await harness.mount({ colorToken: 'sage', allowNone: true, onClear: () => {} });
+      const target = await harness.mount({
+        colorToken: 'sage',
+        allowNone: true,
+        onClear: () => {},
+      });
       const group = target.querySelector('[role="group"]');
-      assert.equal(group.getAttribute('aria-label'), 'Colour presets');
-      assert.equal(target.querySelector('.manager-color-custom').textContent.trim(), 'Custom hex');
+      assert.equal(group.getAttribute('aria-label'), '[presets]');
+      assert.equal(
+        target.querySelector('.manager-color-custom').textContent.trim(),
+        '[custom-hex]'
+      );
       assert.equal(
         target.querySelector('[data-manager-color-none]').getAttribute('aria-label'),
-        'No colour'
+        '[none]'
+      );
+    } finally {
+      restore();
+      harness.remount();
+    }
+  });
+
+  it('falls back to English when no i18n is installed (issue 2257)', async () => {
+    const restore = withI18n(undefined);
+    try {
+      const target = await harness.mount({ colorToken: 'sage' });
+      assert.equal(
+        target.querySelector('[role="group"]').getAttribute('aria-label'),
+        'Colour presets'
       );
     } finally {
       restore();
