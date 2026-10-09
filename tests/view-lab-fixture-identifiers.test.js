@@ -103,6 +103,9 @@ function modifierLibraryIds() {
 const IDENTITY_SOURCES = {
   'data-component-id': new Set(content.components.map((entry) => entry.id)),
   'data-recipe-id': new Set(content.recipes.map((entry) => entry.id)),
+  // The inventory inspector's cross-reference row hooks (issue 2321).
+  'data-inventory-required-for': new Set(content.recipes.map((entry) => entry.id)),
+  'data-inventory-contributor': new Set(content.components.map((entry) => entry.id)),
   'data-manager-tool-id': new Set(content.tools.map((entry) => entry.id)),
   'data-gathering-task-id': new Set(content.gatheringConfig.tasks.map((entry) => entry.id)),
   'data-task-id': new Set(content.gatheringConfig.tasks.map((entry) => entry.id)),
@@ -159,6 +162,9 @@ const IDENTITY_SOURCES = {
       ...(system.components ?? []).map((component) => `${system.id}:${component.id}`),
       // `InventoryListingBuilder` keys a held recipe item `recipeitem:<system>:<definition>`.
       ...(system.recipeItemDefinitions ?? []).map((entry) => `recipeitem:${system.id}:${entry.id}`),
+      // An essence row `essence:<system>:<essence>`, and a tool card `tool:<system>:<tool>`.
+      ...(system.essenceDefinitions ?? []).map((entry) => `essence:${system.id}:${entry.id}`),
+      ...(system.tools ?? []).map((entry) => `tool:${system.id}:${entry.id}`),
     ])
   ),
   // The carrier's key is `item.uuid || item.id`, and an owned item's uuid is the component's

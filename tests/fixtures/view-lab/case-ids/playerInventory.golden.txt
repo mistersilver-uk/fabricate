@@ -2,6 +2,8 @@ player-gathering-environments
 fabricate-app-shell
 player-actor-picker
 player-inventory
+player-inventory-xref-tool
+player-inventory-xref-essence
 player-inventory-page-size
 player-inventory-sort-list
 player-inventory-book-read-learn

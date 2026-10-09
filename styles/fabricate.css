@@ -4463,6 +4463,19 @@
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
+/* `inset="row"`: a dense selectable row that stands beside read-only dense rows takes their inset, so both measure one height. */
+.fabricate-list-row.is-form.is-row-inset {
+  padding: var(--fab-space-2) var(--fab-space-3);
+}
+
+/* `detailAlign="end"`: the detail holds the trailing edge where a quantity would sit, ellipsizing within 40% of the row. */
+.fabricate-list-row.is-truncated.is-detail-end .fabricate-list-row-detail {
+  flex: 0 0 auto;
+  max-width: 40%;
+  text-align: end;
+  color: var(--fab-text-muted);
+}
+
 .fabricate-list-row.is-default {
   gap: var(--fab-space-3);
   padding: var(--fab-space-3) var(--fab-space-4);

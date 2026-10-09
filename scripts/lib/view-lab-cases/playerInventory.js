@@ -103,6 +103,13 @@ const SALVAGE_TARGET_SOURCES = Object.freeze([
   /^src\/ui\/presenters\/(?:salvageCheckNeed|checkDescriptor)\.js$/,
 ]);
 
+/** The inventory inspector's cross-reference frames: its own tree, its store and its header. */
+const XREF_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/inventory\//,
+  /^src\/ui\/svelte\/stores\/inventory/,
+  PLAYER_DETAIL_HEADER,
+]);
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-gathering-environments',
@@ -166,6 +173,46 @@ export const CASES = Object.freeze([
       PLAYER_VIEW_STATE,
       PLAYER_DETAIL_HEADER,
     ],
+  }),
+  // Issue 2321: a tool's Required for, a recipe row that opens beside a gathering row that does
+  // not. Idrin is the crafting actor because only Idrin knows a recipe the Alembic is required for.
+  playerCase({
+    id: 'player-inventory-xref-tool',
+    label: 'Player app — Inventory tool Required for, a recipe and a gathering task',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory' },
+    steps: [
+      { selector: '.fabricate-app-actor-bar .actor-bar-trigger' },
+      { selector: '.actor-bar-popover .manager-travel-option:has-text("Idrin Ashfall")' },
+      { selector: '[data-inventory-search]', fill: 'Alembic' },
+      { selector: CARD_BUTTON('tool:lab-herbalism:hb-tool-alembic') },
+    ],
+    expectSelector:
+      '[data-inventory-section="required"]' +
+      ':has([data-inventory-required-for="hb-r-antitoxin"] > button)' +
+      ':has([data-inventory-required-for-kind="gathering"])',
+    expectCenterHit: '[data-inventory-required-for="hb-r-antitoxin"] > button',
+    kinds: ['player', 'inventory'],
+    sourceMatches: XREF_SOURCES,
+  }),
+  // Issue 2321: an essence's Contributing rows, each a component and the count it carries.
+  playerCase({
+    id: 'player-inventory-xref-essence',
+    label: 'Player app — Inventory essence Contributing',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory' },
+    steps: [
+      { selector: '[data-inventory-search]', fill: 'Earth' },
+      { selector: CARD_BUTTON('essence:lab-smithing:earth') },
+    ],
+    expectSelector:
+      '[data-inventory-section="contributors"]' +
+      ':has([data-inventory-contributor="sm-iron-ore"] .fabricate-list-row-quantity)' +
+      ':has([data-inventory-contributor="sm-oak-haft"])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: XREF_SOURCES,
   }),
   playerCase({
     id: 'player-inventory-page-size',

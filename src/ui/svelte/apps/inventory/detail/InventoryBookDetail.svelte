@@ -28,6 +28,7 @@
   import Medallion from '../../../components/Medallion.svelte';
   import Pagination from '../../../components/Pagination.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { disclosurePhraseKey } from '../../../util/disclosurePhrase.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -270,9 +271,7 @@
   {/if}
 
   <section class="inventory-detail-section" data-inventory-section="learn">
-    <p class="inventory-detail-section-title">
-      {localize('FABRICATE.App.Inventory.Detail.RecipesTitle')}
-    </p>
+    <Kicker>{localize('FABRICATE.App.Inventory.Detail.RecipesTitle')}</Kicker>
     {#if bookRecipes.length === 0}
       <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.NoRecipes')} />
     {:else if bookRecipes.length === 1}
@@ -519,10 +518,9 @@
     overflow: hidden;
   }
 
-  /* The header carries the row height itself (54px + the item's 1px borders = the
-     56px of a standalone `.inventory-detail-row`), rather than stretching to fill
-     the item. That keeps the thumbnail + name fixed: expanding a row appends the
-     body BELOW the header instead of shrinking it, so nothing shifts up. */
+  /* The header carries the row height itself (54px + the item's 1px borders = 56px),
+     rather than stretching to fill the item. That keeps the thumbnail + name fixed:
+     expanding a row appends the body BELOW the header, so nothing shifts up. */
   .inventory-detail-accordion-header {
     box-sizing: border-box;
     min-height: 54px;

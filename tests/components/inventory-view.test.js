@@ -112,6 +112,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     // The Info | Salvage strip (issue 1518).
     'src/ui/svelte/components/EditorTabs.svelte',
+    // The inspector's cross-reference lists (issue 2321).
+    'src/ui/svelte/components/XrefList.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     // The bulk tree (issue 859). `InventoryView` renders the panel as a SIBLING of
@@ -645,21 +647,21 @@ describe('InventoryView (mounted)', () => {
     const target = await harness.mount({ services });
     await settle();
 
-    const usedBy = target.querySelector('[data-inventory-used-by="r1"]');
+    const usedBy = target.querySelector(':scope [data-inventory-used-by="r1"] button');
     assert.ok(usedBy, 'renders a clickable used-by recipe');
     usedBy.click();
     flushSync();
     assert.deepEqual(calls.navigate, ['r1'], 'clicking a used-by recipe navigates to that recipe');
 
     // A recipe producer is clickable and navigates too.
-    const producedBy = target.querySelector('[data-inventory-produced-by="r2"]');
+    const producedBy = target.querySelector(':scope [data-inventory-produced-by="r2"] button');
     assert.ok(producedBy, 'renders a clickable produced-by recipe');
     producedBy.click();
     flushSync();
     assert.deepEqual(calls.navigate, ['r1', 'r2'], 'clicking a produced-by recipe navigates to it');
 
     // A required-for (tool) recipe navigates too.
-    target.querySelector('[data-inventory-required-for="r3"]').click();
+    target.querySelector(':scope [data-inventory-required-for="r3"] button').click();
     flushSync();
     assert.deepEqual(
       calls.navigate,
@@ -729,6 +731,112 @@ describe('InventoryView (mounted)', () => {
       'second page shows the remaining 2 rows'
     );
     assert.ok(detail.querySelector('[data-inventory-used-by="u7"]'), 'shows the second-page rows');
+  });
+
+  it('opens the recipe a second-page row names', async () => {
+    const item = makeItem();
+    item.usedBy = Array.from({ length: 8 }, (_, i) => ({
+      recipeId: `u${i}`,
+      recipeName: `Recipe ${i}`,
+      recipeImg: null,
+      role: 'ingredient',
+    }));
+    const { services, calls } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+    target.querySelector(':scope [data-inventory-pager="used"] [data-pagination-next]').click();
+    await settle();
+    target.querySelector(':scope [data-inventory-used-by="u7"] button').click();
+    flushSync();
+    assert.deepEqual(calls.navigate, ['u7']);
+  });
+
+  it('draws an empty section as its label and its empty note, with no list', async () => {
+    const item = makeItem();
+    item.usedBy = [];
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const section = target.querySelector('[data-inventory-section="used"]');
+    assert.equal(
+      section.querySelector('.fab-kicker')?.textContent.trim(),
+      'FABRICATE.App.Inventory.Detail.UsedByTitle'
+    );
+    assert.ok(!section.querySelector('ul'), 'no list element');
+    const note = section.querySelector('.manager-empty');
+    assert.ok(Boolean(note), 'the empty note follows the label');
+    assert.match(note.textContent, /FABRICATE\.App\.Inventory\.Detail\.UsedByEmpty/u);
+  });
+
+  it('draws a salvage or gathering entry as text that is no control, a recipe entry as a button', async () => {
+    const item = makeItem();
+    item.requiredFor = [
+      ...item.requiredFor,
+      { kind: 'gathering', recipeId: null, name: 'Cut Icecap Fronds', img: null },
+    ];
+    item.producedBy = [
+      ...item.producedBy,
+      { kind: 'salvage', recipeId: null, name: 'Cracked Alembic', img: null },
+    ];
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const focusable = 'button, a[href], input, select, textarea, [tabindex]';
+    for (const hook of [
+      '[data-inventory-required-for-kind="gathering"]',
+      '[data-inventory-produced-by-kind="gathering"]',
+      '[data-inventory-produced-by-kind="salvage"]',
+    ]) {
+      const row = target.querySelector(hook);
+      assert.ok(Boolean(row), `${hook} renders`);
+      assert.equal(row.querySelectorAll(focusable).length, 0, `${hook} holds nothing focusable`);
+    }
+    assert.match(
+      target.querySelector('[data-inventory-produced-by-kind="gathering"]').textContent,
+      /FABRICATE\.App\.Inventory\.Detail\.KindGathering/u,
+      'its kind is its trailing text'
+    );
+    const recipe = target.querySelector(':scope [data-inventory-required-for="r3"] button');
+    assert.ok(Boolean(recipe), 'the recipe entry is a button');
+    assert.match(
+      recipe.textContent,
+      /Carve Bone Idol\s*FABRICATE\.App\.Inventory\.Detail\.KindRecipe/u
+    );
+  });
+
+  it('omits Used by and Produced by from a tool-only card', async () => {
+    const item = makeItem();
+    item.isToolOnly = true;
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const sections = [...target.querySelectorAll('[data-inventory-section]')].map(
+      (section) => section.dataset.inventorySection
+    );
+    assert.deepEqual(sections, ['sources', 'required']);
+  });
+
+  it('renders a recipe that uses the component in two roles as two rows', async () => {
+    const item = makeItem();
+    item.usedBy = [
+      { recipeId: 'r1', recipeName: 'Bone Lantern', recipeImg: null, role: 'ingredient' },
+      { recipeId: 'r1', recipeName: 'Bone Lantern', recipeImg: null, role: 'tool' },
+    ];
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.deepEqual(
+      [
+        ...target.querySelectorAll(
+          ':scope [data-inventory-used-by="r1"] .fabricate-list-row-detail'
+        ),
+      ].map((detail) => detail.textContent),
+      ['FABRICATE.App.Inventory.Detail.RoleIngredient', 'FABRICATE.App.Inventory.Detail.RoleTool']
+    );
   });
 
   it('clamps a section page when the chosen system’s list is shorter than the page it was on', async () => {
@@ -3112,12 +3220,13 @@ describe('InventoryDetailHeader (source contract)', () => {
     '.inventory-detail-total',
     '.inventory-chip',
     '.inventory-detail-section',
+    // The bulk section's eyebrow, the leaf's one consumer since both bodies draw `Kicker`.
     '.inventory-detail-section-title',
     '.inventory-detail-row-name',
   ];
 
   // A scoped rule OPENING a block — `.x {` or `.x,` — as opposed to a mere mention
-  // inside a longer modifier (`.inventory-chip-role {`) or a comment. Matched by
+  // inside a longer modifier (`.inventory-chip-qty {`) or a comment. Matched by
   // exact line rather than a regex: the escaping needed to build one of these
   // selectors into a pattern is exactly how this assertion silently stops matching
   // anything and reads green forever.
@@ -3853,34 +3962,37 @@ describe('Inventory primitive adoption (issue 1514)', () => {
     assert.deepEqual(chosen, ['tools'], 'choosing a segment reaches setFilter with its value');
   });
 
-  it('draws a source portrait as the shared square Avatar, with initials as its fallback', async () => {
-    const { services } = makeServices(makeItem());
+  it('draws a source as the 22px record tile, its glyph standing in for a missing portrait', async () => {
+    const item = makeItem();
+    item.sources[1] = { ...item.sources[1], actorImg: 'icons/chest.webp' };
+    const { services } = makeServices(item);
     const target = await harness.mount({ services });
     await settle();
 
-    const portrait = target.querySelector('.inventory-detail-row [data-avatar]');
-    assert.ok(Boolean(portrait), 'the raw <img>/<i> pair is the shared portrait now');
+    const rows = [
+      ...target.querySelectorAll(':scope [data-inventory-section="sources"] [data-list-row]'),
+    ];
+    assert.deepEqual(
+      rows.map((row) => row.getAttribute('data-inventory-source')),
+      ['a1', 'a2'],
+      'each row carries its actor id as its hook'
+    );
+    const [glyph, portrait] = rows.map((row) => row.querySelector('.fab-medallion'));
+    assert.equal(glyph.style.width, '22px', 'the dense row has no 32px portrait rung');
+    assert.equal(glyph.getAttribute('data-medallion'), 'glyph');
     assert.ok(
-      portrait.classList.contains('is-square'),
-      '`shape` is MANDATORY here: the component defaults to `round`, which draws 999px where ' +
-        'this well has always drawn a rounded square'
+      Boolean(glyph.querySelector('i.fas.fa-user')),
+      'an actor with no image draws the glyph'
     );
-    assert.match(
-      portrait.getAttribute('style').replaceAll(' ', ''),
-      /width:32px;height:32px/u,
-      'at the portrait ladder`s single 32px mark'
+    assert.ok(
+      !target.querySelector(':scope [data-inventory-section="sources"] [data-avatar]'),
+      'no initials'
     );
+    assert.equal(portrait.querySelector('img')?.getAttribute('src'), 'icons/chest.webp');
     assert.equal(
-      portrait.getAttribute('data-avatar'),
-      'initials',
-      'the fixture actor carries no image, and the no-artwork state is INITIALS now rather ' +
-        'than the `fa-user` glyph this markup drew: a content change, and the one the phase ' +
-        'frames record'
-    );
-    assert.equal(
-      portrait.querySelector('.fab-avatar-initials').textContent.trim(),
-      'AK',
-      'and the mark is the actor own name'
+      rows[0].querySelector('.fabricate-list-row-quantity').textContent,
+      '×2',
+      'the held count is the row quantity'
     );
   });
 
@@ -4112,7 +4224,7 @@ describe('Inventory primitive adoption (issue 1514)', () => {
     );
   });
 
-  it('leaves the shell section-eyebrow family hand-rolled, one consumer laying out children', () => {
+  it('leaves the shell section-eyebrow leaf to the one consumer laying out children', () => {
     const shell = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte'),
       'utf8'
@@ -4123,7 +4235,8 @@ describe('Inventory primitive adoption (issue 1514)', () => {
     );
     assert.ok(
       shell.includes(':global(:where(.inventory-detail) .inventory-detail-section-title)'),
-      'the published family survives, and converts together or not at all'
+      'the published family survives for its one remaining consumer, the bulk section, whose ' +
+        'eyebrow cannot convert without a wrapper of its own'
     );
     assert.match(
       section,

@@ -588,3 +588,57 @@ describe('ListRow selectable form (issue 1778)', () => {
     assert.ok(row.querySelector('.fabricate-list-row-name.site-name'), 'the site name class');
   });
 });
+
+describe('ListRow inset and detailAlign (issue 2321)', () => {
+  before(() => harness.setup());
+  afterEach(() => harness.remount());
+  after(() => harness.teardown());
+
+  /** The root's class list and attribute names for one mount. */
+  async function rootOf(props) {
+    const target = await harness.mount(props);
+    const row = target.querySelector('[data-list-row]');
+    const seen = { classes: [...row.classList], attributes: row.getAttributeNames() };
+    harness.remount();
+    return seen;
+  }
+
+  it('writes is-row-inset only on a dense selectable form given `inset="row"`', async () => {
+    const open = () => {};
+    const cases = [
+      ['the default', { name: 'Idol', onOpen: open }, false],
+      ['a dense form', { name: 'Idol', onOpen: open, inset: 'row' }, true],
+      ['a dense row with no form prop', { name: 'Idol', inset: 'row' }, false],
+      [
+        'the default density',
+        { name: 'Idol', onOpen: open, density: 'default', inset: 'row' },
+        false,
+      ],
+      ['the card layout', { name: 'Idol', onOpen: open, layout: 'card', inset: 'row' }, false],
+    ];
+    const seen = [];
+    for (const [label, props] of cases) {
+      const { classes, attributes } = await rootOf(props);
+      seen.push([label, classes.includes('is-row-inset')]);
+      assert.ok(!attributes.includes('inset'), `${label}: the prop never reaches the root`);
+    }
+    assert.deepEqual(
+      seen,
+      cases.map(([label, , expected]) => [label, expected])
+    );
+  });
+
+  it('writes is-detail-end for `detailAlign="end"` alone', async () => {
+    const end = await rootOf({ name: 'Idol', detail: 'Recipe', detailAlign: 'end' });
+    const start = await rootOf({ name: 'Idol', detail: 'Recipe' });
+    assert.ok(end.classes.includes('is-detail-end'));
+    assert.ok(!start.classes.includes('is-detail-end'), 'the default keeps the detail column');
+    assert.ok(!end.attributes.includes('detailalign'), 'the prop never reaches the root');
+  });
+
+  it('keeps inset and detailAlign out of the byte-pinned DENSE_MATRIX, so the markup pin covers their absent defaults', () => {
+    for (const [label, props] of DENSE_MATRIX) {
+      assert.ok(!('inset' in props) && !('detailAlign' in props), label);
+    }
+  });
+});

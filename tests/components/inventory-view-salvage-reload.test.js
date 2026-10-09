@@ -99,6 +99,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     // The Info | Salvage strip (issue 1518).
     'src/ui/svelte/components/EditorTabs.svelte',
+    // The inspector's cross-reference lists (issue 2321).
+    'src/ui/svelte/components/XrefList.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     // The bulk tree (issue 859). `InventoryView` renders the panel as a SIBLING of

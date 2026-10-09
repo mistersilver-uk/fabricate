@@ -2359,10 +2359,10 @@ test('no new art tile renders at an off-ladder size', (t) => {
         'that kind against is matching nothing and every site would be recorded as debt'
     );
   }
-  // Per kind, near the tree's 72 Medallion and 5 Avatar sites.
+  // Per kind, near the tree's 66 Medallion and 4 Avatar sites.
   for (const [kind, floor] of [
-    ['art', 68],
-    ['portrait', 4],
+    ['art', 62],
+    ['portrait', 3],
   ]) {
     const scanned = sites.filter((site) => site.kind === kind).length;
     assertFloor(`off-ladder ${kind}-tile sizes`, scanned, floor);
